@@ -10,6 +10,7 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Prisma Migrate should use a direct DB connection when available.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });

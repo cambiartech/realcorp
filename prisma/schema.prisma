@@ -12,17 +12,17 @@ datasource db {
 // ——— Auth.js (Prisma adapter) ———
 
 model User {
-  id               String    @id @default(cuid())
-  name             String?
-  email            String?   @unique
-  emailVerified    DateTime?
-  image            String?
-  passwordHash     String?
-  isPlatformAdmin  Boolean   @default(false)
+  id              String    @id @default(cuid())
+  name            String?
+  email           String?   @unique
+  emailVerified   DateTime?
+  image           String?
+  passwordHash    String?
+  isPlatformAdmin Boolean   @default(false)
 
-  accounts    Account[]
-  sessions    Session[]
-  memberships Membership[]
+  accounts             Account[]
+  sessions             Session[]
+  memberships          Membership[]
   dashboardPreferences DashboardPreference[]
 }
 
@@ -79,62 +79,62 @@ enum TenantPlan {
 }
 
 model Tenant {
-  id               String       @id @default(cuid())
-  name             String
-  slug             String       @unique
-  status           TenantStatus @default(PROVISIONING)
-  plan             TenantPlan   @default(GROWTH)
-  defaultCurrency  String       @default("NGN")
-  defaultTimezone  String       @default("Africa/Lagos")
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  name            String
+  slug            String       @unique
+  status          TenantStatus @default(PROVISIONING)
+  plan            TenantPlan   @default(GROWTH)
+  defaultCurrency String       @default("NGN")
+  defaultTimezone String       @default("Africa/Lagos")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  settings    TenantSettings?
-  memberships Membership[]
-  invitations Invitation[]
-  pricingPlans ProjectPricingPlan[]
-  projects    Project[]
-  leads       Lead[]
-  deals       Deal[]
-  invoices    Invoice[]
-  payments    PaymentRecord[]
-  auditLogs   AuditLog[]
-  goals       TenantGoal[]
+  settings             TenantSettings?
+  memberships          Membership[]
+  invitations          Invitation[]
+  pricingPlans         ProjectPricingPlan[]
+  projects             Project[]
+  leads                Lead[]
+  deals                Deal[]
+  invoices             Invoice[]
+  payments             PaymentRecord[]
+  auditLogs            AuditLog[]
+  goals                TenantGoal[]
   dashboardPreferences DashboardPreference[]
-  campaigns   Campaign[]
-  realtorPartners RealtorPartner[]
+  campaigns            Campaign[]
+  realtorPartners      RealtorPartner[]
 }
 
 model TenantSettings {
-  id                    String  @id @default(cuid())
-  tenantId              String  @unique
-  monthlyRevenueTarget  Decimal? @db.Decimal(18, 2)
-  pipelineTarget        Decimal? @db.Decimal(18, 2)
-  logoUrl               String?
-  primaryColor          String?
-  accentColor           String?
-  moduleSales           Boolean @default(true)
-  moduleFinance         Boolean @default(true)
-  moduleMarketing       Boolean @default(true)
-  moduleCommunity     Boolean @default(true)
-  moduleRealtorPortal   Boolean @default(true)
+  id                   String   @id @default(cuid())
+  tenantId             String   @unique
+  monthlyRevenueTarget Decimal? @db.Decimal(18, 2)
+  pipelineTarget       Decimal? @db.Decimal(18, 2)
+  logoUrl              String?
+  primaryColor         String?
+  accentColor          String?
+  moduleSales          Boolean  @default(true)
+  moduleFinance        Boolean  @default(true)
+  moduleMarketing      Boolean  @default(true)
+  moduleCommunity      Boolean  @default(true)
+  moduleRealtorPortal  Boolean  @default(true)
   /// Extra nav modules per role beyond defaults, e.g. { "SALES_EXECUTIVE": ["MARKETING","FINANCE"] }
-  roleModuleGrants      Json?
+  roleModuleGrants     Json?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model TenantGoal {
-  id             String   @id @default(cuid())
-  tenantId       String
-  label          String
+  id              String   @id @default(cuid())
+  tenantId        String
+  label           String
   fiscalYearStart DateTime
   fiscalYearEnd   DateTime
-  revenueTarget  Decimal? @db.Decimal(18, 2)
-  pipelineTarget Decimal? @db.Decimal(18, 2)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  revenueTarget   Decimal? @db.Decimal(18, 2)
+  pipelineTarget  Decimal? @db.Decimal(18, 2)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -142,13 +142,13 @@ model TenantGoal {
 }
 
 model DashboardPreference {
-  id         String   @id @default(cuid())
-  tenantId   String
-  userId     String
-  roleView   String?
+  id           String   @id @default(cuid())
+  tenantId     String
+  userId       String
+  roleView     String?
   widgetConfig Json?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -191,14 +191,14 @@ model Membership {
 }
 
 model Invitation {
-  id         String           @id @default(cuid())
+  id         String         @id @default(cuid())
   tenantId   String
   email      String
   role       MembershipRole
-  token      String           @unique
+  token      String         @unique
   expiresAt  DateTime
   acceptedAt DateTime?
-  createdAt  DateTime         @default(now())
+  createdAt  DateTime       @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -224,7 +224,7 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   units        Unit[]
   pricingPlans ProjectPricingPlan[]
 
@@ -254,17 +254,17 @@ model ProjectPricingPlan {
 }
 
 model Unit {
-  id        String     @id @default(cuid())
-  tenantId  String
-  projectId String
+  id            String     @id @default(cuid())
+  tenantId      String
+  projectId     String
   pricingPlanId String?
-  label     String
-  unitType  String?
-  status    UnitStatus @default(AVAILABLE)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  label         String
+  unitType      String?
+  status        UnitStatus @default(AVAILABLE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pricingPlan ProjectPricingPlan? @relation(fields: [pricingPlanId], references: [id], onDelete: SetNull)
   deal        Deal?
 
@@ -327,25 +327,25 @@ model RealtorPartner {
 }
 
 model Lead {
-  id              String      @id @default(cuid())
-  tenantId        String
-  assignedUserId  String?
-  source          String?
-  campaignName    String?
-  campaignId      String?
-  utmSource       String?
-  utmMedium       String?
-  utmCampaign     String?
-  utmContent      String?
+  id               String      @id @default(cuid())
+  tenantId         String
+  assignedUserId   String?
+  source           String?
+  campaignName     String?
+  campaignId       String?
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
   realtorPartnerId String?
-  projectInterest String?
-  budgetRange     String?
-  quality         LeadQuality @default(WARM)
-  name            String?
-  email           String?
-  phone           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  projectInterest  String?
+  budgetRange      String?
+  quality          LeadQuality @default(WARM)
+  name             String?
+  email            String?
+  phone            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaign       Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
@@ -375,24 +375,24 @@ enum FinanceReviewDecision {
 }
 
 model Deal {
-  id             String     @id @default(cuid())
-  tenantId       String
-  leadId         String?
-  unitId         String?    @unique
-  assignedUserId String?
-  stage          DealStage  @default(NEW_LEAD)
-  value          Decimal?   @db.Decimal(18, 2)
-  pendingFinance Boolean    @default(false)
-  financeDecision        FinanceReviewDecision?
-  financeReviewedAt      DateTime?
+  id                      String                 @id @default(cuid())
+  tenantId                String
+  leadId                  String?
+  unitId                  String?                @unique
+  assignedUserId          String?
+  stage                   DealStage              @default(NEW_LEAD)
+  value                   Decimal?               @db.Decimal(18, 2)
+  pendingFinance          Boolean                @default(false)
+  financeDecision         FinanceReviewDecision?
+  financeReviewedAt       DateTime?
   financeReviewedByUserId String?
-  financeReviewedByLabel String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  financeReviewedByLabel  String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lead   Lead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  unit   Unit?  @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
   invoices Invoice[]
 
   @@index([tenantId])
@@ -408,21 +408,21 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id                   String       @id @default(cuid())
-  tenantId             String
-  dealId               String?
-  invoiceNumber        String
-  title                String
-  status               InvoiceStatus @default(SENT)
-  amount               Decimal      @db.Decimal(18, 2)
-  balanceDue           Decimal      @db.Decimal(18, 2)
-  currency             String       @default("NGN")
-  dueDate              DateTime?
-  issuedAt             DateTime     @default(now())
-  createdByUserId      String?
-  createdByLabel       String?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  id              String        @id @default(cuid())
+  tenantId        String
+  dealId          String?
+  invoiceNumber   String
+  title           String
+  status          InvoiceStatus @default(SENT)
+  amount          Decimal       @db.Decimal(18, 2)
+  balanceDue      Decimal       @db.Decimal(18, 2)
+  currency        String        @default("NGN")
+  dueDate         DateTime?
+  issuedAt        DateTime      @default(now())
+  createdByUserId String?
+  createdByLabel  String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   deal     Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
@@ -434,18 +434,18 @@ model Invoice {
 }
 
 model PaymentRecord {
-  id                String   @id @default(cuid())
-  tenantId          String
-  invoiceId         String
-  amount            Decimal  @db.Decimal(18, 2)
-  currency          String   @default("NGN")
-  paidAt            DateTime
-  method            String?
-  reference         String?
-  note              String?
-  recordedByUserId  String?
-  recordedByLabel   String?
-  createdAt         DateTime @default(now())
+  id               String   @id @default(cuid())
+  tenantId         String
+  invoiceId        String
+  amount           Decimal  @db.Decimal(18, 2)
+  currency         String   @default("NGN")
+  paidAt           DateTime
+  method           String?
+  reference        String?
+  note             String?
+  recordedByUserId String?
+  recordedByLabel  String?
+  createdAt        DateTime @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -455,17 +455,17 @@ model PaymentRecord {
 }
 
 model AuditLog {
-  id           String   @id @default(cuid())
-  tenantId     String
-  actorUserId  String?
-  actorLabel   String?
-  module       String
-  entityType   String
-  entityId     String?
-  action       String
-  summary      String?
-  metadata     Json?
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  tenantId    String
+  actorUserId String?
+  actorLabel  String?
+  module      String
+  entityType  String
+  entityId    String?
+  action      String
+  summary     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

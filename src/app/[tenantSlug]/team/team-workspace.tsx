@@ -83,19 +83,6 @@ export function TeamWorkspace({
         </p>
       ) : null}
 
-      <div className="mt-4 rounded-lg border border-dashed border-foreground/20 bg-foreground/[0.02] px-4 py-3 text-xs text-muted">
-        <p className="font-medium text-foreground">One job role per person</p>
-        <p className="mt-1 leading-relaxed">
-          Each member appears once and has a single <strong className="font-medium text-foreground/85">Job role</strong> (Finance manager, Sales manager, etc.). The app does{" "}
-          <strong className="font-medium text-foreground/85">not</strong> support two roles on the same login—e.g. Finance manager and Sales manager together. Someone who covers both
-          areas should use the role that matches their <strong className="font-medium text-foreground/85">main</strong> responsibilities, or{" "}
-          <strong className="font-medium text-foreground/85">Org admin</strong> if they need the combined powers of both.{" "}
-          <span className="text-foreground/70">
-            Settings → Modules can add extra <em>sidebar</em> areas (Marketing, Community, Finance) for a role, but it does not merge manager-level permissions from two job roles.
-          </span>
-        </p>
-      </div>
-
       <div className="mt-6 border-b border-foreground/10">
         <div className="flex gap-5">
           <TabButton

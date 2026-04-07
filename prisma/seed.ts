@@ -14,9 +14,9 @@ import {
 } from "../src/generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!connectionString) {
-  throw new Error("DATABASE_URL is required for seeding");
+  throw new Error("DIRECT_URL or DATABASE_URL is required for seeding");
 }
 
 const prisma = new PrismaClient({

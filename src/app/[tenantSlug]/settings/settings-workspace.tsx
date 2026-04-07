@@ -269,10 +269,6 @@ export function SettingsWorkspace({
         {tab === "modules" && canManageOrg ? (
           <div id="settings-panel-modules" role="tabpanel" aria-labelledby="settings-tab-modules">
             <h2 className="text-sm font-semibold text-foreground">Modules & access</h2>
-            <p className="mt-1 text-xs text-muted">
-              First choose which modules exist for your organization. Then tick which <strong className="font-medium text-foreground/90">extra</strong> areas
-              each role can open in the sidebar (for example, let sales see Marketing).
-            </p>
             <p className="mt-2 text-xs text-muted">
               <strong className="font-medium text-foreground/90">Job roles</strong> (Org admin, Marketing manager, Sales executive, etc.) are set on{" "}
               <Link
@@ -314,32 +310,6 @@ export function SettingsWorkspace({
                 <p className="mt-1 text-xs text-muted">
                   Always has the full sidebar for every module you enable above. No checkboxes needed.
                 </p>
-              </div>
-
-              <div className="rounded-lg border border-dashed border-foreground/20 bg-background px-4 py-3">
-                <p className="text-sm font-semibold text-foreground">How CRM, Team, and this grid work together</p>
-                <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs text-muted">
-                  <li>
-                    <span className="font-medium text-foreground/90">Sales (org-wide)</span> — The <strong className="text-foreground/90">Sales</strong> checkbox
-                    under Organization modules must be on for anyone to use CRM pages. Turning it off hides Dashboard, Projects, Leads, and Deals for the whole
-                    tenant.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground/90">Sales (per role)</span> — The <strong className="text-foreground/90">Sales</strong> column in
-                    the grid adds the full CRM strip (dashboard, projects, leads, deals) for roles that don&apos;t already have all of them—e.g. give a{" "}
-                    <strong className="text-foreground/90">Community manager</strong> CRM access, or add <strong className="text-foreground/90">Deals</strong> for a{" "}
-                    <strong className="text-foreground/90">Marketing manager</strong> who already has projects and leads.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground/90">Team</span> — The <strong className="text-foreground/90">Team</strong> sidebar item and
-                    members page are only for <strong className="text-foreground/90">organization admins</strong> (and platform admins). It is not in the grid
-                    below.
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground/90">Settings</span> — Still in everyone&apos;s sidebar for their own profile and (when allowed)
-                    organization settings.
-                  </li>
-                </ul>
               </div>
 
               <div>
