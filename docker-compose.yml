@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: realcorp
+      POSTGRES_PASSWORD: realcorp
+      POSTGRES_DB: realcorp
+    volumes:
+      - realcorp_pg:/var/lib/postgresql/data
+
+volumes:
+  realcorp_pg:

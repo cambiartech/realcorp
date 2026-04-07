@@ -1,0 +1,8 @@
+# Set "Base directory" in Netlify to `realcorp` if the repo root is the parent folder.
+# Add DATABASE_URL (and AUTH_SECRET, etc.) in Site settings → Environment variables.
+
+[build]
+  command = "npx prisma migrate deploy && npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"

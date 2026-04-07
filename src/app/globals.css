@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
+/*
+ * Realcorp design tokens (single source of truth)
+ * — background / foreground / muted / field: base UI
+ * — error: validation & destructive messages (always use text-error + FormAlert/FormFieldError)
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0a0a0a;
+  --muted: #737373;
+  --border-subtle: rgba(0, 0, 0, 0.12);
+  --field: #f4f4f5;
+  /* Form / validation errors — use text-error, FormAlert, FormFieldError only */
+  --error: #b91c1c;
+  --error-bg: rgba(185, 28, 28, 0.08);
+  --error-border: rgba(185, 28, 28, 0.38);
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #fafafa;
+  --muted: #a3a3a3;
+  --border-subtle: rgba(255, 255, 255, 0.14);
+  --field: #0a0a0a;
+  --error: #f87171;
+  --error-bg: rgba(248, 113, 113, 0.12);
+  --error-border: rgba(248, 113, 113, 0.42);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-field: var(--field);
+  --color-error: var(--error);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  min-height: 100dvh;
 }
 
 body {
+  min-height: 100dvh;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+@keyframes rc-toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes rc-toast-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0) scale(0.98);
+  }
 }
