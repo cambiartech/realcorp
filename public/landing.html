@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#0E1116" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#F4F1E8" media="(prefers-color-scheme: light)" />
+
+  <!-- ── Primary SEO ─────────────────────────────────────────────── -->
+  <title>Realcorp · ERP for property developers</title>
+  <meta name="description" content="Realcorp is the operating system for property developers. Sales CRM, project inventory, milestone payments, and HR — connected on a single ledger of record." />
+  <meta name="keywords" content="property developer ERP, real estate CRM, milestone payments, project inventory, property sales pipeline, real estate finance software, real estate HR" />
+  <meta name="author" content="Realcorp, Inc." />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <link rel="canonical" href="https://realcorp.com/" />
+
+  <!-- ── Open Graph & Twitter ────────────────────────────────────── -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Realcorp · ERP for property developers" />
+  <meta property="og:description" content="Sales CRM, project inventory, milestone payments, and HR — connected on a single ledger of record. Built for the way real corporations actually run." />
+  <meta property="og:url" content="https://realcorp.com/" />
+  <meta property="og:site_name" content="Realcorp" />
+  <meta property="og:image" content="https://realcorp.com/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Realcorp Nexus mark — a node-matrix R rendered in heritage gold on midnight." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Realcorp · ERP for property developers" />
+  <meta name="twitter:description" content="The operating system for property developers. Sales, inventory, finance, and HR — connected on one ledger of record." />
+  <meta name="twitter:image" content="https://realcorp.com/og.png" />
+
+  <!-- ── Favicon (inline SVG; theme-reactive via currentColor) ──── -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230E1116'/><g fill='%23ECE7DD'><circle cx='14' cy='14' r='3'/><circle cx='26' cy='14' r='3'/><circle cx='38' cy='14' r='3'/><circle cx='50' cy='14' r='3'/><circle cx='14' cy='26' r='3'/><circle cx='50' cy='26' r='3'/><circle cx='14' cy='38' r='3'/><circle cx='26' cy='38' r='3'/><circle cx='38' cy='38' r='3'/><circle cx='50' cy='38' r='3'/><circle cx='14' cy='50' r='3'/><circle cx='38' cy='50' r='3'/><circle cx='14' cy='62' r='3'/><circle cx='50' cy='62' r='3'/><circle cx='14' cy='74' r='3'/><circle cx='62' cy='74' r='3'/><circle cx='14' cy='86' r='3'/><circle cx='74' cy='86' r='3'/></g><circle cx='14' cy='38' r='4' fill='%23B08D57'/></svg>" />
+
+  <!-- ── Fonts ──────────────────────────────────────────────────── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+
+  <!-- ── Structured data ────────────────────────────────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Realcorp",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "Enterprise resource planning for property developers — sales CRM, project inventory, milestone payments, and HR on one connected platform.",
+    "url": "https://realcorp.com/",
+    "publisher": { "@type": "Organization", "name": "Realcorp, Inc." },
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "category": "Subscription" }
+  }
+  </script>
+
+  <style>
+    /* ── Tokens ─────────────────────────────────────────────────── */
+    :root {
+      --midnight:  #0E1116;
+      --bone:      #ECE7DD;
+      --paper:     #F4F1E8;
+      --steel:     #4B5563;
+      --gold:      #B08D57;
+      --gold-soft: #C9A878;
+
+      /* Light theme defaults */
+      --bg:       var(--paper);
+      --surface:  #FFFFFF;
+      --fg:       var(--midnight);
+      --fg-muted: rgba(14,17,22,0.62);
+      --fg-dim:   rgba(14,17,22,0.42);
+      --line:     rgba(14,17,22,0.10);
+      --line-strong: rgba(14,17,22,0.18);
+      --accent:   var(--gold);
+      --hover:    rgba(14,17,22,0.04);
+
+      --font-display: 'Newsreader', 'Times New Roman', Georgia, serif;
+      --font-body:    'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono:    'JetBrains Mono', ui-monospace, 'Menlo', monospace;
+
+      --content-w: 1240px;
+      --gutter: clamp(20px, 4vw, 56px);
+      --section-y: clamp(72px, 9vw, 128px);
+    }
+    /* prefers-color-scheme default; only kicks in when data-theme=auto */
+    @media (prefers-color-scheme: dark) {
+      [data-theme="auto"] {
+        --bg:       var(--midnight);
+        --surface:  #15181F;
+        --fg:       var(--bone);
+        --fg-muted: rgba(236,231,221,0.62);
+        --fg-dim:   rgba(236,231,221,0.42);
+        --line:     rgba(236,231,221,0.10);
+        --line-strong: rgba(236,231,221,0.18);
+        --hover:    rgba(236,231,221,0.05);
+      }
+    }
+    [data-theme="dark"] {
+      --bg:       var(--midnight);
+      --surface:  #15181F;
+      --fg:       var(--bone);
+      --fg-muted: rgba(236,231,221,0.62);
+      --fg-dim:   rgba(236,231,221,0.42);
+      --line:     rgba(236,231,221,0.10);
+      --line-strong: rgba(236,231,221,0.18);
+      --hover:    rgba(236,231,221,0.05);
+    }
+
+    /* ── Base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); font-weight: 400; font-size: 16px;
+      line-height: 1.6; -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      transition: background-color .2s ease, color .2s ease;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    ::selection { background: var(--accent); color: var(--midnight); }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .container { max-width: var(--content-w); margin: 0 auto; padding: 0 var(--gutter); }
+    .section { padding: var(--section-y) 0; }
+    .rule { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+    /* ── Typography ─────────────────────────────────────────────── */
+    .eyebrow {
+      font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--fg-muted); font-weight: 500;
+      display: inline-flex; align-items: center; gap: 10px;
+    }
+    .eyebrow::before {
+      content: ''; display: inline-block; width: 14px; height: 1px; background: var(--accent);
+    }
+    h1.display {
+      font-family: var(--font-display); font-weight: 400;
+      font-size: clamp(44px, 7vw, 88px); line-height: 0.98; letter-spacing: -0.022em;
+      margin: 18px 0 24px; text-wrap: balance;
+    }
+    h1.display em { font-style: italic; color: var(--accent); font-weight: 400; }
+    h2.headline {
+      font-family: var(--font-display); font-weight: 400;
+      font-size: clamp(32px, 4.4vw, 52px); line-height: 1.02; letter-spacing: -0.02em;
+      margin: 12px 0 16px; text-wrap: balance;
+    }
+    h3 {
+      font-family: var(--font-body); font-weight: 600;
+      font-size: 18px; line-height: 1.3; margin: 0 0 8px; letter-spacing: -0.005em;
+    }
+    p.lede {
+      font-family: var(--font-display); font-size: clamp(17px, 1.5vw, 21px);
+      line-height: 1.55; color: var(--fg-muted); max-width: 56ch; margin: 0;
+      text-wrap: pretty;
+    }
+    p.body { font-size: 15.5px; line-height: 1.6; color: var(--fg-muted); margin: 0; text-wrap: pretty; }
+
+    /* ── Buttons ────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 13px 22px; font-family: var(--font-body); font-size: 14.5px;
+      font-weight: 500; letter-spacing: -0.005em;
+      border: 1px solid transparent; border-radius: 2px; cursor: pointer;
+      transition: all .14s ease; white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--fg); color: var(--bg);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(14,17,22,0.18); }
+    .btn-ghost {
+      background: transparent; color: var(--fg); border-color: var(--line-strong);
+    }
+    .btn-ghost:hover { background: var(--hover); border-color: var(--fg); }
+    .btn-link {
+      color: var(--fg); padding: 0; background: transparent; border: 0;
+      font-weight: 500; font-size: 14.5px; display: inline-flex; align-items: center; gap: 6px;
+      border-bottom: 1px solid transparent; padding-bottom: 2px;
+    }
+    .btn-link:hover { border-bottom-color: var(--accent); color: var(--accent); }
+    .btn .arrow { transition: transform .15s ease; }
+    .btn:hover .arrow { transform: translateX(3px); }
+
+    /* ── Mark ───────────────────────────────────────────────────── */
+    .mark { color: var(--fg); }
+    .mark .dim    { fill: currentColor; opacity: 0.18; }
+    .mark .ink    { fill: currentColor; }
+    .mark .line-s { stroke: currentColor; fill: none; stroke-width: 1.1; stroke-linecap: square; }
+    .mark .accent { fill: var(--accent); }
+    .mark .accent-ring { fill: none; stroke: var(--accent); stroke-width: 1; }
+    .lockup {
+      display: inline-flex; align-items: center; gap: 12px;
+      font-family: var(--font-display); font-weight: 500;
+      font-size: 22px; letter-spacing: -0.012em; line-height: 1;
+      color: var(--fg);
+    }
+
+    /* ── Nav ────────────────────────────────────────────────────── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s ease, background-color .2s ease;
+    }
+    .nav.scrolled { border-bottom-color: var(--line); }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0; gap: 24px;
+    }
+    .nav-links {
+      display: flex; align-items: center; gap: 28px;
+      font-size: 14.5px; color: var(--fg-muted);
+    }
+    .nav-links a { transition: color .12s; }
+    .nav-links a:hover { color: var(--fg); }
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
+    .nav-toggle, .nav-menu-btn {
+      width: 36px; height: 36px; display: inline-grid; place-items: center;
+      background: transparent; color: var(--fg-muted); border: 1px solid var(--line);
+      border-radius: 2px; transition: all .12s;
+    }
+    .nav-toggle:hover, .nav-menu-btn:hover { color: var(--fg); border-color: var(--line-strong); }
+    .nav-menu-btn { display: none; }
+    @media (max-width: 880px) {
+      .nav-links { display: none; }
+      .nav-menu-btn { display: inline-grid; }
+      .nav-cta .btn { display: none; }
+    }
+
+    /* ── Hero ───────────────────────────────────────────────────── */
+    .hero { position: relative; padding: clamp(64px, 9vw, 128px) 0 clamp(40px, 6vw, 80px); overflow: hidden; }
+    .hero-grid {
+      display: grid; grid-template-columns: 1.15fr 1fr; gap: 48px; align-items: center;
+    }
+    @media (max-width: 920px) { .hero-grid { grid-template-columns: 1fr; gap: 32px; } }
+    .hero-cta { display: flex; gap: 14px; align-items: center; margin-top: 32px; flex-wrap: wrap; }
+    .hero-meta {
+      display: flex; gap: 28px; margin-top: 36px; padding-top: 24px;
+      border-top: 1px solid var(--line); font-family: var(--font-mono);
+      font-size: 11.5px; letter-spacing: 0.10em; text-transform: uppercase;
+      color: var(--fg-muted); flex-wrap: wrap;
+    }
+    .hero-meta strong { color: var(--fg); font-weight: 600; }
+    .hero-visual {
+      position: relative; aspect-ratio: 1 / 1; max-width: 480px;
+      justify-self: end; display: grid; place-items: center;
+    }
+    @media (max-width: 920px) { .hero-visual { justify-self: center; max-width: 360px; } }
+    .hero-visual .mark { width: 70%; height: auto; position: relative; z-index: 2; }
+    .hero-visual::before {
+      content: ''; position: absolute; inset: 0;
+      background-image:
+        radial-gradient(circle, var(--fg) 1px, transparent 1.4px);
+      background-size: 18px 18px;
+      opacity: 0.10;
+      mask-image: radial-gradient(circle at center, black 0%, transparent 75%);
+      -webkit-mask-image: radial-gradient(circle at center, black 0%, transparent 75%);
+    }
+
+    /* Subtle dot background under entire hero band */
+    .hero::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background-image: radial-gradient(circle, var(--fg) 1px, transparent 1.4px);
+      background-size: 28px 28px; opacity: 0.04;
+    }
+    .hero > .container { position: relative; z-index: 1; }
+
+    /* ── Trust bar ──────────────────────────────────────────────── */
+    .trust {
+      padding: 36px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    }
+    .trust-inner {
+      display: flex; align-items: center; gap: 32px; flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .trust-label { font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-muted); flex-shrink: 0; }
+    .trust-logos { display: flex; gap: 40px; flex-wrap: wrap; align-items: center; }
+    .trust-logo {
+      font-family: var(--font-display); font-weight: 500; font-size: 18px;
+      letter-spacing: -0.005em; color: var(--fg-dim);
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .trust-logo .dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; opacity: 0.5; }
+
+    /* ── Feature grid ───────────────────────────────────────────── */
+    .features-head { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: end; margin-bottom: 56px; }
+    @media (max-width: 880px) { .features-head { grid-template-columns: 1fr; gap: 16px; } }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid var(--line); border-left: 1px solid var(--line);
+    }
+    @media (max-width: 920px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .features-grid { grid-template-columns: 1fr; } }
+    .feature {
+      padding: 32px 28px 28px;
+      border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      display: flex; flex-direction: column; gap: 14px;
+      transition: background-color .15s;
+    }
+    .feature:hover { background: var(--hover); }
+    .feature-icon {
+      width: 36px; height: 36px; color: var(--accent);
+      display: grid; place-items: center;
+    }
+    .feature-icon svg { width: 26px; height: 26px; }
+    .feature .num {
+      font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--fg-dim);
+    }
+    .feature ul {
+      list-style: none; padding: 0; margin: 6px 0 0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .feature li {
+      font-size: 13.5px; color: var(--fg-muted); line-height: 1.45;
+      padding-left: 14px; position: relative;
+    }
+    .feature li::before {
+      content: ''; position: absolute; left: 0; top: 9px;
+      width: 6px; height: 1px; background: var(--accent);
+    }
+
+    /* ── How it works ───────────────────────────────────────────── */
+    .steps {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+      counter-reset: step;
+    }
+    @media (max-width: 880px) { .steps { grid-template-columns: 1fr; } }
+    .step {
+      counter-increment: step;
+      padding: 36px 32px; background: var(--surface);
+      border: 1px solid var(--line);
+      position: relative; display: flex; flex-direction: column; gap: 14px;
+    }
+    .step .num {
+      font-family: var(--font-display); font-weight: 400; font-style: italic;
+      font-size: 48px; line-height: 1; color: var(--accent);
+    }
+    .step .num::before { content: counter(step, decimal-leading-zero); }
+    .step h3 { font-size: 20px; }
+
+    /* ── Split / dark band ──────────────────────────────────────── */
+    .split {
+      background: var(--midnight); color: var(--bone);
+      padding: clamp(80px, 10vw, 140px) 0;
+    }
+    .split .eyebrow { color: rgba(236,231,221,0.55); }
+    .split .eyebrow::before { background: var(--gold); }
+    .split-inner {
+      display: grid; grid-template-columns: 1fr 1.2fr; gap: 64px; align-items: center;
+    }
+    @media (max-width: 920px) { .split-inner { grid-template-columns: 1fr; gap: 32px; } }
+    .split .mark { width: 140px; color: var(--bone); }
+    .split h2 {
+      font-family: var(--font-display); font-weight: 400;
+      font-size: clamp(36px, 4.6vw, 58px); line-height: 1.02; letter-spacing: -0.022em;
+      color: var(--bone); margin: 12px 0 0;
+    }
+    .split h2 em { font-style: italic; color: var(--gold); }
+    .split .quote-cite {
+      font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: rgba(236,231,221,0.55); margin-top: 24px;
+    }
+    .stat-row {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 56px;
+      padding-top: 32px; border-top: 1px solid rgba(236,231,221,0.18);
+    }
+    @media (max-width: 720px) { .stat-row { grid-template-columns: 1fr 1fr; gap: 24px; } }
+    .stat .v {
+      font-family: var(--font-display); font-weight: 400; font-size: 44px;
+      line-height: 1; letter-spacing: -0.02em; color: var(--bone);
+    }
+    .stat .k {
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: rgba(236,231,221,0.55); margin-top: 8px;
+    }
+
+    /* ── Final CTA ──────────────────────────────────────────────── */
+    .cta-block {
+      padding: clamp(64px, 8vw, 112px) 0;
+      text-align: center;
+    }
+    .cta-block .container { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+
+    /* ── Footer ─────────────────────────────────────────────────── */
+    footer {
+      padding: 56px 0 32px; border-top: 1px solid var(--line);
+      font-size: 14px;
+    }
+    .footer-grid {
+      display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 720px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+    .footer-col h4 {
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--fg-muted); font-weight: 500;
+      margin: 0 0 14px;
+    }
+    .footer-col ul { list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 8px; }
+    .footer-col a { color: var(--fg-muted); transition: color .12s; }
+    .footer-col a:hover { color: var(--fg); }
+    .footer-bottom {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 24px; border-top: 1px solid var(--line);
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--fg-muted); gap: 16px; flex-wrap: wrap;
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── REUSABLE MARK SYMBOL (defined once, referenced via <use>) ── -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="rc-mark" viewBox="0 0 100 100">
+      <!-- Background open nodes (dim) -->
+      <g class="dim">
+        <circle cx="14" cy="26" r="0.9"/><circle cx="14" cy="50" r="0.9"/><circle cx="14" cy="62" r="0.9"/><circle cx="14" cy="74" r="0.9"/><circle cx="14" cy="86" r="0.9"/>
+        <circle cx="26" cy="26" r="0.9"/><circle cx="26" cy="50" r="0.9"/><circle cx="26" cy="62" r="0.9"/><circle cx="26" cy="74" r="0.9"/><circle cx="26" cy="86" r="0.9"/>
+        <circle cx="38" cy="26" r="0.9"/><circle cx="38" cy="62" r="0.9"/><circle cx="38" cy="74" r="0.9"/><circle cx="38" cy="86" r="0.9"/>
+        <circle cx="50" cy="50" r="0.9"/><circle cx="50" cy="74" r="0.9"/><circle cx="50" cy="86" r="0.9"/>
+        <circle cx="62" cy="14" r="0.9"/><circle cx="62" cy="26" r="0.9"/><circle cx="62" cy="38" r="0.9"/><circle cx="62" cy="50" r="0.9"/><circle cx="62" cy="62" r="0.9"/><circle cx="62" cy="86" r="0.9"/>
+        <circle cx="74" cy="14" r="0.9"/><circle cx="74" cy="26" r="0.9"/><circle cx="74" cy="38" r="0.9"/><circle cx="74" cy="50" r="0.9"/><circle cx="74" cy="62" r="0.9"/><circle cx="74" cy="74" r="0.9"/>
+        <circle cx="86" cy="14" r="0.9"/><circle cx="86" cy="26" r="0.9"/><circle cx="86" cy="38" r="0.9"/><circle cx="86" cy="50" r="0.9"/><circle cx="86" cy="62" r="0.9"/><circle cx="86" cy="74" r="0.9"/><circle cx="86" cy="86" r="0.9"/>
+      </g>
+      <!-- Connective lines -->
+      <g class="line-s">
+        <line x1="14" y1="14" x2="26" y2="14"/><line x1="26" y1="14" x2="38" y2="14"/><line x1="38" y1="14" x2="50" y2="14"/>
+        <line x1="50" y1="14" x2="50" y2="26"/><line x1="50" y1="26" x2="50" y2="38"/>
+        <line x1="14" y1="38" x2="26" y2="38"/><line x1="26" y1="38" x2="38" y2="38"/><line x1="38" y1="38" x2="50" y2="38"/>
+        <line x1="14" y1="14" x2="14" y2="26"/><line x1="14" y1="26" x2="14" y2="38"/><line x1="14" y1="38" x2="14" y2="50"/><line x1="14" y1="50" x2="14" y2="62"/><line x1="14" y1="62" x2="14" y2="74"/><line x1="14" y1="74" x2="14" y2="86"/>
+        <line x1="14" y1="38" x2="38" y2="50"/><line x1="38" y1="50" x2="50" y2="62"/><line x1="50" y1="62" x2="62" y2="74"/><line x1="62" y1="74" x2="74" y2="86"/>
+      </g>
+      <!-- Filled nodes -->
+      <g class="ink">
+        <circle cx="14" cy="14" r="2.6"/><circle cx="26" cy="14" r="2.6"/><circle cx="38" cy="14" r="2.6"/><circle cx="50" cy="14" r="2.6"/>
+        <circle cx="14" cy="26" r="2.6"/><circle cx="50" cy="26" r="2.6"/>
+        <circle cx="26" cy="38" r="2.6"/><circle cx="38" cy="38" r="2.6"/><circle cx="50" cy="38" r="2.6"/>
+        <circle cx="14" cy="50" r="2.6"/><circle cx="38" cy="50" r="2.6"/>
+        <circle cx="14" cy="62" r="2.6"/><circle cx="50" cy="62" r="2.6"/>
+        <circle cx="14" cy="74" r="2.6"/><circle cx="62" cy="74" r="2.6"/>
+        <circle cx="14" cy="86" r="2.6"/><circle cx="74" cy="86" r="2.6"/>
+      </g>
+      <!-- Accent: bowl/leg junction -->
+      <circle class="accent" cx="14" cy="38" r="3.4"/>
+      <circle class="accent-ring" cx="14" cy="38" r="3.4"/>
+    </symbol>
+  </svg>
+
+  <!-- ── NAV ──────────────────────────────────────────────────── -->
+  <header class="nav" id="nav">
+    <div class="container nav-inner">
+      <a href="/" class="lockup" aria-label="Realcorp · home">
+        <svg class="mark" width="34" height="34" aria-hidden="true"><use href="#rc-mark"/></svg>
+        <span>Realcorp</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#product">Product</a>
+        <a href="#modules">Modules</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/signin">Sign in</a>
+      </nav>
+      <div class="nav-cta">
+        <button class="nav-toggle" id="themeToggle" aria-label="Toggle colour theme" title="Toggle theme">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+        </button>
+        <a class="btn btn-primary" href="#demo">Book a demo <span class="arrow">→</span></a>
+        <button class="nav-menu-btn" aria-label="Open menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ── HERO ────────────────────────────────────────────────── -->
+    <section class="hero" id="product">
+      <div class="container">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">ERP for real corporations</div>
+            <h1 class="display">The operating system for <em>property developers.</em></h1>
+            <p class="lede">Sales pipeline, project inventory, milestone payments, and HR — connected on a single ledger of record. Built for the way real corporations actually run.</p>
+            <div class="hero-cta">
+              <a class="btn btn-primary" href="#demo">Book a demo <span class="arrow">→</span></a>
+              <a class="btn btn-ghost" href="#how">See how it works</a>
+            </div>
+            <div class="hero-meta">
+              <span><strong>40+</strong> developers</span>
+              <span><strong>$2.1B</strong> in property sold</span>
+              <span><strong>4 countries</strong> · West Africa</span>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <svg class="mark" viewBox="0 0 100 100" aria-label="Realcorp Nexus mark"><use href="#rc-mark"/></svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TRUST ───────────────────────────────────────────────── -->
+    <section class="trust" aria-label="Customers">
+      <div class="container trust-inner">
+        <div class="trust-label">Trusted by property developers across West Africa</div>
+        <div class="trust-logos">
+          <span class="trust-logo"><span class="dot"></span>Kingsway Estates</span>
+          <span class="trust-logo"><span class="dot"></span>Marigold Group</span>
+          <span class="trust-logo"><span class="dot"></span>Lekki Heights</span>
+          <span class="trust-logo"><span class="dot"></span>Sterling Realty</span>
+          <span class="trust-logo"><span class="dot"></span>Adron Homes</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── FEATURES ───────────────────────────────────────────── -->
+    <section class="section" id="modules">
+      <div class="container">
+        <div class="features-head">
+          <div>
+            <div class="eyebrow">§ Modules</div>
+            <h2 class="headline">Six modules. One ledger.</h2>
+          </div>
+          <p class="body">Every Realcorp module reads from and writes to the same ledger of record. The pipeline closes a deal; the payment plan posts to receivables; the audit trail keeps everyone honest. No exports. No reconciliation theatre.</p>
+        </div>
+
+        <div class="features-grid">
+
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">
+              <!-- Lucide: users -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="num">01 · CRM</div>
+            <h3>Sales CRM</h3>
+            <p class="body">Capture every lead. Score them. Work the pipeline without leaving the platform.</p>
+            <ul>
+              <li>WhatsApp & Meta lead capture</li>
+              <li>Lead scoring & assignment rules</li>
+              <li>Deals, stages, activity feed</li>
+              <li>Quote-to-contract handoff</li>
+            </ul>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">
+              <!-- Lucide: building-2 -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v8h4M18 9h2a2 2 0 0 1 2 2v11h-4M10 6h4M10 10h4M10 14h4M10 18h4"/></svg>
+            </div>
+            <div class="num">02 · Inventory</div>
+            <h3>Projects & units</h3>
+            <p class="body">Every unit, every status, every locking action — tied to the deal that holds it.</p>
+            <ul>
+              <li>Project & unit inventory</li>
+              <li>Allocation, locking, releases</li>
+              <li>Shortlets module</li>
+              <li>Floor-plan & price-list links</li>
+            </ul>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">
+              <!-- Lucide: banknote -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
+            </div>
+            <div class="num">03 · Finance</div>
+            <h3>Finance</h3>
+            <p class="body">Milestone plans, receivables, bank reconciliation, vendor bills — one source of truth.</p>
+            <ul>
+              <li>Milestone payment plans</li>
+              <li>Receivables & payables</li>
+              <li>Bank reconciliation</li>
+              <li>Vendor bills · audit logs</li>
+            </ul>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">
+              <!-- Lucide: user-round-check -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="m16 19 2 2 4-4"/></svg>
+            </div>
+            <div class="num">04 · People</div>
+            <h3>People & HR</h3>
+            <p class="body">From offer letter to payslip — onboarding bundled with the right forms for every role.</p>
+            <ul>
+              <li>Bundled onboarding forms</li>
+              <li>Offer letters · contracts</li>
+              <li>Payslips & deductions</li>
+              <li>Departments & reporting lines</li>
+            </ul>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">
+              <!-- Lucide: layers -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+            </div>
+            <div class="num">05 · Platform</div>
+            <h3>Multi-tenant platform</h3>
+            <p class="body">Every developer org gets an isolated workspace. Operators get a central console.</p>
+            <ul>
+              <li>Isolated tenant workspaces</li>
+              <li>Platform console · onboarding</li>
+              <li>SSO · role-based access</li>
+              <li>Per-tenant branding</li>
+            </ul>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon" aria-hidden="true">
+              <!-- Lucide: megaphone -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+            </div>
+            <div class="num">06 · Marketing</div>
+            <h3>Marketing</h3>
+            <p class="body">Campaigns, broadcasts, and attribution that close the loop with the CRM.</p>
+            <ul>
+              <li>Email & WhatsApp broadcasts</li>
+              <li>Embedded lead-capture forms</li>
+              <li>Campaign attribution</li>
+              <li>Audience segmentation</li>
+            </ul>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ── HOW IT WORKS ───────────────────────────────────────── -->
+    <section class="section" id="how" style="padding-top: 0;">
+      <div class="container">
+        <div class="features-head">
+          <div>
+            <div class="eyebrow">§ How it works</div>
+            <h2 class="headline">Three steps to operational.</h2>
+          </div>
+          <p class="body">Onboarding in under a week. Your team keeps using WhatsApp and email the way they always have — Realcorp is the system that ties it all together behind the scenes.</p>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="num" aria-hidden="true"></div>
+            <h3>Onboard your organization</h3>
+            <p class="body">Spin up an isolated workspace. We migrate your existing project list, deal history, and chart of accounts. Your team signs in with SSO.</p>
+          </div>
+          <div class="step">
+            <div class="num" aria-hidden="true"></div>
+            <h3>Configure your projects</h3>
+            <p class="body">Define project units, payment milestones, commission structure, and departments. Bring your floor plans and price lists.</p>
+          </div>
+          <div class="step">
+            <div class="num" aria-hidden="true"></div>
+            <h3>Run sales, finance, and HR</h3>
+            <p class="body">Capture leads from WhatsApp and Meta. Move them through the pipeline. Allocate units, post milestones, issue payslips — all in one place.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SPLIT / DARK BAND ──────────────────────────────────── -->
+    <section class="split" aria-label="Customer testimonial">
+      <div class="container">
+        <div class="split-inner">
+          <div>
+            <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#rc-mark"/></svg>
+            <div class="eyebrow" style="margin-top: 32px;">A note from operations</div>
+          </div>
+          <div>
+            <h2>"From contract to <em>payslip,</em> the same number reaches every desk."</h2>
+            <div class="quote-cite">Hannah Reyes · SVP Operations · Kingsway Estates</div>
+            <div class="stat-row">
+              <div class="stat"><div class="v">38 hrs</div><div class="k">Weekly time saved</div></div>
+              <div class="stat"><div class="v">$2.1B</div><div class="k">In property sold</div></div>
+              <div class="stat"><div class="v">99.4%</div><div class="k">Audit-trail coverage</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── FINAL CTA ──────────────────────────────────────────── -->
+    <section class="cta-block" id="demo">
+      <div class="container">
+        <div class="eyebrow">Let's talk</div>
+        <h2 class="headline" style="margin: 0; max-width: 22ch;">See Realcorp configured to <em style="font-style: italic; color: var(--accent);">your projects.</em></h2>
+        <p class="lede" style="text-align: center;">A 30-minute call with a solutions engineer. We'll bring a workspace pre-loaded with your project list — so the demo isn't generic.</p>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;">
+          <a class="btn btn-primary" href="/cdn-cgi/l/email-protection#e38b868f8f8ca39186828f808c9193cd808c8e">Book a demo <span class="arrow">→</span></a>
+          <a class="btn btn-ghost" href="/signin">Have an account? Sign in</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── FOOTER ─────────────────────────────────────────────── -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <a href="/" class="lockup">
+            <svg class="mark" width="32" height="32" aria-hidden="true"><use href="#rc-mark"/></svg>
+            <span>Realcorp</span>
+          </a>
+          <p class="body" style="margin-top: 14px; max-width: 38ch; font-size: 13.5px;">
+            The operating system for real corporations. Built in Lagos. Deployed across West Africa.
+          </p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#modules">Modules</a></li>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="/changelog">Changelog</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About</a></li>
+            <li><a href="/customers">Customers</a></li>
+            <li><a href="/careers">Careers</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="/privacy">Privacy</a></li>
+            <li><a href="/terms">Terms</a></li>
+            <li><a href="/security">Security</a></li>
+            <li><a href="/dpa">DPA</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Realcorp, Inc. · One Federal Square · Lagos · NY · DXB</span>
+        <span>v01 · MMXXVI</span>
+      </div>
+    </div>
+  </footer>
+
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    // ── Theme toggle: cycles user override of system preference.
+    // Persisted in localStorage. Default = "auto" (follows OS).
+    (function () {
+      const root = document.documentElement;
+      const KEY = 'realcorp:theme';
+      const saved = localStorage.getItem(KEY);
+      if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+
+      const btn = document.getElementById('themeToggle');
+      btn.addEventListener('click', () => {
+        const current = root.getAttribute('data-theme');
+        const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+        // auto → opposite of system; dark → light; light → dark
+        let next;
+        if (current === 'auto') next = sysDark ? 'light' : 'dark';
+        else if (current === 'dark') next = 'light';
+        else next = 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem(KEY, next);
+      });
+    })();
+
+    // ── Nav scroll state: subtle border once we leave the hero.
+    (function () {
+      const nav = document.getElementById('nav');
+      const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 12);
+      onScroll();
+      window.addEventListener('scroll', onScroll, { passive: true });
+    })();
+  </script>
+
+</body>
+</html>

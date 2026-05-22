@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     default: "Realcorp",
     template: "%s · Realcorp",
   },
-  description: "Multi-tenant PropTech CRM & ERP for real estate developers.",
+  description: "Multi-tenant CRM & ERP for real corporations — sales, finance, inventory, and people on one platform.",
   icons: {
     icon: [{ url: "/fav.svg", type: "image/svg+xml" }],
     apple: [{ url: "/fav.svg", type: "image/svg+xml" }],

@@ -44,7 +44,7 @@ export function RealcorpLogoLink({
   return (
     <Link
       href={href}
-      className={["group inline-flex min-w-0 items-center gap-2.5", className].filter(Boolean).join(" ")}
+      className={["group inline-flex min-w-0 items-center gap-px", className].filter(Boolean).join(" ")}
     >
       <RealcorpMark variant={variant} size={32} className="h-8 w-8" />
       {showWordmark ? (
@@ -57,11 +57,25 @@ export function RealcorpLogoLink({
   );
 }
 
-export function RealcorpHeroLogo({ className }: { className?: string }) {
+export function RealcorpHeroLogo({
+  className,
+  /** Pass to force a mark; omit to auto-switch with light/dark theme */
+  variant,
+}: {
+  className?: string;
+  variant?: keyof typeof MARK;
+}) {
   return (
     <div className={className}>
-      <RealcorpMark variant="light" size={56} className="mx-auto h-14 w-14" />
-      <p className="mt-4 text-center font-serif text-2xl font-semibold tracking-tight text-foreground">Realcorp</p>
+      {variant ? (
+        <RealcorpMark variant={variant} size={80} className="mx-auto h-20 w-20" />
+      ) : (
+        <>
+          <RealcorpMark variant="light" size={80} className="mx-auto h-20 w-20 dark:hidden" />
+          <RealcorpMark variant="dark" size={80} className="mx-auto hidden h-20 w-20 dark:block" />
+        </>
+      )}
+      <p className="mt-5 text-center font-serif text-3xl font-semibold tracking-tight text-foreground">Realcorp</p>
     </div>
   );
 }

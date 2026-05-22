@@ -418,6 +418,7 @@ export function DashboardWorkspace({
   const [openScopeFilters, setOpenScopeFilters] = useState(false);
   const [openSavedViews, setOpenSavedViews] = useState(false);
   const [openOnboardingGuide, setOpenOnboardingGuide] = useState(false);
+  const [showSetupPanel, setShowSetupPanel] = useState(false);
   const [openKpiDetail, setOpenKpiDetail] = useState<null | "LEADS_TODAY" | "DEALS_TODAY" | "PROJECTS" | "TOP_PROJECTS">(null);
   const [openFinanceDetail, setOpenFinanceDetail] = useState<
     null | "COLLECTIONS_TREND" | "OVERDUE_AGING" | "HEALTH_PROJECT_TEAM" | "TARGET_ATTAINMENT"
@@ -957,7 +958,28 @@ export function DashboardWorkspace({
         </section>
       ) : null}
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => setShowSetupPanel((open) => !open)}
+          className="inline-flex items-center gap-2 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.04]"
+          aria-expanded={showSetupPanel}
+        >
+          <span>{showSetupPanel ? "Hide" : "Show"} setup &amp; integrations</span>
+          <svg
+            viewBox="0 0 24 24"
+            className={["h-3.5 w-3.5 transition-transform", showSetupPanel ? "rotate-180" : ""].join(" ")}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+
+        {showSetupPanel ? (
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <section className="rounded-lg border border-foreground/10 bg-background p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Getting started</p>
@@ -993,6 +1015,8 @@ export function DashboardWorkspace({
             </div>
           </div>
         </section>
+          </div>
+        ) : null}
       </div>
 
       {globalRange !== "1M" || moduleFilter !== "ALL" || ownerFilter || projectFilter || sourceFilter ? (
