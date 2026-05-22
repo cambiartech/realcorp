@@ -3,12 +3,31 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { RealcorpLogoLink, RealcorpMark } from "@/components/realcorp-brand";
+import {
+  Activity,
+  CalendarCheck2,
+  ChevronDown,
+  CircleDollarSign,
+  FolderOpen,
+  UsersRound,
+  Home,
+  LayoutDashboard,
+  Megaphone,
+  Search,
+  Settings,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import type { TenantNavKey } from "@/lib/tenant-nav-access";
 
 export type TenantNavProps = {
   tenantName: string;
   tenantSlug: string;
   canAccessPlatform: boolean;
+  canManageHr?: boolean;
+  /** When true, HR admins also see My dashboard (they are on payroll / have a profile). */
+  hasHrEmployeeProfile?: boolean;
   visibleNavKeys: TenantNavKey[];
   userName: string | null;
   userEmail: string | null;
@@ -21,12 +40,46 @@ const ALL_ITEMS: NavItem[] = [
   { key: "projects", label: "Projects", href: "/projects", mobileLabel: "Projects" },
   { key: "leads", label: "Leads", href: "/leads", mobileLabel: "Leads" },
   { key: "deals", label: "Deals", href: "/deals", mobileLabel: "Deals" },
+  { key: "activities", label: "Activities", href: "/activities", mobileLabel: "Tasks" },
   { key: "marketing", label: "Marketing", href: "/marketing", mobileLabel: "Marketing" },
   { key: "community", label: "Community", href: "/community", mobileLabel: "Community" },
+  { key: "shortlets", label: "Short Lets", href: "/shortlets", mobileLabel: "Shortlets" },
   { key: "finance", label: "Finance", href: "/finance", mobileLabel: "Finance" },
+  { key: "hr", label: "People", href: "/hr", mobileLabel: "HR" },
   { key: "team", label: "Team", href: "/team", mobileLabel: "Team" },
   { key: "settings", label: "Settings", href: "/settings", mobileLabel: "Settings" },
 ];
+
+const NAV_ICONS: Record<TenantNavKey, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  projects: FolderOpen,
+  leads: Search,
+  deals: CalendarCheck2,
+  activities: Activity,
+  marketing: Megaphone,
+  community: Users,
+  shortlets: Home,
+  finance: CircleDollarSign,
+  hr: UsersRound,
+  team: Users,
+  settings: Settings,
+};
+
+/** Keys that live inside the collapsible Sales group */
+const SALES_GROUP_KEYS: TenantNavKey[] = ["leads", "deals", "activities"];
+
+/** Keys that render as top-level items (no group) */
+const TOP_LEVEL_KEYS: TenantNavKey[] = [
+  "dashboard",
+  "projects",
+  "marketing",
+  "community",
+  "shortlets",
+  "team",
+  "settings",
+];
+
+type FinanceSubItem = { id: string; label: string; href: string };
 
 function useCoreNavItems(tenantSlug: string, visibleNavKeys: TenantNavKey[]) {
   return useMemo(() => {
@@ -38,11 +91,20 @@ function useCoreNavItems(tenantSlug: string, visibleNavKeys: TenantNavKey[]) {
   }, [tenantSlug, visibleNavKeys]);
 }
 
-/** Desktop sidebar only — must be a direct flex child of the main shell row (not wrapped with mobile nav). */
+function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  const isTenantRoot = href.split("/").length === 2 && href.startsWith("/");
+  if (isTenantRoot) return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Desktop sidebar only */
 export function TenantSidebar({
   tenantName,
   tenantSlug,
   canAccessPlatform,
+  canManageHr = false,
+  hasHrEmployeeProfile = false,
   visibleNavKeys,
   userName,
   userEmail,
@@ -51,13 +113,42 @@ export function TenantSidebar({
   const coreItems = useCoreNavItems(tenantSlug, visibleNavKeys);
 
   const [collapsed, setCollapsed] = useState(false);
+  const [salesOpen, setSalesOpen] = useState(true);
+  const [financeOpen, setFinanceOpen] = useState(true);
+  const [hrOpen, setHrOpen] = useState(true);
+
   useEffect(() => {
     try {
       if (window.localStorage.getItem("tenant-nav-collapsed") === "1") setCollapsed(true);
+      const stored = window.localStorage.getItem("tenant-nav-sales-open");
+      if (stored === "0") setSalesOpen(false);
+      const storedFinance = window.localStorage.getItem("tenant-nav-finance-open");
+      if (storedFinance === "0") setFinanceOpen(false);
+      const storedHr = window.localStorage.getItem("tenant-nav-hr-open");
+      if (storedHr === "0") setHrOpen(false);
     } catch {
       // ignore
     }
   }, []);
+
+  // Auto-expand Sales group when a sales route is active
+  useEffect(() => {
+    const salesItems = coreItems.filter((i) => SALES_GROUP_KEYS.includes(i.key as TenantNavKey));
+    const anyActive = salesItems.some((i) => isActive(pathname, i.href));
+    if (anyActive) setSalesOpen(true);
+  }, [pathname, coreItems]);
+
+  useEffect(() => {
+    const financeItem = coreItems.find((i) => i.key === "finance");
+    if (!financeItem) return;
+    if (pathname === financeItem.href || pathname.startsWith(`${financeItem.href}/`)) setFinanceOpen(true);
+  }, [pathname, coreItems]);
+
+  useEffect(() => {
+    const hrNavItem = coreItems.find((i) => i.key === "hr");
+    if (!hrNavItem) return;
+    if (pathname === hrNavItem.href || pathname.startsWith(`${hrNavItem.href}/`)) setHrOpen(true);
+  }, [pathname, coreItems]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -65,6 +156,90 @@ export function TenantSidebar({
       window.localStorage.setItem("tenant-nav-collapsed", next ? "1" : "0");
       return next;
     });
+  }
+
+  function toggleSales() {
+    setSalesOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("tenant-nav-sales-open", next ? "1" : "0");
+      return next;
+    });
+  }
+
+  function toggleFinance() {
+    setFinanceOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("tenant-nav-finance-open", next ? "1" : "0");
+      return next;
+    });
+  }
+
+  function toggleHr() {
+    setHrOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("tenant-nav-hr-open", next ? "1" : "0");
+      return next;
+    });
+  }
+
+  const topLevelItems = coreItems.filter((i) => TOP_LEVEL_KEYS.includes(i.key as TenantNavKey));
+  const salesItems = coreItems.filter((i) => SALES_GROUP_KEYS.includes(i.key as TenantNavKey));
+  const hasSalesItems = salesItems.length > 0;
+  const financeItem = coreItems.find((i) => i.key === "finance");
+  const financeSubItems: FinanceSubItem[] = financeItem
+    ? [
+        { id: "overview", label: "Overview", href: `${financeItem.href}/overview` },
+        { id: "receivables", label: "Receivables", href: `${financeItem.href}/receivables` },
+        { id: "payables", label: "Payables", href: `${financeItem.href}/payables` },
+        { id: "sales-receipts", label: "Sales Receipts", href: `${financeItem.href}/sales-receipts` },
+        { id: "invoices", label: "Invoices", href: `${financeItem.href}/invoices` },
+        { id: "payments", label: "Payments", href: `${financeItem.href}/payments` },
+        { id: "expenses", label: "Expenses", href: `${financeItem.href}/expenses` },
+        { id: "banking", label: "Banking", href: `${financeItem.href}/banking` },
+        { id: "reports", label: "Reports", href: `${financeItem.href}/reports` },
+        { id: "audit-logs", label: "Audit Logs", href: `${financeItem.href}/audit-logs` },
+        { id: "settings", label: "Settings", href: `${financeItem.href}/settings` },
+      ]
+    : [];
+  const hrItem = coreItems.find((i) => i.key === "hr");
+  const hrSubItems: FinanceSubItem[] = hrItem
+    ? canManageHr
+      ? [
+          { id: "people", label: "People", href: `${hrItem.href}/people` },
+          { id: "payslips", label: "Payslips", href: `${hrItem.href}/payslips` },
+          { id: "appraisals", label: "Appraisals", href: `${hrItem.href}/appraisals` },
+          { id: "documents", label: "Documents", href: `${hrItem.href}/documents` },
+          { id: "insights", label: "Insights", href: `${hrItem.href}/insights` },
+          ...(hasHrEmployeeProfile
+            ? [{ id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard` }]
+            : []),
+        ]
+      : [{ id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard` }]
+    : [];
+  const hasFinanceItems = financeSubItems.length > 0;
+  const hasHrItems = hrSubItems.length > 0;
+
+  function isFinanceSubActive(id: string) {
+    if (!financeItem) return false;
+    const base = `${financeItem.href}/`;
+    const onFinance = pathname.startsWith(base);
+    if (!onFinance) return false;
+    return pathname === `${financeItem.href}/${id}`;
+  }
+
+  function isHrSubActive(id: string) {
+    if (!hrItem) return false;
+    const base = `${hrItem.href}/`;
+    if (!pathname.startsWith(base)) return false;
+    if (id === "my") {
+      return (
+        pathname === `${hrItem.href}/dashboard` ||
+        pathname.startsWith(`${hrItem.href}/dashboard?`) ||
+        pathname === `${hrItem.href}/my` ||
+        pathname.startsWith(`${hrItem.href}/my?`)
+      );
+    }
+    return pathname === `${hrItem.href}/${id}`;
   }
 
   const utilityItems = useMemo(() => {
@@ -77,6 +252,10 @@ export function TenantSidebar({
   const displayName = userName?.trim() || userEmail?.split("@")[0]?.trim() || "Account";
   const emailDisplay = userEmail?.trim() || "";
   const initial = (displayName || emailDisplay || "?").charAt(0).toUpperCase();
+
+  // Separate dashboard + projects from the rest of topLevel
+  const preGroupItems = topLevelItems.filter((i) => i.key === "dashboard" || i.key === "projects");
+  const postGroupItems = topLevelItems.filter((i) => i.key !== "dashboard" && i.key !== "projects");
 
   return (
     <aside
@@ -91,24 +270,22 @@ export function TenantSidebar({
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-foreground/15 hover:bg-foreground/[0.06]"
               title="Expand sidebar"
               aria-label="Expand sidebar"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
+              <RealcorpMark size={26} className="h-6 w-6" />
             </button>
           ) : (
             <>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted">Tenant</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">{tenantName}</p>
-              </div>
+              <RealcorpLogoLink
+                href={coreItems.find((i) => i.key === "dashboard")?.href ?? `/${tenantSlug}`}
+                subtitle={tenantName}
+              />
               <button
                 type="button"
                 onClick={toggleCollapsed}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
                 title="Collapse sidebar"
                 aria-label="Collapse sidebar"
               >
@@ -124,15 +301,155 @@ export function TenantSidebar({
           className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1"
           aria-label="Workspace navigation"
         >
-          {coreItems.map((item) => (
+          {/* Dashboard + Projects always at top */}
+          {preGroupItems.map((item) => (
             <NavLink
               key={item.key}
+              navKey={item.key}
               href={item.href}
               label={item.label}
               active={isActive(pathname, item.href)}
               collapsed={collapsed}
             />
           ))}
+
+          {/* Sales group */}
+          {hasSalesItems ? (
+            <div className="pt-1">
+              {collapsed ? (
+                // In collapsed mode just show icons with a faint divider
+                <div className="my-1 border-t border-foreground/10" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={toggleSales}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                >
+                  <span>Sales</span>
+                  <ChevronDown
+                    className={["h-3.5 w-3.5 transition-transform duration-150", salesOpen ? "" : "-rotate-90"].join(" ")}
+                    strokeWidth={2}
+                  />
+                </button>
+              )}
+              {(collapsed || salesOpen) ? (
+                <div className={collapsed ? "space-y-1" : "mt-0.5 space-y-0.5 pl-3"}>
+                  {salesItems.map((item) => (
+                    <NavLink
+                      key={item.key}
+                      navKey={item.key}
+                      href={item.href}
+                      label={item.label}
+                      active={isActive(pathname, item.href)}
+                      collapsed={collapsed}
+                      indented={!collapsed}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Finance group */}
+          {hasFinanceItems ? (
+            <div className="pt-1">
+              {collapsed ? (
+                <div className="my-1 border-t border-foreground/10" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={toggleFinance}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                >
+                  <span>Finance</span>
+                  <ChevronDown
+                    className={["h-3.5 w-3.5 transition-transform duration-150", financeOpen ? "" : "-rotate-90"].join(" ")}
+                    strokeWidth={2}
+                  />
+                </button>
+              )}
+              {collapsed || financeOpen ? (
+                <div className={collapsed ? "space-y-1" : "mt-0.5 space-y-0.5 pl-3"}>
+                  {financeSubItems.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      title={collapsed ? item.label : undefined}
+                      className={[
+                        "block rounded-md px-3 py-1.5 text-[0.8125rem] transition-colors",
+                        collapsed ? "text-center" : "",
+                        isFinanceSubActive(item.id)
+                          ? "bg-foreground text-background"
+                          : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {collapsed ? item.label.slice(0, 1) : item.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* HR group */}
+          {hasHrItems ? (
+            <div className="pt-1">
+              {collapsed ? (
+                <div className="my-1 border-t border-foreground/10" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={toggleHr}
+                  className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                >
+                  <span>{canManageHr ? "People" : "My HR"}</span>
+                  <ChevronDown
+                    className={["h-3.5 w-3.5 transition-transform duration-150", hrOpen ? "" : "-rotate-90"].join(" ")}
+                    strokeWidth={2}
+                  />
+                </button>
+              )}
+              {collapsed || hrOpen ? (
+                <div className={collapsed ? "space-y-1" : "mt-0.5 space-y-0.5 pl-3"}>
+                  {hrSubItems.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      title={collapsed ? item.label : undefined}
+                      className={[
+                        "block rounded-md px-3 py-1.5 text-[0.8125rem] transition-colors",
+                        collapsed ? "text-center" : "",
+                        isHrSubActive(item.id)
+                          ? "bg-foreground text-background"
+                          : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {collapsed ? item.label.slice(0, 1) : item.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Remaining top-level items */}
+          {postGroupItems.length > 0 ? (
+            <div className={hasSalesItems || hasFinanceItems || hasHrItems ? "pt-1" : ""}>
+              {!collapsed && (hasSalesItems || hasFinanceItems || hasHrItems) ? (
+                <div className="mb-1 border-t border-foreground/10" />
+              ) : null}
+              {postGroupItems.map((item) => (
+                <NavLink
+                  key={item.key}
+                  navKey={item.key}
+                  href={item.href}
+                  label={item.label}
+                  active={isActive(pathname, item.href)}
+                  collapsed={collapsed}
+                />
+              ))}
+            </div>
+          ) : null}
         </nav>
 
         <div className="mt-6 shrink-0 border-t border-foreground/10 pt-4">
@@ -140,6 +457,7 @@ export function TenantSidebar({
             {utilityItems.map((item) => (
               <NavLink
                 key={item.href}
+                navKey={item.label === "Platform" ? "settings" : "dashboard"}
                 href={item.href}
                 label={item.label}
                 active={isActive(pathname, item.href)}
@@ -160,12 +478,13 @@ export function TenantSidebar({
   );
 }
 
-/** Fixed bottom bar on small screens — render outside the main flex row so it does not affect sidebar height. */
+/** Fixed bottom bar on small screens */
 export function TenantMobileDock({
   tenantSlug,
   canAccessPlatform,
+  canManageHr = false,
   visibleNavKeys,
-}: Pick<TenantNavProps, "tenantSlug" | "canAccessPlatform" | "visibleNavKeys">) {
+}: Pick<TenantNavProps, "tenantSlug" | "canAccessPlatform" | "canManageHr" | "visibleNavKeys">) {
   const pathname = usePathname();
   const coreItems = useCoreNavItems(tenantSlug, visibleNavKeys);
 
@@ -237,23 +556,20 @@ function SidebarProfileFooter({
   );
 }
 
-function isActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  const isTenantRoot = href.split("/").length === 2 && href.startsWith("/");
-  if (isTenantRoot) return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
 function NavLink({
+  navKey,
   href,
   label,
   active,
   collapsed,
+  indented,
 }: {
+  navKey: TenantNavKey;
   href: string;
   label: string;
   active: boolean;
   collapsed: boolean;
+  indented?: boolean;
 }) {
   return (
     <Link
@@ -262,15 +578,19 @@ function NavLink({
       className={[
         "block rounded-md px-3 py-2 text-sm transition-colors",
         collapsed ? "text-center" : "",
+        indented ? "py-1.5 text-[0.8125rem]" : "",
         active ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
       ].join(" ")}
     >
       {collapsed ? (
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-current/35 text-xs">
-          {label.slice(0, 1)}
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-current/35">
+          <NavIcon navKey={navKey} className="h-3.5 w-3.5" />
         </span>
       ) : (
-        label
+        <span className="inline-flex items-center gap-2">
+          <NavIcon navKey={navKey} className="h-4 w-4" />
+          <span>{label}</span>
+        </span>
       )}
     </Link>
   );
@@ -288,4 +608,9 @@ function MobileItem({ href, label, active }: { href: string; label: string; acti
       {label}
     </Link>
   );
+}
+
+function NavIcon({ navKey, className }: { navKey: TenantNavKey; className?: string }) {
+  const Icon = NAV_ICONS[navKey];
+  return <Icon className={className || "h-4 w-4"} strokeWidth={1.9} />;
 }

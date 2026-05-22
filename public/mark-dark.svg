@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512" shape-rendering="geometricPrecision">
+  <g fill="#0E1116" opacity="0.18">
+    <circle cx="62" cy="14" r="0.9"></circle>
+    <circle cx="74" cy="14" r="0.9"></circle>
+    <circle cx="86" cy="14" r="0.9"></circle>
+    <circle cx="26" cy="26" r="0.9"></circle>
+    <circle cx="38" cy="26" r="0.9"></circle>
+    <circle cx="62" cy="26" r="0.9"></circle>
+    <circle cx="74" cy="26" r="0.9"></circle>
+    <circle cx="86" cy="26" r="0.9"></circle>
+    <circle cx="62" cy="38" r="0.9"></circle>
+    <circle cx="74" cy="38" r="0.9"></circle>
+    <circle cx="86" cy="38" r="0.9"></circle>
+    <circle cx="26" cy="50" r="0.9"></circle>
+    <circle cx="50" cy="50" r="0.9"></circle>
+    <circle cx="62" cy="50" r="0.9"></circle>
+    <circle cx="74" cy="50" r="0.9"></circle>
+    <circle cx="86" cy="50" r="0.9"></circle>
+    <circle cx="26" cy="62" r="0.9"></circle>
+    <circle cx="38" cy="62" r="0.9"></circle>
+    <circle cx="62" cy="62" r="0.9"></circle>
+    <circle cx="74" cy="62" r="0.9"></circle>
+    <circle cx="86" cy="62" r="0.9"></circle>
+    <circle cx="26" cy="74" r="0.9"></circle>
+    <circle cx="38" cy="74" r="0.9"></circle>
+    <circle cx="50" cy="74" r="0.9"></circle>
+    <circle cx="74" cy="74" r="0.9"></circle>
+    <circle cx="86" cy="74" r="0.9"></circle>
+    <circle cx="26" cy="86" r="0.9"></circle>
+    <circle cx="38" cy="86" r="0.9"></circle>
+    <circle cx="50" cy="86" r="0.9"></circle>
+    <circle cx="62" cy="86" r="0.9"></circle>
+    <circle cx="86" cy="86" r="0.9"></circle>
+  </g>
+  <g stroke="#0E1116" stroke-width="1.1" stroke-linecap="square">
+    <line x1="14" y1="14" x2="26" y2="14"></line>
+    <line x1="26" y1="14" x2="38" y2="14"></line>
+    <line x1="38" y1="14" x2="50" y2="14"></line>
+    <line x1="50" y1="14" x2="50" y2="26"></line>
+    <line x1="50" y1="26" x2="50" y2="38"></line>
+    <line x1="14" y1="38" x2="26" y2="38"></line>
+    <line x1="26" y1="38" x2="38" y2="38"></line>
+    <line x1="38" y1="38" x2="50" y2="38"></line>
+    <line x1="14" y1="14" x2="14" y2="26"></line>
+    <line x1="14" y1="26" x2="14" y2="38"></line>
+    <line x1="14" y1="38" x2="14" y2="50"></line>
+    <line x1="14" y1="50" x2="14" y2="62"></line>
+    <line x1="14" y1="62" x2="14" y2="74"></line>
+    <line x1="14" y1="74" x2="14" y2="86"></line>
+    <line x1="14" y1="38" x2="38" y2="50"></line>
+    <line x1="38" y1="50" x2="50" y2="62"></line>
+    <line x1="50" y1="62" x2="62" y2="74"></line>
+    <line x1="62" y1="74" x2="74" y2="86"></line>
+  </g>
+  <g fill="#0E1116">
+    <circle cx="14" cy="14" r="2.6"></circle>
+    <circle cx="26" cy="14" r="2.6"></circle>
+    <circle cx="38" cy="14" r="2.6"></circle>
+    <circle cx="50" cy="14" r="2.6"></circle>
+    <circle cx="14" cy="26" r="2.6"></circle>
+    <circle cx="50" cy="26" r="2.6"></circle>
+    <circle cx="14" cy="38" r="2.6"></circle>
+    <circle cx="26" cy="38" r="2.6"></circle>
+    <circle cx="38" cy="38" r="2.6"></circle>
+    <circle cx="50" cy="38" r="2.6"></circle>
+    <circle cx="14" cy="50" r="2.6"></circle>
+    <circle cx="38" cy="50" r="2.6"></circle>
+    <circle cx="14" cy="62" r="2.6"></circle>
+    <circle cx="50" cy="62" r="2.6"></circle>
+    <circle cx="14" cy="74" r="2.6"></circle>
+    <circle cx="62" cy="74" r="2.6"></circle>
+    <circle cx="14" cy="86" r="2.6"></circle>
+    <circle cx="74" cy="86" r="2.6"></circle>
+  </g>
+  <circle cx="14" cy="38" r="3.4" fill="#B08D57"></circle>
+  <circle cx="14" cy="38" r="3.4" fill="none" stroke="#B08D57" stroke-width="1"></circle>
+</svg>

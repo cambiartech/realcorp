@@ -12,8 +12,11 @@ import {
 } from "@/lib/role-module-grants-form";
 import { formatEnumLabel } from "@/lib/ui-format";
 import {
+  getOrgLogoUploadSignature,
+  saveIntegrationSettings,
   updateMyDisplayName,
   updateMyPassword,
+  saveOrganizationBranding,
   updateOrganizationName,
   updateOrgModules,
 } from "./actions";
@@ -41,12 +44,41 @@ type SettingsWorkspaceProps = {
     moduleMarketing: boolean;
     moduleCommunity: boolean;
     moduleRealtorPortal: boolean;
+    moduleShortLets: boolean;
+    moduleHr: boolean;
   };
   roleModuleGrantsJson: string;
+  orgDepartments: string[];
   workspaceMeta: WorkspaceMeta;
+  branding: {
+    logoUrl: string | null;
+    primaryColor: string;
+    accentColor: string;
+    orgEmail: string | null;
+    orgPhone: string | null;
+    orgAddressLine: string | null;
+    orgCity: string | null;
+    orgState: string | null;
+    orgCountry: string | null;
+  };
+  integrations: {
+    metaVerifyToken: string | null;
+    metaPageAccessToken: string | null;
+    metaDefaultSource: string | null;
+    termiiApiKey: string | null;
+    termiiSenderId: string | null;
+    whatsappAccessToken: string | null;
+    whatsappPhoneNumberId: string | null;
+    whatsappVerifyToken: string | null;
+    logoUrl: string | null;
+    financeBankAccounts: string[];
+    financePaymentModes: string[];
+    financeCurrencies: string[];
+  };
 };
 
-type TabId = "profile" | "organization" | "modules" | "about";
+type TabId = "profile" | "organization" | "modules" | "integrations" | "about";
+const DEFAULT_DEPARTMENTS = ["Finance", "Sales", "Marketing", "Community"];
 
 export function SettingsWorkspace({
   tenantSlug,
@@ -56,7 +88,10 @@ export function SettingsWorkspace({
   canManageOrg,
   modules,
   roleModuleGrantsJson,
+  orgDepartments,
   workspaceMeta,
+  branding,
+  integrations,
 }: SettingsWorkspaceProps) {
   const tabDefs: { id: TabId; label: string }[] = [
     { id: "profile", label: "Profile" },
@@ -64,6 +99,7 @@ export function SettingsWorkspace({
       ? ([
           { id: "organization", label: "Organization" },
           { id: "modules", label: "Modules & access" },
+          { id: "integrations", label: "Integrations" },
         ] as const)
       : []),
     { id: "about", label: "Workspace" },
@@ -83,12 +119,86 @@ export function SettingsWorkspace({
     updateOrganizationName.bind(null, tenantSlug),
     null as { ok: true } | { ok: false; error: string } | null,
   );
+  const [brandState, brandAction, brandPending] = useActionState(
+    saveOrganizationBranding.bind(null, tenantSlug),
+    null as { ok: true } | { ok: false; error: string } | null,
+  );
   const [modulesState, modulesAction, modulesPending] = useActionState(
     updateOrgModules.bind(null, tenantSlug),
     null as { ok: true } | { ok: false; error: string } | null,
   );
+  const [intState, intAction, intPending] = useActionState(
+    saveIntegrationSettings.bind(null, tenantSlug),
+    null as { ok: true } | { ok: false; error: string } | null,
+  );
+  const [logoUrl, setLogoUrl] = useState(integrations.logoUrl ?? "");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
 
   const initialRoleGrants = useMemo(() => parseRoleGrantsJsonString(roleModuleGrantsJson), [roleModuleGrantsJson]);
+  const initialCustomDepartments = useMemo(
+    () => orgDepartments.filter((x) => !DEFAULT_DEPARTMENTS.includes(x)),
+    [orgDepartments],
+  );
+  const [customDepartments, setCustomDepartments] = useState<string[]>(initialCustomDepartments);
+  const [newDepartment, setNewDepartment] = useState("");
+
+  function addDepartment() {
+    const next = newDepartment.trim();
+    if (!next) return;
+    if (DEFAULT_DEPARTMENTS.includes(next) || customDepartments.includes(next)) {
+      setNewDepartment("");
+      return;
+    }
+    setCustomDepartments((curr) => [...curr, next]);
+    setNewDepartment("");
+  }
+
+  async function handleLogoFileUpload(file: File) {
+    if (logoUploading) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoUploadError("Please upload an image file.");
+      return;
+    }
+    setLogoUploading(true);
+    setLogoUploadError(null);
+    const sig = await getOrgLogoUploadSignature(tenantSlug, { fileName: file.name });
+    if (!sig.ok) {
+      setLogoUploadError(sig.error);
+      setLogoUploading(false);
+      return;
+    }
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("api_key", sig.apiKey);
+      form.append("timestamp", String(sig.timestamp));
+      form.append("signature", sig.signature);
+      form.append("folder", sig.folder);
+      form.append("public_id", sig.publicId);
+      form.append("resource_type", "image");
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, {
+        method: "POST",
+        body: form,
+      });
+      if (!response.ok) {
+        setLogoUploadError("Logo upload failed. Please try again.");
+        setLogoUploading(false);
+        return;
+      }
+      const payload = (await response.json()) as { secure_url?: string };
+      if (!payload.secure_url) {
+        setLogoUploadError("Upload response was invalid.");
+        setLogoUploading(false);
+        return;
+      }
+      setLogoUrl(payload.secure_url);
+    } catch {
+      setLogoUploadError("Could not upload logo right now.");
+    } finally {
+      setLogoUploading(false);
+    }
+  }
 
   return (
     <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02]">
@@ -263,6 +373,108 @@ export function SettingsWorkspace({
                 {orgNamePending ? "Saving…" : "Save organization name"}
               </button>
             </form>
+
+            <div className="mt-8 border-t border-foreground/10 pt-6">
+              <h3 className="text-sm font-semibold text-foreground">Brand & HR documents</h3>
+              <p className="mt-1 text-xs text-muted">
+                Logo, colors, and contact details appear on payslips, employee forms, and printable PDFs.
+              </p>
+              {brandState && !brandState.ok ? (
+                <div className="mt-2">
+                  <FormAlert>{brandState.error}</FormAlert>
+                </div>
+              ) : null}
+              {brandState?.ok ? (
+                <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Branding saved.</p>
+              ) : null}
+              <form action={brandAction} className="mt-4 space-y-4">
+                <input type="hidden" name="logoUrl" value={logoUrl} />
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="inline-flex cursor-pointer items-center rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]">
+                    {logoUploading ? "Uploading…" : "Upload logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void handleLogoFileUpload(file);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  {logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={logoUrl} alt="" className="h-12 w-auto object-contain" />
+                  ) : null}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">Primary color</label>
+                    <input
+                      name="primaryColor"
+                      type="color"
+                      defaultValue={branding.primaryColor}
+                      className="h-10 w-full cursor-pointer rounded border border-foreground/15 bg-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">Accent color</label>
+                    <input
+                      name="accentColor"
+                      type="color"
+                      defaultValue={branding.accentColor}
+                      className="h-10 w-full cursor-pointer rounded border border-foreground/15 bg-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">HR / company email</label>
+                    <input
+                      name="orgEmail"
+                      type="email"
+                      defaultValue={branding.orgEmail ?? ""}
+                      placeholder="hr@company.com"
+                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">Phone</label>
+                    <input
+                      name="orgPhone"
+                      defaultValue={branding.orgPhone ?? ""}
+                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-muted">Street address</label>
+                    <input
+                      name="orgAddressLine"
+                      defaultValue={branding.orgAddressLine ?? ""}
+                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">City</label>
+                    <input name="orgCity" defaultValue={branding.orgCity ?? ""} className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">State</label>
+                    <input name="orgState" defaultValue={branding.orgState ?? ""} className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">Country</label>
+                    <input name="orgCountry" defaultValue={branding.orgCountry ?? "Nigeria"} className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm" />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={brandPending}
+                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                >
+                  {brandPending ? "Saving…" : "Save branding"}
+                </button>
+              </form>
+            </div>
           </div>
         ) : null}
 
@@ -295,6 +507,7 @@ export function SettingsWorkspace({
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <ModuleToggle name="moduleSales" label="Sales (dashboard, projects, leads, deals)" defaultChecked={modules.moduleSales} />
                   <ModuleToggle name="moduleFinance" label="Finance" defaultChecked={modules.moduleFinance} />
+                  <ModuleToggle name="moduleHr" label="People (HR)" defaultChecked={modules.moduleHr} />
                   <ModuleToggle name="moduleMarketing" label="Marketing" defaultChecked={modules.moduleMarketing} />
                   <ModuleToggle name="moduleCommunity" label="Community" defaultChecked={modules.moduleCommunity} />
                   <ModuleToggle
@@ -302,6 +515,16 @@ export function SettingsWorkspace({
                     label="Realtor portal"
                     defaultChecked={modules.moduleRealtorPortal}
                   />
+                </div>
+                <div className="mt-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
+                  <p className="font-medium text-foreground">Short Lets add-on</p>
+                  <p className="mt-1">
+                    Enabled by platform admin package control.
+                    {" "}
+                    <span className="text-foreground/90">
+                      Current: {modules.moduleShortLets ? "ON" : "OFF"}
+                    </span>
+                  </p>
                 </div>
               </div>
 
@@ -321,12 +544,288 @@ export function SettingsWorkspace({
                 <RoleExtraAccessMatrix modules={modules} initialGrants={initialRoleGrants} />
               </div>
 
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization departments</p>
+                <p className="mt-1 text-xs text-muted">
+                  Shared department list for reporting and finance tagging. Defaults are locked to your enabled modules.
+                </p>
+                <input type="hidden" name="orgDepartmentsCsv" value={customDepartments.join("\n")} />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {DEFAULT_DEPARTMENTS.map((department) => (
+                    <span
+                      key={department}
+                      className="inline-flex rounded-full border border-foreground/20 bg-foreground/[0.03] px-2.5 py-1 text-[11px] font-medium text-foreground"
+                    >
+                      {department} (default)
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-3 flex max-w-lg items-center gap-2">
+                  <input
+                    value={newDepartment}
+                    onChange={(e) => setNewDepartment(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addDepartment();
+                      }
+                    }}
+                    placeholder="Add custom department"
+                    className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={addDepartment}
+                    className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="mt-2 flex max-w-lg flex-wrap gap-2">
+                  {customDepartments.length === 0 ? (
+                    <span className="text-[11px] text-muted">No custom departments added yet.</span>
+                  ) : (
+                    customDepartments.map((department) => (
+                      <span
+                        key={department}
+                        className="inline-flex items-center gap-1 rounded-full border border-foreground/20 px-2.5 py-1 text-[11px] font-medium text-foreground"
+                      >
+                        {department}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${department}`}
+                          onClick={() => setCustomDepartments((curr) => curr.filter((x) => x !== department))}
+                          className="rounded px-1 text-muted hover:bg-foreground/[0.08] hover:text-foreground"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-muted">Defaults above cannot be removed.</p>
+              </div>
+
               <button
                 type="submit"
                 disabled={modulesPending}
                 className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
               >
                 {modulesPending ? "Saving…" : "Save modules"}
+              </button>
+            </form>
+          </div>
+        ) : null}
+
+        {tab === "integrations" ? (
+          <div id="settings-panel-integrations" role="tabpanel" aria-labelledby="settings-tab-integrations">
+            <h2 className="text-sm font-semibold text-foreground">Integrations</h2>
+            <p className="mt-1 text-xs text-muted">Connect external platforms to automatically capture and communicate with leads.</p>
+
+            <form action={intAction} className="mt-5 space-y-6">
+              <input type="hidden" name="logoUrl" value={logoUrl} />
+              <div className="rounded-lg border border-foreground/10 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-violet-600/10 text-xs font-bold text-violet-700">🏢</span>
+                  <span className="text-sm font-semibold text-foreground">Branding (Company Logo)</span>
+                </div>
+                <p className="mb-3 text-xs text-muted">
+                  Upload your company logo once. It will be used in future report exports and printable documents.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="inline-flex cursor-pointer items-center rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]">
+                    {logoUploading ? "Uploading..." : "Upload logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void handleLogoFileUpload(file);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setLogoUrl("")}
+                    className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
+                  >
+                    Remove logo
+                  </button>
+                </div>
+                {logoUploadError ? <p className="mt-2 text-xs text-error">{logoUploadError}</p> : null}
+                {logoUrl ? (
+                  <div className="mt-3 rounded-md border border-foreground/10 bg-background p-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={logoUrl} alt="Company logo preview" className="h-16 w-auto object-contain" />
+                    <p className="mt-2 text-[11px] text-muted break-all">{logoUrl}</p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-muted">No logo uploaded yet.</p>
+                )}
+              </div>
+
+              {/* Meta Lead Ads */}
+              <div className="rounded-lg border border-foreground/10 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-blue-600/10 text-xs font-bold text-blue-600">f</span>
+                  <span className="text-sm font-semibold text-foreground">Meta Lead Ads (Facebook / Instagram)</span>
+                </div>
+                <p className="mb-3 text-xs text-muted">
+                  When a prospect fills your Facebook or Instagram lead form, they are automatically created as a lead here.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Verify Token</label>
+                    <input
+                      name="metaVerifyToken"
+                      defaultValue={integrations.metaVerifyToken ?? ""}
+                      placeholder="e.g. my_secret_token_123"
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                    <p className="mt-1 text-[11px] text-muted">Set this exact value in Meta → Webhook → Verify Token</p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Default source label</label>
+                    <input
+                      name="metaDefaultSource"
+                      defaultValue={integrations.metaDefaultSource ?? "Facebook"}
+                      placeholder="Facebook"
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-foreground">Page Access Token</label>
+                    <input
+                      name="metaPageAccessToken"
+                      type="password"
+                      defaultValue={integrations.metaPageAccessToken ?? ""}
+                      placeholder="EAA… (long-lived page token)"
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                    <p className="mt-1 text-[11px] text-muted">Used to fetch full lead field data from the Graph API. Keep this secret.</p>
+                  </div>
+                </div>
+                <div className="mt-3 rounded-md bg-foreground/[0.03] p-2.5 text-xs text-muted">
+                  <strong className="text-foreground">Webhook URL:</strong>{" "}
+                  <code className="select-all rounded bg-foreground/[0.05] px-1 py-0.5 font-mono">
+                    {typeof window !== "undefined" ? window.location.origin : "https://yourapp.com"}/api/webhooks/meta-leads/{tenantSlug}
+                  </code>
+                </div>
+              </div>
+
+              {/* Termii SMS */}
+              <div className="rounded-lg border border-foreground/10 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-green-600/10 text-xs font-bold text-green-700">SMS</span>
+                  <span className="text-sm font-semibold text-foreground">Termii SMS</span>
+                </div>
+                <p className="mb-3 text-xs text-muted">
+                  Send automated SMS messages to leads from a branded sender ID.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">API Key</label>
+                    <input
+                      name="termiiApiKey"
+                      type="password"
+                      defaultValue={integrations.termiiApiKey ?? ""}
+                      placeholder="TL_xxxxxxxxxxxx"
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Sender ID</label>
+                    <input
+                      name="termiiSenderId"
+                      defaultValue={integrations.termiiSenderId ?? "Realcorp"}
+                      placeholder="Realcorp"
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                    <p className="mt-1 text-[11px] text-muted">Max 11 characters, pre-approved by Termii</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* WhatsApp Cloud API */}
+              <div className="rounded-lg border border-foreground/10 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600/10 text-xs font-bold text-emerald-700">WA</span>
+                  <span className="text-sm font-semibold text-foreground">WhatsApp Cloud API (Meta)</span>
+                </div>
+                <p className="mb-3 text-xs text-muted">
+                  Send WhatsApp follow-ups from the CRM and receive inbound replies via webhook.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Access Token</label>
+                    <input
+                      name="whatsappAccessToken"
+                      type="password"
+                      defaultValue={integrations.whatsappAccessToken ?? ""}
+                      placeholder="EAAB..."
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-foreground">Phone Number ID</label>
+                    <input
+                      name="whatsappPhoneNumberId"
+                      defaultValue={integrations.whatsappPhoneNumberId ?? ""}
+                      placeholder="e.g. 123456789012345"
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-foreground">Webhook Verify Token</label>
+                    <input
+                      name="whatsappVerifyToken"
+                      defaultValue={integrations.whatsappVerifyToken ?? ""}
+                      placeholder="my_whatsapp_verify_token"
+                      className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                    />
+                    <p className="mt-1 text-[11px] text-muted">Use this token in Meta webhook setup.</p>
+                  </div>
+                </div>
+                <div className="mt-3 rounded-md bg-foreground/[0.03] p-2.5 text-xs text-muted">
+                  <strong className="text-foreground">Webhook URL:</strong>{" "}
+                  <code className="select-all rounded bg-foreground/[0.05] px-1 py-0.5 font-mono">
+                    {typeof window !== "undefined" ? window.location.origin : "https://yourapp.com"}/api/webhooks/whatsapp/{tenantSlug}
+                  </code>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-foreground/10 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-600/10 text-xs font-bold text-slate-700">₦</span>
+                  <span className="text-sm font-semibold text-foreground">Finance form options</span>
+                </div>
+                <p className="text-xs text-muted">
+                  Finance dropdown catalogs (bank/cash accounts, payment modes, currencies) are now managed in a dedicated Finance Settings page with add/remove controls.
+                </p>
+                <div className="mt-3">
+                  <Link
+                    href={`/${tenantSlug}/finance/settings`}
+                    className="inline-flex rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
+                  >
+                    Open Finance Settings
+                  </Link>
+                </div>
+              </div>
+
+              {intState && !intState.ok && (
+                <FormAlert>{intState.error}</FormAlert>
+              )}
+              {intState?.ok && (
+                <p className="text-sm font-medium text-green-600">Integration settings saved.</p>
+              )}
+              <button
+                type="submit"
+                disabled={intPending}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {intPending ? "Saving…" : "Save integration settings"}
               </button>
             </form>
           </div>
@@ -363,6 +862,7 @@ const ROLE_GRANT_ROW_HINT: Partial<Record<MembershipRole, string>> = {
   [MembershipRole.SALES_EXECUTIVE]: "Default: core CRM, Settings.",
   [MembershipRole.SALES_MANAGER]: "Default: core CRM, Settings.",
   [MembershipRole.FINANCE_MANAGER]: "Default: core CRM, Finance, Settings.",
+  [MembershipRole.HR_MANAGER]: "Default: People (HR), Team, Settings.",
   [MembershipRole.MARKETING_MANAGER]: "Default: projects, leads, Marketing, Settings. Tick Sales to add Deals (full CRM strip).",
   [MembershipRole.COMMUNITY_MANAGER]: "Default: Community, Settings.",
 };

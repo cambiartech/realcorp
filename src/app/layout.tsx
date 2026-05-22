@@ -14,11 +14,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://realcorp.com"),
   title: {
     default: "Realcorp",
     template: "%s · Realcorp",
   },
   description: "Multi-tenant PropTech CRM & ERP for real estate developers.",
+  icons: {
+    icon: [{ url: "/fav.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/fav.svg", type: "image/svg+xml" }],
+  },
+  applicationName: "Realcorp",
 };
 
 export default function RootLayout({

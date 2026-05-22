@@ -56,7 +56,7 @@ export default async function TenantLeadsPage({
         ...(project ? { projectInterest: project } : {}),
         ...(campaign ? { campaignId: campaign } : {}),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ score: "desc" }, { createdAt: "desc" }],
       take: 200,
       include: {
         campaign: { select: { name: true, code: true } },
@@ -144,6 +144,8 @@ export default async function TenantLeadsPage({
             .filter(Boolean)
             .join(" · ") || "—",
         quality: formatEnumLabel(lead.quality),
+        score: lead.score,
+        lastActivityAt: lead.lastActivityAt ? lead.lastActivityAt.toISOString().slice(0, 10) : null,
         owner: lead.assignedUserId ? userMap.get(lead.assignedUserId)?.name || userMap.get(lead.assignedUserId)?.email || "Unknown" : "Unassigned",
         createdAt: lead.createdAt.toISOString().slice(0, 10),
       }))}

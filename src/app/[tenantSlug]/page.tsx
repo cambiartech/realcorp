@@ -4,6 +4,7 @@ import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { DashboardWorkspace } from "./dashboard/dashboard-workspace";
+import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,10 @@ export default async function TenantHomePage({
           moduleMarketing: true,
           moduleCommunity: true,
           roleModuleGrants: true,
+          metaPageAccessToken: true,
+          whatsappAccessToken: true,
+          whatsappPhoneNumberId: true,
+          termiiApiKey: true,
         },
       },
     },
@@ -80,7 +85,7 @@ export default async function TenantHomePage({
   const monthEnd = new Date(monthStart);
   monthEnd.setMonth(monthEnd.getMonth() + 1);
 
-  const [goal, preference, deals, units, leads, invoices, payments, users, projects] = await Promise.all([
+  const [goal, preference, deals, units, leads, invoices, payments, users, projects, activitiesCount, whatsappCount, inboundWebhookLastAt, hrOnboardingStatus] = await Promise.all([
     prisma.tenantGoal.findFirst({
       where: { tenantId: tenant.id, isActive: true },
       orderBy: { updatedAt: "desc" },
@@ -194,6 +199,14 @@ export default async function TenantHomePage({
       select: { id: true, name: true, createdAt: true },
       take: 500,
     }),
+    prisma.activity.count({ where: { tenantId: tenant.id } }),
+    prisma.whatsAppMessage.count({ where: { tenantId: tenant.id } }),
+    prisma.auditLog.findFirst({
+      where: { tenantId: tenant.id, entityType: "WHATSAPP_WEBHOOK", action: "RECEIVED" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
+    loadHrOnboardingStatusForUser(tenant.id, session.user.id, session.user.email),
   ]);
 
   const preferredRoleView = normalizeRoleView(preference?.roleView || roleOptions[0]);
@@ -488,6 +501,42 @@ export default async function TenantHomePage({
         leadSourceQuality,
         topProjectsIntelligence,
         repLeaderboardTrend,
+        hrOnboarding:
+          hrOnboardingStatus.summary.state === "pending"
+            ? {
+                state: "pending" as const,
+                pendingCount: hrOnboardingStatus.summary.pendingCount,
+                sectionLabels: hrOnboardingStatus.summary.sectionLabels,
+                dueLabel: hrOnboardingStatus.summary.dueLabel,
+                masterUrl: hrOnboardingStatus.summary.masterUrl,
+                hrDashboardUrl: `/${tenantSlug}/hr/dashboard`,
+              }
+            : hrOnboardingStatus.summary.state === "complete"
+              ? {
+                  state: "complete" as const,
+                  submittedCount: hrOnboardingStatus.summary.submittedCount,
+                  submittedAtLabel: hrOnboardingStatus.summary.submittedAtLabel,
+                  viewUrl: hrOnboardingStatus.summary.masterUrl,
+                  hrDashboardUrl: `/${tenantSlug}/hr/dashboard`,
+                }
+              : { state: "none" as const, hrDashboardUrl: `/${tenantSlug}/hr/dashboard` },
+        onboarding: {
+          connectIntegrationDone: Boolean(
+            tenant.settings?.metaPageAccessToken ||
+              (tenant.settings?.whatsappAccessToken && tenant.settings?.whatsappPhoneNumberId) ||
+              tenant.settings?.termiiApiKey,
+          ),
+          importedLeadsDone: leads.length > 0,
+          createdDealDone: deals.length > 0,
+          followUpSentDone: whatsappCount > 0 || activitiesCount > 0,
+          firstTaskDone: deals.length > 0 || activitiesCount > 0,
+        },
+        integrationHealth: {
+          metaLeads: Boolean(tenant.settings?.metaPageAccessToken),
+          whatsapp: Boolean(tenant.settings?.whatsappAccessToken && tenant.settings?.whatsappPhoneNumberId),
+          sms: Boolean(tenant.settings?.termiiApiKey),
+          inboundWebhookLastAt: inboundWebhookLastAt?.createdAt.toISOString() ?? null,
+        },
         kpiLeadRows: leads.map((l) => ({
           id: l.id,
           createdAt: l.createdAt.toISOString(),

@@ -49,6 +49,36 @@ type WidgetValue = {
   leadSourceQuality: Array<{ source: string; leads: number; wonDeals: number; winRate: number; wonValue: number }>;
   topProjectsIntelligence: Array<{ project: string; leads: number; dealValue: number; conversionRate: number }>;
   repLeaderboardTrend: Array<{ label: string; current: number; previous: number; deltaPct: number }>;
+  onboarding: {
+    connectIntegrationDone: boolean;
+    importedLeadsDone: boolean;
+    createdDealDone: boolean;
+    followUpSentDone: boolean;
+    firstTaskDone: boolean;
+  };
+  hrOnboarding:
+    | { state: "none"; hrDashboardUrl: string }
+    | {
+        state: "pending";
+        pendingCount: number;
+        sectionLabels: string[];
+        dueLabel: string | null;
+        masterUrl: string | null;
+        hrDashboardUrl: string;
+      }
+    | {
+        state: "complete";
+        submittedCount: number;
+        submittedAtLabel: string;
+        viewUrl: string | null;
+        hrDashboardUrl: string;
+      };
+  integrationHealth: {
+    metaLeads: boolean;
+    whatsapp: boolean;
+    sms: boolean;
+    inboundWebhookLastAt: string | null;
+  };
   revenueMonthly: Array<{ label: string; month: number; year: number; value: number }>;
   pipelineVsTargetMonthly: Array<{ label: string; month: number; year: number; pipeline: number; target: number }>;
   revenueWeekly: Array<{ label: string; value: number }>;
@@ -387,6 +417,7 @@ export function DashboardWorkspace({
   const [openFabMenu, setOpenFabMenu] = useState(false);
   const [openScopeFilters, setOpenScopeFilters] = useState(false);
   const [openSavedViews, setOpenSavedViews] = useState(false);
+  const [openOnboardingGuide, setOpenOnboardingGuide] = useState(false);
   const [openKpiDetail, setOpenKpiDetail] = useState<null | "LEADS_TODAY" | "DEALS_TODAY" | "PROJECTS" | "TOP_PROJECTS">(null);
   const [openFinanceDetail, setOpenFinanceDetail] = useState<
     null | "COLLECTIONS_TREND" | "OVERDUE_AGING" | "HEALTH_PROJECT_TEAM" | "TARGET_ATTAINMENT"
@@ -862,6 +893,108 @@ export function DashboardWorkspace({
         </div>
       </div>
 
+      {values.hrOnboarding.state !== "none" ? (
+        <section
+          className={[
+            "mt-4 rounded-lg border p-4",
+            values.hrOnboarding.state === "complete"
+              ? "border-emerald-500/30 bg-emerald-500/5"
+              : "border-violet-500/30 bg-violet-500/5",
+          ].join(" ")}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">HR onboarding</p>
+              {values.hrOnboarding.state === "complete" ? (
+                <>
+                  <p className="mt-1 text-sm font-semibold text-foreground">All forms submitted</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {values.hrOnboarding.submittedCount} section{values.hrOnboarding.submittedCount === 1 ? "" : "s"}{" "}
+                    sent to HR
+                    {values.hrOnboarding.submittedAtLabel !== "—"
+                      ? ` · ${values.hrOnboarding.submittedAtLabel}`
+                      : ""}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-sm font-semibold text-foreground">
+                    {values.hrOnboarding.pendingCount} section{values.hrOnboarding.pendingCount === 1 ? "" : "s"} still
+                    to complete
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {values.hrOnboarding.sectionLabels.join(" · ")}
+                    {values.hrOnboarding.dueLabel ? ` · due ${values.hrOnboarding.dueLabel}` : ""}
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {values.hrOnboarding.state === "pending" && values.hrOnboarding.masterUrl ? (
+                <a
+                  href={values.hrOnboarding.masterUrl}
+                  className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background"
+                >
+                  Continue forms
+                </a>
+              ) : null}
+              {values.hrOnboarding.state === "complete" && values.hrOnboarding.viewUrl ? (
+                <a
+                  href={values.hrOnboarding.viewUrl}
+                  className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold hover:bg-foreground/[0.06]"
+                >
+                  View forms
+                </a>
+              ) : null}
+              <a
+                href={values.hrOnboarding.hrDashboardUrl}
+                className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold hover:bg-foreground/[0.06]"
+              >
+                My HR dashboard
+              </a>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <section className="rounded-lg border border-foreground/10 bg-background p-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Getting started</p>
+            <button
+              type="button"
+              onClick={() => setOpenOnboardingGuide(true)}
+              className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2"
+            >
+              Launch setup guide
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <ChecklistRow label="Connect at least one integration" done={values.onboarding.connectIntegrationDone} />
+            <ChecklistRow label="Import your first leads" done={values.onboarding.importedLeadsDone} />
+            <ChecklistRow label="Create your first deal" done={values.onboarding.createdDealDone} />
+            <ChecklistRow label="Send first follow-up" done={values.onboarding.followUpSentDone} />
+            <ChecklistRow label="Complete first task/activity" done={values.onboarding.firstTaskDone} />
+          </ul>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-background p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Integration health</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+            <HealthPill label="Meta Leads" ok={values.integrationHealth.metaLeads} />
+            <HealthPill label="WhatsApp" ok={values.integrationHealth.whatsapp} />
+            <HealthPill label="SMS (Termii)" ok={values.integrationHealth.sms} />
+            <div className="rounded-md border border-foreground/10 px-2 py-1.5">
+              <p className="text-[11px] text-muted">Webhook</p>
+              <p className="text-xs font-medium text-foreground">
+                {values.integrationHealth.inboundWebhookLastAt
+                  ? `Last event ${new Date(values.integrationHealth.inboundWebhookLastAt).toLocaleString()}`
+                  : "No events yet"}
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+
       {globalRange !== "1M" || moduleFilter !== "ALL" || ownerFilter || projectFilter || sourceFilter ? (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 py-2.5">
           {globalRange !== "1M" ? (
@@ -1158,6 +1291,16 @@ export function DashboardWorkspace({
             >
               <span>Saved views</span>
               <span className="text-xs text-muted">{openSavedViews ? "On" : "Off"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOpenOnboardingGuide(true);
+                setOpenFabMenu(false);
+              }}
+              className="mt-0.5 flex w-full items-center rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Launch setup guide
             </button>
           </div>
         ) : null}
@@ -1779,6 +1922,36 @@ export function DashboardWorkspace({
         </div>
       ) : null}
 
+      {openOnboardingGuide ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Setup guide</h2>
+                <p className="mt-1 text-sm text-muted">Complete these steps to get your team live quickly.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenOnboardingGuide(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+                aria-label="Close"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <div className="mt-4 space-y-2">
+              <GuideItem done={values.onboarding.connectIntegrationDone} title="Connect integrations" href={`/${tenantSlug}/settings`} />
+              <GuideItem done={values.onboarding.importedLeadsDone} title="Import your first leads" href={`/${tenantSlug}/leads/import`} />
+              <GuideItem done={values.onboarding.createdDealDone} title="Create first deal" href={`/${tenantSlug}/deals`} />
+              <GuideItem done={values.onboarding.followUpSentDone} title="Send first follow-up" href={`/${tenantSlug}/activities?channel=WHATSAPP`} />
+              <GuideItem done={values.onboarding.firstTaskDone} title="Complete first task" href={`/${tenantSlug}/activities?status=PENDING`} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {openBuilder ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-2xl">
@@ -2299,6 +2472,45 @@ function StatPill({ label, value, tone }: { label: string; value: number; tone: 
       <p className="text-[10px] uppercase tracking-wide">{label}</p>
       <p className="text-sm font-semibold">{value}</p>
     </div>
+  );
+}
+
+function ChecklistRow({ label, done }: { label: string; done: boolean }) {
+  return (
+    <li className="flex items-center gap-2">
+      <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-500/15 text-emerald-700" : "bg-foreground/10 text-muted"}`}>
+        {done ? "✓" : "•"}
+      </span>
+      <span className={done ? "text-foreground" : "text-muted"}>{label}</span>
+    </li>
+  );
+}
+
+function HealthPill({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="rounded-md border border-foreground/10 px-2 py-1.5">
+      <p className="text-[11px] text-muted">{label}</p>
+      <p className={`text-xs font-medium ${ok ? "text-emerald-700" : "text-amber-700"}`}>
+        {ok ? "Connected" : "Needs setup"}
+      </p>
+    </div>
+  );
+}
+
+function GuideItem({ done, title, href }: { done: boolean; title: string; href: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-md border border-foreground/10 px-3 py-2 text-sm hover:bg-foreground/[0.04]"
+    >
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-500/15 text-emerald-700" : "bg-foreground/10 text-muted"}`}>
+          {done ? "✓" : "→"}
+        </span>
+        <span className={done ? "text-foreground" : "text-muted"}>{title}</span>
+      </div>
+      <span className="text-xs text-muted">{done ? "Done" : "Open"}</span>
+    </Link>
   );
 }
 

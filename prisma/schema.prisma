@@ -97,12 +97,33 @@ model Tenant {
   leads                Lead[]
   deals                Deal[]
   invoices             Invoice[]
+  salesReceipts        SalesReceipt[]
   payments             PaymentRecord[]
   auditLogs            AuditLog[]
   goals                TenantGoal[]
   dashboardPreferences DashboardPreference[]
   campaigns            Campaign[]
   realtorPartners      RealtorPartner[]
+  shortletUnits        ShortletUnit[]
+  shortletReservations ShortletReservation[]
+  shortletPayments     ShortletPayment[]
+  activities           Activity[]
+  whatsappMessages     WhatsAppMessage[]
+  expenses             Expense[]
+  vendorBills          VendorBill[]
+  vendorBillPayments   VendorBillPayment[]
+  bankStatementImports BankStatementImport[]
+  bankStatementRows    BankStatementRow[]
+  employeeProfiles     EmployeeProfile[]
+  hrAppraisalActions   HrAppraisalAction[]
+  hrAppraisalCycles    HrAppraisalCycle[]
+  hrAppraisals         HrAppraisal[]
+  hrPayslipRuns        HrPayslipRun[]
+  hrPayslips           HrPayslip[]
+  hrDocuments          HrDocument[]
+  hrPerformanceGoals   HrPerformanceGoal[]
+  hrFormRequests       HrFormRequest[]
+  hrOfferLetters       HrOfferLetter[]
 }
 
 model TenantSettings {
@@ -111,15 +132,49 @@ model TenantSettings {
   monthlyRevenueTarget Decimal? @db.Decimal(18, 2)
   pipelineTarget       Decimal? @db.Decimal(18, 2)
   logoUrl              String?
-  primaryColor         String?
-  accentColor          String?
+  primaryColor         String?   @default("#1e3a5f")
+  accentColor          String?   @default("#4f46e5")
+  orgEmail             String?
+  orgPhone             String?
+  orgAddressLine       String?
+  orgCity              String?
+  orgState             String?
+  orgCountry           String?   @default("Nigeria")
   moduleSales          Boolean  @default(true)
   moduleFinance        Boolean  @default(true)
   moduleMarketing      Boolean  @default(true)
   moduleCommunity      Boolean  @default(true)
   moduleRealtorPortal  Boolean  @default(true)
+  moduleShortLets      Boolean  @default(false)
+  moduleHr             Boolean  @default(false)
   /// Extra nav modules per role beyond defaults, e.g. { "SALES_EXECUTIVE": ["MARKETING","FINANCE"] }
   roleModuleGrants     Json?
+  orgDepartments       Json?
+
+  // Meta Lead Ads integration
+  metaVerifyToken      String?   // random string you enter in Meta webhook settings
+  metaPageAccessToken  String?   // long-lived Page Access Token from Meta
+  metaDefaultSource    String?   @default("Facebook")
+
+  // Termii SMS integration
+  termiiApiKey         String?
+  termiiSenderId       String?   @default("Realcorp")
+
+  // WhatsApp Cloud API integration (Meta)
+  whatsappAccessToken  String?
+  whatsappPhoneNumberId String?
+  whatsappVerifyToken  String?
+
+  // Cloudinary uploads (finance attachments)
+  cloudinaryCloudName  String?
+  cloudinaryApiKey     String?
+  cloudinaryApiSecret  String?
+  cloudinaryFolder     String?   @default("realcorp/finance")
+  financeBankAccounts  Json?
+  financePaymentModes  Json?
+  financeCurrencies    Json?
+  /// e.g. { expenseApprovalThreshold, firstReminderAfterDays, secondReminderAfterDays }
+  financeControls      Json?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -161,6 +216,7 @@ model DashboardPreference {
 enum MembershipRole {
   ORG_ADMIN
   FINANCE_MANAGER
+  HR_MANAGER
   SALES_MANAGER
   SALES_EXECUTIVE
   MARKETING_MANAGER
@@ -253,20 +309,86 @@ model ProjectPricingPlan {
   @@index([projectId])
 }
 
+enum UnitPurpose {
+  SALE
+  SHORT_LET
+  RENTAL
+  HOSTEL
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  WHATSAPP
+  MEETING
+  TASK
+}
+
+enum ActivityStatus {
+  DONE
+  PENDING
+  OVERDUE
+}
+
+model Activity {
+  id              String         @id @default(cuid())
+  tenantId        String
+  entityType      String
+  entityId        String
+  type            ActivityType
+  status          ActivityStatus @default(DONE)
+  title           String
+  body            String?        @db.Text
+  dueAt           DateTime?
+  completedAt     DateTime?
+  createdByUserId String
+  assignedUserId  String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, assignedUserId])
+  @@index([tenantId, dueAt])
+}
+
+model WhatsAppMessage {
+  id             String   @id @default(cuid())
+  tenantId       String
+  leadId         String?
+  direction      String   // INBOUND | OUTBOUND
+  waMessageId    String?
+  fromPhone      String?
+  toPhone        String?
+  body           String   @db.Text
+  timestamp      DateTime
+  createdAt      DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead   Lead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, timestamp])
+  @@index([tenantId, leadId, timestamp])
+}
+
 model Unit {
-  id            String     @id @default(cuid())
+  id            String       @id @default(cuid())
   tenantId      String
   projectId     String
   pricingPlanId String?
   label         String
+  purpose       UnitPurpose  @default(SALE)
   unitType      String?
-  status        UnitStatus @default(AVAILABLE)
+  status        UnitStatus   @default(AVAILABLE)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  pricingPlan ProjectPricingPlan? @relation(fields: [pricingPlanId], references: [id], onDelete: SetNull)
-  deal        Deal?
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pricingPlan  ProjectPricingPlan? @relation(fields: [pricingPlanId], references: [id], onDelete: SetNull)
+  deal         Deal?
+  shortletUnit ShortletUnit?
 
   @@index([tenantId])
   @@index([projectId])
@@ -341,6 +463,8 @@ model Lead {
   projectInterest  String?
   budgetRange      String?
   quality          LeadQuality @default(WARM)
+  score            Int         @default(0)
+  lastActivityAt   DateTime?
   name             String?
   email            String?
   phone            String?
@@ -351,8 +475,10 @@ model Lead {
   campaign       Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   realtorPartner RealtorPartner? @relation(fields: [realtorPartnerId], references: [id], onDelete: SetNull)
   deals          Deal[]
+  whatsappMessages WhatsAppMessage[]
 
   @@index([tenantId])
+  @@index([tenantId, score])
   @@index([tenantId, campaignId])
   @@index([tenantId, realtorPartnerId])
 }
@@ -394,6 +520,7 @@ model Deal {
   lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
   unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
   invoices Invoice[]
+  salesReceipts SalesReceipt[]
 
   @@index([tenantId])
   @@index([assignedUserId])
@@ -417,6 +544,7 @@ model Invoice {
   amount          Decimal       @db.Decimal(18, 2)
   balanceDue      Decimal       @db.Decimal(18, 2)
   currency        String        @default("NGN")
+  department      String?
   dueDate         DateTime?
   issuedAt        DateTime      @default(now())
   createdByUserId String?
@@ -439,10 +567,14 @@ model PaymentRecord {
   invoiceId        String
   amount           Decimal  @db.Decimal(18, 2)
   currency         String   @default("NGN")
+  department       String?
   paidAt           DateTime
   method           String?
   reference        String?
   note             String?
+  attachmentUrl    String?
+  attachmentName   String?
+  attachmentPublicId String?
   recordedByUserId String?
   recordedByLabel  String?
   createdAt        DateTime @default(now())
@@ -452,6 +584,262 @@ model PaymentRecord {
 
   @@index([tenantId, paidAt])
   @@index([invoiceId])
+}
+
+model Expense {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  projectId          String?
+  unitId             String?
+  category           String
+  department         String?
+  vendorName         String?
+  amount             Decimal  @db.Decimal(18, 2)
+  currency           String   @default("NGN")
+  expenseDate        DateTime
+  paidThroughAccount String?
+  reference          String?
+  note               String?
+  attachmentUrl      String?
+  attachmentName     String?
+  attachmentPublicId String?
+  createdByUserId    String?
+  createdByLabel     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, expenseDate])
+  @@index([tenantId, category])
+}
+
+enum VendorBillStatus {
+  OPEN
+  PARTIAL
+  PAID
+  VOID
+}
+
+model VendorBill {
+  id              String           @id @default(cuid())
+  tenantId        String
+  projectId       String?
+  unitId          String?
+  billNumber      String
+  vendorName      String
+  title           String
+  status          VendorBillStatus @default(OPEN)
+  amount          Decimal          @db.Decimal(18, 2)
+  balanceDue      Decimal          @db.Decimal(18, 2)
+  currency        String           @default("NGN")
+  department      String?
+  dueDate         DateTime?
+  issuedAt        DateTime         @default(now())
+  note            String?
+  createdByUserId String?
+  createdByLabel  String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments VendorBillPayment[]
+
+  @@unique([tenantId, billNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+}
+
+model VendorBillPayment {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  billId             String
+  amount             Decimal  @db.Decimal(18, 2)
+  currency           String   @default("NGN")
+  paidAt             DateTime
+  method             String?
+  reference          String?
+  paidThroughAccount String?
+  recordedByUserId   String?
+  recordedByLabel    String?
+  createdAt          DateTime @default(now())
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bill   VendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, paidAt])
+  @@index([billId])
+}
+
+model SalesReceipt {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  dealId             String?
+  receiptNumber      String
+  title              String
+  customerName       String?
+  amount             Decimal  @db.Decimal(18, 2)
+  currency           String   @default("NGN")
+  paymentMode        String?
+  depositAccount     String?
+  reference          String?
+  note               String?
+  status             String   @default("RECORDED")
+  issuedAt           DateTime @default(now())
+  createdByUserId    String?
+  createdByLabel     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal   Deal?  @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, receiptNumber])
+  @@index([tenantId, issuedAt])
+  @@index([tenantId, dealId])
+}
+
+enum BankMatchStatus {
+  UNMATCHED
+  MATCHED
+  EXCEPTION
+}
+
+model BankStatementImport {
+  id              String             @id @default(cuid())
+  tenantId        String
+  sourceName      String
+  importedByUserId String?
+  importedByLabel String?
+  importedAt      DateTime           @default(now())
+  finalizedAt     DateTime?
+  finalizedByUserId String?
+  finalizedByLabel String?
+  createdAt       DateTime           @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rows   BankStatementRow[]
+
+  @@index([tenantId, importedAt])
+}
+
+model BankStatementRow {
+  id                String          @id @default(cuid())
+  tenantId          String
+  importId          String
+  postedAt          DateTime?
+  description       String?
+  reference         String?
+  debit             Decimal         @default(0) @db.Decimal(18, 2)
+  credit            Decimal         @default(0) @db.Decimal(18, 2)
+  amountAbs         Decimal         @db.Decimal(18, 2)
+  direction         String
+  matchStatus       BankMatchStatus @default(UNMATCHED)
+  matchedEntityType String?
+  matchedEntityId   String?
+  matchedAt         DateTime?
+  matchedByUserId   String?
+  matchedByLabel    String?
+  exceptionReason   String?
+  reconciliationNote String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  import BankStatementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, postedAt])
+  @@index([tenantId, matchStatus, createdAt])
+  @@index([tenantId, matchedEntityType, matchedEntityId])
+  @@index([importId])
+}
+
+enum ShortletUnitStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum ShortletReservationStatus {
+  RESERVED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+model ShortletUnit {
+  id                  String             @id @default(cuid())
+  tenantId            String
+  projectUnitId       String?            @unique
+  name                String
+  location            String?
+  nightlyRate         Decimal            @db.Decimal(18, 2)
+  cleaningFee         Decimal?           @db.Decimal(18, 2)
+  currency            String             @default("NGN")
+  status              ShortletUnitStatus @default(AVAILABLE)
+  activeReservationId String?            @unique
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectUnit       Unit?                 @relation(fields: [projectUnitId], references: [id], onDelete: SetNull)
+  activeReservation ShortletReservation?  @relation("ActiveShortletReservation", fields: [activeReservationId], references: [id], onDelete: SetNull)
+  reservations      ShortletReservation[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model ShortletReservation {
+  id              String                    @id @default(cuid())
+  tenantId        String
+  unitId          String
+  guestName       String
+  guestEmail      String?
+  guestPhone      String?
+  checkIn         DateTime
+  checkOut        DateTime
+  nights          Int
+  totalAmount     Decimal                   @db.Decimal(18, 2)
+  amountPaid      Decimal                   @default(0) @db.Decimal(18, 2)
+  balanceDue      Decimal                   @db.Decimal(18, 2)
+  currency        String                    @default("NGN")
+  status          ShortletReservationStatus @default(RESERVED)
+  notes           String?
+  createdByUserId String?
+  createdByLabel  String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unit         ShortletUnit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  activeOnUnit ShortletUnit?     @relation("ActiveShortletReservation")
+  payments     ShortletPayment[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, checkIn, checkOut])
+  @@index([unitId, status])
+}
+
+model ShortletPayment {
+  id               String   @id @default(cuid())
+  tenantId         String
+  reservationId    String
+  amount           Decimal  @db.Decimal(18, 2)
+  currency         String   @default("NGN")
+  paidAt           DateTime
+  method           String?
+  reference        String?
+  note             String?
+  recordedByUserId String?
+  recordedByLabel  String?
+  createdAt        DateTime @default(now())
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reservation ShortletReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, paidAt])
+  @@index([reservationId])
 }
 
 model AuditLog {
@@ -472,4 +860,356 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, module])
   @@index([tenantId, entityType])
+}
+
+// ——— Human Resources (People management) ———
+
+enum EmployeeProfileStatus {
+  DRAFT
+  ACTIVE
+  EXITED
+}
+
+enum HrDocumentCategory {
+  BIODATA
+  BANK_FORM
+  OFFER_LETTER
+  NDA
+  GUARANTOR
+  JOB_DESCRIPTION
+  CONTRACT
+  PAYSLIP
+  APPRAISAL
+  OTHER
+}
+
+enum HrAppraisalCycleType {
+  MONTHLY
+  YEARLY
+}
+
+enum HrAppraisalCycleStatus {
+  OPEN
+  CLOSED
+}
+
+enum HrAppraisalStatus {
+  DRAFT
+  SELF_SUBMITTED
+  REVIEWED
+}
+
+enum HrPayslipRunStatus {
+  DRAFT
+  FINALIZED
+}
+
+enum HrPayslipPaymentStatus {
+  PENDING
+  PAID
+}
+
+enum HrFormType {
+  BIODATA
+  BANK_FORM
+  GUARANTOR
+  HEALTH
+}
+
+enum HrFormDeliveryMode {
+  ONLINE_FILL
+  PRINT_UPLOAD
+  BOTH
+}
+
+enum HrFormRequestStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  CANCELLED
+  EXPIRED
+}
+
+enum HrOfferLetterStatus {
+  DRAFT
+  AWAITING_SIGNATURE
+  SIGNED
+}
+
+model HrOfferLetter {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  employeeProfileId   String               @unique
+  bodyHtml            String               @db.Text
+  status              HrOfferLetterStatus  @default(DRAFT)
+  token               String?              @unique
+  tokenExpiresAt      DateTime?
+  candidateSignature  String?              @db.Text
+  candidateSignedAt   DateTime?
+  signedSnapshotUrl   String?
+  lastEditedByUserId  String?
+  lastEditedByLabel   String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([token])
+}
+
+model EmployeeProfile {
+  id               String                @id @default(cuid())
+  tenantId         String
+  userId           String
+  employeeNumber   String?
+  status           EmployeeProfileStatus @default(DRAFT)
+  fullName         String?
+  gender           String?
+  dateOfBirth      DateTime?
+  maritalStatus    String?
+  nationality      String?
+  phoneMobile      String?
+  workEmail        String?
+  addressStreet    String?
+  addressCity      String?
+  addressState     String?
+  position         String?
+  department       String?
+  dateOfJoining    DateTime?
+  reportingToLabel String?
+  employmentType   String?
+  workSchedule     String?
+  paygroupName     String?
+  grossMonthly     Decimal?              @db.Decimal(18, 2)
+  payeeTaxMonthly  Decimal?              @db.Decimal(18, 2)
+  basicPercent     Decimal               @default(30) @db.Decimal(5, 2)
+  housingPercent   Decimal               @default(20) @db.Decimal(5, 2)
+  transportPercent Decimal               @default(15) @db.Decimal(5, 2)
+  otherPercent     Decimal               @default(35) @db.Decimal(5, 2)
+  emergencyContact Json?
+  education        Json?
+  nextOfKin        Json?
+  healthInfo       Json?
+  additionalInfo   Json?
+  bankAccount      Json?
+  guarantorInfo    Json?
+  hrNotes          String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  documents        HrDocument[]
+  appraisals       HrAppraisal[]
+  payslips         HrPayslip[]
+  performanceGoals HrPerformanceGoal[]
+  formRequests     HrFormRequest[]
+  offerLetter      HrOfferLetter?
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, status])
+  @@index([tenantId, department])
+}
+
+model HrDocument {
+  id                String             @id @default(cuid())
+  tenantId          String
+  employeeProfileId String
+  category          HrDocumentCategory @default(OTHER)
+  title             String
+  fileUrl           String
+  fileName          String?
+  uploadedByUserId  String?
+  uploadedByLabel   String?
+  createdAt         DateTime           @default(now())
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeProfileId])
+  @@index([tenantId, category])
+}
+
+model HrAppraisalAction {
+  id          String               @id @default(cuid())
+  tenantId    String
+  title       String
+  description String?
+  cycleType   HrAppraisalCycleType
+  sortOrder   Int                  @default(0)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, cycleType, isActive])
+}
+
+model HrAppraisalCycle {
+  id          String                 @id @default(cuid())
+  tenantId    String
+  cycleType   HrAppraisalCycleType
+  periodLabel String
+  status      HrAppraisalCycleStatus @default(OPEN)
+  dueDate     DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appraisals HrAppraisal[]
+
+  @@unique([tenantId, cycleType, periodLabel])
+  @@index([tenantId, status])
+}
+
+model HrAppraisal {
+  id                String            @id @default(cuid())
+  tenantId          String
+  cycleId           String
+  employeeProfileId String
+  status            HrAppraisalStatus @default(DRAFT)
+  actionScores      Json?
+  selfNotes         String?
+  managerNotes      String?
+  overallRating     Int?
+  reviewerUserId    String?
+  reviewerLabel     String?
+  reviewedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cycle   HrAppraisalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  profile EmployeeProfile  @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleId, employeeProfileId])
+  @@index([tenantId, employeeProfileId])
+}
+
+model HrPayslipRun {
+  id        String             @id @default(cuid())
+  tenantId  String
+  year      Int
+  month     Int
+  label     String
+  status    HrPayslipRunStatus   @default(DRAFT)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payslips HrPayslip[]
+
+  @@unique([tenantId, year, month])
+  @@index([tenantId, status])
+}
+
+model HrPayslip {
+  id                String   @id @default(cuid())
+  tenantId          String
+  runId             String
+  employeeProfileId String
+  currency          String   @default("NGN")
+  grossPay          Decimal  @db.Decimal(18, 2)
+  payeeTax          Decimal  @db.Decimal(18, 2)
+  pensionDeduction  Decimal  @db.Decimal(18, 2)
+  otherDeductions   Decimal  @default(0) @db.Decimal(18, 2)
+  netPay            Decimal  @db.Decimal(18, 2)
+  earningsBreakdown Json
+  deductionsBreakdown Json
+  paymentStatus     HrPayslipPaymentStatus @default(PENDING)
+  paidAt            DateTime?
+  paymentReference  String?
+  paidByLabel       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run     HrPayslipRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, employeeProfileId])
+  @@index([tenantId, employeeProfileId])
+  @@index([tenantId, paymentStatus])
+}
+
+model HrPerformanceGoal {
+  id                String    @id @default(cuid())
+  tenantId          String
+  employeeProfileId String
+  title             String
+  description       String?
+  targetValue       String?
+  progressPercent   Int       @default(0)
+  dueDate           DateTime?
+  status            String    @default("IN_PROGRESS")
+  createdByLabel    String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeProfileId])
+}
+
+model HrFormRequest {
+  id                String               @id @default(cuid())
+  tenantId          String
+  employeeProfileId String?
+  recipientName     String?
+  recipientEmail    String?
+  formType          HrFormType
+  deliveryMode      HrFormDeliveryMode   @default(ONLINE_FILL)
+  status            HrFormRequestStatus  @default(PENDING)
+  token             String               @unique
+  /// When HR sends multiple forms at once, all share this token → one master link.
+  bundleToken       String?
+  hrNote            String?
+  submittedPayload  Json?
+  submittedFileUrl  String?
+  submittedFileName String?
+  expiresAt         DateTime
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  approvedByUserId  String?
+  approvedByLabel   String?
+  createdByUserId   String?
+  createdByLabel    String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeProfileId])
+  @@index([tenantId, status])
+  @@index([token])
+  @@index([bundleToken])
+}
+
+// ——— Nigeria reference geography (synced from open dataset, shared platform-wide) ———
+
+model NigeriaStateRef {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  slug        String          @unique
+  lgaCount    Int             @default(0)
+  sourceUrl   String?
+  syncedAt    DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  lgas        NigeriaLgaRef[]
+}
+
+model NigeriaLgaRef {
+  id      String          @id @default(cuid())
+  stateId String
+  name    String
+  slug    String
+  state   NigeriaStateRef @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@unique([stateId, slug])
+  @@index([stateId])
+  @@index([name])
 }

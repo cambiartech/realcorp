@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { TenantHeaderActions } from "@/components/tenant-header-actions";
 import { TenantMobileDock, TenantSidebar } from "@/components/tenant-nav";
 import prisma from "@/lib/db";
+import { canManageHr } from "@/lib/hr-access";
 import { getVisibleNavKeys, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 
 export default async function TenantLayout({
@@ -32,6 +33,8 @@ export default async function TenantLayout({
           moduleFinance: true,
           moduleMarketing: true,
           moduleCommunity: true,
+          moduleShortLets: true,
+          moduleHr: true,
           roleModuleGrants: true,
         },
       },
@@ -61,15 +64,25 @@ export default async function TenantLayout({
   const visibleNavKeys = getVisibleNavKeys({
     role: membership?.role,
     isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+    membershipStatus: membership?.status,
     settings: settingsNav,
   });
 
   const userLabel = session.user.name || session.user.email || "Signed in";
+  const manageHr = canManageHr(Boolean(session.user.isPlatformAdmin), membership);
+  const hrEmployeeProfile = manageHr
+    ? await prisma.employeeProfile.findUnique({
+        where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+        select: { id: true },
+      })
+    : null;
 
   const navProps = {
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
     canAccessPlatform: Boolean(session.user.isPlatformAdmin),
+    canManageHr: manageHr,
+    hasHrEmployeeProfile: Boolean(hrEmployeeProfile),
     visibleNavKeys,
     userName: session.user.name ?? null,
     userEmail: session.user.email ?? null,

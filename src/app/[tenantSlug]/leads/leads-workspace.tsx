@@ -17,9 +17,27 @@ type LeadRow = {
   source: string;
   attribution: string;
   quality: string;
+  score: number;
+  lastActivityAt: string | null;
   owner: string;
   createdAt: string;
 };
+
+function ScoreBadge({ score }: { score: number }) {
+  const hot = score >= 70;
+  const warm = score >= 40;
+  const ring = hot
+    ? "bg-red-500/10 text-red-600 ring-1 ring-red-400/40"
+    : warm
+      ? "bg-amber-400/10 text-amber-600 ring-1 ring-amber-400/40"
+      : "bg-foreground/5 text-muted ring-1 ring-foreground/10";
+  const label = hot ? "🔥" : warm ? "☀" : "❄";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${ring}`}>
+      {label} {score}
+    </span>
+  );
+}
 
 type TeamUser = {
   id: string;
@@ -105,13 +123,21 @@ export function LeadsWorkspace({
           ) : null}
         </div>
         {canCreate ? (
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-          >
-            New lead
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/${tenantSlug}/leads/import`}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+            >
+              Import CSV
+            </Link>
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+            >
+              New lead
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -140,47 +166,94 @@ export function LeadsWorkspace({
         </div>
       ) : null}
 
+      {/* Hot leads priority band */}
+      {leads.some((l) => l.score >= 70) && (
+        <div className="mt-5 rounded-lg border border-red-400/30 bg-red-500/5 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-base">🔥</span>
+            <span className="text-sm font-semibold text-red-600">Hot leads — act now</span>
+            <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600">
+              {leads.filter((l) => l.score >= 70).length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {leads
+              .filter((l) => l.score >= 70)
+              .slice(0, 8)
+              .map((lead) => (
+                <Link
+                  key={lead.id}
+                  href={`/${tenantSlug}/leads/${lead.id}`}
+                  className="flex items-center gap-2 rounded-lg border border-red-400/25 bg-background px-3 py-2 text-sm shadow-sm hover:border-red-400/50 hover:shadow-md"
+                >
+                  <span className="font-medium text-foreground">{lead.name}</span>
+                  <ScoreBadge score={lead.score} />
+                  {lead.lastActivityAt && (
+                    <span className="text-xs text-muted">last {lead.lastActivityAt}</span>
+                  )}
+                </Link>
+              ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
         <table className="w-full text-left text-sm">
           <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
             <tr>
+              <th className="px-4 py-3">Score</th>
               <th className="px-4 py-3">Lead</th>
               <th className="px-4 py-3">Contact</th>
               <th className="px-4 py-3">Source</th>
               <th className="px-4 py-3">Attribution</th>
-              <th className="px-4 py-3">Quality</th>
+              <th className="px-4 py-3">Last activity</th>
               <th className="px-4 py-3">Owner</th>
-              <th className="px-4 py-3">Created</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-foreground/10">
             {leads.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-sm text-muted">
+                <td colSpan={9} className="px-4 py-8 text-sm text-muted">
                   No leads yet.
                 </td>
               </tr>
             ) : (
               leads.map((lead) => (
-                <tr key={lead.id}>
-                  <td className="px-4 py-3 font-medium text-foreground">{lead.name}</td>
+                <tr key={lead.id} className={lead.score >= 70 ? "bg-red-500/[0.02]" : ""}>
+                  <td className="px-4 py-3">
+                    <ScoreBadge score={lead.score} />
+                  </td>
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    <Link href={`/${tenantSlug}/leads/${lead.id}`} className="hover:underline hover:decoration-foreground/30">
+                      {lead.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-muted">
                     <div>{lead.email}</div>
                     <div className="text-xs">{lead.phone}</div>
                   </td>
                   <td className="px-4 py-3 text-muted">{lead.source}</td>
                   <td className="max-w-[200px] px-4 py-3 text-xs text-muted">{lead.attribution}</td>
-                  <td className="px-4 py-3 text-foreground/90">{lead.quality}</td>
+                  <td className="px-4 py-3 text-xs text-muted">
+                    {lead.lastActivityAt ?? <span className="italic">Never</span>}
+                  </td>
                   <td className="px-4 py-3 text-muted">{lead.owner}</td>
-                  <td className="px-4 py-3 text-muted">{lead.createdAt}</td>
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/${tenantSlug}/deals?leadId=${lead.id}`}
-                      className="text-xs font-medium text-foreground underline decoration-foreground/20 underline-offset-2"
-                    >
-                      Convert to deal
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Link
+                        href={`/${tenantSlug}/leads/${lead.id}`}
+                        className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                      >
+                        View
+                      </Link>
+                      <Link
+                        href={`/${tenantSlug}/deals?leadId=${lead.id}`}
+                        className="text-xs font-medium text-foreground underline decoration-foreground/20 underline-offset-2"
+                      >
+                        Convert to deal
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))

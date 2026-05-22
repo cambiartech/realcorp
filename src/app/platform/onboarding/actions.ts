@@ -6,6 +6,7 @@ import { MembershipRole, TenantPlan, TenantStatus } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { parseOrganizationOnboardingForm } from "@/lib/validators/organization";
+import { getInviteBaseUrl, sendInviteEmail } from "@/lib/email";
 
 export type OnboardResult =
   | { ok: true; tenantSlug: string; inviteUrl: string }
@@ -81,11 +82,17 @@ export async function createOrganization(
 
   revalidatePath("/platform");
 
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-
+  const base = getInviteBaseUrl();
   const inviteUrl = `${base}/join?token=${token}`;
+
+  const inviterLabel = session.user.name || session.user.email || "Platform admin";
+  void sendInviteEmail({
+    to: parsed.data.adminEmail,
+    tenantName: parsed.data.organizationName,
+    inviterLabel,
+    inviteUrl,
+    roleLabel: MembershipRole.ORG_ADMIN,
+  });
 
   return {
     ok: true,

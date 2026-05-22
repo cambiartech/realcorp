@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { MembershipStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,19 @@ export default async function PaymentReceiptPage({
   if (!payment) notFound();
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
+      <div className="sticky top-0 z-20 -mx-4 mb-5 border-b border-foreground/10 bg-background/90 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static sm:mb-6 sm:rounded-lg sm:border sm:px-4 sm:py-3 sm:shadow-none sm:backdrop-blur-0">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Link
+            href={`/${tenantSlug}/finance/payments`}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 sm:inline-flex sm:w-auto"
+          >
+            <span aria-hidden>←</span>
+            Back to payments
+          </Link>
+          <p className="text-center text-[11px] text-muted sm:text-right">Or use your browser Back button.</p>
+        </div>
+      </div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-foreground">Payment Receipt</h1>
       </div>
@@ -83,6 +96,21 @@ export default async function PaymentReceiptPage({
             <p className="text-xs text-muted">Reference</p>
             <p className="text-sm font-medium text-foreground">{payment.reference || "Not specified"}</p>
           </div>
+        </div>
+        <div className="mt-4">
+          <p className="text-xs text-muted">Attachment</p>
+          {payment.attachmentUrl ? (
+            <a
+              href={payment.attachmentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
+            >
+              {payment.attachmentName || "Open receipt attachment"}
+            </a>
+          ) : (
+            <p className="text-sm font-medium text-foreground">No attachment</p>
+          )}
         </div>
         <div className="mt-5 border-t border-foreground/10 pt-4">
           <p className="text-xs text-muted">Invoice Remaining Balance</p>

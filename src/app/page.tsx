@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { RealcorpHeroLogo } from "@/components/realcorp-brand";
 
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24 pt-20">
-      <p className="text-xs font-semibold uppercase tracking-[0.35em] text-muted">Realcorp</p>
+      <RealcorpHeroLogo className="mb-2" />
       <h1 className="mt-4 max-w-xl text-center text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
         PropTech CRM &amp; ERP for real estate developers
       </h1>

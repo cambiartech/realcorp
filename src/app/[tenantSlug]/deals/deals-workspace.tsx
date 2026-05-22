@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCorners,
@@ -22,13 +23,20 @@ import { getEntityTimelineLogs } from "../finance/actions";
 
 type DealCard = {
   id: string;
+  leadId: string | null;
   leadName: string;
+  leadScore: number;
   unitLabel: string;
+  projectName: string;
+  projectId: string | null;
   owner: string;
   value: string;
   pendingFinance: boolean;
   stage: DealStage;
+  createdAt: string;
 };
+
+type ViewMode = "kanban" | "list";
 
 type SelectOption = { id: string; label: string };
 type ActiveFilterChip = { label: string; clearHref: string };
@@ -74,6 +82,7 @@ export function DealsWorkspace({
   users,
   defaultLeadId,
   activeFilterChips,
+  initialView = "kanban",
 }: {
   tenantSlug: string;
   deals: DealCard[];
@@ -82,7 +91,9 @@ export function DealsWorkspace({
   users: SelectOption[];
   defaultLeadId?: string;
   activeFilterChips?: ActiveFilterChip[];
+  initialView?: ViewMode;
 }) {
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
   const [isCreateOpen, setIsCreateOpen] = useState(Boolean(defaultLeadId));
   const [activeDeal, setActiveDeal] = useState<DealCard | null>(null);
   const [boardDeals, setBoardDeals] = useState<DealCard[]>(deals);
@@ -236,16 +247,116 @@ export function DealsWorkspace({
             </div>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-        >
-          New deal
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex overflow-hidden rounded-md border border-foreground/15">
+            <button
+              type="button"
+              onClick={() => setViewMode("kanban")}
+              title="Kanban view"
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]"}`}
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="5" height="18" rx="1" />
+                <rect x="10" y="3" width="5" height="12" rx="1" />
+                <rect x="17" y="3" width="4" height="15" rx="1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              title="List view"
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]"}`}
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" strokeLinecap="round" />
+                <line x1="3" y1="12" x2="3.01" y2="12" strokeLinecap="round" />
+                <line x1="3" y1="18" x2="3.01" y2="18" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+          >
+            New deal
+          </button>
+        </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto pb-2">
+      {/* List view */}
+      {viewMode === "list" && (
+        <div className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+              <tr>
+                <th className="px-4 py-3">Lead</th>
+                <th className="px-4 py-3">Stage</th>
+                <th className="px-4 py-3">Value</th>
+                <th className="px-4 py-3">Unit / Project</th>
+                <th className="px-4 py-3">Owner</th>
+                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-foreground/10">
+              {deals.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-sm text-muted">No deals yet.</td>
+                </tr>
+              ) : (
+                deals.map((deal) => (
+                  <tr key={deal.id}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {deal.leadId ? (
+                          <Link href={`/${tenantSlug}/leads/${deal.leadId}`} className="font-medium text-foreground hover:underline">
+                            {deal.leadName}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-foreground">{deal.leadName}</span>
+                        )}
+                        {deal.leadScore > 0 && (
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${deal.leadScore >= 70 ? "bg-red-500/10 text-red-600" : deal.leadScore >= 40 ? "bg-amber-400/10 text-amber-600" : "bg-foreground/5 text-muted"}`}>
+                            {deal.leadScore}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${deal.stage === "CLOSED_WON" ? "bg-green-500/10 text-green-600" : deal.stage === "CLOSED_LOST" ? "bg-red-500/10 text-red-600" : deal.stage === "RESERVATION_MADE" ? "bg-amber-500/10 text-amber-600" : "bg-foreground/5 text-muted"}`}>
+                        {STAGE_LABEL[deal.stage]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-foreground">{deal.value}</td>
+                    <td className="px-4 py-3 text-muted">
+                      <div>{deal.unitLabel}</div>
+                      <div className="text-xs">{deal.projectName}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted">{deal.owner}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{deal.createdAt}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/${tenantSlug}/deals/${deal.id}`}
+                        className="text-xs font-medium text-foreground underline decoration-foreground/20 underline-offset-2 hover:opacity-70"
+                      >
+                        Full view →
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Kanban board */}
+      {viewMode === "kanban" && <div className="mt-6 overflow-x-auto pb-2">
         <DndContext
           id="tenant-deals-board"
           sensors={sensors}
@@ -268,6 +379,7 @@ export function DealsWorkspace({
                     <DealCardItem
                       key={deal.id}
                       deal={deal}
+                      tenantSlug={tenantSlug}
                       isDragging={draggingDealId === deal.id}
                       dragDisabled={isDraggingSavePending}
                       onMoveClick={() => setActiveDeal(deal)}
@@ -284,7 +396,7 @@ export function DealsWorkspace({
             ))}
           </div>
         </DndContext>
-      </div>
+      </div>}
 
       {isCreateOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
@@ -511,12 +623,14 @@ function StageColumn({
 
 function DealCardItem({
   deal,
+  tenantSlug,
   isDragging,
   dragDisabled,
   onMoveClick,
   onTimelineClick,
 }: {
   deal: DealCard;
+  tenantSlug: string;
   isDragging: boolean;
   dragDisabled: boolean;
   onMoveClick: () => void;
@@ -542,7 +656,9 @@ function DealCardItem({
         isDragging || internalDragging ? "opacity-60" : "",
       ].join(" ")}
     >
-      <p className="font-semibold text-foreground">{deal.leadName}</p>
+      <Link href={`/${tenantSlug}/deals/${deal.id}`} className="block font-semibold text-foreground hover:underline hover:decoration-foreground/30">
+        {deal.leadName}
+      </Link>
       <p className="mt-0.5 text-muted">{deal.unitLabel}</p>
       <p className="mt-0.5 text-muted">Owner: {deal.owner}</p>
       <p className="mt-0.5 text-foreground/90">{deal.value}</p>
@@ -570,6 +686,12 @@ function DealCardItem({
       >
         Timeline
       </button>
+      <Link
+        href={`/${tenantSlug}/deals/${deal.id}`}
+        className="mt-1 block text-[11px] text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+      >
+        Full view →
+      </Link>
     </article>
   );
 }

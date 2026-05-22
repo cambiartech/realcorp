@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { UnitStatus } from "@/generated/prisma";
+import { UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -11,6 +11,8 @@ import { createPricingPlan, createUnit, deleteUnit, reserveUnit, unreserveUnit, 
 type UnitRow = {
   id: string;
   label: string;
+  purpose: string;
+  purposeValue: UnitPurpose;
   unitType: string;
   status: string;
   statusValue: UnitStatus;
@@ -265,7 +267,8 @@ export function ProjectUnitsWorkspace({
           <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-3">Label</th>
-              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Purpose</th>
+              <th className="px-4 py-3">Layout</th>
               <th className="px-4 py-3">Pricing plan</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Actions</th>
@@ -274,7 +277,7 @@ export function ProjectUnitsWorkspace({
           <tbody className="divide-y divide-foreground/10">
             {units.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-sm text-muted">
+                <td colSpan={6} className="px-4 py-8 text-sm text-muted">
                   No units yet.
                 </td>
               </tr>
@@ -282,6 +285,7 @@ export function ProjectUnitsWorkspace({
               units.map((unit) => (
                 <tr key={unit.id}>
                   <td className="px-4 py-3 font-medium text-foreground">{unit.label}</td>
+                  <td className="px-4 py-3 text-foreground/90">{unit.purpose}</td>
                   <td className="px-4 py-3 text-muted">{unit.unitType}</td>
                   <td className="px-4 py-3 text-muted">{unit.pricingPlanName}</td>
                   <td className="px-4 py-3 text-foreground/90">{unit.status}</td>
@@ -381,8 +385,20 @@ export function ProjectUnitsWorkspace({
               </div>
 
               <div>
+                <label htmlFor="unit-purpose" className="mb-1 block text-sm text-muted">
+                  Purpose
+                </label>
+                <UiSelect id="unit-purpose" name="purpose" defaultValue={UnitPurpose.SALE}>
+                  <option value={UnitPurpose.SALE}>For sale</option>
+                  <option value={UnitPurpose.SHORT_LET}>Short let</option>
+                  <option value={UnitPurpose.RENTAL}>Rental</option>
+                  <option value={UnitPurpose.HOSTEL}>Hostel</option>
+                </UiSelect>
+              </div>
+
+              <div>
                 <label htmlFor="unit-type" className="mb-1 block text-sm text-muted">
-                  Unit type (optional)
+                  Layout (optional)
                 </label>
                 <input
                   id="unit-type"
@@ -474,8 +490,19 @@ export function ProjectUnitsWorkspace({
                 {editErrors.label ? <FormFieldError>{editErrors.label}</FormFieldError> : null}
               </div>
               <div>
+                <label htmlFor="unit-edit-purpose" className="mb-1 block text-sm text-muted">
+                  Purpose
+                </label>
+                <UiSelect id="unit-edit-purpose" name="purpose" defaultValue={editingUnit.purposeValue}>
+                  <option value={UnitPurpose.SALE}>For sale</option>
+                  <option value={UnitPurpose.SHORT_LET}>Short let</option>
+                  <option value={UnitPurpose.RENTAL}>Rental</option>
+                  <option value={UnitPurpose.HOSTEL}>Hostel</option>
+                </UiSelect>
+              </div>
+              <div>
                 <label htmlFor="unit-edit-type" className="mb-1 block text-sm text-muted">
-                  Unit type (optional)
+                  Layout (optional)
                 </label>
                 <input
                   id="unit-edit-type"

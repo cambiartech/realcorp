@@ -1,4 +1,4 @@
-import { UnitStatus } from "@/generated/prisma";
+import { UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { z } from "zod";
 
 export const createProjectSchema = z.object({
@@ -14,6 +14,7 @@ export const createProjectSchema = z.object({
 
 export const createUnitSchema = z.object({
   label: z.string().trim().min(1, "Unit label is required.").max(80, "Unit label is too long."),
+  purpose: z.nativeEnum(UnitPurpose),
   unitType: z.string().trim().max(80, "Unit type is too long.").optional(),
   status: z.nativeEnum(UnitStatus).optional(),
   pricingPlanId: z
@@ -54,8 +55,16 @@ export function parseCreateProjectForm(formData: FormData) {
 }
 
 export function parseCreateUnitForm(formData: FormData) {
+  const purposeRaw = formData.get("purpose");
+  const purposeValues = Object.values(UnitPurpose) as string[];
+  const purpose =
+    typeof purposeRaw === "string" && purposeRaw !== "" && purposeValues.includes(purposeRaw)
+      ? (purposeRaw as UnitPurpose)
+      : UnitPurpose.SALE;
+
   return createUnitSchema.safeParse({
     label: formData.get("label"),
+    purpose,
     unitType: formData.get("unitType") || undefined,
     status: formData.get("status") || UnitStatus.AVAILABLE,
     pricingPlanId: formData.get("pricingPlanId") || undefined,

@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus, Prisma } from "@/generated/prisma";
+import { createTenantUploadSignature } from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
 import { parseRoleModuleGrantsFromFormData } from "@/lib/role-module-grants-form";
 import { revalidatePath } from "next/cache";
@@ -14,6 +15,18 @@ function canManageOrgModules(isPlatformAdmin: boolean, role: MembershipRole | un
 
 function canRenameOrg(isPlatformAdmin: boolean, role: MembershipRole | undefined) {
   return isPlatformAdmin || role === MembershipRole.ORG_ADMIN;
+}
+
+function parseLinesList(value: FormDataEntryValue | null): string[] {
+  const raw = String(value || "");
+  return Array.from(
+    new Set(
+      raw
+        .split(/\r?\n|,/g)
+        .map((x) => x.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 export async function updateMyDisplayName(tenantSlug: string, _prev: unknown, formData: FormData) {
@@ -106,6 +119,50 @@ export async function updateMyPassword(tenantSlug: string, _prev: unknown, formD
   return { ok: true };
 }
 
+export async function saveOrganizationBranding(tenantSlug: string, _prev: unknown, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, settings: { select: { id: true } } },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true },
+  });
+  if (!session.user.isPlatformAdmin && !canRenameOrg(false, membership?.role)) {
+    return { ok: false, error: "Only admins can update branding." };
+  }
+
+  const primaryColor = (formData.get("primaryColor") as string)?.trim() || null;
+  const accentColor = (formData.get("accentColor") as string)?.trim() || null;
+
+  const data = {
+    primaryColor,
+    accentColor,
+    orgEmail: (formData.get("orgEmail") as string)?.trim() || null,
+    orgPhone: (formData.get("orgPhone") as string)?.trim() || null,
+    orgAddressLine: (formData.get("orgAddressLine") as string)?.trim() || null,
+    orgCity: (formData.get("orgCity") as string)?.trim() || null,
+    orgState: (formData.get("orgState") as string)?.trim() || null,
+    orgCountry: (formData.get("orgCountry") as string)?.trim() || "Nigeria",
+    logoUrl: (formData.get("logoUrl") as string)?.trim() || null,
+  };
+
+  if (tenant.settings) {
+    await prisma.tenantSettings.update({ where: { tenantId: tenant.id }, data });
+  } else {
+    await prisma.tenantSettings.create({ data: { tenantId: tenant.id, ...data } });
+  }
+
+  revalidatePath(`/${tenantSlug}/settings`);
+  revalidatePath(`/${tenantSlug}/hr`);
+  return { ok: true };
+}
+
 export async function updateOrganizationName(tenantSlug: string, _prev: unknown, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -159,6 +216,12 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
   const moduleMarketing = formData.get("moduleMarketing") === "on";
   const moduleCommunity = formData.get("moduleCommunity") === "on";
   const moduleRealtorPortal = formData.get("moduleRealtorPortal") === "on";
+  const moduleHr = formData.get("moduleHr") === "on";
+  const DEFAULT_DEPARTMENTS = ["Finance", "Sales", "Marketing", "Community"];
+  const parsedDepartments = parseLinesList(formData.get("orgDepartmentsCsv"));
+  const orgDepartments = Array.from(
+    new Set([...DEFAULT_DEPARTMENTS, ...parsedDepartments].map((x) => x.trim()).filter(Boolean)),
+  ).slice(0, 50);
 
   const roleModuleGrantsParsed = parseRoleModuleGrantsFromFormData(formData);
 
@@ -171,6 +234,8 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
         moduleMarketing,
         moduleCommunity,
         moduleRealtorPortal,
+        moduleHr,
+        orgDepartments: orgDepartments as Prisma.InputJsonValue,
         ...(roleModuleGrantsParsed ? { roleModuleGrants: roleModuleGrantsParsed as Prisma.InputJsonValue } : {}),
       },
     });
@@ -183,6 +248,8 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
         moduleMarketing,
         moduleCommunity,
         moduleRealtorPortal,
+        moduleHr,
+        orgDepartments: orgDepartments as Prisma.InputJsonValue,
         roleModuleGrants: roleModuleGrantsParsed ? (roleModuleGrantsParsed as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
@@ -191,4 +258,93 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
   revalidatePath(`/${tenantSlug}`);
   revalidatePath(`/${tenantSlug}/settings`);
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Integrations settings (Meta Lead Ads + Termii)
+// ---------------------------------------------------------------------------
+export async function saveIntegrationSettings(tenantSlug: string, _prev: unknown, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, settings: { select: { id: true } } },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true },
+  });
+  if (!session.user.isPlatformAdmin && !canManageOrgModules(false, membership?.role)) {
+    return { ok: false, error: "Only admins can change integration settings." };
+  }
+
+  const data = {
+    logoUrl: (formData.get("logoUrl") as string)?.trim() || null,
+    metaVerifyToken: (formData.get("metaVerifyToken") as string)?.trim() || null,
+    metaPageAccessToken: (formData.get("metaPageAccessToken") as string)?.trim() || null,
+    metaDefaultSource: (formData.get("metaDefaultSource") as string)?.trim() || "Facebook",
+    termiiApiKey: (formData.get("termiiApiKey") as string)?.trim() || null,
+    termiiSenderId: (formData.get("termiiSenderId") as string)?.trim() || "Realcorp",
+    whatsappAccessToken: (formData.get("whatsappAccessToken") as string)?.trim() || null,
+    whatsappPhoneNumberId: (formData.get("whatsappPhoneNumberId") as string)?.trim() || null,
+    whatsappVerifyToken: (formData.get("whatsappVerifyToken") as string)?.trim() || null,
+    // File uploads use platform CLOUDINARY_* in server .env — not configured per tenant here.
+    // Finance dropdown catalogs are edited only on Finance → Settings; do not wipe them here.
+  };
+
+  if (tenant.settings) {
+    await prisma.tenantSettings.update({ where: { tenantId: tenant.id }, data });
+  } else {
+    await prisma.tenantSettings.create({ data: { tenantId: tenant.id, ...data } });
+  }
+
+  revalidatePath(`/${tenantSlug}/settings`);
+  revalidatePath(`/${tenantSlug}`);
+  return { ok: true };
+}
+
+export async function getOrgLogoUploadSignature(
+  tenantSlug: string,
+  input?: { fileName?: string },
+): Promise<
+  | {
+      ok: true;
+      cloudName: string;
+      apiKey: string;
+      folder: string;
+      timestamp: number;
+      publicId: string;
+      signature: string;
+    }
+  | { ok: false; error: string }
+> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, slug: true },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  if (!canManageOrgModules(Boolean(session.user.isPlatformAdmin), membership?.role)) {
+    return { ok: false, error: "Only admins can upload branding assets." };
+  }
+  if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
+    return { ok: false, error: "No access." };
+  }
+
+  return createTenantUploadSignature({
+    tenantId: tenant.id,
+    tenantSlug: tenant.slug,
+    area: "branding",
+    fileName: input?.fileName || "company-logo",
+  });
 }

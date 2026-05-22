@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
-import { formatEnumLabel } from "@/lib/ui-format";
+import { formatEnumLabel, formatUnitPurpose } from "@/lib/ui-format";
 import { suggestUnitLabels } from "@/lib/unit-label-suggestions";
 import { notFound } from "next/navigation";
 import { ProjectUnitsWorkspace } from "./project-units-workspace";
@@ -57,6 +57,7 @@ export default async function ProjectUnitsPage({
         select: {
           id: true,
           label: true,
+          purpose: true,
           unitType: true,
           status: true,
           pricingPlanId: true,
@@ -94,6 +95,8 @@ export default async function ProjectUnitsPage({
       units={project.units.map((unit) => ({
         id: unit.id,
         label: unit.label,
+        purpose: formatUnitPurpose(unit.purpose),
+        purposeValue: unit.purpose,
         unitType: unit.unitType ?? "Unspecified",
         status: formatEnumLabel(unit.status),
         statusValue: unit.status,

@@ -9,12 +9,35 @@ import { SettingsWorkspace } from "./settings-workspace";
 export const dynamic = "force-dynamic";
 
 const settingsSelect = {
+  logoUrl: true,
+  primaryColor: true,
+  accentColor: true,
+  orgEmail: true,
+  orgPhone: true,
+  orgAddressLine: true,
+  orgCity: true,
+  orgState: true,
+  orgCountry: true,
   moduleSales: true,
   moduleFinance: true,
   moduleMarketing: true,
   moduleCommunity: true,
   moduleRealtorPortal: true,
+  moduleShortLets: true,
+  moduleHr: true,
   roleModuleGrants: true,
+  orgDepartments: true,
+  metaVerifyToken: true,
+  metaPageAccessToken: true,
+  metaDefaultSource: true,
+  termiiApiKey: true,
+  termiiSenderId: true,
+  whatsappAccessToken: true,
+  whatsappPhoneNumberId: true,
+  whatsappVerifyToken: true,
+  financeBankAccounts: true,
+  financePaymentModes: true,
+  financeCurrencies: true,
 } as const;
 
 export default async function TenantSettingsPage({
@@ -82,6 +105,8 @@ export default async function TenantSettingsPage({
     moduleMarketing: tenant.settings?.moduleMarketing ?? true,
     moduleCommunity: tenant.settings?.moduleCommunity ?? true,
     moduleRealtorPortal: tenant.settings?.moduleRealtorPortal ?? true,
+    moduleShortLets: tenant.settings?.moduleShortLets ?? false,
+    moduleHr: tenant.settings?.moduleHr ?? false,
   };
 
   const roleModuleGrantsJson = JSON.stringify(
@@ -89,6 +114,12 @@ export default async function TenantSettingsPage({
     null,
     2,
   );
+  const orgDepartments = (tenant.settings?.orgDepartments as string[] | null | undefined) ?? [
+    "Finance",
+    "Sales",
+    "Marketing",
+    "Community",
+  ];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
@@ -104,7 +135,33 @@ export default async function TenantSettingsPage({
           canManageOrg={canManageOrg}
           modules={modules}
           roleModuleGrantsJson={roleModuleGrantsJson}
+          orgDepartments={orgDepartments}
           workspaceMeta={workspaceMeta}
+          branding={{
+            logoUrl: tenant.settings?.logoUrl ?? null,
+            primaryColor: tenant.settings?.primaryColor ?? "#1e3a5f",
+            accentColor: tenant.settings?.accentColor ?? "#4f46e5",
+            orgEmail: tenant.settings?.orgEmail ?? null,
+            orgPhone: tenant.settings?.orgPhone ?? null,
+            orgAddressLine: tenant.settings?.orgAddressLine ?? null,
+            orgCity: tenant.settings?.orgCity ?? null,
+            orgState: tenant.settings?.orgState ?? null,
+            orgCountry: tenant.settings?.orgCountry ?? "Nigeria",
+          }}
+          integrations={{
+            metaVerifyToken: tenant.settings?.metaVerifyToken ?? null,
+            metaPageAccessToken: tenant.settings?.metaPageAccessToken ?? null,
+            metaDefaultSource: tenant.settings?.metaDefaultSource ?? null,
+            termiiApiKey: tenant.settings?.termiiApiKey ?? null,
+            termiiSenderId: tenant.settings?.termiiSenderId ?? null,
+            whatsappAccessToken: tenant.settings?.whatsappAccessToken ?? null,
+            whatsappPhoneNumberId: tenant.settings?.whatsappPhoneNumberId ?? null,
+            whatsappVerifyToken: tenant.settings?.whatsappVerifyToken ?? null,
+            logoUrl: tenant.settings?.logoUrl ?? null,
+            financeBankAccounts: (tenant.settings?.financeBankAccounts as string[] | null | undefined) ?? [],
+            financePaymentModes: (tenant.settings?.financePaymentModes as string[] | null | undefined) ?? [],
+            financeCurrencies: (tenant.settings?.financeCurrencies as string[] | null | undefined) ?? [tenant.defaultCurrency],
+          }}
         />
       </div>
     </div>

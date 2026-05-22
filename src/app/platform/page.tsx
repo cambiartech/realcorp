@@ -1,5 +1,6 @@
 import Link from "next/link";
 import prisma from "@/lib/db";
+import { PlatformModulesForm } from "./modules-form";
 
 export const dynamic = "force-dynamic";
 
@@ -40,13 +41,14 @@ export default async function PlatformHomePage() {
               <th className="px-4 py-3">Slug</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Plan</th>
+              <th className="px-4 py-3">Modules</th>
               <th className="px-4 py-3">Created</th>
             </tr>
           </thead>
           <tbody>
             {tenants.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-muted">
+                <td colSpan={6} className="px-4 py-12 text-center text-muted">
                   No tenants yet. Use{" "}
                   <strong className="text-foreground/90">Onboard new organization</strong>.
                 </td>
@@ -65,6 +67,20 @@ export default async function PlatformHomePage() {
                   </td>
                   <td className="px-4 py-3 text-muted">{t.status}</td>
                   <td className="px-4 py-3 text-muted">{t.plan}</td>
+                  <td className="px-4 py-3 text-muted">
+                    <PlatformModulesForm
+                      tenantId={t.id}
+                      summary={moduleSummary(t.settings)}
+                      initial={{
+                        moduleSales: t.settings?.moduleSales ?? true,
+                        moduleFinance: t.settings?.moduleFinance ?? true,
+                        moduleMarketing: t.settings?.moduleMarketing ?? true,
+                        moduleCommunity: t.settings?.moduleCommunity ?? true,
+                        moduleRealtorPortal: t.settings?.moduleRealtorPortal ?? true,
+                        moduleShortLets: t.settings?.moduleShortLets ?? false,
+                      }}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-muted">{t.createdAt.toISOString().slice(0, 10)}</td>
                 </tr>
               ))
@@ -74,4 +90,28 @@ export default async function PlatformHomePage() {
       </div>
     </div>
   );
+}
+
+function moduleSummary(
+  settings: {
+    moduleSales: boolean;
+    moduleFinance: boolean;
+    moduleMarketing: boolean;
+    moduleCommunity: boolean;
+    moduleRealtorPortal: boolean;
+    moduleShortLets: boolean;
+  } | null,
+) {
+  const flags = {
+    Sales: settings?.moduleSales ?? true,
+    Finance: settings?.moduleFinance ?? true,
+    Marketing: settings?.moduleMarketing ?? true,
+    Community: settings?.moduleCommunity ?? true,
+    "Realtor portal": settings?.moduleRealtorPortal ?? true,
+    "Short Lets": settings?.moduleShortLets ?? false,
+  };
+  const enabled = Object.entries(flags)
+    .filter(([, on]) => on)
+    .map(([name]) => name);
+  return enabled.length ? `${enabled.length} enabled` : "All off";
 }

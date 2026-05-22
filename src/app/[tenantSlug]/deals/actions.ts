@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { DealStage, MembershipStatus, UnitStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
+import { recalculateLeadScore } from "@/lib/lead-scoring";
 import { parseCreateDealForm, parseMoveDealStageForm } from "@/lib/validators/deal";
 import { revalidatePath } from "next/cache";
 
@@ -85,11 +86,13 @@ export async function createDeal(
       summary: "Created deal.",
       metadata: { stage: parsed.data.stage, pendingFinance: parsed.data.pendingFinance },
     });
+    if (created.leadId) void recalculateLeadScore(created.leadId);
   } catch {
     return { ok: false, error: "Could not create deal right now." };
   }
 
   revalidatePath(`/${tenantSlug}/deals`);
+  revalidatePath(`/${tenantSlug}/leads`);
   return { ok: true };
 }
 
@@ -145,11 +148,86 @@ export async function moveDealStage(
       summary: "Moved deal stage.",
       metadata: { stage: parsed.data.stage },
     });
+    // Re-score the linked lead when deal stage changes
+    const linked = await prisma.deal.findUnique({
+      where: { id: deal.id },
+      select: { leadId: true },
+    });
+    if (linked?.leadId) void recalculateLeadScore(linked.leadId);
   } catch {
     return { ok: false, error: "Could not move deal stage right now." };
   }
 
   revalidatePath(`/${tenantSlug}/deals`);
+  revalidatePath(`/${tenantSlug}/leads`);
+  return { ok: true };
+}
+
+export async function updateDeal(
+  tenantSlug: string,
+  dealId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, isActiveMember } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!(session.user.isPlatformAdmin || isActiveMember)) {
+    return { ok: false, error: "You do not have permission to edit deals." };
+  }
+
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, tenantId: tenant.id },
+    select: { id: true },
+  });
+  if (!deal) return { ok: false, error: "Deal not found." };
+
+  const valueRaw = formData.get("value");
+  const value = valueRaw && valueRaw !== "" ? Number(valueRaw) : null;
+  if (valueRaw && valueRaw !== "" && Number.isNaN(value)) {
+    return { ok: false, error: "Value must be a valid number." };
+  }
+
+  const assignedUserId = formData.get("assignedUserId");
+  const pendingFinance = formData.get("pendingFinance") === "on";
+  const notes = formData.get("notes");
+
+  if (assignedUserId && assignedUserId !== "") {
+    const assignee = await prisma.membership.findFirst({
+      where: { tenantId: tenant.id, userId: String(assignedUserId), status: MembershipStatus.ACTIVE },
+      select: { id: true },
+    });
+    if (!assignee) return { ok: false, error: "Assigned owner is invalid." };
+  }
+
+  try {
+    await prisma.deal.update({
+      where: { id: deal.id },
+      data: {
+        value: value,
+        assignedUserId: assignedUserId ? String(assignedUserId) : null,
+        pendingFinance,
+        ...(notes !== null && notes !== "" ? {} : {}),
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "SALES",
+      entityType: "DEAL",
+      entityId: deal.id,
+      action: "UPDATE",
+      summary: "Updated deal details.",
+    });
+  } catch {
+    return { ok: false, error: "Could not update deal right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/deals`);
+  revalidatePath(`/${tenantSlug}/deals/${dealId}`);
   return { ok: true };
 }
 

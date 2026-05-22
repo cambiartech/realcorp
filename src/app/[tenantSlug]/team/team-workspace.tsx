@@ -2,28 +2,38 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MembershipRole } from "@/generated/prisma";
+import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
 import { parseTeamInviteForm, zodTeamInviteIssuesToFieldRecord, type TeamInviteFieldName } from "@/lib/validators/team-invite";
-import { inviteTenantMember, updateMembershipRole, type TeamInviteResult } from "./actions";
+import {
+  deleteInvitation,
+  inviteTenantMember,
+  resendInvitation,
+  setMembershipStatus,
+  updateMembershipRole,
+  type TeamInviteResult,
+} from "./actions";
 
 const initial: TeamInviteResult | null = null;
 
 type TeamMemberRow = {
   id: string;
+  userId: string;
   name: string;
   email: string;
   role: string;
   roleValue: MembershipRole;
+  status: MembershipStatus;
 };
 
 type PendingInviteRow = {
   id: string;
   email: string;
   role: string;
+  roleValue: MembershipRole;
   expiresAt: string;
 };
 
@@ -46,12 +56,14 @@ export function TeamWorkspace({
   canInvite,
   members,
   invites,
+  currentUserId,
 }: {
   tenantName: string;
   tenantSlug: string;
   canInvite: boolean;
   members: TeamMemberRow[];
   invites: PendingInviteRow[];
+  currentUserId: string;
 }) {
   const [activeTab, setActiveTab] = useState<"members" | "invites">("members");
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -99,9 +111,14 @@ export function TeamWorkspace({
       </div>
 
       {activeTab === "members" ? (
-        <MembersTable members={members} tenantSlug={tenantSlug} canManageRoles={canInvite} />
+        <MembersTable
+          members={members}
+          tenantSlug={tenantSlug}
+          canManageRoles={canInvite}
+          currentUserId={currentUserId}
+        />
       ) : (
-        <InvitesTable invites={invites} />
+        <InvitesTable invites={invites} tenantSlug={tenantSlug} canManageInvites={canInvite} />
       )}
 
       {isInviteOpen && canInvite ? (
@@ -136,10 +153,12 @@ function MembersTable({
   members,
   tenantSlug,
   canManageRoles,
+  currentUserId,
 }: {
   members: TeamMemberRow[];
   tenantSlug: string;
   canManageRoles: boolean;
+  currentUserId: string;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -161,6 +180,16 @@ function MembersTable({
     router.refresh();
   }
 
+  async function handleStatusChange(member: TeamMemberRow) {
+    const next = member.status === MembershipStatus.ACTIVE ? "SUSPENDED" : "ACTIVE";
+    setPendingId(member.id);
+    const result = await setMembershipStatus(tenantSlug, member.id, next);
+    setPendingId(null);
+    if (result.ok) showSnackbar(next === "ACTIVE" ? "Member enabled." : "Member disabled.", "success");
+    else showSnackbar(result.error, "error");
+    router.refresh();
+  }
+
   if (members.length === 0) {
     return <EmptyState title="No team members yet." hint="Use Invite team member to onboard your first teammate." />;
   }
@@ -173,6 +202,8 @@ function MembersTable({
             <th className="px-4 py-3">Name</th>
             <th className="px-4 py-3">Email</th>
             <th className="min-w-[200px] px-4 py-3">Job role</th>
+            <th className="px-4 py-3">Status</th>
+            {canManageRoles ? <th className="px-4 py-3">Actions</th> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-foreground/10">
@@ -199,6 +230,20 @@ function MembersTable({
                   <span className="text-foreground/90">{member.role}</span>
                 )}
               </td>
+              <td className="px-4 py-3 text-foreground/90">{member.status === MembershipStatus.ACTIVE ? "Active" : "Disabled"}</td>
+              {canManageRoles ? (
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    disabled={pendingId === member.id || member.userId === currentUserId}
+                    onClick={() => void handleStatusChange(member)}
+                    className="rounded border border-foreground/20 px-2 py-1 text-xs hover:bg-foreground/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                    title={member.userId === currentUserId ? "You cannot disable your own account." : undefined}
+                  >
+                    {member.status === MembershipStatus.ACTIVE ? "Disable user" : "Enable user"}
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -214,7 +259,37 @@ function MembersTable({
   );
 }
 
-function InvitesTable({ invites }: { invites: PendingInviteRow[] }) {
+function InvitesTable({
+  invites,
+  tenantSlug,
+  canManageInvites,
+}: {
+  invites: PendingInviteRow[];
+  tenantSlug: string;
+  canManageInvites: boolean;
+}) {
+  const router = useRouter();
+  const { showSnackbar } = useSnackbar();
+  const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
+
+  async function handleResend(invite: PendingInviteRow) {
+    setPendingInviteId(invite.id);
+    const result = await resendInvitation(tenantSlug, invite.id);
+    setPendingInviteId(null);
+    if (result.ok) showSnackbar(`Invite resent to ${invite.email}.`, "success");
+    else showSnackbar(result.error, "error");
+    router.refresh();
+  }
+
+  async function handleDelete(invite: PendingInviteRow) {
+    setPendingInviteId(invite.id);
+    const result = await deleteInvitation(tenantSlug, invite.id);
+    setPendingInviteId(null);
+    if (result.ok) showSnackbar("Invite deleted.", "success");
+    else showSnackbar(result.error, "error");
+    router.refresh();
+  }
+
   if (invites.length === 0) {
     return <EmptyState title="No pending invites." hint="New invites will appear here until they are accepted." />;
   }
@@ -227,6 +302,7 @@ function InvitesTable({ invites }: { invites: PendingInviteRow[] }) {
             <th className="px-4 py-3">Email</th>
             <th className="px-4 py-3">Role</th>
             <th className="px-4 py-3">Expires</th>
+            {canManageInvites ? <th className="px-4 py-3">Actions</th> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-foreground/10">
@@ -235,6 +311,28 @@ function InvitesTable({ invites }: { invites: PendingInviteRow[] }) {
               <td className="px-4 py-3 font-medium text-foreground">{invite.email}</td>
               <td className="px-4 py-3 text-foreground/90">{invite.role}</td>
               <td className="px-4 py-3 text-muted">{invite.expiresAt}</td>
+              {canManageInvites ? (
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleResend(invite)}
+                      disabled={pendingInviteId === invite.id}
+                      className="rounded border border-foreground/20 px-2 py-1 text-xs hover:bg-foreground/[0.06] disabled:opacity-50"
+                    >
+                      Resend
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(invite)}
+                      disabled={pendingInviteId === invite.id}
+                      className="rounded border border-foreground/20 px-2 py-1 text-xs text-rose-600 hover:bg-rose-500/10 disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
@@ -263,10 +361,16 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
 
   useEffect(() => {
     if (!state) return;
-    const key = state.ok ? `ok:${state.inviteUrl}` : `err:${state.error}`;
+    const key = state.ok ? `ok:${state.inviteUrl}:${state.emailSent ? "sent" : "failed"}` : `err:${state.error}`;
     if (seenStateRef.current === key) return;
     seenStateRef.current = key;
-    if (state.ok) showSnackbar("Invite created successfully.", "success");
+    if (state.ok) {
+      if (state.emailSent) {
+        showSnackbar("Invite created and email sent.", "success");
+      } else {
+        showSnackbar("Invite created, but email failed. Share the link manually.", "error");
+      }
+    }
     else showSnackbar(state.error, "error");
   }, [showSnackbar, state]);
 
@@ -305,7 +409,16 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
 
         {hasSuccess ? (
           <div className="mt-4 space-y-3">
-            <p className="text-sm text-muted">Invite created. Share this link:</p>
+            <p className="text-sm text-muted">
+              {state?.ok && state.emailSent
+                ? "Invite created and email sent. You can also share this link:"
+                : "Invite created, but email was not sent. Share this link manually:"}
+            </p>
+            {state?.ok && !state.emailSent ? (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+                Email delivery failed: {state.emailError || "unknown error"}.
+              </p>
+            ) : null}
             <p className="break-all rounded-md border border-foreground/10 bg-field p-3 font-mono text-xs text-foreground">
               {successUrl}
             </p>

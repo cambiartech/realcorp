@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { DealStage, MembershipRole, MembershipStatus, UnitStatus } from "@/generated/prisma";
+import { DealStage, MembershipRole, MembershipStatus, UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
 import {
@@ -126,6 +126,7 @@ export async function createUnit(
         projectId: project.id,
         pricingPlanId: parsed.data.pricingPlanId || null,
         label: parsed.data.label,
+        purpose: parsed.data.purpose ?? UnitPurpose.SALE,
         unitType: parsed.data.unitType || null,
         status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
       },
@@ -295,6 +296,7 @@ export async function updateUnit(
       data: {
         pricingPlanId: parsed.data.pricingPlanId || null,
         label: parsed.data.label,
+        purpose: parsed.data.purpose ?? UnitPurpose.SALE,
         unitType: parsed.data.unitType || null,
         status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
       },

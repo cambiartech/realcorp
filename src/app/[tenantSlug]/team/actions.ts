@@ -6,12 +6,15 @@ import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
+import { getInviteBaseUrl, sendInviteEmail } from "@/lib/email";
 import { parseTeamInviteForm } from "@/lib/validators/team-invite";
 import { z } from "zod";
 
 export type TeamInviteResult =
-  | { ok: true; inviteUrl: string }
+  | { ok: true; inviteUrl: string; emailSent: boolean; emailError?: string }
   | { ok: false; error: string };
+
+type ActionResult = { ok: true } | { ok: false; error: string };
 
 export async function inviteTenantMember(
   tenantSlug: string,
@@ -30,7 +33,7 @@ export async function inviteTenantMember(
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!tenant) {
     return { ok: false, error: "Tenant not found." };
@@ -84,13 +87,38 @@ export async function inviteTenantMember(
     return { ok: false, error: "Could not create invite right now. Try again." };
   }
 
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const base = getInviteBaseUrl();
   const inviteUrl = `${base}/join?token=${token}`;
 
+  const inviterLabel = session.user.name || session.user.email || "Organization admin";
+  const emailResult = await sendInviteEmail({
+    to: email,
+    tenantName: tenant.name,
+    inviterLabel,
+    inviteUrl,
+    roleLabel: role,
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: inviterLabel,
+    module: "TEAM",
+    entityType: "INVITATION",
+    action: emailResult.ok ? "EMAIL_SENT" : "EMAIL_FAILED",
+    summary: emailResult.ok
+      ? `Invitation email sent to ${email}.`
+      : `Invitation email failed for ${email}: ${emailResult.error}`,
+    metadata: { email, role, ok: emailResult.ok },
+  });
+
   revalidatePath(`/${tenantSlug}/team`);
-  return { ok: true, inviteUrl };
+  return {
+    ok: true,
+    inviteUrl,
+    emailSent: emailResult.ok,
+    ...(emailResult.ok ? {} : { emailError: emailResult.error }),
+  };
 }
 
 const updateRoleSchema = z.object({
@@ -167,6 +195,170 @@ export async function updateMembershipRole(
     action: "UPDATE",
     summary: `Updated member role to ${parsed.data.role}.`,
     metadata: { membershipId: target.id, role: parsed.data.role },
+  });
+
+  revalidatePath(`/${tenantSlug}/team`);
+  revalidatePath(`/${tenantSlug}`, "layout");
+  return { ok: true };
+}
+
+export async function resendInvitation(
+  tenantSlug: string,
+  invitationId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true, name: true } });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  const canManage =
+    session.user.isPlatformAdmin ||
+    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
+  if (!canManage) return { ok: false, error: "Only organization admins can manage invites." };
+
+  const invite = await prisma.invitation.findFirst({
+    where: { id: invitationId, tenantId: tenant.id, acceptedAt: null },
+    select: { id: true, token: true, email: true, role: true, expiresAt: true },
+  });
+  if (!invite) return { ok: false, error: "Invite not found or already accepted." };
+
+  let token = invite.token;
+  let expiresAt = invite.expiresAt;
+  if (expiresAt <= new Date()) {
+    token = randomBytes(32).toString("hex");
+    expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 14);
+    await prisma.invitation.update({
+      where: { id: invite.id },
+      data: { token, expiresAt },
+    });
+  }
+
+  const inviteUrl = `${getInviteBaseUrl()}/join?token=${token}`;
+  const actorLabel = session.user.name || session.user.email || "Organization admin";
+  const emailResult = await sendInviteEmail({
+    to: invite.email,
+    tenantName: tenant.name,
+    inviterLabel: actorLabel,
+    inviteUrl,
+    roleLabel: invite.role,
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "TEAM",
+    entityType: "INVITATION",
+    entityId: invite.id,
+    action: emailResult.ok ? "RESEND_EMAIL_SENT" : "RESEND_EMAIL_FAILED",
+    summary: emailResult.ok
+      ? `Resent invitation email to ${invite.email}.`
+      : `Resend failed for ${invite.email}: ${emailResult.error}`,
+    metadata: { email: invite.email, role: invite.role, ok: emailResult.ok },
+  });
+
+  revalidatePath(`/${tenantSlug}/team`);
+  return emailResult.ok ? { ok: true } : { ok: false, error: emailResult.error || "Failed to send invite email." };
+}
+
+export async function deleteInvitation(
+  tenantSlug: string,
+  invitationId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  const canManage =
+    session.user.isPlatformAdmin ||
+    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
+  if (!canManage) return { ok: false, error: "Only organization admins can manage invites." };
+
+  const invite = await prisma.invitation.findFirst({
+    where: { id: invitationId, tenantId: tenant.id, acceptedAt: null },
+    select: { id: true, email: true, role: true },
+  });
+  if (!invite) return { ok: false, error: "Invite not found or already accepted." };
+
+  await prisma.invitation.delete({ where: { id: invite.id } });
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    module: "TEAM",
+    entityType: "INVITATION",
+    entityId: invite.id,
+    action: "DELETE",
+    summary: `Deleted pending invite for ${invite.email}.`,
+    metadata: { email: invite.email, role: invite.role },
+  });
+
+  revalidatePath(`/${tenantSlug}/team`);
+  return { ok: true };
+}
+
+export async function setMembershipStatus(
+  tenantSlug: string,
+  membershipId: string,
+  status: "ACTIVE" | "SUSPENDED",
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const actorMembership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  const canManage =
+    session.user.isPlatformAdmin ||
+    (actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN);
+  if (!canManage) return { ok: false, error: "Only organization admins can manage members." };
+
+  const target = await prisma.membership.findFirst({
+    where: { id: membershipId, tenantId: tenant.id },
+    select: { id: true, role: true, status: true, userId: true },
+  });
+  if (!target) return { ok: false, error: "Member not found." };
+  if (!session.user.isPlatformAdmin && target.userId === session.user.id) {
+    return { ok: false, error: "You cannot disable your own account." };
+  }
+
+  if (target.role === MembershipRole.ORG_ADMIN && status === "SUSPENDED") {
+    const activeOrgAdmins = await prisma.membership.count({
+      where: { tenantId: tenant.id, role: MembershipRole.ORG_ADMIN, status: MembershipStatus.ACTIVE },
+    });
+    if (activeOrgAdmins <= 1) return { ok: false, error: "Keep at least one active organization admin." };
+  }
+
+  await prisma.membership.update({
+    where: { id: target.id },
+    data: { status: status === "ACTIVE" ? MembershipStatus.ACTIVE : MembershipStatus.SUSPENDED },
+  });
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    module: "TEAM",
+    entityType: "MEMBERSHIP",
+    entityId: target.id,
+    action: status === "ACTIVE" ? "ENABLE_MEMBER" : "DISABLE_MEMBER",
+    summary: `${status === "ACTIVE" ? "Enabled" : "Disabled"} member account.`,
+    metadata: { membershipId: target.id, status },
   });
 
   revalidatePath(`/${tenantSlug}/team`);

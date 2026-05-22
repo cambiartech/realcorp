@@ -73,17 +73,21 @@ export default async function TenantTeamPage({
       canInvite={canInvite}
       members={members.map((member) => ({
         id: member.id,
+        userId: member.user.id,
         name: member.user.name || member.user.email || "User",
         email: member.user.email || "No email",
         role: formatEnumLabel(member.role),
         roleValue: member.role,
+        status: member.status,
       }))}
       invites={invites.map((invite) => ({
         id: invite.id,
         email: invite.email,
         role: formatEnumLabel(invite.role),
+        roleValue: invite.role,
         expiresAt: invite.expiresAt.toISOString().slice(0, 10),
       }))}
+      currentUserId={session.user.id}
     />
   );
 }

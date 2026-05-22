@@ -12,10 +12,10 @@ export default async function DealsPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ leadId?: string; owner?: string; stage?: string; projectId?: string }>;
+  searchParams: Promise<{ leadId?: string; owner?: string; stage?: string; projectId?: string; view?: string }>;
 }) {
   const { tenantSlug } = await params;
-  const { leadId, owner, stage, projectId } = await searchParams;
+  const { leadId, owner, stage, projectId, view } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -63,8 +63,8 @@ export default async function DealsPage({
       },
       orderBy: { createdAt: "desc" },
       include: {
-        lead: { select: { id: true, name: true } },
-        unit: { select: { id: true, label: true, projectId: true } },
+        lead: { select: { id: true, name: true, score: true } },
+        unit: { select: { id: true, label: true, projectId: true, project: { select: { id: true, name: true } } } },
       },
       take: 500,
     }),
@@ -128,16 +128,22 @@ export default async function DealsPage({
       tenantSlug={tenant.slug}
       defaultLeadId={leadId}
       activeFilterChips={activeFilterChips}
+      initialView={view === "list" ? "list" : "kanban"}
       deals={deals.map((deal) => ({
         id: deal.id,
+        leadId: deal.leadId,
         leadName: deal.lead?.name || "Direct deal",
+        leadScore: deal.lead?.score ?? 0,
         unitLabel: deal.unit?.label || "No unit",
+        projectName: deal.unit?.project?.name ?? "—",
+        projectId: deal.unit?.project?.id ?? null,
         owner: deal.assignedUserId
           ? userMap.get(deal.assignedUserId)?.name || userMap.get(deal.assignedUserId)?.email || "Unknown"
           : "Unassigned",
         value: deal.value ? `NGN ${Number(deal.value).toLocaleString()}` : "—",
         pendingFinance: deal.pendingFinance,
         stage: deal.stage,
+        createdAt: deal.createdAt.toISOString().slice(0, 10),
       }))}
       leads={leads.map((lead) => ({
         id: lead.id,

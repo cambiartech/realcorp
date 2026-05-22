@@ -72,10 +72,12 @@ async function main() {
       tenantId: tenant.id,
       monthlyRevenueTarget: "250000000",
       pipelineTarget: "500000000",
+      moduleHr: true,
     },
     update: {
       monthlyRevenueTarget: "250000000",
       pipelineTarget: "500000000",
+      moduleHr: true,
     },
   });
 
@@ -434,6 +436,13 @@ async function main() {
   });
 
   console.log("Seed OK.");
+  try {
+    const { syncNigeriaLocationsFromSource } = await import("../src/lib/nigeria-locations-sync");
+    const geo = await syncNigeriaLocationsFromSource(false);
+    console.log(`Nigeria locations: ${geo.states} states, ${geo.lgas} LGAs synced.`);
+  } catch (err) {
+    console.warn("Nigeria locations sync skipped (run npm run db:sync-locations):", err);
+  }
   console.log("");
   console.log("Platform admin: admin@realcorp.com");
   console.log(`Bo Properties tenant: /${BO_SLUG}`);

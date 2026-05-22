@@ -46,7 +46,16 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
       {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
       {state?.ok ? (
         <div className="space-y-2">
-          <p className="text-sm text-muted">Invite created. Share this link:</p>
+          <p className="text-sm text-muted">
+            {state.emailSent
+              ? "Invite created and email sent. You can also share this link:"
+              : "Invite created, but email failed. Share this link manually:"}
+          </p>
+          {!state.emailSent ? (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+              Email delivery failed: {state.emailError || "unknown error"}.
+            </p>
+          ) : null}
           <p className="break-all border border-foreground/10 bg-field p-3 font-mono text-xs text-foreground">
             {state.inviteUrl}
           </p>

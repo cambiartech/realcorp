@@ -1,13 +1,16 @@
-import { MembershipRole } from "@/generated/prisma";
+import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 
 export type TenantNavKey =
   | "dashboard"
   | "projects"
   | "leads"
   | "deals"
+  | "activities"
   | "marketing"
   | "community"
+  | "shortlets"
   | "finance"
+  | "hr"
   | "team"
   | "settings";
 
@@ -16,6 +19,8 @@ export type TenantSettingsNavSlice = {
   moduleFinance: boolean;
   moduleMarketing: boolean;
   moduleCommunity: boolean;
+  moduleShortLets: boolean;
+  moduleHr: boolean;
   roleModuleGrants: unknown;
 };
 
@@ -24,14 +29,17 @@ const NAV_ORDER: TenantNavKey[] = [
   "projects",
   "leads",
   "deals",
+  "activities",
   "marketing",
   "community",
+  "shortlets",
   "finance",
+  "hr",
   "team",
   "settings",
 ];
 
-const SALES_STACK: TenantNavKey[] = ["dashboard", "projects", "leads", "deals"];
+const SALES_STACK: TenantNavKey[] = ["dashboard", "projects", "leads", "deals", "activities"];
 
 function parseGrants(raw: unknown): Partial<Record<MembershipRole, string[]>> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -52,6 +60,7 @@ const GRANT_TO_NAV: Record<string, TenantNavKey> = {
   MARKETING: "marketing",
   COMMUNITY: "community",
   FINANCE: "finance",
+  HR: "hr",
 };
 
 function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): TenantNavKey[] {
@@ -62,7 +71,9 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.ORG_ADMIN:
       return [...NAV_ORDER];
     case MembershipRole.FINANCE_MANAGER:
-      return [...SALES_STACK, "finance", "settings"];
+      return [...SALES_STACK, "shortlets", "finance", "settings"];
+    case MembershipRole.HR_MANAGER:
+      return ["dashboard", "hr", "team", "settings"];
     case MembershipRole.MARKETING_MANAGER:
       return ["dashboard", "projects", "leads", "marketing", "settings"];
     case MembershipRole.COMMUNITY_MANAGER:
@@ -70,7 +81,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.SALES_MANAGER:
     case MembershipRole.SALES_EXECUTIVE:
     default:
-      return [...SALES_STACK, "settings"];
+      return [...SALES_STACK, "shortlets", "settings"];
   }
 }
 
@@ -78,7 +89,10 @@ function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice):
   return keys.filter((k) => {
     if (k === "marketing") return s.moduleMarketing;
     if (k === "community") return s.moduleCommunity;
+    if (k === "shortlets") return s.moduleShortLets;
     if (k === "finance") return s.moduleFinance;
+    if (k === "hr") return s.moduleHr;
+    if (k === "activities") return s.moduleSales;
     if (SALES_STACK.includes(k)) return s.moduleSales;
     return true;
   });
@@ -104,6 +118,7 @@ function applyRoleGrants(
     if (nav === "marketing" && s.moduleMarketing) set.add("marketing");
     if (nav === "community" && s.moduleCommunity) set.add("community");
     if (nav === "finance" && s.moduleFinance) set.add("finance");
+    if (nav === "hr" && s.moduleHr) set.add("hr");
   }
   return NAV_ORDER.filter((k) => set.has(k));
 }
@@ -116,6 +131,8 @@ export function normalizeSettingsNavSlice(
     moduleFinance: raw?.moduleFinance ?? true,
     moduleMarketing: raw?.moduleMarketing ?? true,
     moduleCommunity: raw?.moduleCommunity ?? true,
+    moduleShortLets: raw?.moduleShortLets ?? false,
+    moduleHr: raw?.moduleHr ?? false,
     roleModuleGrants: raw?.roleModuleGrants ?? null,
   };
 }
@@ -123,15 +140,22 @@ export function normalizeSettingsNavSlice(
 export function getVisibleNavKeys(opts: {
   role: MembershipRole | null | undefined;
   isPlatformAdmin: boolean;
+  membershipStatus?: MembershipStatus | null;
   settings: TenantSettingsNavSlice;
 }): TenantNavKey[] {
-  const { role, isPlatformAdmin, settings } = opts;
+  const { role, isPlatformAdmin, settings, membershipStatus } = opts;
   const r = role ?? MembershipRole.SALES_EXECUTIVE;
   let keys = defaultNavForRole(r, isPlatformAdmin);
   keys = applyOrgModuleToggles(keys, settings);
   const grants = parseGrants(settings.roleModuleGrants);
   keys = applyRoleGrants(keys, r, grants, settings);
   keys = applyOrgModuleToggles(keys, settings);
+  const active = isPlatformAdmin || membershipStatus === MembershipStatus.ACTIVE;
+  if (settings.moduleHr && active && !keys.includes("hr")) {
+    const set = new Set(keys);
+    set.add("hr");
+    keys = NAV_ORDER.filter((k) => set.has(k));
+  }
   return NAV_ORDER.filter((k) => keys.includes(k));
 }
 
