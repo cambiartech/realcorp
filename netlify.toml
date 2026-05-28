@@ -1,10 +1,22 @@
-# Set "Base directory" in Netlify to `realcorp` if the repo root is the parent folder.
-# Add DATABASE_URL + DIRECT_URL (and AUTH_SECRET, etc.) in Site settings → Environment variables.
-# - DATABASE_URL: pooled (pgbouncer) for runtime queries
-# - DIRECT_URL: direct (5432) for migrations
+# Realcorp — Netlify deployment
+#
+# Monorepo: set Netlify "Base directory" to `realcorp` if the repo root is the parent folder.
+# Env vars go in Netlify UI (Production scope) — NOT in committed .env files.
+#
+# Required:
+#   DATABASE_URL   — pooled Postgres (Supabase :6543 ?pgbouncer=true) for runtime
+#   DIRECT_URL     — direct Postgres (Supabase :5432) for prisma migrate deploy
+#   AUTH_SECRET    — openssl rand -base64 32
+#   NEXT_PUBLIC_APP_URL — https://your-production-domain
+#
+# Recommended: RESEND_*, CLOUDINARY_* (or CLOUDINARY_URL)
+# See docs/DEPLOYMENT.md for full checklist and troubleshooting.
 
 [build]
   command = "npx prisma migrate deploy && npm run build"
 
 [build.environment]
   NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

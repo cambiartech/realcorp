@@ -55,6 +55,11 @@ Sign in at `/login`, then open `/platform` → **Onboard new organization**.
 | `npm run db:seed`    | Platform admin user    |
 | `npm run db:studio`  | Prisma Studio          |
 
+## Deploying to Netlify
+
+Production deploys apply migrations automatically (`prisma migrate deploy` in `netlify.toml`).  
+**Full checklist, env vars, and troubleshooting:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+
 ## Prisma 7 + PostgreSQL
 
 Runtime client uses `@prisma/adapter-pg` with `DATABASE_URL`. Migrations read the same URL from `prisma.config.ts` (loads `.env` via `dotenv`).
