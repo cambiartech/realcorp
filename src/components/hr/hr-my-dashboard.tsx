@@ -10,6 +10,11 @@ import type { PayslipCalculation } from "@/lib/hr-payslip";
 import type { ProfileDetailRow } from "@/lib/hr-profile-form";
 import type { TenantBranding } from "@/lib/tenant-branding";
 import { saveSelfAppraisal } from "@/app/[tenantSlug]/hr/actions";
+import { AppraisalRatingSelect } from "@/components/hr/appraisal-rating-select";
+import { RichTextDisplay, RichTextField } from "@/components/rich-text-field";
+import { groupAppraisalActionsBySection, parseSelfAppraisalFormData } from "@/lib/appraisal-form-utils";
+import { appraisalRatingLabel } from "@/lib/appraisal-competencies";
+import { getManagerRating, getSelfRating, parseActionScores, type AppraisalCriterionScore } from "@/lib/appraisal-scores";
 
 type MyTab = "overview" | "payslips" | "record" | "documents" | "appraisals";
 
@@ -110,13 +115,14 @@ export function HrMyDashboard({
       selfNotes: string;
       managerNotes: string;
       overallRating: number | null;
-      actionScores: Record<string, { rating?: number; completed?: boolean }> | null;
+      actionScores: Record<string, AppraisalCriterionScore> | null;
     }>;
     appraisalActions: Array<{
       id: string;
       title: string;
       description: string;
       cycleType: string;
+      sortOrder?: number;
     }>;
   };
 }) {
@@ -170,23 +176,16 @@ export function HrMyDashboard({
 
   async function submitAppraisal(appraisalId: string, form: HTMLFormElement) {
     const fd = new FormData(form);
-    const actionResponses: { actionId: string; rating?: number; completed?: boolean }[] = [];
-    for (const [key, val] of fd.entries()) {
-      if (key.startsWith("action_rating_")) {
-        const actionId = key.replace("action_rating_", "");
-        const rating = Number(val);
-        if (rating >= 1 && rating <= 5) {
-          actionResponses.push({ actionId, rating });
-        }
-      }
-      if (key.startsWith("action_done_") && val === "on") {
-        const actionId = key.replace("action_done_", "");
-        actionResponses.push({ actionId, completed: true });
-      }
-    }
+    const actions = actionsByCycleType.get(
+      myView.appraisals.find((a) => a.id === appraisalId)?.cycleType ?? "",
+    ) ?? [];
+    const { selfNotes, actionResponses } = parseSelfAppraisalFormData(
+      fd,
+      actions.map((a) => a.id),
+    );
     setPending(true);
     const result = await saveSelfAppraisal(tenantSlug, appraisalId, {
-      selfNotes: String(fd.get("selfNotes") || ""),
+      selfNotes,
       actionResponses,
     });
     setPending(false);
@@ -576,7 +575,8 @@ export function HrMyDashboard({
             {myView.appraisals.map((a) => {
               const actions = actionsByCycleType.get(a.cycleType) ?? [];
               const canEdit = a.cycleStatus === "OPEN" && a.statusValue !== "REVIEWED";
-              const scores = (a.actionScores as Record<string, { rating?: number; completed?: boolean }> | null) ?? {};
+              const scores = parseActionScores(a.actionScores);
+              const grouped = groupAppraisalActionsBySection(actions);
 
               return (
                 <form
@@ -597,6 +597,12 @@ export function HrMyDashboard({
                         Status: {a.status}
                         {a.dueDateLabel !== "—" ? ` · Due ${a.dueDateLabel}` : ""}
                       </p>
+                      {canEdit ? (
+                        <p className="mt-1 text-xs text-muted">
+                          Rate yourself 0–5 on each area, add examples, then submit to your line manager for
+                          confirmation.
+                        </p>
+                      ) : null}
                     </div>
                     {!canEdit ? (
                       <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-medium uppercase">
@@ -605,65 +611,85 @@ export function HrMyDashboard({
                     ) : null}
                   </div>
 
-                  {actions.length > 0 ? (
-                    <div className="mt-4 space-y-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">Review checklist</p>
-                      {actions.map((action) => (
-                        <div key={action.id} className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
-                          <p className="text-sm font-medium text-foreground">{action.title}</p>
-                          {action.description ? <p className="mt-0.5 text-xs text-muted">{action.description}</p> : null}
-                          {canEdit ? (
-                            <div className="mt-2 flex flex-wrap items-center gap-3">
-                              <label className="flex items-center gap-2 text-xs">
-                                <input
-                                  type="checkbox"
-                                  name={`action_done_${action.id}`}
-                                  defaultChecked={Boolean(scores[action.id]?.completed)}
-                                />
-                                Done
-                              </label>
-                              <label className="flex items-center gap-2 text-xs">
-                                Rating
-                                <select
-                                  name={`action_rating_${action.id}`}
-                                  defaultValue={scores[action.id]?.rating ? String(scores[action.id].rating) : ""}
-                                  className="rounded border border-foreground/15 bg-field px-2 py-1 text-xs"
+                  {grouped.length > 0 ? (
+                    <div className="mt-4 space-y-5">
+                      {grouped.map((group) => (
+                        <div key={group.section}>
+                          <p className="text-xs font-bold uppercase tracking-wide text-muted">{group.label}</p>
+                          <div className="mt-2 space-y-3">
+                            {group.actions.map((action) => {
+                              const score = scores[action.id];
+                              const selfRating = getSelfRating(score);
+                              return (
+                                <div
+                                  key={action.id}
+                                  className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3"
                                 >
-                                  <option value="">—</option>
-                                  {[1, 2, 3, 4, 5].map((n) => (
-                                    <option key={n} value={n}>
-                                      {n}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            </div>
-                          ) : scores[action.id]?.rating ? (
-                            <p className="mt-1 text-xs text-muted">Your rating: {scores[action.id].rating}/5</p>
-                          ) : null}
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium text-foreground">{action.title}</p>
+                                      {action.description ? (
+                                        <p className="mt-0.5 text-xs text-muted">{action.description}</p>
+                                      ) : null}
+                                    </div>
+                                    {canEdit ? (
+                                      <AppraisalRatingSelect
+                                        name={`action_self_rating_${action.id}`}
+                                        defaultValue={selfRating}
+                                        className="min-w-[11rem] text-xs"
+                                        placeholder="Your score"
+                                      />
+                                    ) : selfRating != null ? (
+                                      <span className="text-xs font-medium text-muted">
+                                        You: {appraisalRatingLabel(selfRating)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {canEdit ? (
+                                    <RichTextField
+                                      name={`action_self_notes_${action.id}`}
+                                      defaultValue={score?.selfNotes ?? ""}
+                                      placeholder="Examples, outcomes, and supporting notes for this area…"
+                                      minHeight="5rem"
+                                      className="mt-2"
+                                    />
+                                  ) : score?.selfNotes ? (
+                                    <div className="mt-2">
+                                      <RichTextDisplay html={score.selfNotes} />
+                                    </div>
+                                  ) : null}
+                                  {a.statusValue === "REVIEWED" && getManagerRating(score) != null ? (
+                                    <p className="mt-2 text-xs text-muted">
+                                      Final score: {appraisalRatingLabel(getManagerRating(score))}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       ))}
                     </div>
                   ) : null}
 
-                  <label className="mt-4 block text-sm">
-                    <span className="mb-1 block text-xs font-medium text-muted">Your comments</span>
-                    <textarea
-                      name="selfNotes"
-                      defaultValue={a.selfNotes}
-                      readOnly={!canEdit}
-                      rows={4}
-                      placeholder="What went well this period? What will you improve?"
-                      className={inputClass}
-                    />
-                  </label>
+                  <RichTextField
+                    name="selfNotes"
+                    label="Additional comments (optional)"
+                    defaultValue={a.selfNotes}
+                    readOnly={!canEdit}
+                    placeholder="Anything else for your line manager — context, goals, or requests for support."
+                    minHeight="5rem"
+                    className="mt-4"
+                  />
 
                   {a.statusValue === "REVIEWED" && a.managerNotes ? (
                     <div className="mt-3 rounded-md bg-foreground/[0.04] p-3 text-sm">
                       <p className="text-xs font-semibold text-muted">Manager feedback</p>
-                      <p className="mt-1 whitespace-pre-wrap">{a.managerNotes}</p>
-                      {a.overallRating ? (
-                        <p className="mt-2 text-xs text-muted">Overall rating: {a.overallRating}/5</p>
+                      <RichTextDisplay html={a.managerNotes} className="mt-1" />
+                      {a.overallRating != null ? (
+                        <p className="mt-2 text-xs text-muted">
+                          Final overall rating: {appraisalRatingLabel(a.overallRating)}
+                        </p>
                       ) : null}
                     </div>
                   ) : null}

@@ -70,7 +70,7 @@ export default async function RealtorPortalPage({
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
       <header className="text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Realtor portal</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Community portal</p>
         <h1 className="mt-2 text-2xl font-bold text-stone-900 dark:text-stone-50">{tenant.name}</h1>
         <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">Signed in as {partner.displayName}</p>
       </header>

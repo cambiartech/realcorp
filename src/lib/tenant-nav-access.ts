@@ -6,6 +6,7 @@ export type TenantNavKey =
   | "leads"
   | "deals"
   | "activities"
+  | "tasks"
   | "marketing"
   | "community"
   | "shortlets"
@@ -21,6 +22,7 @@ export type TenantSettingsNavSlice = {
   moduleCommunity: boolean;
   moduleShortLets: boolean;
   moduleHr: boolean;
+  moduleTasks: boolean;
   roleModuleGrants: unknown;
 };
 
@@ -30,6 +32,7 @@ const NAV_ORDER: TenantNavKey[] = [
   "leads",
   "deals",
   "activities",
+  "tasks",
   "marketing",
   "community",
   "shortlets",
@@ -61,6 +64,7 @@ const GRANT_TO_NAV: Record<string, TenantNavKey> = {
   COMMUNITY: "community",
   FINANCE: "finance",
   HR: "hr",
+  TASKS: "tasks",
 };
 
 function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): TenantNavKey[] {
@@ -71,17 +75,17 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.ORG_ADMIN:
       return [...NAV_ORDER];
     case MembershipRole.FINANCE_MANAGER:
-      return [...SALES_STACK, "shortlets", "finance", "settings"];
+      return [...SALES_STACK, "shortlets", "tasks", "finance", "settings"];
     case MembershipRole.HR_MANAGER:
-      return ["dashboard", "hr", "team", "settings"];
+      return ["dashboard", "tasks", "hr", "team", "settings"];
     case MembershipRole.MARKETING_MANAGER:
-      return ["dashboard", "projects", "leads", "marketing", "settings"];
+      return ["dashboard", "projects", "leads", "tasks", "marketing", "settings"];
     case MembershipRole.COMMUNITY_MANAGER:
-      return ["dashboard", "community", "settings"];
+      return ["dashboard", "tasks", "community", "settings"];
     case MembershipRole.SALES_MANAGER:
     case MembershipRole.SALES_EXECUTIVE:
     default:
-      return [...SALES_STACK, "shortlets", "settings"];
+      return [...SALES_STACK, "shortlets", "tasks", "settings"];
   }
 }
 
@@ -92,6 +96,7 @@ function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice):
     if (k === "shortlets") return s.moduleShortLets;
     if (k === "finance") return s.moduleFinance;
     if (k === "hr") return s.moduleHr;
+    if (k === "tasks") return s.moduleTasks;
     if (k === "activities") return s.moduleSales;
     if (SALES_STACK.includes(k)) return s.moduleSales;
     return true;
@@ -119,6 +124,7 @@ function applyRoleGrants(
     if (nav === "community" && s.moduleCommunity) set.add("community");
     if (nav === "finance" && s.moduleFinance) set.add("finance");
     if (nav === "hr" && s.moduleHr) set.add("hr");
+    if (nav === "tasks" && s.moduleTasks) set.add("tasks");
   }
   return NAV_ORDER.filter((k) => set.has(k));
 }
@@ -133,6 +139,7 @@ export function normalizeSettingsNavSlice(
     moduleCommunity: raw?.moduleCommunity ?? true,
     moduleShortLets: raw?.moduleShortLets ?? false,
     moduleHr: raw?.moduleHr ?? false,
+    moduleTasks: raw?.moduleTasks ?? true,
     roleModuleGrants: raw?.roleModuleGrants ?? null,
   };
 }
@@ -154,6 +161,11 @@ export function getVisibleNavKeys(opts: {
   if (settings.moduleHr && active && !keys.includes("hr")) {
     const set = new Set(keys);
     set.add("hr");
+    keys = NAV_ORDER.filter((k) => set.has(k));
+  }
+  if (settings.moduleTasks && active && !keys.includes("tasks")) {
+    const set = new Set(keys);
+    set.add("tasks");
     keys = NAV_ORDER.filter((k) => set.has(k));
   }
   return NAV_ORDER.filter((k) => keys.includes(k));

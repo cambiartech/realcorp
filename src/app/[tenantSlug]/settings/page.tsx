@@ -25,6 +25,7 @@ const settingsSelect = {
   moduleRealtorPortal: true,
   moduleShortLets: true,
   moduleHr: true,
+  moduleTasks: true,
   roleModuleGrants: true,
   orgDepartments: true,
   metaVerifyToken: true,
@@ -107,6 +108,7 @@ export default async function TenantSettingsPage({
     moduleRealtorPortal: tenant.settings?.moduleRealtorPortal ?? true,
     moduleShortLets: tenant.settings?.moduleShortLets ?? false,
     moduleHr: tenant.settings?.moduleHr ?? false,
+    moduleTasks: tenant.settings?.moduleTasks ?? true,
   };
 
   const roleModuleGrantsJson = JSON.stringify(
@@ -122,7 +124,7 @@ export default async function TenantSettingsPage({
   ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+    <div className="w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-2xl font-bold tracking-tight text-foreground">Settings</h1>
       <p className="mt-1 text-sm text-muted">Your account and organization preferences.</p>
 

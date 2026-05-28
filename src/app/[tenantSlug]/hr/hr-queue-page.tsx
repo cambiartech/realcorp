@@ -10,8 +10,15 @@ import { hrOfferSignPath } from "@/lib/hr-offer-path";
 import { profileToDetailRow } from "@/lib/hr-profile-form";
 import { buildProfileChecklist, checklistProgress } from "@/lib/hr-profile-checklist";
 import { buildHrAnalytics } from "@/lib/hr-analytics";
+import {
+  buildStaffMonthlyPerformance,
+  currentMonthPerformancePeriod,
+  monthPerformancePeriod,
+  type StaffMonthlyPerformancePeriod,
+} from "@/lib/staff-monthly-performance";
 import { aggregatePayslipYtd, type PayslipYtdSummary } from "@/lib/hr-payslip-ytd";
 import { ensureEmployeeProfileForMember } from "@/lib/hr-profile-ensure";
+import { ensureDefaultAppraisalCriteria } from "@/app/[tenantSlug]/hr/actions";
 import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
 import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
@@ -91,6 +98,8 @@ export default async function HrQueuePage({
     redirect(`/${tenantSlug}/hr/dashboard`);
   }
 
+  await ensureDefaultAppraisalCriteria(tenant.id);
+
   const previewEmployeeUserId =
     canManage && tab === "my" && sp.employeeUserId?.trim() ? sp.employeeUserId.trim() : null;
   const myViewUserId = previewEmployeeUserId ?? session.user.id;
@@ -119,6 +128,11 @@ export default async function HrQueuePage({
 
   const myViewEmail = myViewMember?.user.email ?? session.user.email ?? null;
 
+  const scoreDataSince = new Date();
+  scoreDataSince.setMonth(scoreDataSince.getMonth() - 11);
+  scoreDataSince.setDate(1);
+  scoreDataSince.setHours(0, 0, 0, 0);
+
   const [
     members,
     profiles,
@@ -137,6 +151,10 @@ export default async function HrQueuePage({
     ytdPayslips,
     offerLetters,
     myPendingOffer,
+    workTasks,
+    scoreLeads,
+    scoreDeals,
+    scoreActivities,
   ] = await Promise.all([
     prisma.membership.findMany({
       where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
@@ -277,6 +295,39 @@ export default async function HrQueuePage({
         profile: { userId: myViewUserId },
       },
       select: { token: true },
+    }),
+    prisma.workTask.findMany({
+      where: {
+        tenantId: tenant.id,
+        OR: [
+          { createdAt: { gte: scoreDataSince } },
+          { completedAt: { gte: scoreDataSince } },
+          { dueDate: { gte: scoreDataSince } },
+        ],
+      },
+      select: {
+        assigneeUserId: true,
+        status: true,
+        dueDate: true,
+        completedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.lead.findMany({
+      where: { tenantId: tenant.id, createdAt: { gte: scoreDataSince } },
+      select: { assignedUserId: true, createdAt: true },
+    }),
+    prisma.deal.findMany({
+      where: { tenantId: tenant.id, updatedAt: { gte: scoreDataSince } },
+      select: { assignedUserId: true, stage: true, value: true, updatedAt: true },
+    }),
+    prisma.activity.findMany({
+      where: {
+        tenantId: tenant.id,
+        OR: [{ createdAt: { gte: scoreDataSince } }, { completedAt: { gte: scoreDataSince } }],
+      },
+      select: { assignedUserId: true, completedAt: true, createdAt: true },
     }),
   ]);
 
@@ -445,6 +496,52 @@ export default async function HrQueuePage({
     missingGrossCount,
   });
 
+  const monthlyAppraisalActionIds = appraisalActions
+    .filter((a) => a.cycleType === "MONTHLY" && a.isActive)
+    .map((a) => a.id);
+
+  const staffPerformancePeriods: StaffMonthlyPerformancePeriod[] = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    return monthPerformancePeriod(d.getFullYear(), d.getMonth() + 1);
+  });
+
+  const staffPerformanceInput = {
+    profiles: profiles.map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      fullName: p.fullName || "Unnamed",
+      department: p.department,
+      position: p.position,
+      status: p.status,
+    })),
+    tasks: workTasks,
+    appraisals: appraisalCycles.flatMap((c) =>
+      c.appraisals.map((a) => ({
+        employeeProfileId: a.employeeProfileId,
+        status: a.status,
+        overallRating: a.overallRating,
+        actionScores: a.actionScores,
+        cycleType: c.cycleType,
+        periodLabel: c.periodLabel,
+      })),
+    ),
+    appraisalActionIds: monthlyAppraisalActionIds,
+    leads: scoreLeads,
+    deals: scoreDeals,
+    activities: scoreActivities,
+    goals: goals.map((g) => ({
+      employeeProfileId: g.employeeProfileId,
+      progressPercent: g.progressPercent,
+      status: g.status,
+    })),
+  };
+
+  const staffMonthlyScoresDefault = buildStaffMonthlyPerformance({
+    period: currentMonthPerformancePeriod(),
+    ...staffPerformanceInput,
+  });
+
   return (
     <HrWorkspace
       tenantSlug={tenant.slug}
@@ -583,6 +680,15 @@ export default async function HrQueuePage({
       profileOptions={profileOptions}
       departments={departments}
       yearlyArchive={yearlyArchive}
+      staffPerformancePeriods={staffPerformancePeriods.map((p) => ({
+        year: p.year,
+        month: p.month,
+        label: p.label,
+        start: p.start.toISOString(),
+        end: p.end.toISOString(),
+      }))}
+      staffPerformanceInput={staffPerformanceInput}
+      staffMonthlyScoresDefault={staffMonthlyScoresDefault}
       hrAnalytics={hrAnalytics}
       myYtd={
         myProfile
@@ -707,6 +813,7 @@ export default async function HrQueuePage({
             title: a.title,
             description: a.description || "",
             cycleType: a.cycleType,
+            sortOrder: a.sortOrder,
           })),
       }}
       formRequests={formRequests.map((r) => ({

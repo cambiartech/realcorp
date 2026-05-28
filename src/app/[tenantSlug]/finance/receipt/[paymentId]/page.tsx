@@ -44,6 +44,11 @@ export default async function PaymentReceiptPage({
   });
   if (!payment) notFound();
 
+  const isDirect = !payment.invoice;
+  const sourceLabel = payment.invoice
+    ? `${payment.invoice.invoiceNumber} - ${payment.invoice.title}`
+    : payment.standaloneTitle || "Direct payment";
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-8">
       <div className="sticky top-0 z-20 -mx-4 mb-5 border-b border-foreground/10 bg-background/90 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static sm:mb-6 sm:rounded-lg sm:border sm:px-4 sm:py-3 sm:shadow-none sm:backdrop-blur-0">
@@ -59,7 +64,7 @@ export default async function PaymentReceiptPage({
         </div>
       </div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-foreground">Payment Receipt</h1>
+        <h1 className="text-xl font-semibold text-foreground">{isDirect ? "Direct Payment Receipt" : "Payment Receipt"}</h1>
       </div>
       <div className="rounded-lg border border-foreground/10 bg-background p-5">
         <p className="text-sm text-muted">{tenant.name}</p>
@@ -67,10 +72,11 @@ export default async function PaymentReceiptPage({
         <p className="font-medium text-foreground">{payment.id}</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div>
-            <p className="text-xs text-muted">Invoice</p>
-            <p className="text-sm font-medium text-foreground">
-              {payment.invoice.invoiceNumber} - {payment.invoice.title}
-            </p>
+            <p className="text-xs text-muted">{isDirect ? "Payment" : "Invoice"}</p>
+            <p className="text-sm font-medium text-foreground">{sourceLabel}</p>
+            {isDirect && payment.payerName ? (
+              <p className="mt-0.5 text-xs text-muted">Payer: {payment.payerName}</p>
+            ) : null}
           </div>
           <div>
             <p className="text-xs text-muted">Paid On</p>
@@ -112,12 +118,14 @@ export default async function PaymentReceiptPage({
             <p className="text-sm font-medium text-foreground">No attachment</p>
           )}
         </div>
-        <div className="mt-5 border-t border-foreground/10 pt-4">
-          <p className="text-xs text-muted">Invoice Remaining Balance</p>
-          <p className="text-base font-semibold text-foreground">
-            {payment.invoice.currency} {Number(payment.invoice.balanceDue).toLocaleString()}
-          </p>
-        </div>
+        {payment.invoice ? (
+          <div className="mt-5 border-t border-foreground/10 pt-4">
+            <p className="text-xs text-muted">Invoice Remaining Balance</p>
+            <p className="text-base font-semibold text-foreground">
+              {payment.invoice.currency} {Number(payment.invoice.balanceDue).toLocaleString()}
+            </p>
+          </div>
+        ) : null}
       </div>
       <p className="mt-3 text-xs text-muted">Use browser print to save this receipt as PDF.</p>
     </div>

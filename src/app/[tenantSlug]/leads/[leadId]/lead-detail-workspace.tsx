@@ -181,7 +181,7 @@ export function LeadDetailWorkspace({
   const waTemplates = buildWhatsAppTemplates(lead);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+    <div className="w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>

@@ -35,7 +35,9 @@ export default async function TenantLayout({
           moduleCommunity: true,
           moduleShortLets: true,
           moduleHr: true,
+          moduleTasks: true,
           roleModuleGrants: true,
+          logoUrl: true,
         },
       },
     },
@@ -80,6 +82,7 @@ export default async function TenantLayout({
   const navProps = {
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
+    tenantLogoUrl: tenant.settings?.logoUrl ?? null,
     canAccessPlatform: Boolean(session.user.isPlatformAdmin),
     canManageHr: manageHr,
     hasHrEmployeeProfile: Boolean(hrEmployeeProfile),
@@ -91,9 +94,13 @@ export default async function TenantLayout({
   return (
     <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-background text-foreground">
       <header className="shrink-0 border-b border-foreground/10 bg-background">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
-          <Link href={`/${tenant.slug}`} className="text-sm font-bold tracking-tight text-foreground">
-            {tenant.name}
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <Link href={`/${tenant.slug}`} className="inline-flex min-w-0 items-center gap-2 text-sm font-bold tracking-tight text-foreground">
+            {tenant.settings?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={tenant.settings.logoUrl} alt="" className="h-7 w-auto max-w-[100px] object-contain" />
+            ) : null}
+            <span className="truncate">{tenant.name}</span>
           </Link>
           <div className="flex items-center gap-2">
             <p className="text-xs text-muted md:hidden">Tenant app</p>

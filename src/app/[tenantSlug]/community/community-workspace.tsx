@@ -2,6 +2,12 @@
 
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
+import { UiSelect } from "@/components/ui-select";
+import {
+  type CommunityMemberLeaderboardEntry,
+  type CommunityLeaderboardPeriod,
+  formatLeaderboardMoney,
+} from "@/lib/community-leaderboard";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createRealtorPartner, rotateRealtorPortalToken, setRealtorPartnerActive } from "./actions";
@@ -22,16 +28,38 @@ type PartnerRow = {
 type ActionResult = { ok: true } | { ok: false; error: string };
 const initial: ActionResult | null = null;
 
+type CommunityTab = "partners" | "leaderboard";
+
+const PERIOD_OPTIONS: Array<{ id: CommunityLeaderboardPeriod; label: string }> = [
+  { id: "month", label: "This month" },
+  { id: "quarter", label: "This quarter" },
+  { id: "year", label: "This year" },
+];
+
+const RANK_STYLE = [
+  "border-amber-400/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200",
+  "border-slate-300/50 bg-slate-50 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200",
+  "border-orange-400/40 bg-orange-50 text-orange-900 dark:bg-orange-950/30 dark:text-orange-200",
+];
+
 export function CommunityWorkspace({
   tenantSlug,
   tenantName,
+  currency,
   canEdit,
+  initialTab = "partners",
+  initialPeriod = "month",
+  leaderboards,
   partners,
   summary,
 }: {
   tenantSlug: string;
   tenantName: string;
+  currency: string;
   canEdit: boolean;
+  initialTab?: CommunityTab;
+  initialPeriod?: CommunityLeaderboardPeriod;
+  leaderboards: Record<CommunityLeaderboardPeriod, { label: string; entries: CommunityMemberLeaderboardEntry[] }>;
   partners: PartnerRow[];
   summary: {
     totalPartners: number;
@@ -40,6 +68,8 @@ export function CommunityWorkspace({
     monthLeads: number;
   };
 }) {
+  const [tab, setTab] = useState<CommunityTab>(initialTab);
+  const [period, setPeriod] = useState<CommunityLeaderboardPeriod>(initialPeriod);
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createRealtorPartner.bind(null, tenantSlug), initial);
   const { showSnackbar } = useSnackbar();
@@ -47,6 +77,9 @@ export function CommunityWorkspace({
   const [pendingRotate, startRotate] = useTransition();
   const [freshLink, setFreshLink] = useState<string | null>(null);
   const router = useRouter();
+
+  const board = leaderboards[period];
+  const topPerformer = board.entries[0] ?? null;
 
   useEffect(() => {
     if (!state) return;
@@ -65,25 +98,161 @@ export function CommunityWorkspace({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Community & realtors</h1>
-          <p className="mt-1 text-sm text-muted">
-            Directory and portal access for <span className="font-medium text-foreground">{tenantName}</span>.
+          <h1 className="text-2xl font-bold text-foreground">Community</h1>
+          <p className="mt-1 max-w-xl text-sm text-muted">
+            Community members submit prospects via portal links — sales picks them up in Leads. Rankings celebrate top
+            contributors for <span className="font-medium text-foreground">{tenantName}</span>.
           </p>
         </div>
-        {canEdit ? (
+        {canEdit && tab === "partners" ? (
           <button
             type="button"
             onClick={() => setOpen(true)}
             className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
           >
-            Add realtor partner
+            Add partner
           </button>
         ) : null}
       </div>
 
+      <div className="mt-5 flex flex-wrap gap-2 border-b border-foreground/10 pb-3">
+        {(
+          [
+            { id: "partners" as const, label: "Partners" },
+            { id: "leaderboard" as const, label: "Leaderboard" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={[
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              tab === t.id
+                ? "bg-foreground text-background"
+                : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+            ].join(" ")}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "partners" ? (
+        <PartnersTab
+          canEdit={canEdit}
+          partners={partners}
+          summary={summary}
+          freshLink={freshLink}
+          pendingRotate={pendingRotate}
+          tenantSlug={tenantSlug}
+          setFreshLink={setFreshLink}
+          showSnackbar={showSnackbar}
+          startRotate={startRotate}
+          router={router}
+        />
+      ) : (
+        <LeaderboardTab
+          period={period}
+          setPeriod={setPeriod}
+          board={board}
+          topPerformer={topPerformer}
+          currency={currency}
+        />
+      )}
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-foreground">Add partner</h2>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <form ref={formRef} action={formAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+              {state && !state.ok ? (
+                <div className="sm:col-span-2">
+                  <FormAlert>{state.error}</FormAlert>
+                </div>
+              ) : null}
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm text-muted">Display name</label>
+                <input
+                  name="displayName"
+                  required
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Email</label>
+                <input name="email" type="text" inputMode="email" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Phone</label>
+                <input name="phone" type="text" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Company</label>
+                <input name="company" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Territory</label>
+                <input name="territory" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm text-muted">Notes</label>
+                <textarea name="notes" rows={3} className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+              </div>
+              <div className="flex justify-end gap-2 sm:col-span-2 pt-2">
+                <button type="button" onClick={() => setOpen(false)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]">
+                  Cancel
+                </button>
+                <button type="submit" disabled={pending} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+                  {pending ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PartnersTab({
+  canEdit,
+  partners,
+  summary,
+  freshLink,
+  pendingRotate,
+  tenantSlug,
+  setFreshLink,
+  showSnackbar,
+  startRotate,
+  router,
+}: {
+  canEdit: boolean;
+  partners: PartnerRow[];
+  summary: { totalPartners: number; activePartners: number; portalReady: number; monthLeads: number };
+  freshLink: string | null;
+  pendingRotate: boolean;
+  tenantSlug: string;
+  setFreshLink: (v: string | null) => void;
+  showSnackbar: (msg: string, tone: "success" | "error" | "info") => void;
+  startRotate: (fn: () => void) => void;
+  router: ReturnType<typeof useRouter>;
+}) {
+  return (
+    <>
       {!canEdit ? (
         <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
           Read-only directory. Org admins, community managers, and sales managers can manage partners and portal links.
@@ -91,15 +260,15 @@ export function CommunityWorkspace({
       ) : null}
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Total partners" value={summary.totalPartners} />
-        <KpiCard label="Active partners" value={summary.activePartners} />
-        <KpiCard label="Portal configured" value={summary.portalReady} />
-        <KpiCard label="Partner leads (month)" value={summary.monthLeads} />
+        <KpiCard label="Community members" value={summary.totalPartners} />
+        <KpiCard label="Active members" value={summary.activePartners} />
+        <KpiCard label="Portal links live" value={summary.portalReady} />
+        <KpiCard label="Prospects this month" value={summary.monthLeads} />
       </section>
 
       {freshLink ? (
         <div className="mt-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm">
-          <p className="font-semibold text-foreground">New portal link (copy now — it won’t be shown again)</p>
+          <p className="font-semibold text-foreground">New portal link (copy now — it won&apos;t be shown again)</p>
           <p className="mt-2 break-all font-mono text-xs text-foreground">{freshLink}</p>
           <button
             type="button"
@@ -111,11 +280,7 @@ export function CommunityWorkspace({
           >
             Copy link
           </button>
-          <button
-            type="button"
-            className="ml-2 mt-3 text-xs text-muted underline"
-            onClick={() => setFreshLink(null)}
-          >
+          <button type="button" className="ml-2 mt-3 text-xs text-muted underline" onClick={() => setFreshLink(null)}>
             Dismiss
           </button>
         </div>
@@ -138,7 +303,7 @@ export function CommunityWorkspace({
             {partners.length === 0 ? (
               <tr>
                 <td colSpan={canEdit ? 7 : 6} className="px-4 py-8 text-muted">
-                  No realtor partners yet. Add partners to issue secure submit/track links.
+                  No community members yet. Add a member and generate their portal link so they can submit prospects.
                 </td>
               </tr>
             ) : (
@@ -170,7 +335,7 @@ export function CommunityWorkspace({
                                 showSnackbar(res.error, "error");
                                 return;
                               }
-                              setFreshLink(fullUrl(res.relativePath));
+                              setFreshLink(`${window.location.origin}${res.relativePath}`);
                               showSnackbar("Portal link generated.", "success");
                               router.refresh();
                             });
@@ -205,99 +370,131 @@ export function CommunityWorkspace({
       </div>
 
       <p className="mt-4 text-xs text-muted">
-        External realtors use their portal link to submit leads and see submissions tied to their account. Links include a
-        secret token — treat them like passwords.
+        Each member gets a private portal link (like a sign-up URL). They submit prospects there; your sales team sees
+        them under Leads with the member attributed. Generate links from the Actions column.
       </p>
+    </>
+  );
+}
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Add realtor partner</h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
-                aria-label="Close"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-            <form ref={formRef} action={formAction} className="mt-4 grid gap-3 sm:grid-cols-2">
-              {state && !state.ok ? (
-                <div className="sm:col-span-2">
-                  <FormAlert>{state.error}</FormAlert>
-                </div>
-              ) : null}
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm text-muted">Display name</label>
-                <input
-                  name="displayName"
-                  required
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Email</label>
-                <input
-                  name="email"
-                  type="text"
-                  inputMode="email"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Phone</label>
-                <input
-                  name="phone"
-                  type="text"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Company</label>
-                <input
-                  name="company"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Territory</label>
-                <input
-                  name="territory"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm text-muted">Notes</label>
-                <textarea
-                  name="notes"
-                  rows={3}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-                >
-                  {pending ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
-          </div>
+function LeaderboardTab({
+  period,
+  setPeriod,
+  board,
+  topPerformer,
+  currency,
+}: {
+  period: CommunityLeaderboardPeriod;
+  setPeriod: (p: CommunityLeaderboardPeriod) => void;
+  board: { label: string; entries: CommunityMemberLeaderboardEntry[] };
+  topPerformer: CommunityMemberLeaderboardEntry | null;
+  currency: string;
+}) {
+  return (
+    <div className="mt-4 space-y-4">
+      <section className="rounded-lg border border-indigo-500/25 bg-indigo-500/5 p-4 text-sm text-muted">
+        <p className="font-medium text-foreground">Community leaderboard — not staff</p>
+        <p className="mt-1 text-xs">
+          This ranks external community members who submit prospects through portal links or send referrals. Sales sees
+          every submission under Leads. Staff performance lives on the Dashboard and in People → Appraisals.
+        </p>
+      </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Ranking period</p>
+          <p className="mt-0.5 text-sm font-semibold text-foreground">{board.label}</p>
         </div>
+        <UiSelect
+          value={period}
+          onChange={(e) => setPeriod(e.target.value as CommunityLeaderboardPeriod)}
+          className="min-w-[160px] text-sm"
+        >
+          {PERIOD_OPTIONS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label}
+            </option>
+          ))}
+        </UiSelect>
+      </div>
+
+      {topPerformer ? (
+        <section className="rounded-lg border border-amber-400/40 bg-gradient-to-r from-amber-50/80 to-background p-4 dark:from-amber-950/20">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+            Top community member · {board.label}
+          </p>
+          <p className="mt-1 text-lg font-bold text-foreground">{topPerformer.name}</p>
+          <p className="text-xs text-muted">
+            {topPerformer.company ?? topPerformer.territory ?? "Community"}
+            {" · "}
+            {topPerformer.prospectsSubmitted + topPerformer.referrals} submissions
+            {topPerformer.dealsWon > 0 ? ` · ${topPerformer.dealsWon} closed sale(s)` : ""}
+            {" · "}
+            {topPerformer.compositeScore} pts
+          </p>
+        </section>
       ) : null}
+
+      <div className="overflow-hidden rounded-lg border border-foreground/10">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+            <tr>
+              <th className="px-4 py-3">Rank</th>
+              <th className="px-4 py-3">Member</th>
+              <th className="px-4 py-3">Prospects</th>
+              <th className="px-4 py-3">Referrals</th>
+              <th className="px-4 py-3">Hot leads</th>
+              <th className="px-4 py-3">Closed sales</th>
+              <th className="px-4 py-3">Score</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-foreground/10">
+            {board.entries.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-muted">
+                  No community activity for this period yet. When members submit prospects or referrals through their portal
+                  links, rankings appear here.
+                </td>
+              </tr>
+            ) : (
+              board.entries.map((entry, idx) => (
+                <tr key={entry.partnerId}>
+                  <td className="px-4 py-3">
+                    <span
+                      className={[
+                        "inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold",
+                        idx < 3 ? RANK_STYLE[idx] : "border-foreground/15 text-muted",
+                      ].join(" ")}
+                    >
+                      {idx + 1}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-foreground">{entry.name}</div>
+                    <div className="text-xs text-muted">
+                      {entry.company ?? "—"}
+                      {entry.territory ? ` · ${entry.territory}` : ""}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-foreground">{entry.prospectsSubmitted}</td>
+                  <td className="px-4 py-3 text-foreground">{entry.referrals}</td>
+                  <td className="px-4 py-3 text-foreground">{entry.hotProspects}</td>
+                  <td className="px-4 py-3 text-muted">
+                    <div>{entry.dealsWon}</div>
+                    <div className="text-xs">{formatLeaderboardMoney(entry.dealValue, currency)}</div>
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-foreground">{entry.compositeScore}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-muted">
+        Scores weight portal prospects, referrals, hot-lead quality, and closed sales tied to each member. Use month /
+        quarter / year views to pick standout community contributors — separate from internal team leaderboards.
+      </p>
     </div>
   );
 }

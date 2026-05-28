@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus, Prisma } from "@/generated/prisma";
-import { createTenantUploadSignature } from "@/lib/cloudinary-upload-server";
+import { createTenantUploadSignature, type CloudinaryUploadSignature } from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
 import { parseRoleModuleGrantsFromFormData } from "@/lib/role-module-grants-form";
 import { revalidatePath } from "next/cache";
@@ -160,6 +160,51 @@ export async function saveOrganizationBranding(tenantSlug: string, _prev: unknow
 
   revalidatePath(`/${tenantSlug}/settings`);
   revalidatePath(`/${tenantSlug}/hr`);
+  revalidatePath(`/${tenantSlug}`, "layout");
+  return { ok: true };
+}
+
+export async function saveOrganizationLogoUrl(
+  tenantSlug: string,
+  logoUrl: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = z.string().trim().url("Invalid logo URL.").safeParse(logoUrl);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || "Invalid logo URL." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, settings: { select: { id: true } } },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  if (!session.user.isPlatformAdmin && !canRenameOrg(false, membership?.role)) {
+    return { ok: false, error: "Only admins can update branding." };
+  }
+  if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
+    return { ok: false, error: "No access." };
+  }
+
+  if (tenant.settings) {
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { logoUrl: parsed.data },
+    });
+  } else {
+    await prisma.tenantSettings.create({
+      data: { tenantId: tenant.id, logoUrl: parsed.data },
+    });
+  }
+
+  revalidatePath(`/${tenantSlug}/settings`);
+  revalidatePath(`/${tenantSlug}/hr`);
+  revalidatePath(`/${tenantSlug}`, "layout");
   return { ok: true };
 }
 
@@ -217,6 +262,7 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
   const moduleCommunity = formData.get("moduleCommunity") === "on";
   const moduleRealtorPortal = formData.get("moduleRealtorPortal") === "on";
   const moduleHr = formData.get("moduleHr") === "on";
+  const moduleTasks = formData.get("moduleTasks") === "on";
   const DEFAULT_DEPARTMENTS = ["Finance", "Sales", "Marketing", "Community"];
   const parsedDepartments = parseLinesList(formData.get("orgDepartmentsCsv"));
   const orgDepartments = Array.from(
@@ -235,6 +281,7 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
         moduleCommunity,
         moduleRealtorPortal,
         moduleHr,
+        moduleTasks,
         orgDepartments: orgDepartments as Prisma.InputJsonValue,
         ...(roleModuleGrantsParsed ? { roleModuleGrants: roleModuleGrantsParsed as Prisma.InputJsonValue } : {}),
       },
@@ -249,6 +296,7 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
         moduleCommunity,
         moduleRealtorPortal,
         moduleHr,
+        moduleTasks,
         orgDepartments: orgDepartments as Prisma.InputJsonValue,
         roleModuleGrants: roleModuleGrantsParsed ? (roleModuleGrantsParsed as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
@@ -302,25 +350,14 @@ export async function saveIntegrationSettings(tenantSlug: string, _prev: unknown
   }
 
   revalidatePath(`/${tenantSlug}/settings`);
-  revalidatePath(`/${tenantSlug}`);
+  revalidatePath(`/${tenantSlug}`, "layout");
   return { ok: true };
 }
 
 export async function getOrgLogoUploadSignature(
   tenantSlug: string,
   input?: { fileName?: string },
-): Promise<
-  | {
-      ok: true;
-      cloudName: string;
-      apiKey: string;
-      folder: string;
-      timestamp: number;
-      publicId: string;
-      signature: string;
-    }
-  | { ok: false; error: string }
-> {
+): Promise<CloudinaryUploadSignature | { ok: false; error: string }> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 

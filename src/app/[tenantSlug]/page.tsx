@@ -37,6 +37,7 @@ export default async function TenantHomePage({
           whatsappAccessToken: true,
           whatsappPhoneNumberId: true,
           termiiApiKey: true,
+          moduleTasks: true,
         },
       },
     },
@@ -85,7 +86,9 @@ export default async function TenantHomePage({
   const monthEnd = new Date(monthStart);
   monthEnd.setMonth(monthEnd.getMonth() + 1);
 
-  const [goal, preference, deals, units, leads, invoices, payments, users, projects, activitiesCount, whatsappCount, inboundWebhookLastAt, hrOnboardingStatus] = await Promise.all([
+  const moduleTasksEnabled = tenant.settings?.moduleTasks ?? true;
+
+  const [goal, preference, deals, units, leads, invoices, payments, users, projects, activitiesCount, whatsappCount, inboundWebhookLastAt, hrOnboardingStatus, myWorkTasksRaw] = await Promise.all([
     prisma.tenantGoal.findFirst({
       where: { tenantId: tenant.id, isActive: true },
       orderBy: { updatedAt: "desc" },
@@ -159,6 +162,7 @@ export default async function TenantHomePage({
       select: {
         id: true,
         invoiceId: true,
+        standaloneTitle: true,
         amount: true,
         currency: true,
         paidAt: true,
@@ -207,6 +211,18 @@ export default async function TenantHomePage({
       select: { createdAt: true },
     }),
     loadHrOnboardingStatusForUser(tenant.id, session.user.id, session.user.email),
+    moduleTasksEnabled
+      ? prisma.workTask.findMany({
+          where: {
+            tenantId: tenant.id,
+            status: { in: ["TODO", "IN_PROGRESS", "IN_REVIEW"] },
+            OR: [{ assigneeUserId: session.user.id }, { createdByUserId: session.user.id }],
+          },
+          orderBy: [{ dueDate: "asc" }, { updatedAt: "desc" }],
+          include: { space: { select: { name: true } } },
+          take: 8,
+        })
+      : Promise.resolve([]),
   ]);
 
   const preferredRoleView = normalizeRoleView(preference?.roleView || roleOptions[0]);
@@ -250,6 +266,28 @@ export default async function TenantHomePage({
     count: deals.filter((d) => d.stage === stage).length,
   }));
   const userMap = new Map(users.map((u) => [u.user.id, u.user.name || u.user.email || u.user.id]));
+  const taskStatusLabel: Record<string, string> = {
+    TODO: "To-do",
+    IN_PROGRESS: "In progress",
+    IN_REVIEW: "In review",
+    DONE: "Complete",
+  };
+  const myWorkTasks = moduleTasksEnabled
+    ? myWorkTasksRaw.map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        statusLabel: taskStatusLabel[t.status] || t.status,
+        priority: t.priority,
+        dueDateLabel: t.dueDate
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.dueDate)
+          : null,
+        spaceName: t.space?.name || null,
+        isAssignee: t.assigneeUserId === session.user.id,
+        isOwner: t.createdByUserId === session.user.id,
+      }))
+    : [];
+  const myOpenTaskCount = myWorkTasks.length;
   const leaderboardByUser = new Map<string, number>();
   for (const d of deals) {
     if (d.stage !== "CLOSED_WON" || !d.assignedUserId) continue;
@@ -491,6 +529,10 @@ export default async function TenantHomePage({
         unassignedLeads,
         myPipelineCount,
         myNewLeads7d,
+        myOpenTaskCount,
+        myWorkTasks,
+        tasksModuleEnabled: moduleTasksEnabled,
+        tasksPageUrl: `/${tenantSlug}/tasks?view=my`,
         leadFunnel,
         leaderboard,
         revenueMonthly,
@@ -586,16 +628,19 @@ export default async function TenantHomePage({
         kpiPaymentRows: payments.map((p) => ({
           id: p.id,
           invoiceId: p.invoiceId,
-          invoiceNumber: p.invoice.invoiceNumber,
+          invoiceNumber: p.invoice?.invoiceNumber || (p.standaloneTitle ? "Direct" : "—"),
           paidAt: p.paidAt.toISOString(),
           amount: Number(p.amount),
           currency: p.currency,
           method: p.method || "—",
           reference: p.reference || "—",
-          ownerId: p.invoice.deal?.assignedUserId || null,
-          ownerLabel: p.invoice.deal?.assignedUserId ? userMap.get(p.invoice.deal.assignedUserId) || "Unknown" : "Unassigned",
-          projectId: p.invoice.deal?.unit?.project?.id || null,
-          projectName: p.invoice.deal?.unit?.project?.name || p.invoice.deal?.lead?.projectInterest || "No project",
+          ownerId: p.invoice?.deal?.assignedUserId || null,
+          ownerLabel: p.invoice?.deal?.assignedUserId
+            ? userMap.get(p.invoice.deal.assignedUserId) || "Unknown"
+            : "Unassigned",
+          projectId: p.invoice?.deal?.unit?.project?.id || null,
+          projectName:
+            p.invoice?.deal?.unit?.project?.name || p.invoice?.deal?.lead?.projectInterest || "No project",
           recordedByLabel:
             p.recordedByLabel || (p.recordedByUserId ? userMap.get(p.recordedByUserId) || "Unknown" : "Unknown"),
         })),

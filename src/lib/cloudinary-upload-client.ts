@@ -19,7 +19,7 @@ export function isPlatformCloudinaryReady() {
 }
 
 export const CLOUDINARY_SETUP_MESSAGE =
-  "Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to .env (see .env.example). Restart the dev server after saving.";
+  "Cloudinary is not configured. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to .env (uppercase), or set CLOUDINARY_URL. Restart the dev server after saving.";
 
 /** Browser upload using a server-issued signature. */
 export async function uploadViaCloudinarySignature(

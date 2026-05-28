@@ -22,6 +22,15 @@ import { mergeHrFormIntoProfile } from "@/lib/hr-form-merge";
 import { hrFormFillPath, HR_FORM_TYPE_LABELS, hrOnboardingBundlePath, sortFormTypes } from "@/lib/hr-form-types";
 import { hrOfferSignPath } from "@/lib/hr-offer-path";
 import { sanitizeOfferLetterHtml } from "@/lib/offer-letter-html";
+import { sanitizeRichTextHtml } from "@/lib/rich-text-sanitize";
+import { DEFAULT_APPRAISAL_CRITERIA } from "@/lib/appraisal-competencies";
+import {
+  averageConfirmedRatings,
+  mergeManagerAppraisalScores,
+  mergeSelfAppraisalScores,
+  parseActionScores,
+  type AppraisalActionScores,
+} from "@/lib/appraisal-scores";
 import { writeAuditLog } from "@/lib/audit-log";
 import {
   createTenantUploadSignature,
@@ -290,6 +299,23 @@ export async function createAppraisalActionItem(
   return { ok: true };
 }
 
+/** Seed standard competency criteria (monthly + yearly) when a tenant has none yet. */
+export async function ensureDefaultAppraisalCriteria(tenantId: string): Promise<void> {
+  const count = await prisma.hrAppraisalAction.count({ where: { tenantId } });
+  if (count > 0) return;
+
+  await prisma.hrAppraisalAction.createMany({
+    data: DEFAULT_APPRAISAL_CRITERIA.map((c) => ({
+      tenantId,
+      title: c.title,
+      description: c.description,
+      cycleType: c.cycleType as HrAppraisalCycleType,
+      sortOrder: c.sortOrder,
+      isActive: true,
+    })),
+  });
+}
+
 export async function createAppraisalCycle(
   tenantSlug: string,
   input: { cycleType: "MONTHLY" | "YEARLY"; periodLabel: string; dueDate?: string },
@@ -358,7 +384,13 @@ export async function saveAppraisalReview(
     managerNotes?: string;
     overallRating?: number;
     actionScoresJson?: string;
-    actionResponses?: Array<{ actionId: string; rating?: number; completed?: boolean }>;
+    actionResponses?: Array<{
+      actionId: string;
+      managerRating?: number;
+      managerNotes?: string;
+      rating?: number;
+      completed?: boolean;
+    }>;
   },
 ): Promise<ActionResult> {
   const session = await auth();
@@ -369,28 +401,32 @@ export async function saveAppraisalReview(
     return { ok: false, error: "You do not have permission." };
   }
 
-  let actionScores: Prisma.InputJsonValue | undefined;
+  const existing = await prisma.hrAppraisal.findFirst({
+    where: { id: appraisalId, tenantId: tenant.id },
+    select: { actionScores: true },
+  });
+  const prior = parseActionScores(existing?.actionScores);
+
+  let actionScores: AppraisalActionScores | undefined;
+  let overallRating = input.overallRating;
+
   if (input.actionResponses?.length) {
-    const existing = await prisma.hrAppraisal.findFirst({
-      where: { id: appraisalId, tenantId: tenant.id },
-      select: { actionScores: true },
-    });
-    const prior =
-      existing?.actionScores && typeof existing.actionScores === "object"
-        ? (existing.actionScores as Record<string, { rating?: number; completed?: boolean }>)
-        : {};
-    const scores: Record<string, { rating?: number; completed?: boolean }> = { ...prior };
-    for (const row of input.actionResponses) {
-      scores[row.actionId] = {
-        ...scores[row.actionId],
-        ...(row.rating ? { rating: row.rating } : {}),
-        ...(row.completed ? { completed: true } : {}),
-      };
+    actionScores = mergeManagerAppraisalScores(
+      prior,
+      input.actionResponses.map((row) => ({
+        actionId: row.actionId,
+        managerRating: row.managerRating ?? row.rating,
+        managerNotes: row.managerNotes,
+      })),
+    );
+    const actionIds = input.actionResponses.map((r) => r.actionId);
+    const computed = averageConfirmedRatings(actionScores, actionIds);
+    if (computed != null && overallRating == null) {
+      overallRating = Math.round(computed);
     }
-    actionScores = scores;
   } else if (input.actionScoresJson?.trim()) {
     try {
-      actionScores = JSON.parse(input.actionScoresJson) as Prisma.InputJsonValue;
+      actionScores = parseActionScores(JSON.parse(input.actionScoresJson));
     } catch {
       return { ok: false, error: "Invalid scores format." };
     }
@@ -399,9 +435,9 @@ export async function saveAppraisalReview(
   await prisma.hrAppraisal.update({
     where: { id: appraisalId, tenantId: tenant.id },
     data: {
-      managerNotes: input.managerNotes || null,
-      overallRating: input.overallRating ?? null,
-      actionScores,
+      managerNotes: input.managerNotes ? sanitizeRichTextHtml(input.managerNotes) : null,
+      overallRating: overallRating ?? null,
+      actionScores: actionScores as Prisma.InputJsonValue | undefined,
       status: HrAppraisalStatus.REVIEWED,
       reviewerUserId: session.user.id,
       reviewerLabel: session.user.name || session.user.email || "Reviewer",
@@ -417,7 +453,13 @@ export async function saveSelfAppraisal(
   appraisalId: string,
   input: {
     selfNotes?: string;
-    actionResponses?: Array<{ actionId: string; rating?: number; completed?: boolean }>;
+    actionResponses?: Array<{
+      actionId: string;
+      selfRating?: number;
+      selfNotes?: string;
+      rating?: number;
+      completed?: boolean;
+    }>;
   },
 ): Promise<ActionResult> {
   const session = await auth();
@@ -437,23 +479,25 @@ export async function saveSelfAppraisal(
     return { ok: false, error: "This appraisal period is closed." };
   }
 
-  let actionScores: Prisma.InputJsonValue | undefined;
+  const prior = parseActionScores(appraisal.actionScores);
+  let actionScores: AppraisalActionScores | undefined;
+
   if (input.actionResponses?.length) {
-    const scores: Record<string, { rating?: number; completed?: boolean }> = {};
-    for (const row of input.actionResponses) {
-      scores[row.actionId] = {
-        ...(row.rating ? { rating: row.rating } : {}),
-        ...(row.completed ? { completed: true } : {}),
-      };
-    }
-    actionScores = scores;
+    actionScores = mergeSelfAppraisalScores(
+      prior,
+      input.actionResponses.map((row) => ({
+        actionId: row.actionId,
+        selfRating: row.selfRating ?? row.rating,
+        selfNotes: row.selfNotes ? sanitizeRichTextHtml(row.selfNotes) : undefined,
+      })),
+    );
   }
 
   await prisma.hrAppraisal.update({
     where: { id: appraisalId },
     data: {
-      selfNotes: input.selfNotes || null,
-      actionScores,
+      selfNotes: input.selfNotes ? sanitizeRichTextHtml(input.selfNotes) : null,
+      actionScores: actionScores as Prisma.InputJsonValue | undefined,
       status: HrAppraisalStatus.SELF_SUBMITTED,
     },
   });

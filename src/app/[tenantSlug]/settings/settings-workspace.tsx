@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { MembershipRole } from "@/generated/prisma";
 import {
   EXTRA_MODULE_GRANT_TOKENS,
@@ -17,10 +18,13 @@ import {
   updateMyDisplayName,
   updateMyPassword,
   saveOrganizationBranding,
+  saveOrganizationLogoUrl,
   updateOrganizationName,
   updateOrgModules,
 } from "./actions";
 import { FormAlert } from "@/components/form-message";
+import { useSnackbar } from "@/components/snackbar";
+import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 
 type WorkspaceMeta = {
   slug: string;
@@ -46,6 +50,7 @@ type SettingsWorkspaceProps = {
     moduleRealtorPortal: boolean;
     moduleShortLets: boolean;
     moduleHr: boolean;
+    moduleTasks: boolean;
   };
   roleModuleGrantsJson: string;
   orgDepartments: string[];
@@ -131,9 +136,24 @@ export function SettingsWorkspace({
     saveIntegrationSettings.bind(null, tenantSlug),
     null as { ok: true } | { ok: false; error: string } | null,
   );
-  const [logoUrl, setLogoUrl] = useState(integrations.logoUrl ?? "");
+  const router = useRouter();
+  const [logoUrl, setLogoUrl] = useState(branding.logoUrl ?? integrations.logoUrl ?? "");
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+  const { showSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    setLogoUrl(branding.logoUrl ?? integrations.logoUrl ?? "");
+  }, [branding.logoUrl, integrations.logoUrl]);
+
+  useEffect(() => {
+    if (brandState?.ok) router.refresh();
+  }, [brandState, router]);
+
+  function reportLogoIssue(message: string) {
+    setLogoUploadError(message);
+    showSnackbar(message, "error");
+  }
 
   const initialRoleGrants = useMemo(() => parseRoleGrantsJsonString(roleModuleGrantsJson), [roleModuleGrantsJson]);
   const initialCustomDepartments = useMemo(
@@ -157,44 +177,35 @@ export function SettingsWorkspace({
   async function handleLogoFileUpload(file: File) {
     if (logoUploading) return;
     if (!file.type.startsWith("image/")) {
-      setLogoUploadError("Please upload an image file.");
+      reportLogoIssue("Please upload an image file.");
       return;
     }
     setLogoUploading(true);
     setLogoUploadError(null);
     const sig = await getOrgLogoUploadSignature(tenantSlug, { fileName: file.name });
     if (!sig.ok) {
-      setLogoUploadError(sig.error);
+      reportLogoIssue(sig.error);
       setLogoUploading(false);
       return;
     }
     try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("api_key", sig.apiKey);
-      form.append("timestamp", String(sig.timestamp));
-      form.append("signature", sig.signature);
-      form.append("folder", sig.folder);
-      form.append("public_id", sig.publicId);
-      form.append("resource_type", "image");
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, {
-        method: "POST",
-        body: form,
-      });
-      if (!response.ok) {
-        setLogoUploadError("Logo upload failed. Please try again.");
+      const uploaded = await uploadViaCloudinarySignature(file, sig);
+      if (!uploaded.ok) {
+        reportLogoIssue(uploaded.error);
         setLogoUploading(false);
         return;
       }
-      const payload = (await response.json()) as { secure_url?: string };
-      if (!payload.secure_url) {
-        setLogoUploadError("Upload response was invalid.");
+      setLogoUrl(uploaded.secureUrl);
+      const saved = await saveOrganizationLogoUrl(tenantSlug, uploaded.secureUrl);
+      if (!saved.ok) {
+        reportLogoIssue(saved.error);
         setLogoUploading(false);
         return;
       }
-      setLogoUrl(payload.secure_url);
+      showSnackbar("Logo saved for your organization.", "success");
+      router.refresh();
     } catch {
-      setLogoUploadError("Could not upload logo right now.");
+      reportLogoIssue("Could not upload logo right now.");
     } finally {
       setLogoUploading(false);
     }
@@ -508,6 +519,7 @@ export function SettingsWorkspace({
                   <ModuleToggle name="moduleSales" label="Sales (dashboard, projects, leads, deals)" defaultChecked={modules.moduleSales} />
                   <ModuleToggle name="moduleFinance" label="Finance" defaultChecked={modules.moduleFinance} />
                   <ModuleToggle name="moduleHr" label="People (HR)" defaultChecked={modules.moduleHr} />
+                  <ModuleToggle name="moduleTasks" label="Tasks (company work & boards)" defaultChecked={modules.moduleTasks} />
                   <ModuleToggle name="moduleMarketing" label="Marketing" defaultChecked={modules.moduleMarketing} />
                   <ModuleToggle name="moduleCommunity" label="Community" defaultChecked={modules.moduleCommunity} />
                   <ModuleToggle
@@ -654,7 +666,11 @@ export function SettingsWorkspace({
                     Remove logo
                   </button>
                 </div>
-                {logoUploadError ? <p className="mt-2 text-xs text-error">{logoUploadError}</p> : null}
+                {logoUploadError ? (
+                  <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                    {logoUploadError}
+                  </div>
+                ) : null}
                 {logoUrl ? (
                   <div className="mt-3 rounded-md border border-foreground/10 bg-background p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

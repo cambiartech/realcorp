@@ -2,6 +2,10 @@ import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
+import {
+  buildCommunityMemberLeaderboard,
+  type CommunityLeaderboardPeriod,
+} from "@/lib/community-leaderboard";
 import { notFound } from "next/navigation";
 import { CommunityWorkspace } from "./community-workspace";
 
@@ -16,8 +20,15 @@ function canManageCommunity(role: MembershipRole | undefined, isPlatformAdmin: b
   );
 }
 
-export default async function CommunityPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
+export default async function CommunityPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tenantSlug: string }>;
+  searchParams: Promise<{ tab?: string; period?: string }>;
+}) {
   const { tenantSlug } = await params;
+  const { tab, period } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -27,12 +38,15 @@ export default async function CommunityPage({ params }: { params: Promise<{ tena
       id: true,
       slug: true,
       name: true,
+      defaultCurrency: true,
       settings: {
         select: {
           moduleSales: true,
           moduleFinance: true,
           moduleMarketing: true,
           moduleCommunity: true,
+          moduleHr: true,
+          moduleTasks: true,
           roleModuleGrants: true,
         },
       },
@@ -49,7 +63,11 @@ export default async function CommunityPage({ params }: { params: Promise<{ tena
     membership?.status === MembershipStatus.ACTIVE &&
     canManageCommunity(membership.role, Boolean(session.user.isPlatformAdmin));
 
-  const [partners, monthLeads] = await Promise.all([
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const [partners, monthLeads, partnerLeads, partnerDeals] = await Promise.all([
     prisma.realtorPartner.findMany({
       where: { tenantId: tenant.id },
       orderBy: { createdAt: "desc" },
@@ -60,19 +78,66 @@ export default async function CommunityPage({ params }: { params: Promise<{ tena
       where: {
         tenantId: tenant.id,
         realtorPartnerId: { not: null },
-        createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        createdAt: { gte: monthStart },
       },
+    }),
+    prisma.lead.findMany({
+      where: { tenantId: tenant.id, realtorPartnerId: { not: null } },
+      select: {
+        realtorPartnerId: true,
+        source: true,
+        quality: true,
+        createdAt: true,
+      },
+      take: 5000,
+    }),
+    prisma.deal.findMany({
+      where: {
+        tenantId: tenant.id,
+        lead: { realtorPartnerId: { not: null } },
+      },
+      select: {
+        stage: true,
+        value: true,
+        updatedAt: true,
+        lead: { select: { realtorPartnerId: true } },
+      },
+      take: 2000,
     }),
   ]);
 
   const activePartners = partners.filter((p) => p.isActive).length;
   const portalReady = partners.filter((p) => p.portalTokenHash).length;
 
+  const leaderboardInput = {
+    partners: partners.map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      company: p.company,
+      territory: p.territory,
+      isActive: p.isActive,
+    })),
+    leads: partnerLeads,
+    deals: partnerDeals,
+  };
+
+  const periods: CommunityLeaderboardPeriod[] = ["month", "quarter", "year"];
+  const leaderboards = Object.fromEntries(
+    periods.map((p) => [p, buildCommunityMemberLeaderboard({ ...leaderboardInput, period: p })]),
+  ) as Record<CommunityLeaderboardPeriod, ReturnType<typeof buildCommunityMemberLeaderboard>>;
+
+  const initialPeriod: CommunityLeaderboardPeriod =
+    period === "quarter" || period === "year" ? period : "month";
+
   return (
     <CommunityWorkspace
       tenantSlug={tenant.slug}
       tenantName={tenant.name}
+      currency={tenant.defaultCurrency}
       canEdit={canEdit}
+      initialTab={tab === "leaderboard" ? "leaderboard" : "partners"}
+      initialPeriod={initialPeriod}
+      leaderboards={leaderboards}
       partners={partners.map((p) => ({
         id: p.id,
         displayName: p.displayName,

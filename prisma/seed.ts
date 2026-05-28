@@ -6,13 +6,9 @@ import {
   TenantPlan,
   MembershipRole,
   MembershipStatus,
-  DealStage,
-  UnitStatus,
-  LeadQuality,
-  InvoiceStatus,
-  CampaignStatus,
 } from "../src/generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { runDemoDataPack } from "./demo-seed";
 
 const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!connectionString) {
@@ -28,7 +24,6 @@ const BO_SLUG = "bopropertiesng";
 async function main() {
   const platformPassword = process.env.SEED_PLATFORM_PASSWORD ?? "Pass@123";
   const demoPassword = process.env.SEED_DEMO_PASSWORD ?? "Pass@40123";
-  /** Bo Properties org admin (`dev@bopropertiesng.com`) — default matches common local demo expectation */
   const orgAdminBoPassword = process.env.SEED_ORG_ADMIN_BO_PASSWORD ?? "Pass@123";
 
   const platformHash = await bcrypt.hash(platformPassword, 12);
@@ -73,11 +68,17 @@ async function main() {
       monthlyRevenueTarget: "250000000",
       pipelineTarget: "500000000",
       moduleHr: true,
+      moduleShortLets: true,
+      moduleSales: true,
+      moduleFinance: true,
+      moduleMarketing: true,
+      moduleCommunity: true,
     },
     update: {
       monthlyRevenueTarget: "250000000",
       pipelineTarget: "500000000",
       moduleHr: true,
+      moduleShortLets: true,
     },
   });
 
@@ -117,43 +118,39 @@ async function main() {
       passwordHash: demoHash,
       emailVerified: new Date(),
     },
-    update: {
+    update: { passwordHash: demoHash },
+  });
+
+  const hrUser = await prisma.user.upsert({
+    where: { email: "hr@bopropertiesng.com" },
+    create: {
+      email: "hr@bopropertiesng.com",
+      name: "Chioma Nwachukwu",
       passwordHash: demoHash,
+      emailVerified: new Date(),
     },
+    update: { passwordHash: demoHash, name: "Chioma Nwachukwu" },
   });
 
-  await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: orgAdmin.id } },
-    create: {
-      tenantId: tenant.id,
-      userId: orgAdmin.id,
-      role: MembershipRole.ORG_ADMIN,
-      status: MembershipStatus.ACTIVE,
-    },
-    update: { role: MembershipRole.ORG_ADMIN, status: MembershipStatus.ACTIVE },
-  });
+  const memberships: Array<{ userId: string; role: MembershipRole }> = [
+    { userId: orgAdmin.id, role: MembershipRole.ORG_ADMIN },
+    { userId: salesUser.id, role: MembershipRole.SALES_EXECUTIVE },
+    { userId: financeUser.id, role: MembershipRole.FINANCE_MANAGER },
+    { userId: hrUser.id, role: MembershipRole.HR_MANAGER },
+  ];
 
-  await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: salesUser.id } },
-    create: {
-      tenantId: tenant.id,
-      userId: salesUser.id,
-      role: MembershipRole.SALES_EXECUTIVE,
-      status: MembershipStatus.ACTIVE,
-    },
-    update: { role: MembershipRole.SALES_EXECUTIVE, status: MembershipStatus.ACTIVE },
-  });
-
-  await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: financeUser.id } },
-    create: {
-      tenantId: tenant.id,
-      userId: financeUser.id,
-      role: MembershipRole.FINANCE_MANAGER,
-      status: MembershipStatus.ACTIVE,
-    },
-    update: { role: MembershipRole.FINANCE_MANAGER, status: MembershipStatus.ACTIVE },
-  });
+  for (const m of memberships) {
+    await prisma.membership.upsert({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: m.userId } },
+      create: {
+        tenantId: tenant.id,
+        userId: m.userId,
+        role: m.role,
+        status: MembershipStatus.ACTIVE,
+      },
+      update: { role: m.role, status: MembershipStatus.ACTIVE },
+    });
+  }
 
   const fyStart = new Date("2026-01-01T00:00:00.000Z");
   const fyEnd = new Date("2026-12-31T23:59:59.999Z");
@@ -170,269 +167,11 @@ async function main() {
     },
   });
 
-  const demoPack = await prisma.campaign.findFirst({
-    where: { tenantId: tenant.id, code: "LAGOS_Q1" },
-    select: { id: true },
-  });
-  if (demoPack) {
-    console.log("Seed OK — Bo Properties demo pack already applied (campaign LAGOS_Q1). Skipping CRM fixture recreate.");
-    console.log("  To fully reset demo data, use a fresh DB or delete the LAGOS_Q1 campaign and related rows.");
-    console.log("");
-    console.log("Platform admin: admin@realcorp.com");
-    console.log(`Bo Properties (${BO_SLUG}):`);
-    console.log("  dev@bopropertiesng.com (org admin: SEED_ORG_ADMIN_BO_PASSWORD or default Pass@123)");
-    console.log("  dev+1@bopropertiesng.com, finance@bopropertiesng.com — SEED_DEMO_PASSWORD or default Pass@40123");
-    return;
-  }
-
-  const campaign = await prisma.campaign.create({
-    data: {
-      tenantId: tenant.id,
-      name: "Lagos Q1 Push",
-      code: "LAGOS_Q1",
-      status: CampaignStatus.ACTIVE,
-      description: "Paid social + search — demo attribution",
-    },
-  });
-
-  const partner = await prisma.realtorPartner.create({
-    data: {
-      tenantId: tenant.id,
-      displayName: "Elite Realty Partners",
-      email: "partners@eliterealty.demo",
-      company: "Elite Realty",
-      territory: "Lagos Island",
-      isActive: true,
-    },
-  });
-
-  const projectAzure = await prisma.project.create({
-    data: {
-      tenantId: tenant.id,
-      name: "The Azure — Lekki",
-      basePrice: "85000000",
-      currency: "NGN",
-    },
-  });
-
-  const projectPalm = await prisma.project.create({
-    data: {
-      tenantId: tenant.id,
-      name: "Palm Heights — Abuja",
-      basePrice: "62000000",
-      currency: "NGN",
-    },
-  });
-
-  const planAzure = await prisma.projectPricingPlan.create({
-    data: {
-      tenantId: tenant.id,
-      projectId: projectAzure.id,
-      name: "3-Bed Premium",
-      price: "92000000",
-      currency: "NGN",
-      initialDeposit: "15000000",
-      paymentDurationMonths: 18,
-      billingCadence: "monthly",
-    },
-  });
-
-  const planPalm = await prisma.projectPricingPlan.create({
-    data: {
-      tenantId: tenant.id,
-      projectId: projectPalm.id,
-      name: "2-Bed Executive",
-      price: "68000000",
-      currency: "NGN",
-      initialDeposit: "10000000",
-      paymentDurationMonths: 24,
-      billingCadence: "monthly",
-    },
-  });
-
-  const unitsAzure = await prisma.$transaction([
-    prisma.unit.create({
-      data: {
-        tenantId: tenant.id,
-        projectId: projectAzure.id,
-        pricingPlanId: planAzure.id,
-        label: "Azure A-12",
-        unitType: "3BR",
-        status: UnitStatus.AVAILABLE,
-      },
-    }),
-    prisma.unit.create({
-      data: {
-        tenantId: tenant.id,
-        projectId: projectAzure.id,
-        pricingPlanId: planAzure.id,
-        label: "Azure B-04",
-        unitType: "3BR",
-        status: UnitStatus.RESERVED,
-      },
-    }),
-    prisma.unit.create({
-      data: {
-        tenantId: tenant.id,
-        projectId: projectAzure.id,
-        pricingPlanId: planAzure.id,
-        label: "Azure C-21",
-        unitType: "3BR",
-        status: UnitStatus.SOLD,
-      },
-    }),
-  ]);
-
-  const unitPalm1 = await prisma.unit.create({
-    data: {
-      tenantId: tenant.id,
-      projectId: projectPalm.id,
-      pricingPlanId: planPalm.id,
-      label: "Palm P-07",
-      unitType: "2BR",
-      status: UnitStatus.AVAILABLE,
-    },
-  });
-
-  const leads = await prisma.$transaction([
-    prisma.lead.create({
-      data: {
-        tenantId: tenant.id,
-        assignedUserId: salesUser.id,
-        source: "Instagram",
-        campaignId: campaign.id,
-        campaignName: campaign.name,
-        utmSource: "instagram",
-        utmMedium: "paid",
-        utmCampaign: "LAGOS_Q1",
-        projectInterest: projectAzure.name,
-        quality: LeadQuality.HOT,
-        name: "Chidi Eze",
-        email: "chidi.eze@example.com",
-        phone: "+234 801 000 0001",
-      },
-    }),
-    prisma.lead.create({
-      data: {
-        tenantId: tenant.id,
-        assignedUserId: salesUser.id,
-        source: "Referral",
-        realtorPartnerId: partner.id,
-        projectInterest: projectPalm.name,
-        quality: LeadQuality.WARM,
-        name: "Fatima Bello",
-        email: "fatima.bello@example.com",
-        phone: "+234 802 000 0002",
-      },
-    }),
-    prisma.lead.create({
-      data: {
-        tenantId: tenant.id,
-        assignedUserId: orgAdmin.id,
-        source: "Website",
-        projectInterest: projectAzure.name,
-        quality: LeadQuality.COLD,
-        name: "James Okafor",
-        email: "j.okafor@example.com",
-      },
-    }),
-  ]);
-
-  const dealReserved = await prisma.deal.create({
-    data: {
-      tenantId: tenant.id,
-      leadId: leads[0].id,
-      unitId: unitsAzure[1].id,
-      assignedUserId: salesUser.id,
-      stage: DealStage.RESERVATION_MADE,
-      value: "92000000",
-      pendingFinance: true,
-    },
-  });
-
-  await prisma.deal.create({
-    data: {
-      tenantId: tenant.id,
-      leadId: leads[1].id,
-      unitId: unitPalm1.id,
-      assignedUserId: salesUser.id,
-      stage: DealStage.NEGOTIATION,
-      value: "68000000",
-      pendingFinance: false,
-    },
-  });
-
-  await prisma.deal.create({
-    data: {
-      tenantId: tenant.id,
-      leadId: leads[2].id,
-      assignedUserId: orgAdmin.id,
-      stage: DealStage.QUALIFIED,
-      value: "85000000",
-      pendingFinance: false,
-    },
-  });
-
-  const invCount = await prisma.invoice.count({ where: { tenantId: tenant.id } });
-  const invNum1 = `INV-${String(invCount + 1).padStart(5, "0")}`;
-  const invNum2 = `INV-${String(invCount + 2).padStart(5, "0")}`;
-
-  const inv1 = await prisma.invoice.create({
-    data: {
-      tenantId: tenant.id,
-      dealId: dealReserved.id,
-      invoiceNumber: invNum1,
-      title: "Reservation deposit — Azure B-04",
-      status: InvoiceStatus.PARTIALLY_PAID,
-      amount: "15000000",
-      balanceDue: "5000000",
-      currency: "NGN",
-      dueDate: new Date(Date.now() + 14 * 86_400_000),
-      createdByUserId: financeUser.id,
-      createdByLabel: financeUser.name,
-    },
-  });
-
-  await prisma.paymentRecord.create({
-    data: {
-      tenantId: tenant.id,
-      invoiceId: inv1.id,
-      amount: "10000000",
-      currency: "NGN",
-      paidAt: new Date(),
-      method: "Bank transfer",
-      reference: "GTB-DEMO-001",
-      recordedByUserId: financeUser.id,
-      recordedByLabel: financeUser.name,
-    },
-  });
-
-  await prisma.invoice.create({
-    data: {
-      tenantId: tenant.id,
-      invoiceNumber: invNum2,
-      title: "Professional fees — staging",
-      status: InvoiceStatus.SENT,
-      amount: "2500000",
-      balanceDue: "2500000",
-      currency: "NGN",
-      dueDate: new Date(Date.now() - 10 * 86_400_000),
-      createdByUserId: financeUser.id,
-      createdByLabel: financeUser.name,
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      tenantId: tenant.id,
-      actorUserId: orgAdmin.id,
-      actorLabel: orgAdmin.name,
-      module: "FINANCE",
-      entityType: "INVOICE",
-      entityId: inv1.id,
-      action: "CREATE",
-      summary: "Demo seed: invoice created for CEO walkthrough.",
-    },
+  await runDemoDataPack(prisma, tenant.id, {
+    orgAdmin: { id: orgAdmin.id, name: orgAdmin.name, email: orgAdmin.email! },
+    salesUser: { id: salesUser.id, name: salesUser.name, email: salesUser.email! },
+    financeUser: { id: financeUser.id, name: financeUser.name, email: financeUser.email! },
+    hrUser: { id: hrUser.id, name: hrUser.name, email: hrUser.email! },
   });
 
   console.log("Seed OK.");
@@ -449,10 +188,12 @@ async function main() {
   console.log("  dev@bopropertiesng.com (org admin)");
   console.log("  dev+1@bopropertiesng.com (sales)");
   console.log("  finance@bopropertiesng.com (finance)");
+  console.log("  hr@bopropertiesng.com (people / HR)");
   console.log("");
   console.log(
-    "Use SEED_PLATFORM_PASSWORD, SEED_ORG_ADMIN_BO_PASSWORD, SEED_DEMO_PASSWORD in production; defaults are for local demo only.",
+    "Passwords: SEED_PLATFORM_PASSWORD, SEED_ORG_ADMIN_BO_PASSWORD, SEED_DEMO_PASSWORD (local defaults Pass@123 / Pass@40123).",
   );
+  console.log("Re-apply demo fixtures: delete campaign DEMO_PACK_V2, then npm run db:seed");
 }
 
 main()

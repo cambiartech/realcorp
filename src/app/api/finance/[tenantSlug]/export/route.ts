@@ -82,7 +82,7 @@ export async function GET(
     });
     const rows = payments.map((p) => ({
       id: p.id,
-      invoiceNumber: p.invoice.invoiceNumber,
+      invoiceNumber: p.invoice?.invoiceNumber || p.standaloneTitle || "Direct",
       amount: Number(p.amount),
       currency: p.currency,
       paidAt: p.paidAt.toISOString(),

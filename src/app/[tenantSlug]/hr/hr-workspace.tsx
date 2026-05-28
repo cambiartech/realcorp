@@ -11,6 +11,7 @@ import { HrPeopleWorkspace } from "@/components/hr/hr-people-workspace";
 import type { HrAnalyticsSnapshot } from "@/lib/hr-analytics";
 import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
+import type { StaffMonthlyScoreEntry } from "@/lib/staff-monthly-performance";
 import type { ProfileDetailRow } from "@/lib/hr-profile-form";
 import type { PayslipCalculation } from "@/lib/hr-payslip";
 import type { TenantBranding } from "@/lib/tenant-branding";
@@ -140,6 +141,39 @@ export function HrWorkspace(props: {
   profileOptions: Array<{ id: string; label: string; department: string }>;
   departments: string[];
   yearlyArchive: YearlyArchiveEntry[];
+  staffPerformancePeriods: Array<{ year: number; month: number; label: string; start: string; end: string }>;
+  staffPerformanceInput: {
+    profiles: Array<{
+      id: string;
+      userId: string;
+      fullName: string;
+      department: string | null;
+      position: string | null;
+      status: string;
+    }>;
+    tasks: Array<{
+      assigneeUserId: string | null;
+      status: string;
+      dueDate: Date | null;
+      completedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    appraisals: Array<{
+      employeeProfileId: string;
+      status: string;
+      overallRating: number | null;
+      actionScores: unknown;
+      cycleType: string;
+      periodLabel: string;
+    }>;
+    appraisalActionIds: string[];
+    leads: Array<{ assignedUserId: string | null; createdAt: Date }>;
+    deals: Array<{ assignedUserId: string | null; stage: string; value: unknown; updatedAt: Date }>;
+    activities: Array<{ assignedUserId: string | null; completedAt: Date | null; createdAt: Date }>;
+    goals: Array<{ employeeProfileId: string; progressPercent: number; status: string }>;
+  };
+  staffMonthlyScoresDefault: StaffMonthlyScoreEntry[];
   hrAnalytics: HrAnalyticsSnapshot;
   peopleOnboardUserId?: string;
   offerByUserId?: Record<
@@ -238,6 +272,9 @@ export function HrWorkspace(props: {
     profileOptions,
     departments,
     yearlyArchive,
+    staffPerformancePeriods,
+    staffPerformanceInput,
+    staffMonthlyScoresDefault,
     hrAnalytics,
     peopleOnboardUserId,
     offerByUserId,
@@ -250,7 +287,7 @@ export function HrWorkspace(props: {
   const headings: Record<HrTab, { title: string; subtitle: string }> = {
     people: { title: "People", subtitle: "Employee records — biodata, job, bank, and pay setup (Bo Properties forms)." },
     payslips: { title: "Payslips", subtitle: "Generate monthly payslips. Employees download from My HR after you finalize." },
-    appraisals: { title: "Appraisals", subtitle: "Monthly and yearly review cycles with action checklists." },
+    appraisals: { title: "Appraisals", subtitle: "Monthly performance scores, manager reviews, and yearly archive." },
     documents: { title: "Documents", subtitle: "NDAs, offer letters, guarantor forms, and other HR files." },
     insights: { title: "Insights", subtitle: "Headcount, joiners, appraisal backlog, and employee register export." },
     my: { title: "My dashboard", subtitle: "Your payslips, HR record, documents, and self-appraisals." },
@@ -324,12 +361,16 @@ export function HrWorkspace(props: {
         {activeTab === "appraisals" && canManageHr ? (
           <HrAppraisalsWorkspace
             tenantSlug={tenantSlug}
+            currency={currency}
             appraisalActions={appraisalActions}
             appraisalCycles={appraisalCycles}
             performanceGoals={performanceGoals}
             profileOptions={profileOptions}
             departments={departments}
             yearlyArchive={yearlyArchive}
+            staffPerformancePeriods={staffPerformancePeriods}
+            staffPerformanceInput={staffPerformanceInput}
+            staffMonthlyScoresDefault={staffMonthlyScoresDefault}
           />
         ) : null}
 

@@ -21,6 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSnackbar } from "@/components/snackbar";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 import { UiSelect } from "@/components/ui-select";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { saveDashboardPreference, upsertTenantGoal } from "./actions";
@@ -43,6 +44,20 @@ type WidgetValue = {
   unassignedLeads: number;
   myPipelineCount: number;
   myNewLeads7d: number;
+  myOpenTaskCount: number;
+  myWorkTasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    statusLabel: string;
+    priority: string;
+    dueDateLabel: string | null;
+    spaceName: string | null;
+    isAssignee: boolean;
+    isOwner: boolean;
+  }>;
+  tasksModuleEnabled: boolean;
+  tasksPageUrl: string;
   leadFunnel: Array<{ stage: string; count: number }>;
   leaderboard: Array<{ label: string; value: number }>;
   stageVelocity: Array<{ stage: string; avgDays: number; dropOffPct: number }>;
@@ -124,7 +139,7 @@ type WidgetValue = {
   }>;
   kpiPaymentRows: Array<{
     id: string;
-    invoiceId: string;
+    invoiceId: string | null;
     invoiceNumber: string;
     paidAt: string;
     amount: number;
@@ -183,6 +198,7 @@ const WIDGET_LABELS: Record<string, string> = {
   unassigned_leads: "Unassigned leads",
   my_pipeline: "My pipeline",
   my_new_leads: "My new leads (7d)",
+  my_open_tasks: "My open tasks",
 };
 
 const ROLE_WIDGETS: Record<RoleView, string[]> = {
@@ -199,6 +215,7 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
     "lead_source_quality",
     "top_projects_intel",
     "rep_leaderboard_trend",
+    "my_open_tasks",
   ],
   FINANCE_MANAGER: [
     "expected_month",
@@ -206,6 +223,7 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
     "pending_verification",
     "recent_payments",
     "pending_finance_count",
+    "my_open_tasks",
   ],
   SALES_MANAGER: [
     "team_pipeline",
@@ -216,8 +234,9 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
     "lead_source_quality",
     "top_projects_intel",
     "rep_leaderboard_trend",
+    "my_open_tasks",
   ],
-  SALES_EXECUTIVE: ["my_pipeline", "my_new_leads", "lead_funnel"],
+  SALES_EXECUTIVE: ["my_pipeline", "my_new_leads", "lead_funnel", "my_open_tasks"],
 };
 
 const ALL_WIDGET_IDS = new Set(Object.values(ROLE_WIDGETS).flat());
@@ -859,7 +878,7 @@ export function DashboardWorkspace({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+    <TenantPageShell>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{tenantName} Dashboard</h1>
@@ -955,6 +974,42 @@ export function DashboardWorkspace({
               </a>
             </div>
           </div>
+        </section>
+      ) : null}
+
+      {values.tasksModuleEnabled && values.myWorkTasks.length > 0 ? (
+        <section className="mt-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Your tasks</p>
+              <span className="rounded-full border border-indigo-300/40 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                {values.myOpenTaskCount} open
+              </span>
+            </div>
+            <Link href={values.tasksPageUrl} className="text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
+              View all →
+            </Link>
+          </div>
+          {values.myWorkTasks[0] ? (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-foreground/10 bg-background px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{values.myWorkTasks[0].title}</p>
+                <p className="mt-0.5 truncate text-[11px] text-muted">
+                  {values.myWorkTasks[0].spaceName ? `${values.myWorkTasks[0].spaceName} · ` : ""}
+                  {values.myWorkTasks[0].statusLabel}
+                  {values.myWorkTasks[0].dueDateLabel ? ` · Due ${values.myWorkTasks[0].dueDateLabel}` : ""}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full border border-foreground/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-muted">
+                {values.myWorkTasks[0].priority}
+              </span>
+            </div>
+          ) : null}
+          {values.myOpenTaskCount > 1 ? (
+            <Link href={values.tasksPageUrl} className="mt-2 inline-block text-[11px] font-medium text-muted hover:text-foreground">
+              View {values.myOpenTaskCount - 1} more task{values.myOpenTaskCount - 1 === 1 ? "" : "s"} →
+            </Link>
+          ) : null}
         </section>
       ) : null}
 
@@ -2160,7 +2215,7 @@ export function DashboardWorkspace({
           </div>
         </div>
       ) : null}
-    </div>
+    </TenantPageShell>
   );
 }
 
@@ -2437,6 +2492,31 @@ function WidgetCard({
         </div>
       </div>
     );
+  } else if (id === "my_open_tasks") {
+    title = "My Open Tasks";
+    const topTask = values.myWorkTasks[0];
+    body = values.tasksModuleEnabled ? (
+      <>
+        <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+          <p className="text-xl font-bold text-foreground">{values.myOpenTaskCount}</p>
+          <p className="text-[11px] text-muted">open task{values.myOpenTaskCount === 1 ? "" : "s"}</p>
+        </div>
+        {topTask ? (
+          <div className="mt-2 rounded-md border border-foreground/10 px-2 py-1.5 text-xs">
+            <p className="truncate font-medium text-foreground">{topTask.title}</p>
+            <p className="text-[10px] text-muted">
+              {topTask.statusLabel}
+              {topTask.dueDateLabel ? ` · ${topTask.dueDateLabel}` : ""}
+            </p>
+          </div>
+        ) : null}
+        <Link href={values.tasksPageUrl} className="mt-2 inline-block text-xs font-semibold text-indigo-600 hover:underline">
+          {values.myOpenTaskCount > 1 ? `View ${values.myOpenTaskCount - 1} more →` : "View tasks →"}
+        </Link>
+      </>
+    ) : (
+      <p className="mt-3 text-xs text-muted">Tasks module is disabled.</p>
+    );
   } else if (id === "inventory_snapshot") {
     title = "Inventory Snapshot";
     body = (
@@ -2466,6 +2546,7 @@ function WidgetCard({
       unassigned_leads: { title: "Unassigned Leads", value: `${values.unassignedLeads} lead(s)`, tone: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-500/10 dark:border-yellow-500/30 dark:text-yellow-300" },
       my_pipeline: { title: "My Pipeline", value: `${values.myPipelineCount} deal(s)`, tone: "bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:text-indigo-300" },
       my_new_leads: { title: "My New Leads (7d)", value: `${values.myNewLeads7d} lead(s)`, tone: "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-800 dark:bg-fuchsia-500/10 dark:border-fuchsia-500/30 dark:text-fuchsia-300" },
+      my_open_tasks: { title: "My Open Tasks", value: `${values.myOpenTaskCount} task(s)`, tone: "bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:text-indigo-300" },
     };
     const c = flat[id] || { title: id, value: "No data.", tone: "bg-foreground/5 border-foreground/10 text-foreground" };
     title = c.title;

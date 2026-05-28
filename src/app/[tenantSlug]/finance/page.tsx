@@ -83,6 +83,20 @@ export default async function FinanceQueuePage({
   if (!canView) notFound();
 
   const canManage = canManageFinance(Boolean(session.user.isPlatformAdmin), membership);
+
+  const [activeFiscalGoal, financeVendors] = await Promise.all([
+    prisma.tenantGoal.findFirst({
+      where: { tenantId: tenant.id, isActive: true },
+      orderBy: { updatedAt: "desc" },
+      select: { label: true, fiscalYearStart: true, fiscalYearEnd: true },
+    }),
+    prisma.financeVendor.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
+
   const savedBanks = normalizeFinanceOptionList(tenant.settings?.financeBankAccounts);
   const savedModes = normalizeFinanceOptionList(tenant.settings?.financePaymentModes);
   const mergedModes =
@@ -473,9 +487,17 @@ export default async function FinanceQueuePage({
         label: deal.lead?.name || deal.lead?.email || `Deal ${deal.id.slice(0, 8)}`,
       }))}
       invoices={invoiceRows}
-      payments={payments.map((payment) => ({
+      payments={payments.map((payment) => {
+        const isDirect = !payment.invoiceId;
+        const invoiceLabel = payment.invoice
+          ? `${payment.invoice.invoiceNumber} - ${payment.invoice.title}`
+          : payment.standaloneTitle
+            ? `${payment.standaloneTitle}${payment.payerName ? ` · ${payment.payerName}` : ""}`
+            : "Direct payment";
+        return {
         id: payment.id,
-        invoiceLabel: `${payment.invoice.invoiceNumber} - ${payment.invoice.title}`,
+        invoiceLabel,
+        isDirect,
         amountLabel: `${payment.currency} ${Number(payment.amount).toLocaleString()}`,
         amountValue: Number(payment.amount),
         method: canManage ? payment.method || "—" : "Restricted",
@@ -485,12 +507,13 @@ export default async function FinanceQueuePage({
         paidAtValue: payment.paidAt.toISOString().slice(0, 10),
         recordedBy: canManage ? payment.recordedByLabel || "Unknown" : "Restricted",
         hasAttachment: Boolean(payment.attachmentUrl),
-      projectId: payment.invoice.deal?.unit?.project?.id || "",
-      projectLabel: payment.invoice.deal?.unit?.project?.name || "Unassigned project",
-      unitId: payment.invoice.deal?.unit?.id || "",
-      unitLabel: payment.invoice.deal?.unit?.label || "Unassigned unit",
-        department: payment.department || payment.invoice.department || "",
-      }))}
+      projectId: payment.invoice?.deal?.unit?.project?.id || "",
+      projectLabel: payment.invoice?.deal?.unit?.project?.name || "Unassigned project",
+      unitId: payment.invoice?.deal?.unit?.id || "",
+      unitLabel: payment.invoice?.deal?.unit?.label || "Unassigned unit",
+        department: payment.department || payment.invoice?.department || "",
+      };
+      })}
       expenses={expenses.map((expense) => ({
         id: expense.id,
         category: expense.category,
@@ -645,6 +668,16 @@ export default async function FinanceQueuePage({
       })}
       financeOptions={financeOptions}
       financeControls={financeControls}
+      fiscalYear={
+        activeFiscalGoal
+          ? {
+              label: activeFiscalGoal.label,
+              start: activeFiscalGoal.fiscalYearStart.toISOString().slice(0, 10),
+              end: activeFiscalGoal.fiscalYearEnd.toISOString().slice(0, 10),
+            }
+          : null
+      }
+      financeVendors={financeVendors}
       vendorBills={vendorBills.map((bill) => {
         const dueDate = bill.dueDate;
         const isOpen = bill.status !== "VOID" && bill.status !== "PAID" && Number(bill.balanceDue) > 0;
@@ -672,6 +705,14 @@ export default async function FinanceQueuePage({
           overdueDays,
           canRecordPayment: Number(bill.balanceDue) > 0 && bill.status !== "VOID" && bill.status !== "PAID",
           canVoid: bill.status === "OPEN",
+          isRecurring: Boolean(bill.isRecurring),
+          recurrenceLabel: bill.recurrenceFrequency
+            ? bill.recurrenceFrequency === "DAILY"
+              ? "Daily"
+              : bill.recurrenceFrequency === "WEEKLY"
+                ? "Weekly"
+                : "Monthly"
+            : "",
         };
       })}
     />

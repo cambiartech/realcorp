@@ -14,6 +14,7 @@ function pageSurface(resolvedTheme: string | undefined): LandingSurface {
 export function LandingPage() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -30,6 +31,23 @@ export function LandingPage() {
   }, []);
 
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
+
+  const closeMobileNav = () => setMobileNavOpen(false);
+
+  const mobileNavLinks = [
+    { href: "#product", label: "Product" },
+    { href: "#modules", label: "Modules" },
+    { href: "#how", label: "How it works" },
+    { href: "#demo", label: "Pricing" },
+    { href: "/login", label: "Sign in", isRoute: true as const },
+  ];
 
   return (
     <div className="landing-root min-h-dvh" data-theme={theme}>
@@ -65,12 +83,43 @@ export function LandingPage() {
             <a className="btn btn-primary" href="#demo">
               Book a demo <span className="arrow">→</span>
             </a>
-            <button type="button" className="nav-menu-btn" aria-label="Open menu">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                <path d="M3 6h18M3 12h18M3 18h18" />
-              </svg>
+            <button
+              type="button"
+              className="nav-menu-btn"
+              aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileNavOpen}
+              onClick={() => setMobileNavOpen((open) => !open)}
+            >
+              {mobileNavOpen ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <path d="M3 6h18M3 12h18M3 18h18" />
+                </svg>
+              )}
             </button>
           </div>
+        </div>
+
+        <div className={["nav-mobile-panel", mobileNavOpen ? "open" : ""].filter(Boolean).join(" ")} aria-hidden={!mobileNavOpen}>
+          <nav className="nav-mobile-links" aria-label="Mobile">
+            {mobileNavLinks.map((item) =>
+              "isRoute" in item && item.isRoute ? (
+                <Link key={item.href} href={item.href} onClick={closeMobileNav}>
+                  {item.label}
+                </Link>
+              ) : (
+                <a key={item.href} href={item.href} onClick={closeMobileNav}>
+                  {item.label}
+                </a>
+              ),
+            )}
+            <a className="btn btn-primary nav-mobile-cta" href="#demo" onClick={closeMobileNav}>
+              Book a demo <span className="arrow">→</span>
+            </a>
+          </nav>
         </div>
       </header>
 

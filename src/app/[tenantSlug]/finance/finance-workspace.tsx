@@ -10,6 +10,7 @@ import {
   createInvoiceRecord,
   createSalesReceiptRecord,
   createVendorBill,
+  saveFinanceVendor,
   recordVendorBillPayment,
   voidVendorBill,
   sendBulkOverdueReminders,
@@ -23,13 +24,24 @@ import {
   saveBankStatementRowNote,
   unmatchBankStatementRow,
   recordInvoicePayment,
+  recordStandalonePayment,
   resolvePendingFinance,
   sendInvoiceRecord,
   sendInvoiceReminder,
   updateInvoiceRecord,
   voidInvoiceRecord,
 } from "./actions";
+import { RecordVendorBillModal, type TenantFiscalYear } from "@/components/finance/record-vendor-bill-modal";
+import { VendorNamePicker, type FinanceVendorOption } from "@/components/finance/vendor-name-picker";
+import {
+  buildBalanceExportLines,
+  downloadFinanceReportPackXlsx,
+  downloadFinanceReportXlsx,
+  type ReportExportKind,
+} from "@/lib/finance-report-xlsx";
+import { vendorNamesMatch } from "@/lib/finance-vendor";
 import { UiSelect } from "@/components/ui-select";
+import { recurrenceFrequencyLabel, type VendorBillRecurrenceFrequency } from "@/lib/vendor-bill-recurrence";
 
 type FinanceDeal = {
   id: string;
@@ -88,6 +100,7 @@ type InvoiceRecordItem = {
 type PaymentRow = {
   id: string;
   invoiceLabel: string;
+  isDirect: boolean;
   amountLabel: string;
   amountValue: number;
   method: string;
@@ -143,6 +156,8 @@ type VendorBillRow = {
   overdueDays: number;
   canRecordPayment: boolean;
   canVoid: boolean;
+  isRecurring: boolean;
+  recurrenceLabel: string;
 };
 
 type ImportedBankRow = {
@@ -436,6 +451,8 @@ export function FinanceWorkspace({
   bankingImports,
   financeOptions,
   financeControls,
+  fiscalYear,
+  financeVendors,
   vendorBills,
 }: {
   tenantSlug: string;
@@ -462,13 +479,17 @@ export function FinanceWorkspace({
     departments: string[];
   };
   financeControls: FinanceControls;
+  fiscalYear: TenantFiscalYear | null;
+  financeVendors: FinanceVendorOption[];
   vendorBills: VendorBillRow[];
 }) {
   const [items, setItems] = useState(deals);
+  const [vendorOptions, setVendorOptions] = useState(financeVendors);
   const [pendingDealId, setPendingDealId] = useState<string | null>(null);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [isCreateReceiptOpen, setIsCreateReceiptOpen] = useState(false);
   const [isCreateExpenseOpen, setIsCreateExpenseOpen] = useState(false);
+  const [expenseVendorName, setExpenseVendorName] = useState("");
   const [editingInvoice, setEditingInvoice] = useState<InvoiceRecordItem | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRecordItem | null>(null);
   const [paymentAttachment, setPaymentAttachment] = useState<{
@@ -505,6 +526,16 @@ export function FinanceWorkspace({
   const [reportDrilldownMonth, setReportDrilldownMonth] = useState<string | null>(null);
   const [paymentBill, setPaymentBill] = useState<VendorBillRow | null>(null);
   const [isCreateBillOpen, setIsCreateBillOpen] = useState(false);
+  const [payablesViewTab, setPayablesViewTab] = useState<"aging" | "bills">("bills");
+  const [receivablesViewTab, setReceivablesViewTab] = useState<"current" | "aging">("current");
+  const [financeOverviewTab, setFinanceOverviewTab] = useState<"pending" | "decisions">("pending");
+  const [showFinanceOverviewHelp, setShowFinanceOverviewHelp] = useState(false);
+  const [paymentsViewTab, setPaymentsViewTab] = useState<"all" | "invoiced" | "direct">("all");
+  const [isCreateDirectPaymentOpen, setIsCreateDirectPaymentOpen] = useState(false);
+
+  useEffect(() => {
+    setVendorOptions(financeVendors);
+  }, [financeVendors]);
   const [highlightFocusId, setHighlightFocusId] = useState<string | null>(null);
   const [autoMatching, setAutoMatching] = useState(false);
   const [finalizingImportId, setFinalizingImportId] = useState<string | null>(null);
@@ -619,7 +650,7 @@ export function FinanceWorkspace({
 
   const dedicatedHeading: Record<DedicatedFinanceSlug, { title: string; subtitle: string }> = {
     invoices: { title: "Invoices", subtitle: "Issue, send, and collect on customer invoices." },
-    payments: { title: "Payments", subtitle: "Recorded invoice payments and printable receipts." },
+    payments: { title: "Payments", subtitle: "Invoice payments and direct collections — no invoice required for walk-ins or misc. cash." },
     expenses: { title: "Expenses", subtitle: "Operational spend and reimbursements." },
     receipts: { title: "Sales receipts", subtitle: "Direct collections not tied to an invoice." },
     ar: { title: "Receivables", subtitle: "Money customers owe you — aging and follow-ups." },
@@ -829,6 +860,7 @@ export function FinanceWorkspace({
     }
     showSnackbar("Expense created.", "success");
     setIsCreateExpenseOpen(false);
+    setExpenseVendorName("");
     setExpenseAttachment(null);
     setActionPending(false);
     router.refresh();
@@ -961,16 +993,32 @@ export function FinanceWorkspace({
     router.refresh();
   }
 
-  async function handleCreateBill(formData: FormData) {
+  async function handleSaveVendor(name: string) {
+    const result = await saveFinanceVendor(tenantSlug, name);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return false;
+    }
+    setVendorOptions((prev) => {
+      if (prev.some((v) => vendorNamesMatch(v.name, result.name))) return prev;
+      return [...prev, { id: result.vendorId, name: result.name }].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    showSnackbar(`Vendor “${result.name}” saved.`, "success");
+    return true;
+  }
+
+  async function handleRecordDirectPayment(formData: FormData) {
     if (actionPending) return;
     setActionPending(true);
-    const result = await createVendorBill(tenantSlug, {
-      vendorName: String(formData.get("vendorName") || ""),
+    const result = await recordStandalonePayment(tenantSlug, {
       title: String(formData.get("title") || ""),
+      payerName: String(formData.get("payerName") || "") || undefined,
       amount: Number(formData.get("amount") || 0),
       currency: String(formData.get("currency") || reportView.currency),
-      dueDate: String(formData.get("dueDate") || "") || undefined,
+      paidAt: String(formData.get("paidAt") || ""),
       department: String(formData.get("department") || "") || undefined,
+      method: String(formData.get("method") || "") || undefined,
+      reference: String(formData.get("reference") || "") || undefined,
       note: String(formData.get("note") || "") || undefined,
     });
     if (!result.ok) {
@@ -978,7 +1026,56 @@ export function FinanceWorkspace({
       setActionPending(false);
       return;
     }
-    showSnackbar("Bill recorded.", "success");
+    showSnackbar("Direct payment recorded.", "success");
+    setIsCreateDirectPaymentOpen(false);
+    setActionPending(false);
+    router.refresh();
+  }
+
+  const paymentsListFiltered = useMemo(() => {
+    if (paymentsViewTab === "invoiced") return payments.filter((p) => !p.isDirect);
+    if (paymentsViewTab === "direct") return payments.filter((p) => p.isDirect);
+    return payments;
+  }, [payments, paymentsViewTab]);
+
+  async function handleCreateBill(formData: FormData) {
+    if (actionPending) return;
+    setActionPending(true);
+    const isRecurring = formData.get("isRecurring") === "on";
+    const recurrenceRaw = String(formData.get("recurrenceFrequency") || "");
+    const recurrenceFrequency =
+      recurrenceRaw === "DAILY" || recurrenceRaw === "WEEKLY" || recurrenceRaw === "MONTHLY"
+        ? (recurrenceRaw as VendorBillRecurrenceFrequency)
+        : undefined;
+    const rangeRaw = String(formData.get("recurrenceRangeMode") || "");
+    const recurrenceRangeMode =
+      rangeRaw === "FISCAL_YEAR_END" || rangeRaw === "END_DATE" || rangeRaw === "PERIOD_COUNT" ? rangeRaw : undefined;
+    const result = await createVendorBill(tenantSlug, {
+      vendorName: String(formData.get("vendorName") || ""),
+      title: String(formData.get("title") || "") || undefined,
+      amount: Number(formData.get("amount") || 0),
+      currency: String(formData.get("currency") || reportView.currency),
+      dueDate: String(formData.get("dueDate") || "") || undefined,
+      department: String(formData.get("department") || "") || undefined,
+      note: String(formData.get("note") || "") || undefined,
+      isRecurring,
+      recurrenceFrequency: isRecurring ? recurrenceFrequency : undefined,
+      recurrenceRangeMode: isRecurring ? recurrenceRangeMode : undefined,
+      recurrenceEndDate: String(formData.get("recurrenceEndDate") || "") || undefined,
+      recurrencePeriodCount: Number(formData.get("recurrencePeriodCount") || 0) || undefined,
+      useAutoTitle: formData.get("useAutoTitle") === "on",
+    });
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      setActionPending(false);
+      return;
+    }
+    showSnackbar(
+      isRecurring && recurrenceFrequency
+        ? `Recurring bills saved (${recurrenceFrequencyLabel(recurrenceFrequency).toLowerCase()} schedule).`
+        : "Bill recorded.",
+      "success",
+    );
     setIsCreateBillOpen(false);
     setActionPending(false);
     router.refresh();
@@ -1225,93 +1322,45 @@ export function FinanceWorkspace({
     return `"${raw.replace(/"/g, "\"\"")}"`;
   }
 
-  function exportReportCsv(kind: "pnl" | "cashflow" | "expenses" | "balance") {
-    const toMoney = (n: number) => Number.isFinite(n) ? n : 0;
-    if (kind === "pnl") {
-      const lines = [
-        [csvEscape("company"), csvEscape(reportView.companyName)].join(","),
-        [csvEscape("generatedAt"), csvEscape(reportView.generatedAtLabel)].join(","),
-        [csvEscape("windowMonths"), csvEscape(reportMonthWindow)].join(","),
-        "",
-        ["month", "invoiced", "collected", "expenses", "net"].join(","),
-        ...visiblePnlBreakdown.map((row) =>
-          [row.month, toMoney(row.invoiced), toMoney(row.collected), toMoney(row.expenses), toMoney(row.net)]
-            .map((x) => csvEscape(x))
-            .join(","),
-        ),
-      ];
-      const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `finance-pnl-${reportMonthWindow}m-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
-    if (kind === "cashflow") {
-      const lines = [
-        [csvEscape("company"), csvEscape(reportView.companyName)].join(","),
-        [csvEscape("generatedAt"), csvEscape(reportView.generatedAtLabel)].join(","),
-        [csvEscape("windowMonths"), csvEscape(reportMonthWindow)].join(","),
-        "",
-        ["month", "inflow", "outflow", "net"].join(","),
-        ...visibleCashflowBreakdown.map((row) =>
-          [row.month, toMoney(row.inflow), toMoney(row.outflow), toMoney(row.net)].map((x) => csvEscape(x)).join(","),
-        ),
-      ];
-      const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `finance-cashflow-${reportMonthWindow}m-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
-    if (kind === "balance") {
-      const sectionRows = [
-        ...balanceSheetSections.assets.map((line) => ["What you own", line.label, toMoney(line.amount)]),
-        ...balanceSheetSections.liabilities.map((line) => ["What you owe", line.label, toMoney(line.amount)]),
-        ...balanceSheetSections.equity.map((line) => ["Owner position", line.label, toMoney(line.amount)]),
-      ];
-      const lines = [
-        [csvEscape("company"), csvEscape(reportView.companyName)].join(","),
-        [csvEscape("generatedAt"), csvEscape(reportView.generatedAtLabel)].join(","),
-        "",
-        ["section", "line", "amount"].join(","),
-        ...sectionRows.map((row) => row.map((x) => csvEscape(x)).join(",")),
-      ];
-      const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `finance-balance-sheet-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
-    const lines = [
-      [csvEscape("company"), csvEscape(reportView.companyName)].join(","),
-      [csvEscape("generatedAt"), csvEscape(reportView.generatedAtLabel)].join(","),
-      "",
-      ["category", "count", "total"].join(","),
-      ...visibleExpenseBreakdown.map((row) => [row.category, row.count, toMoney(row.total)].map((x) => csvEscape(x)).join(",")),
-    ];
-    const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `finance-expense-breakdown-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  function reportExportMeta() {
+    return {
+      companyName: reportView.companyName,
+      generatedAtLabel: reportView.generatedAtLabel,
+      currency: reportView.currency,
+      windowMonths: reportMonthWindow,
+    };
   }
 
-  function exportReportPack() {
-    exportReportCsv("pnl");
-    setTimeout(() => exportReportCsv("cashflow"), 250);
-    setTimeout(() => exportReportCsv("expenses"), 500);
-    setTimeout(() => exportReportCsv("balance"), 750);
+  async function exportReportExcel(kind: ReportExportKind) {
+    const meta = reportExportMeta();
+    try {
+      if (kind === "pnl") {
+        await downloadFinanceReportXlsx("pnl", meta, { pnl: visiblePnlBreakdown });
+      } else if (kind === "cashflow") {
+        await downloadFinanceReportXlsx("cashflow", meta, { cashflow: visibleCashflowBreakdown });
+      } else if (kind === "expenses") {
+        await downloadFinanceReportXlsx("expenses", meta, { expenses: visibleExpenseBreakdown });
+      } else {
+        await downloadFinanceReportXlsx("balance", meta, {
+          balance: buildBalanceExportLines(balanceSheetSections),
+        });
+      }
+    } catch {
+      showSnackbar("Could not generate Excel export. Try again.", "error");
+    }
+  }
+
+  async function exportReportPack() {
+    try {
+      await downloadFinanceReportPackXlsx(reportExportMeta(), {
+        pnl: visiblePnlBreakdown,
+        cashflow: visibleCashflowBreakdown,
+        expenses: visibleExpenseBreakdown,
+        balance: buildBalanceExportLines(balanceSheetSections),
+      });
+    } catch {
+      showSnackbar("Could not generate report pack. Try again.", "error");
+    }
   }
 
   const scopedBankRows = useMemo(() => {
@@ -1821,13 +1870,49 @@ export function FinanceWorkspace({
   }
 
   return (
-    <div className="mx-auto max-w-[1100px] px-4 py-6 sm:py-8">
+    <div className="w-full max-w-[1100px] px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{pageHeading.title}</h1>
           <p className="mt-1 text-sm text-muted">{pageHeading.subtitle}</p>
         </div>
+        {isFinanceOverviewSurface ? (
+          <button
+            type="button"
+            onClick={() => setShowFinanceOverviewHelp((x) => !x)}
+            className={[
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors",
+              showFinanceOverviewHelp
+                ? "border-foreground bg-foreground text-background"
+                : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+            ].join(" ")}
+            aria-label={showFinanceOverviewHelp ? "Hide workflow help" : "Show workflow help"}
+            title="How this workflow works"
+          >
+            i
+          </button>
+        ) : null}
       </div>
+
+      {isFinanceOverviewSurface && showFinanceOverviewHelp ? (
+        <section className="mt-4 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <h3 className="text-sm font-semibold text-foreground">How teams interact with this flow</h3>
+          <div className="mt-2 grid gap-2 text-sm text-muted">
+            <p>
+              Sales team creates/updates deals and flags finance checks as pending; those deals appear in{" "}
+              <span className="font-medium text-foreground">Pending Queue</span>.
+            </p>
+            <p>
+              Finance Manager or Org Admin approves/rejects from queue; decision metadata is saved with reviewer and
+              timestamp.
+            </p>
+            <p>
+              Open <span className="font-medium text-foreground">Audit Logs</span> from the sidebar for the full searchable
+              trail. Invoices, payments, and expenses each have their own pages.
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       {!canManageFinance && isFinanceOverviewSurface ? (
         <div className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 text-sm text-muted">
@@ -1836,18 +1921,38 @@ export function FinanceWorkspace({
       ) : null}
 
       {isFinanceOverviewSurface ? (
-        <>
-          <section className="mt-6 rounded-lg border border-foreground/10 bg-background">
-            <header className="border-b border-foreground/10 bg-foreground/[0.02] px-4 py-3">
-              <h2 className="text-sm font-semibold text-foreground">Pending finance checks</h2>
-            </header>
-            <div className="hidden grid-cols-[2.2fr_1fr_1fr_1fr_1.2fr] gap-3 border-b border-foreground/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted md:grid">
-              <p>Deal</p>
-              <p>Owner</p>
-              <p>Stage</p>
-              <p>Value</p>
-              <p>Action</p>
-            </div>
+        <section className="mt-6 rounded-lg border border-foreground/10 bg-background">
+          <div className="flex gap-1 border-b border-foreground/10 px-4 pt-3">
+            {(
+              [
+                { id: "pending" as const, label: "Pending checks" },
+                { id: "decisions" as const, label: "Recent decisions" },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFinanceOverviewTab(tab.id)}
+                className={[
+                  "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                  financeOverviewTab === tab.id
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted hover:text-foreground",
+                ].join(" ")}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {financeOverviewTab === "pending" ? (
+            <>
+              <div className="hidden grid-cols-[2.2fr_1fr_1fr_1fr_1.2fr] gap-3 border-b border-foreground/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted md:grid">
+                <p>Deal</p>
+                <p>Owner</p>
+                <p>Stage</p>
+                <p>Value</p>
+                <p>Action</p>
+              </div>
             {items.length === 0 ? (
               <div className="p-5 text-sm text-muted">No pending finance items right now.</div>
             ) : (
@@ -1886,13 +1991,12 @@ export function FinanceWorkspace({
                 })}
               </ul>
             )}
-          </section>
-
-          <section className="mt-6 rounded-lg border border-foreground/10 bg-background">
-            <header className="border-b border-foreground/10 bg-foreground/[0.02] px-4 py-3">
-              <h2 className="text-sm font-semibold text-foreground">Recent finance decisions</h2>
-              <p className="mt-0.5 text-xs text-muted">Latest approvals and rejections. Full history lives under Audit Logs.</p>
-            </header>
+            </>
+          ) : (
+            <>
+              <p className="border-b border-foreground/10 px-4 py-2 text-xs text-muted">
+                Latest approvals and rejections. Full history lives under Audit Logs.
+              </p>
             {recentDecisions.length === 0 ? (
               <p className="px-4 py-4 text-sm text-muted">No decisions recorded yet.</p>
             ) : (
@@ -1927,8 +2031,9 @@ export function FinanceWorkspace({
                 View full audit log →
               </Link>
             </div>
-          </section>
-        </>
+            </>
+          )}
+        </section>
       ) : dedicatedSlug ? (
           <section className="mt-6 rounded-lg border border-foreground/10 bg-background">
           <div className="p-4">
@@ -1969,6 +2074,14 @@ export function FinanceWorkspace({
                       className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
                     >
                       New bill
+                    </button>
+                  ) : recordsTab === "payments" ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateDirectPaymentOpen(true)}
+                      className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
+                    >
+                      Record direct payment
                     </button>
                   ) : null}
                 </div>
@@ -2108,46 +2221,84 @@ export function FinanceWorkspace({
                 </div>
               )
             ) : recordsTab === "payments" ? (
-              payments.length === 0 ? (
-                <p className="text-sm text-muted">No payment records yet.</p>
-              ) : (
-                <div className="overflow-hidden rounded-lg border border-foreground/10">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
-                      <tr>
-                        <th className="px-3 py-2">Invoice</th>
-                        <th className="px-3 py-2">Amount</th>
-                        <th className="px-3 py-2">Method</th>
-                        <th className="px-3 py-2">Reference</th>
-                        <th className="px-3 py-2">Paid At</th>
-                        <th className="px-3 py-2">Recorded By</th>
-                        <th className="px-3 py-2">Receipt</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-foreground/10">
-                      {payments.map((payment) => (
-                        <tr key={payment.id} data-focus-id={payment.id} className={rowFocusClass(highlightFocusId, payment.id)}>
-                          <td className="px-3 py-2">{payment.invoiceLabel}</td>
-                          <td className="px-3 py-2">{payment.amountLabel}</td>
-                          <td className="px-3 py-2">{payment.method}</td>
-                          <td className="px-3 py-2">{payment.reference}</td>
-                          <td className="px-3 py-2">{payment.paidAtLabel}</td>
-                          <td className="px-3 py-2">{payment.recordedBy}</td>
-                          <td className="px-3 py-2">
-                            <Link
-                              href={`/${tenantSlug}/finance/receipt/${payment.id}`}
-                              className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2"
-                            >
-                              Open
-                            </Link>
-                            {payment.hasAttachment ? <span className="ml-2 text-[11px] text-emerald-600">Attachment</span> : null}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <>
+                <div className="mb-3 flex flex-wrap gap-1 border-b border-foreground/10 pb-2">
+                  {(
+                    [
+                      { id: "all" as const, label: "All" },
+                      { id: "invoiced" as const, label: "On invoice" },
+                      { id: "direct" as const, label: "Direct" },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setPaymentsViewTab(tab.id)}
+                      className={[
+                        "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                        paymentsViewTab === tab.id
+                          ? "bg-foreground text-background"
+                          : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
-              )
+                {paymentsListFiltered.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    {paymentsViewTab === "direct"
+                      ? "No direct payments yet. Use “Record direct payment” for walk-ins, deposits, or misc. cash without an invoice."
+                      : paymentsViewTab === "invoiced"
+                        ? "No invoice-linked payments yet."
+                        : "No payment records yet."}
+                  </p>
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-foreground/10">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                        <tr>
+                          <th className="px-3 py-2">Source</th>
+                          <th className="px-3 py-2">Amount</th>
+                          <th className="px-3 py-2">Method</th>
+                          <th className="px-3 py-2">Reference</th>
+                          <th className="px-3 py-2">Paid At</th>
+                          <th className="px-3 py-2">Recorded By</th>
+                          <th className="px-3 py-2">Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-foreground/10">
+                        {paymentsListFiltered.map((payment) => (
+                          <tr key={payment.id} data-focus-id={payment.id} className={rowFocusClass(highlightFocusId, payment.id)}>
+                            <td className="px-3 py-2">
+                              <p>{payment.invoiceLabel}</p>
+                              {payment.isDirect ? (
+                                <span className="mt-0.5 inline-block rounded-full border border-sky-300/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600">
+                                  Direct
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-2">{payment.amountLabel}</td>
+                            <td className="px-3 py-2">{payment.method}</td>
+                            <td className="px-3 py-2">{payment.reference}</td>
+                            <td className="px-3 py-2">{payment.paidAtLabel}</td>
+                            <td className="px-3 py-2">{payment.recordedBy}</td>
+                            <td className="px-3 py-2">
+                              <Link
+                                href={`/${tenantSlug}/finance/receipt/${payment.id}`}
+                                className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2"
+                              >
+                                Open
+                              </Link>
+                              {payment.hasAttachment ? <span className="ml-2 text-[11px] text-emerald-600">Attachment</span> : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             ) : recordsTab === "expenses" ? (
               expenses.length === 0 ? (
                 <p className="text-sm text-muted">No expense records yet.</p>
@@ -2216,31 +2367,57 @@ export function FinanceWorkspace({
                     <p className="mt-1 text-xl font-semibold text-foreground">{arView.followUpsNeeded}</p>
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-lg border border-foreground/10">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
-                      <tr>
-                        <th className="px-3 py-2">Current</th>
-                        <th className="px-3 py-2">1-30</th>
-                        <th className="px-3 py-2">31-60</th>
-                        <th className="px-3 py-2">61-90</th>
-                        <th className="px-3 py-2">90+</th>
-                        <th className="px-3 py-2">No due date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-t border-foreground/10">
-                        <td className="px-3 py-2">{arView.agingBuckets.current}</td>
-                        <td className="px-3 py-2">{arView.agingBuckets.d1_30}</td>
-                        <td className="px-3 py-2">{arView.agingBuckets.d31_60}</td>
-                        <td className="px-3 py-2">{arView.agingBuckets.d61_90}</td>
-                        <td className="px-3 py-2">{arView.agingBuckets.d90_plus}</td>
-                        <td className="px-3 py-2">{arView.agingBuckets.noDueDate}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="flex gap-1 border-b border-foreground/10">
+                  {(
+                    [
+                      { id: "current" as const, label: "Current (follow-ups)" },
+                      { id: "aging" as const, label: "Aging" },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setReceivablesViewTab(tab.id)}
+                      className={[
+                        "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                        receivablesViewTab === tab.id
+                          ? "border-foreground text-foreground"
+                          : "border-transparent text-muted hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
-                {arView.followUps.length === 0 ? (
+                {receivablesViewTab === "aging" ? (
+                  <div className="overflow-hidden rounded-lg border border-foreground/10">
+                    <p className="border-b border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
+                      Open invoice balances grouped by how long they have been overdue.
+                    </p>
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                        <tr>
+                          <th className="px-3 py-2">Current</th>
+                          <th className="px-3 py-2">1-30</th>
+                          <th className="px-3 py-2">31-60</th>
+                          <th className="px-3 py-2">61-90</th>
+                          <th className="px-3 py-2">90+</th>
+                          <th className="px-3 py-2">No due date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-foreground/10">
+                          <td className="px-3 py-2">{arView.agingBuckets.current}</td>
+                          <td className="px-3 py-2">{arView.agingBuckets.d1_30}</td>
+                          <td className="px-3 py-2">{arView.agingBuckets.d31_60}</td>
+                          <td className="px-3 py-2">{arView.agingBuckets.d61_90}</td>
+                          <td className="px-3 py-2">{arView.agingBuckets.d90_plus}</td>
+                          <td className="px-3 py-2">{arView.agingBuckets.noDueDate}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : arView.followUps.length === 0 ? (
                   <p className="text-sm text-muted">No overdue follow-up queue right now.</p>
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -2296,43 +2473,69 @@ export function FinanceWorkspace({
                     </p>
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-lg border border-foreground/10">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
-                      <tr>
-                        <th className="px-3 py-2">Current</th>
-                        <th className="px-3 py-2">1-30</th>
-                        <th className="px-3 py-2">31-60</th>
-                        <th className="px-3 py-2">61-90</th>
-                        <th className="px-3 py-2">90+</th>
-                        <th className="px-3 py-2">No due date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-t border-foreground/10">
-                        <td className="px-3 py-2">
-                          {reportView.currency} {payablesAging.current.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-2">
-                          {reportView.currency} {payablesAging.d1_30.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-2">
-                          {reportView.currency} {payablesAging.d31_60.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-2">
-                          {reportView.currency} {payablesAging.d61_90.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-2">
-                          {reportView.currency} {payablesAging.d90_plus.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-2">
-                          {reportView.currency} {payablesAging.noDueDate.toLocaleString()}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="flex gap-1 border-b border-foreground/10">
+                  {(
+                    [
+                      { id: "aging" as const, label: "Current (aging)" },
+                      { id: "bills" as const, label: "Bills" },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setPayablesViewTab(tab.id)}
+                      className={[
+                        "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                        payablesViewTab === tab.id
+                          ? "border-foreground text-foreground"
+                          : "border-transparent text-muted hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
-                {vendorBills.length === 0 ? (
+                {payablesViewTab === "aging" ? (
+                  <div className="overflow-hidden rounded-lg border border-foreground/10">
+                    <p className="border-b border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
+                      Open balances by how long they have been due — same buckets as receivables aging.
+                    </p>
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                        <tr>
+                          <th className="px-3 py-2">Current</th>
+                          <th className="px-3 py-2">1-30</th>
+                          <th className="px-3 py-2">31-60</th>
+                          <th className="px-3 py-2">61-90</th>
+                          <th className="px-3 py-2">90+</th>
+                          <th className="px-3 py-2">No due date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-foreground/10">
+                          <td className="px-3 py-2">
+                            {reportView.currency} {payablesAging.current.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2">
+                            {reportView.currency} {payablesAging.d1_30.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2">
+                            {reportView.currency} {payablesAging.d31_60.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2">
+                            {reportView.currency} {payablesAging.d61_90.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2">
+                            {reportView.currency} {payablesAging.d90_plus.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2">
+                            {reportView.currency} {payablesAging.noDueDate.toLocaleString()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : vendorBills.length === 0 ? (
                   <p className="text-sm text-muted">No vendor bills yet. Record a bill when a supplier invoices you.</p>
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -2353,6 +2556,11 @@ export function FinanceWorkspace({
                             <td className="px-3 py-2">
                               <p className="font-medium text-foreground">{bill.billNumber}</p>
                               <p className="text-xs text-muted">{bill.title}</p>
+                              {bill.isRecurring && bill.recurrenceLabel ? (
+                                <span className="mt-1 inline-block rounded bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                                  Recurring · {bill.recurrenceLabel}
+                                </span>
+                              ) : null}
                             </td>
                             <td className="px-3 py-2">{bill.vendorName}</td>
                             <td className="px-3 py-2 text-muted">{bill.status}</td>
@@ -2425,10 +2633,10 @@ export function FinanceWorkspace({
                     </UiSelect>
                     <button
                       type="button"
-                      onClick={() => exportReportPack()}
+                      onClick={() => void exportReportPack()}
                       className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90"
                     >
-                      Export all (CSV)
+                      Export all (Excel)
                     </button>
                   </div>
                 </div>
@@ -2539,53 +2747,56 @@ export function FinanceWorkspace({
                       <p className="text-sm font-semibold text-foreground">Balance sheet</p>
                       <button
                         type="button"
-                        onClick={() => exportReportCsv("balance")}
+                        onClick={() => void exportReportExcel("balance")}
                         className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
                       >
-                        Export CSV
+                        Export Excel
                       </button>
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-lg border border-foreground/10 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">What you own</p>
+                      <div className="rounded-lg border border-emerald-200/60 bg-emerald-50/40 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">What you own</p>
                         <ul className="mt-2 space-y-2 text-sm">
                           {balanceSheetSections.assets.map((line) => (
-                            <li key={line.label} className={line.sub ? "pl-3 text-muted" : "text-foreground"}>
+                            <li
+                              key={line.label}
+                              className={line.sub ? "pl-3 text-red-600 dark:text-red-400" : "text-foreground"}
+                            >
                               <span>{line.label}</span>
-                              <span className="float-right font-semibold">
+                              <span className={["float-right font-semibold", line.sub ? "text-red-600 dark:text-red-400" : ""].join(" ")}>
                                 {reportView.currency} {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
                         </ul>
-                        <p className="mt-3 border-t border-foreground/10 pt-2 text-sm font-semibold text-foreground">
+                        <p className="mt-3 border-t border-emerald-200/60 pt-2 text-sm font-semibold text-emerald-800 dark:border-emerald-900/40 dark:text-emerald-300">
                           Total{" "}
                           <span className="float-right">
                             {reportView.currency} {balanceSheetSections.assetsTotal.toLocaleString()}
                           </span>
                         </p>
                       </div>
-                      <div className="rounded-lg border border-foreground/10 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">What you owe</p>
+                      <div className="rounded-lg border border-red-200/60 bg-red-50/40 p-3 dark:border-red-900/40 dark:bg-red-950/20">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">What you owe</p>
                         <ul className="mt-2 space-y-2 text-sm">
                           {balanceSheetSections.liabilities.map((line) => (
                             <li key={line.label} className="text-foreground">
                               <span>{line.label}</span>
-                              <span className="float-right font-semibold">
+                              <span className="float-right font-semibold text-red-700 dark:text-red-400">
                                 {reportView.currency} {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
                         </ul>
-                        <p className="mt-3 border-t border-foreground/10 pt-2 text-sm font-semibold text-foreground">
+                        <p className="mt-3 border-t border-red-200/60 pt-2 text-sm font-semibold text-red-800 dark:border-red-900/40 dark:text-red-300">
                           Total{" "}
                           <span className="float-right">
                             {reportView.currency} {balanceSheetSections.liabilitiesTotal.toLocaleString()}
                           </span>
                         </p>
                       </div>
-                      <div className="rounded-lg border border-foreground/10 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Owner position</p>
+                      <div className="rounded-lg border border-blue-200/60 bg-blue-50/40 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">Owner position</p>
                         <ul className="mt-2 space-y-2 text-sm">
                           {balanceSheetSections.equity.map((line) => (
                             <li key={line.label} className="text-foreground">
@@ -2596,7 +2807,7 @@ export function FinanceWorkspace({
                             </li>
                           ))}
                         </ul>
-                        <p className={["mt-3 border-t border-foreground/10 pt-2 text-sm font-semibold", valueTone(balanceSheetSections.equityTotal)].join(" ")}>
+                        <p className={["mt-3 border-t border-blue-200/60 pt-2 text-sm font-semibold dark:border-blue-900/40", valueTone(balanceSheetSections.equityTotal)].join(" ")}>
                           Total{" "}
                           <span className="float-right">
                             {reportView.currency} {balanceSheetSections.equityTotal.toLocaleString()}
@@ -2613,10 +2824,10 @@ export function FinanceWorkspace({
                     <p className="text-sm font-semibold text-foreground">Profit & loss by month (last {reportMonthWindow} months)</p>
                     <button
                       type="button"
-                      onClick={() => exportReportCsv("pnl")}
+                      onClick={() => void exportReportExcel("pnl")}
                       className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
                     >
-                      Export CSV
+                      Export Excel
                     </button>
                   </div>
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -2663,10 +2874,10 @@ export function FinanceWorkspace({
                       <p className="text-sm font-semibold text-foreground">Cash flow by month</p>
                       <button
                         type="button"
-                        onClick={() => exportReportCsv("cashflow")}
+                        onClick={() => void exportReportExcel("cashflow")}
                         className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
                       >
-                        Export CSV
+                        Export Excel
                       </button>
                     </div>
                     <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -2709,10 +2920,10 @@ export function FinanceWorkspace({
                       <p className="text-sm font-semibold text-foreground">Expense by category</p>
                       <button
                         type="button"
-                        onClick={() => exportReportCsv("expenses")}
+                        onClick={() => void exportReportExcel("expenses")}
                         className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
                       >
-                        Export CSV
+                        Export Excel
                       </button>
                     </div>
                     <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -3403,25 +3614,6 @@ export function FinanceWorkspace({
           </section>
       ) : null}
 
-      {isFinanceOverviewSurface ? (
-      <section className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-        <h3 className="text-sm font-semibold text-foreground">How teams interact with this flow</h3>
-        <div className="mt-2 grid gap-2 text-sm text-muted">
-          <p>
-            Sales team creates/updates deals and flags finance checks as pending; those deals appear in{" "}
-            <span className="font-medium text-foreground">Pending Queue</span>.
-          </p>
-          <p>
-            Finance Manager or Org Admin approves/rejects from queue; decision metadata is saved with reviewer and
-            timestamp.
-          </p>
-          <p>
-            Open <span className="font-medium text-foreground">Audit Logs</span> from the sidebar for the full searchable
-            trail. Invoices, payments, and expenses each have their own pages.
-          </p>
-        </div>
-      </section>
-      ) : null}
 
       {isCreateInvoiceOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
@@ -3676,7 +3868,10 @@ export function FinanceWorkspace({
               <h2 className="text-lg font-semibold text-foreground">Create expense</h2>
               <button
                 type="button"
-                onClick={() => setIsCreateExpenseOpen(false)}
+                onClick={() => {
+                  setIsCreateExpenseOpen(false);
+                  setExpenseVendorName("");
+                }}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
                 aria-label="Close modal"
               >
@@ -3706,11 +3901,13 @@ export function FinanceWorkspace({
                   <label className="mb-1 block text-sm text-muted">Category</label>
                   <input name="category" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Vendor (optional)</label>
-                  <input name="vendorName" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
               </div>
+              <VendorNamePicker
+                vendors={vendorOptions}
+                value={expenseVendorName}
+                onChange={setExpenseVendorName}
+                onAddVendor={handleSaveVendor}
+              />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm text-muted">Amount</label>
@@ -3815,80 +4012,18 @@ export function FinanceWorkspace({
         </div>
       ) : null}
 
-      {isCreateBillOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Record vendor bill</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateBillOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-            <form action={handleCreateBill} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-muted">Vendor name</label>
-                <input name="vendorName" required className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Bill title</label>
-                <input name="title" required className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Amount</label>
-                  <input name="amount" inputMode="decimal" required className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Currency</label>
-                  <UiSelect name="currency" defaultValue={financeOptions.currencies[0] || "NGN"}>
-                    {financeOptions.currencies.map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currency}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Due date (optional)</label>
-                  <input name="dueDate" type="date" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-                  <UiSelect name="department" defaultValue="">
-                    <option value="">Select department</option>
-                    {financeOptions.departments.map((department) => (
-                      <option key={department} value={department}>
-                        {department}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Note (optional)</label>
-                <input name="note" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setIsCreateBillOpen(false)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]">
-                  Cancel
-                </button>
-                <button type="submit" disabled={actionPending} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-                  {actionPending ? "Saving..." : "Save bill"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
+      <RecordVendorBillModal
+        open={isCreateBillOpen}
+        onClose={() => setIsCreateBillOpen(false)}
+        onSubmit={(formData) => void handleCreateBill(formData)}
+        actionPending={actionPending}
+        currencies={financeOptions.currencies}
+        departments={financeOptions.departments}
+        defaultCurrency={reportView.currency}
+        fiscalYear={fiscalYear}
+        vendors={vendorOptions}
+        onSaveVendor={handleSaveVendor}
+      />
 
       {paymentBill ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
@@ -4092,6 +4227,133 @@ export function FinanceWorkspace({
                   className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {actionPending ? "Saving..." : "Record"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {isCreateDirectPaymentOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-foreground">Record direct payment</h2>
+              <button
+                type="button"
+                onClick={() => setIsCreateDirectPaymentOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+                aria-label="Close modal"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              For walk-ins, reservation deposits, or other cash received without an invoice.
+            </p>
+            <form action={handleRecordDirectPayment} className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Title / description</label>
+                <input
+                  name="title"
+                  required
+                  placeholder="e.g. Walk-in deposit — Azure B-04"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Payer name (optional)</label>
+                <input
+                  name="payerName"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm text-muted">Amount</label>
+                  <input
+                    name="amount"
+                    inputMode="decimal"
+                    required
+                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-muted">Currency</label>
+                  <UiSelect name="currency" defaultValue={reportView.currency}>
+                    {financeOptions.currencies.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </UiSelect>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Paid date</label>
+                <input
+                  name="paidAt"
+                  type="date"
+                  required
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm text-muted">Method (optional)</label>
+                  <UiSelect name="method" defaultValue={financeOptions.paymentModes[0] || ""}>
+                    <option value="">Select method</option>
+                    {financeOptions.paymentModes.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {mode}
+                      </option>
+                    ))}
+                  </UiSelect>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+                  <input
+                    name="reference"
+                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+                <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
+                  <option value="">None</option>
+                  {financeOptions.departments.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Note (optional)</label>
+                <textarea
+                  name="note"
+                  rows={2}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateDirectPaymentOpen(false)}
+                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionPending}
+                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {actionPending ? "Saving..." : "Record payment"}
                 </button>
               </div>
             </form>

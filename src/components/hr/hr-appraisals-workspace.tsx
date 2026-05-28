@@ -2,12 +2,29 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ClipboardList, ListChecks, Target, Users } from "lucide-react";
+import { Archive, BarChart3, ClipboardList, ListChecks, Target, Users } from "lucide-react";
 import { HrGoalsPanel } from "@/components/hr/hr-goals-panel";
+import { HrMonthlyScoresPanel } from "@/components/hr/hr-monthly-scores-panel";
 import { YearlyAppraisalArchive, type YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
 import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { AppraisalRatingSelect } from "@/components/hr/appraisal-rating-select";
+import { RichTextDisplay, RichTextField } from "@/components/rich-text-field";
+import { appraisalRatingLabel } from "@/lib/appraisal-competencies";
+import { groupAppraisalActionsBySection, parseManagerAppraisalFormData } from "@/lib/appraisal-form-utils";
+import {
+  averageConfirmedRatings,
+  getManagerRating,
+  getSelfRating,
+  parseActionScores,
+  type AppraisalCriterionScore,
+} from "@/lib/appraisal-scores";
+import {
+  buildStaffMonthlyPerformance,
+  type StaffMonthlyPerformancePeriod,
+  type StaffMonthlyScoreEntry,
+} from "@/lib/staff-monthly-performance";
 import {
   closeAppraisalCycle,
   createAppraisalActionItem,
@@ -15,7 +32,7 @@ import {
   saveAppraisalReview,
 } from "@/app/[tenantSlug]/hr/actions";
 
-type WorkspaceTab = "criteria" | "cycles" | "review" | "goals" | "archive";
+type WorkspaceTab = "scores" | "review" | "criteria" | "cycles" | "goals" | "archive";
 
 export type AppraisalActionView = {
   id: string;
@@ -24,6 +41,7 @@ export type AppraisalActionView = {
   cycleType: string;
   cycleTypeLabel: string;
   isActive: boolean;
+  sortOrder?: number;
 };
 
 export type AppraisalCycleView = {
@@ -43,7 +61,7 @@ export type AppraisalCycleView = {
     overallRating: number | null;
     managerNotes: string;
     selfNotes: string;
-    actionScores: Record<string, { rating?: number; completed?: boolean }> | null;
+    actionScores: Record<string, AppraisalCriterionScore> | null;
   }>;
 };
 
@@ -55,33 +73,77 @@ const STATUS_STYLES: Record<string, string> = {
 
 export function HrAppraisalsWorkspace({
   tenantSlug,
+  currency,
   appraisalActions,
   appraisalCycles,
   performanceGoals,
   profileOptions,
   departments,
   yearlyArchive,
+  staffPerformancePeriods,
+  staffPerformanceInput,
+  staffMonthlyScoresDefault,
 }: {
   tenantSlug: string;
+  currency: string;
   appraisalActions: AppraisalActionView[];
   appraisalCycles: AppraisalCycleView[];
   performanceGoals: PerformanceGoalRow[];
   profileOptions: Array<{ id: string; label: string; department: string }>;
   departments: string[];
   yearlyArchive: YearlyArchiveEntry[];
+  staffPerformancePeriods: Array<{ year: number; month: number; label: string; start: string; end: string }>;
+  staffPerformanceInput: Parameters<typeof buildStaffMonthlyPerformance>[0] extends infer T
+    ? T extends { period: unknown }
+      ? Omit<T, "period">
+      : never
+    : never;
+  staffMonthlyScoresDefault: StaffMonthlyScoreEntry[];
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
-  const [tab, setTab] = useState<WorkspaceTab>("review");
-  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(
-    appraisalCycles.find((c) => c.statusValue === "OPEN")?.id ?? appraisalCycles[0]?.id ?? null,
+  const [tab, setTab] = useState<WorkspaceTab>("scores");
+
+  const monthlyCycles = useMemo(
+    () => appraisalCycles.filter((c) => c.cycleType === "MONTHLY"),
+    [appraisalCycles],
+  );
+
+  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(() => {
+    const openMonthly = monthlyCycles.find((c) => c.statusValue === "OPEN");
+    if (openMonthly) return openMonthly.id;
+    return monthlyCycles[0]?.id ?? null;
+  });
+
+  const performancePeriods = useMemo(
+    (): StaffMonthlyPerformancePeriod[] =>
+      staffPerformancePeriods.map((p) => ({
+        year: p.year,
+        month: p.month,
+        label: p.label,
+        start: new Date(p.start),
+        end: new Date(p.end),
+      })),
+    [staffPerformancePeriods],
+  );
+
+  const [scorePeriod, setScorePeriod] = useState<StaffMonthlyPerformancePeriod | null>(
+    () => performancePeriods[performancePeriods.length - 1] ?? null,
+  );
+
+  const monthlyScores = useMemo(
+    () =>
+      scorePeriod
+        ? buildStaffMonthlyPerformance({ period: scorePeriod, ...staffPerformanceInput })
+        : staffMonthlyScoresDefault,
+    [scorePeriod, staffPerformanceInput, staffMonthlyScoresDefault],
   );
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   const selectedCycle = useMemo(
-    () => appraisalCycles.find((c) => c.id === selectedCycleId) ?? null,
-    [appraisalCycles, selectedCycleId],
+    () => monthlyCycles.find((c) => c.id === selectedCycleId) ?? monthlyCycles[0] ?? null,
+    [monthlyCycles, selectedCycleId],
   );
 
   const reviewAppraisal = reviewId && selectedCycle ? selectedCycle.appraisals.find((a) => a.id === reviewId) : null;
@@ -92,10 +154,10 @@ export function HrAppraisalsWorkspace({
   }, [appraisalActions, selectedCycle]);
 
   const queueCounts = useMemo(() => {
-    const open = appraisalCycles.filter((c) => c.statusValue === "OPEN");
+    const open = monthlyCycles.filter((c) => c.statusValue === "OPEN");
     const pending = open.flatMap((c) => c.appraisals).filter((a) => a.statusValue === "SELF_SUBMITTED");
     return { openCycles: open.length, pendingReview: pending.length };
-  }, [appraisalCycles]);
+  }, [monthlyCycles]);
 
   async function runAction(fn: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     setPending(true);
@@ -110,6 +172,7 @@ export function HrAppraisalsWorkspace({
   }
 
   const tabs: { id: WorkspaceTab; label: string; icon: typeof ListChecks }[] = [
+    { id: "scores", label: "Monthly scores", icon: BarChart3 },
     { id: "review", label: "Review queue", icon: Users },
     { id: "goals", label: "Performance goals", icon: Target },
     { id: "archive", label: "Yearly archive", icon: Archive },
@@ -121,11 +184,11 @@ export function HrAppraisalsWorkspace({
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-foreground/10 p-4">
-          <p className="text-xs text-muted">Open periods</p>
+          <p className="text-xs text-muted">Open monthly periods</p>
           <p className="text-2xl font-bold">{queueCounts.openCycles}</p>
         </div>
         <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-4">
-          <p className="text-xs text-muted">Awaiting manager review</p>
+          <p className="text-xs text-muted">Awaiting manager review (this month)</p>
           <p className="text-2xl font-bold text-violet-800">{queueCounts.pendingReview}</p>
         </div>
       </div>
@@ -146,6 +209,16 @@ export function HrAppraisalsWorkspace({
           </button>
         ))}
       </div>
+
+      {tab === "scores" && scorePeriod ? (
+        <HrMonthlyScoresPanel
+          period={scorePeriod}
+          periods={performancePeriods}
+          onPeriodChange={setScorePeriod}
+          entries={monthlyScores}
+          currency={currency}
+        />
+      ) : null}
 
       {tab === "goals" ? (
         <HrGoalsPanel
@@ -312,7 +385,7 @@ export function HrAppraisalsWorkspace({
           <aside className="w-full lg:w-52">
             <p className="mb-2 text-[10px] font-bold uppercase text-muted">Periods</p>
             <ul className="space-y-1">
-              {appraisalCycles.map((c) => (
+              {monthlyCycles.map((c) => (
                 <li key={c.id}>
                   <button
                     type="button"
@@ -383,104 +456,157 @@ export function HrAppraisalsWorkspace({
 
       {reviewAppraisal && selectedCycle ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-xl">
             <h2 className="text-lg font-semibold">Manager review — {reviewAppraisal.employeeName}</h2>
             <p className="text-xs text-muted">
               {selectedCycle.periodLabel} · {selectedCycle.cycleTypeLabel}
             </p>
+            <p className="mt-2 text-xs text-muted">
+              Review the employee&apos;s self-ratings (0–5), confirm or adjust each score, and add development notes.
+              {selectedCycle.cycleType === "MONTHLY"
+                ? " Confirmed scores feed the monthly performance ranking."
+                : " Confirmed scores are recorded for this yearly review."}
+            </p>
+
             {reviewAppraisal.selfNotes ? (
-              <div className="mt-3 rounded-md border border-foreground/10 bg-foreground/[0.03] p-3 text-sm">
-                <p className="text-xs font-semibold text-muted">Employee comments</p>
-                <p className="mt-1 whitespace-pre-wrap">{reviewAppraisal.selfNotes}</p>
+              <div className="mt-3 rounded-md border border-foreground/10 bg-foreground/[0.03] p-3">
+                <p className="text-xs font-semibold text-muted">Employee summary</p>
+                <RichTextDisplay html={reviewAppraisal.selfNotes} className="mt-1" />
               </div>
             ) : null}
-            {cycleActions.length > 0 ? (
-              <div className="mt-3 space-y-2">
-                <p className="text-xs font-semibold text-muted">Criteria scores (employee)</p>
-                {cycleActions.map((action) => {
-                  const score = reviewAppraisal.actionScores?.[action.id];
-                  return (
-                    <div key={action.id} className="flex justify-between text-sm">
-                      <span>{action.title}</span>
-                      <span className="text-muted">
-                        {score?.completed ? "Done" : ""}
-                        {score?.rating ? ` ${score.rating}/5` : " —"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
+
             <form
-              className="mt-4 space-y-3"
+              className="mt-4 space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
-                const actionResponses: { actionId: string; rating?: number; completed?: boolean }[] = [];
-                for (const action of cycleActions) {
-                  const rating = Number(fd.get(`mgr_rating_${action.id}`) || 0);
-                  if (rating >= 1 && rating <= 5) {
-                    actionResponses.push({ actionId: action.id, rating });
-                  }
-                  if (fd.get(`mgr_done_${action.id}`) === "on") {
-                    actionResponses.push({ actionId: action.id, completed: true });
-                  }
-                }
+                const parsed = parseManagerAppraisalFormData(
+                  fd,
+                  cycleActions.map((a) => a.id),
+                );
                 void runAction(
                   () =>
                     saveAppraisalReview(tenantSlug, reviewAppraisal.id, {
-                      managerNotes: String(fd.get("managerNotes") || ""),
-                      overallRating: Number(fd.get("overallRating") || 0) || undefined,
-                      actionResponses,
+                      managerNotes: parsed.managerNotes,
+                      overallRating: parsed.overallRating,
+                      actionResponses: parsed.actionResponses,
                     }),
                   "Review saved.",
                 ).then(() => setReviewId(null));
               }}
             >
-              {cycleActions.map((action) => (
-                <div key={action.id} className="rounded-md border border-foreground/10 p-2">
-                  <p className="text-sm font-medium">{action.title}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <UiSelect name={`mgr_rating_${action.id}`} defaultValue="">
-                      <option value="">Your score</option>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <option key={n} value={n}>
-                          {n}/5
-                        </option>
-                      ))}
-                    </UiSelect>
-                    <label className="flex items-center gap-1.5 text-xs">
-                      <input type="checkbox" name={`mgr_done_${action.id}`} />
-                      Met expectation
-                    </label>
+              {groupAppraisalActionsBySection(cycleActions).map((group) => (
+                <div key={group.section}>
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted">{group.label}</p>
+                  <div className="mt-2 space-y-3">
+                    {group.actions.map((action) => {
+                      const scores = parseActionScores(reviewAppraisal.actionScores);
+                      const score = scores[action.id];
+                      const selfRating = getSelfRating(score);
+                      const managerRating = getManagerRating(score);
+                      const isReadOnly = reviewAppraisal.statusValue === "REVIEWED";
+
+                      return (
+                        <div key={action.id} className="rounded-md border border-foreground/10 p-3">
+                          <p className="text-sm font-medium">{action.title}</p>
+                          {action.description ? (
+                            <p className="mt-0.5 text-xs text-muted">{action.description}</p>
+                          ) : null}
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                            <span className="rounded-full bg-foreground/[0.06] px-2 py-0.5">
+                              Employee: {appraisalRatingLabel(selfRating)}
+                            </span>
+                            {isReadOnly ? (
+                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-800">
+                                Final: {appraisalRatingLabel(managerRating)}
+                              </span>
+                            ) : (
+                              <AppraisalRatingSelect
+                                name={`mgr_rating_${action.id}`}
+                                defaultValue={managerRating ?? selfRating}
+                                placeholder="Confirm score"
+                                className="min-w-[11rem]"
+                              />
+                            )}
+                          </div>
+                          {score?.selfNotes ? (
+                            <div className="mt-2 rounded border border-foreground/10 bg-foreground/[0.02] p-2">
+                              <p className="text-[10px] font-semibold uppercase text-muted">Employee notes</p>
+                              <RichTextDisplay html={score.selfNotes} className="mt-1" />
+                            </div>
+                          ) : null}
+                          {isReadOnly && score?.managerNotes ? (
+                            <div className="mt-2">
+                              <p className="text-[10px] font-semibold uppercase text-muted">Your notes</p>
+                              <RichTextDisplay html={score.managerNotes} className="mt-1" />
+                            </div>
+                          ) : !isReadOnly ? (
+                            <RichTextField
+                              name={`mgr_notes_${action.id}`}
+                              defaultValue={score?.managerNotes ?? ""}
+                              placeholder="Manager comments on this area (optional)"
+                              minHeight="4rem"
+                              className="mt-2"
+                            />
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
-              <textarea
+
+              <RichTextField
                 name="managerNotes"
-                rows={4}
+                label="Overall manager summary"
                 defaultValue={reviewAppraisal.managerNotes}
-                className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
-                placeholder="Manager summary and development notes"
+                readOnly={reviewAppraisal.statusValue === "REVIEWED"}
+                placeholder="Summary, development plan, and next steps"
+                minHeight="5rem"
               />
-              <UiSelect name="overallRating" defaultValue={String(reviewAppraisal.overallRating ?? 3)}>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    Overall: {n} / 5
-                  </option>
-                ))}
-              </UiSelect>
-              <div className="flex justify-end gap-2">
+
+              {reviewAppraisal.statusValue === "REVIEWED" ? (
+                reviewAppraisal.overallRating != null ? (
+                  <p className="text-sm font-medium">
+                    Final overall: {appraisalRatingLabel(reviewAppraisal.overallRating)}
+                  </p>
+                ) : null
+              ) : (
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="block text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Overall (optional override)</span>
+                    <AppraisalRatingSelect
+                      name="overallRating"
+                      defaultValue={
+                        reviewAppraisal.overallRating ??
+                        averageConfirmedRatings(
+                          parseActionScores(reviewAppraisal.actionScores),
+                          cycleActions.map((a) => a.id),
+                        ) ??
+                        getSelfRating(parseActionScores(reviewAppraisal.actionScores)[cycleActions[0]?.id])
+                      }
+                      placeholder="Auto from confirmed scores"
+                    />
+                  </label>
+                  <p className="text-xs text-muted pb-2">
+                    Leave blank to auto-calculate from confirmed criterion scores.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 border-t border-foreground/10 pt-3">
                 <button type="button" onClick={() => setReviewId(null)}>
-                  Cancel
+                  {reviewAppraisal.statusValue === "REVIEWED" ? "Close" : "Cancel"}
                 </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
-                >
-                  Save review
-                </button>
+                {reviewAppraisal.statusValue !== "REVIEWED" ? (
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+                  >
+                    Save review
+                  </button>
+                ) : null}
               </div>
             </form>
           </div>

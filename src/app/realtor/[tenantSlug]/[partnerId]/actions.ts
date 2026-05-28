@@ -59,7 +59,7 @@ export async function submitPortalLead(
         name: parsed.data.name,
         email: parsed.data.email ?? null,
         phone: parsed.data.phone ?? null,
-        source: `Realtor: ${partner.displayName}`,
+        source: `Community: ${partner.displayName}`,
         campaignName,
         campaignId,
         utmSource: parsed.data.utmSource ?? null,

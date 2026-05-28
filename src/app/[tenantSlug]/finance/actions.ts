@@ -6,6 +6,16 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { createTenantUploadSignature } from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
 import { parseFinanceControls } from "@/lib/finance-controls";
+import { normalizeFinanceVendorName, vendorNamesMatch } from "@/lib/finance-vendor";
+import {
+  buildRecurrenceRangeInput,
+  buildVendorBillTitle,
+  describeRecurrenceRange,
+  parseDueDateInput,
+  recurrencePeriodsInRange,
+  type RecurrenceRangeMode,
+  type VendorBillRecurrenceFrequency,
+} from "@/lib/vendor-bill-recurrence";
 import {
   createExpenseInputSchema,
   createInvoiceInputSchema,
@@ -13,6 +23,7 @@ import {
   createVendorBillInputSchema,
   financeControlsInputSchema,
   recordPaymentInputSchema,
+  recordStandalonePaymentInputSchema,
   recordVendorBillPaymentInputSchema,
   updateInvoiceInputSchema,
 } from "@/lib/validators/finance";
@@ -157,6 +168,27 @@ function canManageFinance(
   if (isPlatformAdmin) return true;
   if (!membership || membership.status !== MembershipStatus.ACTIVE) return false;
   return membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.FINANCE_MANAGER;
+}
+
+async function ensureFinanceVendor(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  rawName: string,
+): Promise<string> {
+  const name = normalizeFinanceVendorName(rawName);
+  if (name.length < 2) return name;
+
+  const existing = await tx.financeVendor.findMany({
+    where: { tenantId },
+    select: { name: true },
+  });
+  const match = existing.find((row) => vendorNamesMatch(row.name, name));
+  if (match) return match.name;
+
+  await tx.financeVendor.create({
+    data: { tenantId, name },
+  });
+  return name;
 }
 
 async function canViewAuditDetails(tenantSlug: string, userId: string, isPlatformAdmin: boolean) {
@@ -389,6 +421,79 @@ export async function recordInvoicePayment(
         department: parsed.data.department || null,
         method: parsed.data.method || null,
         attachmentUrl: parsed.data.attachmentUrl || null,
+      },
+    });
+  } catch {
+    return { ok: false, error: "Could not record payment right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function recordStandalonePayment(
+  tenantSlug: string,
+  input: {
+    title: string;
+    payerName?: string;
+    amount: number;
+    currency: string;
+    paidAt: string;
+    department?: string;
+    method?: string;
+    reference?: string;
+    note?: string;
+    attachmentUrl?: string;
+    attachmentName?: string;
+    attachmentPublicId?: string;
+  },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = recordStandalonePaymentInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to record payments." };
+  }
+
+  try {
+    const created = await prisma.paymentRecord.create({
+      data: {
+        tenantId: tenant.id,
+        invoiceId: null,
+        standaloneTitle: parsed.data.title,
+        payerName: parsed.data.payerName || null,
+        amount: parsed.data.amount,
+        currency: parsed.data.currency,
+        department: parsed.data.department || null,
+        paidAt: new Date(parsed.data.paidAt),
+        method: parsed.data.method || null,
+        reference: parsed.data.reference || null,
+        note: parsed.data.note || null,
+        attachmentUrl: parsed.data.attachmentUrl || null,
+        attachmentName: parsed.data.attachmentName || null,
+        attachmentPublicId: parsed.data.attachmentPublicId || null,
+        recordedByUserId: session.user.id,
+        recordedByLabel: session.user.name || session.user.email || "Unknown recorder",
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown recorder",
+      module: "FINANCE",
+      entityType: "PAYMENT",
+      entityId: created.id,
+      action: "CREATE",
+      summary: `Recorded direct payment: ${parsed.data.title}.`,
+      metadata: {
+        amount: parsed.data.amount,
+        currency: parsed.data.currency,
+        payerName: parsed.data.payerName || null,
       },
     });
   } catch {
@@ -794,12 +899,16 @@ export async function createExpenseRecord(
   }
 
   try {
+    let expenseVendorName = parsed.data.vendorName || null;
+    if (expenseVendorName) {
+      expenseVendorName = await prisma.$transaction((tx) => ensureFinanceVendor(tx, tenant.id, expenseVendorName!));
+    }
     const created = await prisma.expense.create({
       data: {
         tenantId: tenant.id,
         category: parsed.data.category,
         department: parsed.data.department || null,
-        vendorName: parsed.data.vendorName || null,
+        vendorName: expenseVendorName,
         amount: parsed.data.amount,
         currency: parsed.data.currency,
         expenseDate: new Date(parsed.data.expenseDate),
@@ -841,12 +950,18 @@ export async function createVendorBill(
   tenantSlug: string,
   input: {
     vendorName: string;
-    title: string;
+    title?: string;
     amount: number;
     currency: string;
     dueDate?: string;
     department?: string;
     note?: string;
+    isRecurring?: boolean;
+    recurrenceFrequency?: VendorBillRecurrenceFrequency;
+    recurrenceRangeMode?: RecurrenceRangeMode;
+    recurrenceEndDate?: string;
+    recurrencePeriodCount?: number;
+    useAutoTitle?: boolean;
   },
 ): Promise<ActionResult> {
   const session = await auth();
@@ -861,37 +976,126 @@ export async function createVendorBill(
     return { ok: false, error: "You do not have permission to create bills." };
   }
 
-  const count = await prisma.vendorBill.count({ where: { tenantId: tenant.id } });
-  const billNumber = `BILL-${String(count + 1).padStart(5, "0")}`;
+  const anchorDue = parseDueDateInput(parsed.data.dueDate) ?? new Date();
+  const frequency = parsed.data.isRecurring ? parsed.data.recurrenceFrequency : undefined;
+  const useAutoTitle = parsed.data.useAutoTitle || parsed.data.isRecurring;
+
+  let recurrenceRange = null as ReturnType<typeof buildRecurrenceRangeInput>;
+  if (frequency && parsed.data.recurrenceRangeMode) {
+    if (parsed.data.recurrenceRangeMode === "FISCAL_YEAR_END") {
+      const goal = await prisma.tenantGoal.findFirst({
+        where: { tenantId: tenant.id, isActive: true },
+        orderBy: { updatedAt: "desc" },
+        select: { fiscalYearEnd: true },
+      });
+      if (!goal) {
+        return {
+          ok: false,
+          error: "Set an active fiscal year on the dashboard before scheduling bills through year-end.",
+        };
+      }
+      recurrenceRange = buildRecurrenceRangeInput("FISCAL_YEAR_END", { fiscalYearEnd: goal.fiscalYearEnd });
+    } else if (parsed.data.recurrenceRangeMode === "END_DATE") {
+      recurrenceRange = buildRecurrenceRangeInput("END_DATE", { endDate: parsed.data.recurrenceEndDate });
+    } else {
+      recurrenceRange = buildRecurrenceRangeInput("PERIOD_COUNT", {
+        periodCount: parsed.data.recurrencePeriodCount,
+      });
+    }
+    if (!recurrenceRange) {
+      return { ok: false, error: "Could not build the bill schedule from your date range." };
+    }
+  }
+
+  const billDrafts = (() => {
+    if (frequency && recurrenceRange) {
+      const periods = recurrencePeriodsInRange(parsed.data.vendorName, anchorDue, frequency, recurrenceRange);
+      if (periods.length === 0) {
+        return null;
+      }
+      return periods.map((period) => ({
+        dueDate: period.dueDate,
+        title: period.title,
+        recurrenceIndex: period.index,
+      }));
+    }
+    const title =
+      useAutoTitle || !parsed.data.title
+        ? buildVendorBillTitle(parsed.data.vendorName, parseDueDateInput(parsed.data.dueDate), null)
+        : parsed.data.title;
+    return [
+      {
+        dueDate: parseDueDateInput(parsed.data.dueDate),
+        title,
+        recurrenceIndex: null as number | null,
+      },
+    ];
+  })();
+
+  if (billDrafts === null) {
+    return {
+      ok: false,
+      error: "No bills fall in that schedule. Check the first due date and how long the series should run.",
+    };
+  }
+
+  const seriesId = frequency ? crypto.randomUUID() : null;
+  const actorLabel = session.user.name || session.user.email || "Unknown recorder";
 
   try {
-    const created = await prisma.vendorBill.create({
-      data: {
+    await prisma.$transaction(async (tx) => {
+      const vendorName = await ensureFinanceVendor(tx, tenant.id, parsed.data.vendorName);
+      const baseCount = await tx.vendorBill.count({ where: { tenantId: tenant.id } });
+      const createdIds: string[] = [];
+
+      for (let i = 0; i < billDrafts.length; i += 1) {
+        const draft = billDrafts[i];
+        const billNumber = `BILL-${String(baseCount + 1 + i).padStart(5, "0")}`;
+        const created = await tx.vendorBill.create({
+          data: {
+            tenantId: tenant.id,
+            billNumber,
+            vendorName,
+            title: draft.title,
+            amount: parsed.data.amount,
+            balanceDue: parsed.data.amount,
+            currency: parsed.data.currency,
+            department: parsed.data.department || null,
+            dueDate: draft.dueDate,
+            note: parsed.data.note || null,
+            status: VendorBillStatus.OPEN,
+            isRecurring: Boolean(frequency),
+            recurrenceFrequency: frequency ?? null,
+            recurrenceSeriesId: seriesId,
+            recurrenceIndex: draft.recurrenceIndex,
+            createdByUserId: session.user.id,
+            createdByLabel: actorLabel,
+          },
+        });
+        createdIds.push(created.id);
+      }
+
+      const firstNumber = `BILL-${String(baseCount + 1).padStart(5, "0")}`;
+      await writeAuditLog({
         tenantId: tenant.id,
-        billNumber,
-        vendorName: parsed.data.vendorName,
-        title: parsed.data.title,
-        amount: parsed.data.amount,
-        balanceDue: parsed.data.amount,
-        currency: parsed.data.currency,
-        department: parsed.data.department || null,
-        dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
-        note: parsed.data.note || null,
-        status: VendorBillStatus.OPEN,
-        createdByUserId: session.user.id,
-        createdByLabel: session.user.name || session.user.email || "Unknown recorder",
-      },
-    });
-    await writeAuditLog({
-      tenantId: tenant.id,
-      actorUserId: session.user.id,
-      actorLabel: session.user.name || session.user.email || "Unknown recorder",
-      module: "FINANCE",
-      entityType: "VENDOR_BILL",
-      entityId: created.id,
-      action: "CREATE",
-      summary: `Created vendor bill ${billNumber} for ${parsed.data.vendorName}.`,
-      metadata: { amount: parsed.data.amount, currency: parsed.data.currency },
+        actorUserId: session.user.id,
+        actorLabel,
+        module: "FINANCE",
+        entityType: "VENDOR_BILL",
+        entityId: createdIds[0],
+        action: "CREATE",
+        summary: frequency
+          ? `Created ${describeRecurrenceRange(recurrenceRange!, frequency, billDrafts.length)} starting at ${firstNumber} for ${vendorName}.`
+          : `Created vendor bill ${firstNumber} for ${vendorName}.`,
+        metadata: {
+          amount: parsed.data.amount,
+          currency: parsed.data.currency,
+          isRecurring: Boolean(frequency),
+          recurrenceFrequency: frequency,
+          recurrenceRangeMode: parsed.data.recurrenceRangeMode,
+          billCount: billDrafts.length,
+        },
+      });
     });
   } catch {
     return { ok: false, error: "Could not create bill right now." };
@@ -899,6 +1103,53 @@ export async function createVendorBill(
 
   revalidatePath(`/${tenantSlug}/finance`);
   return { ok: true };
+}
+
+export async function saveFinanceVendor(
+  tenantSlug: string,
+  rawName: string,
+): Promise<{ ok: true; vendorId: string; name: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const name = normalizeFinanceVendorName(rawName);
+  if (name.length < 2) return { ok: false, error: "Vendor name must be at least 2 characters." };
+  if (name.length > 120) return { ok: false, error: "Vendor name is too long." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to manage vendors." };
+  }
+
+  let saved: { id: string; name: string };
+  try {
+    saved = await prisma.$transaction(async (tx) => {
+      const canonical = await ensureFinanceVendor(tx, tenant.id, name);
+      const row = await tx.financeVendor.findFirst({
+        where: { tenantId: tenant.id, name: canonical },
+        select: { id: true, name: true },
+      });
+      if (!row) throw new Error("missing vendor");
+      return row;
+    });
+
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown recorder",
+      module: "FINANCE",
+      entityType: "FINANCE_VENDOR",
+      entityId: saved.id,
+      action: "CREATE",
+      summary: `Saved vendor ${saved.name}.`,
+    });
+  } catch {
+    return { ok: false, error: "Could not save vendor right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true, vendorId: saved.id, name: saved.name };
 }
 
 export async function recordVendorBillPayment(

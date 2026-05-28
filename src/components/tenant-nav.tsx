@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { RealcorpLogoLink, RealcorpMark } from "@/components/realcorp-brand";
 import {
   Activity,
   CalendarCheck2,
@@ -13,6 +12,7 @@ import {
   UsersRound,
   Home,
   LayoutDashboard,
+  ListTodo,
   Megaphone,
   Search,
   Settings,
@@ -24,6 +24,7 @@ import type { TenantNavKey } from "@/lib/tenant-nav-access";
 export type TenantNavProps = {
   tenantName: string;
   tenantSlug: string;
+  tenantLogoUrl?: string | null;
   canAccessPlatform: boolean;
   canManageHr?: boolean;
   /** When true, HR admins also see My dashboard (they are on payroll / have a profile). */
@@ -40,7 +41,8 @@ const ALL_ITEMS: NavItem[] = [
   { key: "projects", label: "Projects", href: "/projects", mobileLabel: "Projects" },
   { key: "leads", label: "Leads", href: "/leads", mobileLabel: "Leads" },
   { key: "deals", label: "Deals", href: "/deals", mobileLabel: "Deals" },
-  { key: "activities", label: "Activities", href: "/activities", mobileLabel: "Tasks" },
+  { key: "activities", label: "Activities", href: "/activities", mobileLabel: "Activity" },
+  { key: "tasks", label: "Tasks", href: "/tasks", mobileLabel: "Tasks" },
   { key: "marketing", label: "Marketing", href: "/marketing", mobileLabel: "Marketing" },
   { key: "community", label: "Community", href: "/community", mobileLabel: "Community" },
   { key: "shortlets", label: "Short Lets", href: "/shortlets", mobileLabel: "Shortlets" },
@@ -56,6 +58,7 @@ const NAV_ICONS: Record<TenantNavKey, LucideIcon> = {
   leads: Search,
   deals: CalendarCheck2,
   activities: Activity,
+  tasks: ListTodo,
   marketing: Megaphone,
   community: Users,
   shortlets: Home,
@@ -72,6 +75,7 @@ const SALES_GROUP_KEYS: TenantNavKey[] = ["leads", "deals", "activities"];
 const TOP_LEVEL_KEYS: TenantNavKey[] = [
   "dashboard",
   "projects",
+  "tasks",
   "marketing",
   "community",
   "shortlets",
@@ -98,10 +102,47 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function tenantInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function TenantBrandLink({
+  href,
+  tenantName,
+  logoUrl,
+}: {
+  href: string;
+  tenantName: string;
+  logoUrl?: string | null;
+}) {
+  const mark = logoUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={logoUrl} alt="" className="h-8 w-auto max-w-[120px] shrink-0 object-contain" />
+  ) : (
+    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-foreground/15 bg-foreground/[0.04] text-xs font-bold text-foreground">
+      {tenantInitials(tenantName)}
+    </span>
+  );
+
+  return (
+    <Link href={href} className="group inline-flex min-w-0 items-center gap-2">
+      {mark}
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-bold tracking-tight text-foreground group-hover:opacity-90">{tenantName}</span>
+        <span className="block text-[10px] text-muted">Organization</span>
+      </span>
+    </Link>
+  );
+}
+
 /** Desktop sidebar only */
 export function TenantSidebar({
   tenantName,
   tenantSlug,
+  tenantLogoUrl = null,
   canAccessPlatform,
   canManageHr = false,
   hasHrEmployeeProfile = false,
@@ -271,16 +312,22 @@ export function TenantSidebar({
               type="button"
               onClick={toggleCollapsed}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-foreground/15 hover:bg-foreground/[0.06]"
-              title="Expand sidebar"
+              title={`${tenantName} — expand sidebar`}
               aria-label="Expand sidebar"
             >
-              <RealcorpMark size={26} className="h-6 w-6" />
+              {tenantLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={tenantLogoUrl} alt="" className="h-6 w-auto max-w-[28px] object-contain" />
+              ) : (
+                <span className="text-[10px] font-bold text-foreground">{tenantInitials(tenantName)}</span>
+              )}
             </button>
           ) : (
             <>
-              <RealcorpLogoLink
+              <TenantBrandLink
                 href={coreItems.find((i) => i.key === "dashboard")?.href ?? `/${tenantSlug}`}
-                subtitle={tenantName}
+                tenantName={tenantName}
+                logoUrl={tenantLogoUrl}
               />
               <button
                 type="button"

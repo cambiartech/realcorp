@@ -110,6 +110,7 @@ model Tenant {
   activities           Activity[]
   whatsappMessages     WhatsAppMessage[]
   expenses             Expense[]
+  financeVendors       FinanceVendor[]
   vendorBills          VendorBill[]
   vendorBillPayments   VendorBillPayment[]
   bankStatementImports BankStatementImport[]
@@ -124,6 +125,9 @@ model Tenant {
   hrPerformanceGoals   HrPerformanceGoal[]
   hrFormRequests       HrFormRequest[]
   hrOfferLetters       HrOfferLetter[]
+  taskSpaces           TaskSpace[]
+  taskProjects         TaskProject[]
+  workTasks            WorkTask[]
 }
 
 model TenantSettings {
@@ -147,6 +151,7 @@ model TenantSettings {
   moduleRealtorPortal  Boolean  @default(true)
   moduleShortLets      Boolean  @default(false)
   moduleHr             Boolean  @default(false)
+  moduleTasks          Boolean  @default(true)
   /// Extra nav modules per role beyond defaults, e.g. { "SALES_EXECUTIVE": ["MARKETING","FINANCE"] }
   roleModuleGrants     Json?
   orgDepartments       Json?
@@ -564,7 +569,9 @@ model Invoice {
 model PaymentRecord {
   id               String   @id @default(cuid())
   tenantId         String
-  invoiceId        String
+  invoiceId        String?
+  standaloneTitle  String?
+  payerName        String?
   amount           Decimal  @db.Decimal(18, 2)
   currency         String   @default("NGN")
   department       String?
@@ -579,8 +586,8 @@ model PaymentRecord {
   recordedByLabel  String?
   createdAt        DateTime @default(now())
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, paidAt])
   @@index([invoiceId])
@@ -614,6 +621,19 @@ model Expense {
   @@index([tenantId, category])
 }
 
+model FinanceVendor {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, name])
+}
+
 enum VendorBillStatus {
   OPEN
   PARTIAL
@@ -621,26 +641,36 @@ enum VendorBillStatus {
   VOID
 }
 
+enum VendorBillRecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 model VendorBill {
-  id              String           @id @default(cuid())
-  tenantId        String
-  projectId       String?
-  unitId          String?
-  billNumber      String
-  vendorName      String
-  title           String
-  status          VendorBillStatus @default(OPEN)
-  amount          Decimal          @db.Decimal(18, 2)
-  balanceDue      Decimal          @db.Decimal(18, 2)
-  currency        String           @default("NGN")
-  department      String?
-  dueDate         DateTime?
-  issuedAt        DateTime         @default(now())
-  note            String?
-  createdByUserId String?
-  createdByLabel  String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                  String                         @id @default(cuid())
+  tenantId            String
+  projectId           String?
+  unitId              String?
+  billNumber          String
+  vendorName          String
+  title               String
+  status              VendorBillStatus               @default(OPEN)
+  amount              Decimal                        @db.Decimal(18, 2)
+  balanceDue          Decimal                        @db.Decimal(18, 2)
+  currency            String                         @default("NGN")
+  department          String?
+  dueDate             DateTime?
+  issuedAt            DateTime                       @default(now())
+  note                String?
+  isRecurring         Boolean                        @default(false)
+  recurrenceFrequency VendorBillRecurrenceFrequency?
+  recurrenceSeriesId  String?
+  recurrenceIndex     Int?
+  createdByUserId     String?
+  createdByLabel      String?
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
 
   tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   payments VendorBillPayment[]
@@ -648,6 +678,7 @@ model VendorBill {
   @@unique([tenantId, billNumber])
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
+  @@index([tenantId, recurrenceSeriesId])
 }
 
 model VendorBillPayment {
@@ -1212,4 +1243,104 @@ model NigeriaLgaRef {
   @@unique([stateId, slug])
   @@index([stateId])
   @@index([name])
+}
+
+// ---------------------------------------------------------------------------
+// Tasks — org-wide work (Notion-style teamspaces, projects, kanban)
+// Separate from CRM Activity (sales follow-ups on leads/deals).
+// ---------------------------------------------------------------------------
+
+enum WorkTaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum WorkTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/// Teamspace — e.g. Company HQ, Product, Engineering, People
+model TaskSpace {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  slug        String
+  description String?
+  color       String?  @default("#6366f1")
+  sortOrder   Int      @default(0)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects TaskProject[]
+  tasks    WorkTask[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, sortOrder])
+}
+
+/// Work project within a space — roadmap, sprint, appraisal cycle container
+model TaskProject {
+  id          String            @id @default(cuid())
+  tenantId    String
+  spaceId     String
+  name        String
+  description String?
+  status      TaskProjectStatus @default(ACTIVE)
+  sprintLabel String?
+  iconEmoji   String?
+  dueDate     DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  space  TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tasks  WorkTask[]
+
+  @@index([tenantId, spaceId])
+  @@index([tenantId, status])
+}
+
+model WorkTask {
+  id              String           @id @default(cuid())
+  tenantId        String
+  spaceId         String?
+  projectId       String?
+  title           String
+  description     String?          @db.Text
+  status          WorkTaskStatus   @default(TODO)
+  priority        WorkTaskPriority @default(MEDIUM)
+  assigneeUserId  String?
+  createdByUserId String
+  dueDate         DateTime?
+  completedAt     DateTime?
+  sprintLabel     String?
+  sortOrder       Int              @default(0)
+  /// Future HR/CRM links: HR_APPRAISAL | HR_GOAL | LEAD | DEAL
+  linkedEntityType String?
+  linkedEntityId   String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  space   TaskSpace?   @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  project TaskProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, assigneeUserId])
+  @@index([tenantId, spaceId])
+  @@index([tenantId, projectId])
+  @@index([tenantId, linkedEntityType, linkedEntityId])
 }
