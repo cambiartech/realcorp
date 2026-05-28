@@ -275,6 +275,7 @@ export function HrOnboardingWizard({
           <button
             type="button"
             disabled={pending}
+            aria-busy={pending}
             onClick={async () => {
               const formId = step === "personal" ? "onboard-personal" : step === "bank" ? "onboard-bank" : null;
               if (formId) {
@@ -285,6 +286,7 @@ export function HrOnboardingWizard({
             }}
             className="inline-flex items-center gap-1 rounded-md border border-foreground bg-foreground px-4 py-1.5 text-xs font-semibold text-background"
           >
+            {pending ? <InlineSpinner /> : null}
             {pending ? "Saving…" : "Save & continue"}
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -292,17 +294,28 @@ export function HrOnboardingWizard({
           <button
             type="button"
             disabled={pending}
+            aria-busy={pending}
             onClick={async () => {
               const form = document.getElementById("onboard-activate") as HTMLFormElement | null;
               if (form && !(await saveForm(form, "ACTIVE"))) return;
               onComplete();
             }}
-            className="rounded-md border border-emerald-600 bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white"
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-600 bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white"
           >
+            {pending ? <InlineSpinner /> : null}
             {pending ? "Activating…" : "Activate employee"}
           </button>
         )}
       </div>
     </div>
+  );
+}
+
+function InlineSpinner() {
+  return (
+    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
   );
 }

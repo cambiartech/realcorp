@@ -125,6 +125,37 @@ DIRECT_URL="postgresql://..." npx prisma migrate deploy
 
 Then trigger **Deploy site** in Netlify (or push a commit).
 
+## Getting production error logs (Netlify)
+
+Browser errors like `This page couldn't load` with a digest mean the failure happened in a server function.
+
+### Netlify UI
+
+1. Open **Netlify → Site → Logs**.
+2. Filter by:
+   - **Runtime** / **Functions**
+   - Your production site
+   - Time window around the error
+3. Search for the failing route (for example `/${tenantSlug}` or `/projects`) and for:
+   - `Error:`
+   - `digest`
+   - `projects:createProject`
+
+### Build vs runtime
+
+- **Build logs**: migration/build failures (`prisma migrate deploy`, `next build`).
+- **Runtime logs**: request-time crashes after deploy (what you need for `This page couldn't load`).
+
+### CLI option (optional)
+
+Use Netlify CLI if preferred:
+
+```bash
+netlify logs --functions
+```
+
+(Requires `netlify login` and selecting the site.)
+
 ### 4. One-time production seed (platform admin only)
 
 **Not** run on every deploy. First go-live only:

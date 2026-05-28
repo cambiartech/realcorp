@@ -13,6 +13,10 @@ import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
+function logProjectActionError(action: string, tenantSlug: string, error: unknown) {
+  console.error(`[projects:${action}] tenant=${tenantSlug}`, error);
+}
+
 async function getTenantAndAccess(tenantSlug: string, userId: string, isPlatformAdmin?: boolean) {
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
@@ -73,7 +77,8 @@ export async function createProject(
       action: "CREATE",
       summary: `Created project ${project.name}.`,
     });
-  } catch {
+  } catch (error) {
+    logProjectActionError("createProject", tenantSlug, error);
     return { ok: false, error: "Could not create project right now." };
   }
 
@@ -196,7 +201,8 @@ export async function updateProject(
       action: "UPDATE",
       summary: `Updated project ${parsed.data.name}.`,
     });
-  } catch {
+  } catch (error) {
+    logProjectActionError("updateProject", tenantSlug, error);
     return { ok: false, error: "Could not update project right now." };
   }
 
@@ -243,7 +249,8 @@ export async function deleteProject(
       action: "DELETE",
       summary: "Deleted project.",
     });
-  } catch {
+  } catch (error) {
+    logProjectActionError("deleteProject", tenantSlug, error);
     return { ok: false, error: "Could not delete project right now." };
   }
 
