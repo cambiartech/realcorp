@@ -71,7 +71,7 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
     <SnackbarContext.Provider value={value}>
       {children}
       <div
-        className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-[min(92vw,24rem)] flex-col gap-2.5 sm:bottom-6 sm:right-6"
+        className="pointer-events-none fixed inset-x-4 bottom-4 z-[70] mx-auto flex w-auto max-w-[24rem] flex-col gap-2.5 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:mx-0 sm:w-[min(92vw,24rem)]"
         aria-live="polite"
         aria-relevant="additions"
       >
