@@ -11,6 +11,7 @@ import {
   parseRoleGrantsJsonString,
   type ExtraModuleGrantToken,
 } from "@/lib/role-module-grants-form";
+import { TENANT_MODULE_DEFINITIONS, TENANT_MODULE_GROUPS } from "@/lib/tenant-module-definitions";
 import { formatEnumLabel } from "@/lib/ui-format";
 import {
   getOrgLogoUploadSignature,
@@ -21,10 +22,14 @@ import {
   saveOrganizationLogoUrl,
   updateOrganizationName,
   updateOrgModules,
+  saveOrgDepartments,
 } from "./actions";
 import { FormAlert } from "@/components/form-message";
+import { OrgDepartmentsEditor } from "@/components/org-departments-editor";
+import { isDefaultOrgDepartment } from "@/lib/org-departments";
 import { useSnackbar } from "@/components/snackbar";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
+import { ButtonSpinner } from "@/components/button-spinner";
 
 type WorkspaceMeta = {
   slug: string;
@@ -51,6 +56,7 @@ type SettingsWorkspaceProps = {
     moduleShortLets: boolean;
     moduleHr: boolean;
     moduleTasks: boolean;
+    moduleClients: boolean;
   };
   roleModuleGrantsJson: string;
   orgDepartments: string[];
@@ -83,7 +89,6 @@ type SettingsWorkspaceProps = {
 };
 
 type TabId = "profile" | "organization" | "modules" | "integrations" | "about";
-const DEFAULT_DEPARTMENTS = ["Finance", "Sales", "Marketing", "Community"];
 
 export function SettingsWorkspace({
   tenantSlug,
@@ -97,7 +102,8 @@ export function SettingsWorkspace({
   workspaceMeta,
   branding,
   integrations,
-}: SettingsWorkspaceProps) {
+  initialTab,
+}: SettingsWorkspaceProps & { initialTab?: TabId }) {
   const tabDefs: { id: TabId; label: string }[] = [
     { id: "profile", label: "Profile" },
     ...(canManageOrg
@@ -110,7 +116,23 @@ export function SettingsWorkspace({
     { id: "about", label: "Workspace" },
   ];
 
-  const [tab, setTab] = useState<TabId>("profile");
+  const [tab, setTab] = useState<TabId>(() => {
+    if (initialTab === "organization" && canManageOrg) return "organization";
+    if (initialTab === "modules" && canManageOrg) return "modules";
+    if (initialTab === "integrations") return "integrations";
+    if (initialTab === "about") return "about";
+    if (initialTab === "profile") return "profile";
+    return "profile";
+  });
+
+  useEffect(() => {
+    if (!initialTab) return;
+    if (initialTab === "organization" && canManageOrg) setTab("organization");
+    else if (initialTab === "modules" && canManageOrg) setTab("modules");
+    else if (initialTab === "integrations") setTab("integrations");
+    else if (initialTab === "about") setTab("about");
+    else if (initialTab === "profile") setTab("profile");
+  }, [initialTab, canManageOrg]);
 
   const [profileState, profileAction, profilePending] = useActionState(
     updateMyDisplayName.bind(null, tenantSlug),
@@ -132,6 +154,10 @@ export function SettingsWorkspace({
     updateOrgModules.bind(null, tenantSlug),
     null as { ok: true } | { ok: false; error: string } | null,
   );
+  const [departmentsState, departmentsAction, departmentsPending] = useActionState(
+    saveOrgDepartments.bind(null, tenantSlug),
+    null as { ok: true } | { ok: false; error: string } | null,
+  );
   const [intState, intAction, intPending] = useActionState(
     saveIntegrationSettings.bind(null, tenantSlug),
     null as { ok: true } | { ok: false; error: string } | null,
@@ -147,8 +173,25 @@ export function SettingsWorkspace({
   }, [branding.logoUrl, integrations.logoUrl]);
 
   useEffect(() => {
-    if (brandState?.ok) router.refresh();
-  }, [brandState, router]);
+    if (brandState?.ok) {
+      showSnackbar("Branding saved. Setup coach will show your next step.", "success");
+      router.refresh();
+    }
+  }, [brandState, router, showSnackbar]);
+
+  useEffect(() => {
+    if (orgNameState?.ok) {
+      showSnackbar("Organization name saved. Setup coach will show your next step.", "success");
+      router.refresh();
+    }
+  }, [orgNameState, router, showSnackbar]);
+
+  useEffect(() => {
+    if (departmentsState?.ok) {
+      showSnackbar("Departments saved. Available across Finance, HR, and reporting.", "success");
+      router.refresh();
+    }
+  }, [departmentsState, router, showSnackbar]);
 
   function reportLogoIssue(message: string) {
     setLogoUploadError(message);
@@ -157,22 +200,21 @@ export function SettingsWorkspace({
 
   const initialRoleGrants = useMemo(() => parseRoleGrantsJsonString(roleModuleGrantsJson), [roleModuleGrantsJson]);
   const initialCustomDepartments = useMemo(
-    () => orgDepartments.filter((x) => !DEFAULT_DEPARTMENTS.includes(x)),
+    () => orgDepartments.filter((x) => !isDefaultOrgDepartment(x)),
     [orgDepartments],
   );
   const [customDepartments, setCustomDepartments] = useState<string[]>(initialCustomDepartments);
-  const [newDepartment, setNewDepartment] = useState("");
 
-  function addDepartment() {
-    const next = newDepartment.trim();
-    if (!next) return;
-    if (DEFAULT_DEPARTMENTS.includes(next) || customDepartments.includes(next)) {
-      setNewDepartment("");
-      return;
+  useEffect(() => {
+    setCustomDepartments(initialCustomDepartments);
+  }, [initialCustomDepartments]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || tab !== "organization") return;
+    if (window.location.hash === "#org-departments") {
+      document.getElementById("org-departments")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    setCustomDepartments((curr) => [...curr, next]);
-    setNewDepartment("");
-  }
+  }, [tab]);
 
   async function handleLogoFileUpload(file: File) {
     if (logoUploading) return;
@@ -279,8 +321,10 @@ export function SettingsWorkspace({
                 <button
                   type="submit"
                   disabled={profilePending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                  aria-busy={profilePending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
                 >
+                  {profilePending ? <ButtonSpinner /> : null}
                   {profilePending ? "Saving…" : "Save profile"}
                 </button>
               </form>
@@ -339,8 +383,10 @@ export function SettingsWorkspace({
                 <button
                   type="submit"
                   disabled={passwordPending}
-                  className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
+                  aria-busy={passwordPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
                 >
+                  {passwordPending ? <ButtonSpinner /> : null}
                   {passwordPending ? "Updating…" : "Update password"}
                 </button>
               </form>
@@ -379,11 +425,39 @@ export function SettingsWorkspace({
               <button
                 type="submit"
                 disabled={orgNamePending}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                aria-busy={orgNamePending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
               >
+                {orgNamePending ? <ButtonSpinner /> : null}
                 {orgNamePending ? "Saving…" : "Save organization name"}
               </button>
             </form>
+
+            <div className="mt-8 border-t border-foreground/10 pt-6">
+              {departmentsState && !departmentsState.ok ? (
+                <div className="mb-2">
+                  <FormAlert>{departmentsState.error}</FormAlert>
+                </div>
+              ) : null}
+              {departmentsState?.ok ? (
+                <p className="mb-2 text-xs text-emerald-600 dark:text-emerald-400">Departments saved.</p>
+              ) : null}
+              <form action={departmentsAction} className="space-y-4">
+                <OrgDepartmentsEditor
+                  customDepartments={customDepartments}
+                  onCustomDepartmentsChange={setCustomDepartments}
+                />
+                <button
+                  type="submit"
+                  disabled={departmentsPending}
+                  aria-busy={departmentsPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                >
+                  {departmentsPending ? <ButtonSpinner /> : null}
+                  {departmentsPending ? "Saving…" : "Save departments"}
+                </button>
+              </form>
+            </div>
 
             <div className="mt-8 border-t border-foreground/10 pt-6">
               <h3 className="text-sm font-semibold text-foreground">Brand & HR documents</h3>
@@ -480,8 +554,10 @@ export function SettingsWorkspace({
                 <button
                   type="submit"
                   disabled={brandPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                  aria-busy={brandPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
                 >
+                  {brandPending ? <ButtonSpinner /> : null}
                   {brandPending ? "Saving…" : "Save branding"}
                 </button>
               </form>
@@ -515,27 +591,35 @@ export function SettingsWorkspace({
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization modules</p>
                 <p className="mt-1 text-xs text-muted">When a module is off, nobody sees it—including extras below.</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <ModuleToggle name="moduleSales" label="Sales (dashboard, projects, leads, deals)" defaultChecked={modules.moduleSales} />
-                  <ModuleToggle name="moduleFinance" label="Finance" defaultChecked={modules.moduleFinance} />
-                  <ModuleToggle name="moduleHr" label="People (HR)" defaultChecked={modules.moduleHr} />
-                  <ModuleToggle name="moduleTasks" label="Tasks (company work & boards)" defaultChecked={modules.moduleTasks} />
-                  <ModuleToggle name="moduleMarketing" label="Marketing" defaultChecked={modules.moduleMarketing} />
-                  <ModuleToggle name="moduleCommunity" label="Community" defaultChecked={modules.moduleCommunity} />
-                  <ModuleToggle
-                    name="moduleRealtorPortal"
-                    label="Realtor portal"
-                    defaultChecked={modules.moduleRealtorPortal}
-                  />
+                <div className="mt-4 space-y-5">
+                  {TENANT_MODULE_GROUPS.map((group) => {
+                    const items = TENANT_MODULE_DEFINITIONS.filter(
+                      (d) => d.group === group.id && d.key !== "moduleShortLets",
+                    );
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={group.id}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted">{group.label}</p>
+                        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                          {items.map((def) => (
+                            <ModuleToggle
+                              key={def.key}
+                              name={def.key}
+                              label={def.description ? `${def.label} — ${def.description}` : def.label}
+                              defaultChecked={modules[def.key]}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="mt-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
-                  <p className="font-medium text-foreground">Short Lets add-on</p>
+                <div className="mt-4 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
+                  <p className="font-medium text-foreground">Short lets add-on</p>
                   <p className="mt-1">
-                    Enabled by platform admin package control.
+                    Toggle from Platform admin (Tenants → Modules), or ask Realcorp support.
                     {" "}
-                    <span className="text-foreground/90">
-                      Current: {modules.moduleShortLets ? "ON" : "OFF"}
-                    </span>
+                    <span className="text-foreground/90">Current: {modules.moduleShortLets ? "ON" : "OFF"}</span>
                   </p>
                 </div>
               </div>
@@ -556,73 +640,13 @@ export function SettingsWorkspace({
                 <RoleExtraAccessMatrix modules={modules} initialGrants={initialRoleGrants} />
               </div>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization departments</p>
-                <p className="mt-1 text-xs text-muted">
-                  Shared department list for reporting and finance tagging. Defaults are locked to your enabled modules.
-                </p>
-                <input type="hidden" name="orgDepartmentsCsv" value={customDepartments.join("\n")} />
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {DEFAULT_DEPARTMENTS.map((department) => (
-                    <span
-                      key={department}
-                      className="inline-flex rounded-full border border-foreground/20 bg-foreground/[0.03] px-2.5 py-1 text-[11px] font-medium text-foreground"
-                    >
-                      {department} (default)
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-3 flex max-w-lg items-center gap-2">
-                  <input
-                    value={newDepartment}
-                    onChange={(e) => setNewDepartment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addDepartment();
-                      }
-                    }}
-                    placeholder="Add custom department"
-                    className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
-                  />
-                  <button
-                    type="button"
-                    onClick={addDepartment}
-                    className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
-                  >
-                    Add
-                  </button>
-                </div>
-                <div className="mt-2 flex max-w-lg flex-wrap gap-2">
-                  {customDepartments.length === 0 ? (
-                    <span className="text-[11px] text-muted">No custom departments added yet.</span>
-                  ) : (
-                    customDepartments.map((department) => (
-                      <span
-                        key={department}
-                        className="inline-flex items-center gap-1 rounded-full border border-foreground/20 px-2.5 py-1 text-[11px] font-medium text-foreground"
-                      >
-                        {department}
-                        <button
-                          type="button"
-                          aria-label={`Remove ${department}`}
-                          onClick={() => setCustomDepartments((curr) => curr.filter((x) => x !== department))}
-                          className="rounded px-1 text-muted hover:bg-foreground/[0.08] hover:text-foreground"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-                <p className="mt-1 text-[11px] text-muted">Defaults above cannot be removed.</p>
-              </div>
-
               <button
                 type="submit"
                 disabled={modulesPending}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                aria-busy={modulesPending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
               >
+                {modulesPending ? <ButtonSpinner /> : null}
                 {modulesPending ? "Saving…" : "Save modules"}
               </button>
             </form>
@@ -839,8 +863,10 @@ export function SettingsWorkspace({
               <button
                 type="submit"
                 disabled={intPending}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+                aria-busy={intPending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
               >
+                {intPending ? <ButtonSpinner /> : null}
                 {intPending ? "Saving…" : "Save integration settings"}
               </button>
             </form>

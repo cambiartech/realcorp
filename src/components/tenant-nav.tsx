@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  Building2,
   CalendarCheck2,
   ChevronDown,
   CircleDollarSign,
@@ -39,6 +40,7 @@ type NavItem = { key: TenantNavKey; label: string; href: string; mobileLabel: st
 const ALL_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "", mobileLabel: "Dash" },
   { key: "projects", label: "Projects", href: "/projects", mobileLabel: "Projects" },
+  { key: "clients", label: "Clients", href: "/clients", mobileLabel: "Clients" },
   { key: "leads", label: "Leads", href: "/leads", mobileLabel: "Leads" },
   { key: "deals", label: "Deals", href: "/deals", mobileLabel: "Deals" },
   { key: "activities", label: "Activities", href: "/activities", mobileLabel: "Activity" },
@@ -55,6 +57,7 @@ const ALL_ITEMS: NavItem[] = [
 const NAV_ICONS: Record<TenantNavKey, LucideIcon> = {
   dashboard: LayoutDashboard,
   projects: FolderOpen,
+  clients: Building2,
   leads: Search,
   deals: CalendarCheck2,
   activities: Activity,
@@ -75,6 +78,7 @@ const SALES_GROUP_KEYS: TenantNavKey[] = ["leads", "deals", "activities"];
 const TOP_LEVEL_KEYS: TenantNavKey[] = [
   "dashboard",
   "projects",
+  "clients",
   "tasks",
   "marketing",
   "community",
@@ -233,6 +237,7 @@ export function TenantSidebar({
         { id: "receivables", label: "Receivables", href: `${financeItem.href}/receivables` },
         { id: "payables", label: "Payables", href: `${financeItem.href}/payables` },
         { id: "sales-receipts", label: "Sales Receipts", href: `${financeItem.href}/sales-receipts` },
+        { id: "documents", label: "Documents", href: `${financeItem.href}/documents` },
         { id: "invoices", label: "Invoices", href: `${financeItem.href}/invoices` },
         { id: "payments", label: "Payments", href: `${financeItem.href}/payments` },
         { id: "expenses", label: "Expenses", href: `${financeItem.href}/expenses` },

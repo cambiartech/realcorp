@@ -5,15 +5,19 @@ import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { DashboardWorkspace } from "./dashboard/dashboard-workspace";
 import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
+import { buildOrgSetupSteps, orgSetupProgress } from "@/lib/org-setup-checklist";
 
 export const dynamic = "force-dynamic";
 
 export default async function TenantHomePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
+  searchParams?: Promise<{ openGoals?: string }>;
 }) {
   const { tenantSlug } = await params;
+  const sp = searchParams ? await searchParams : {};
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -26,6 +30,7 @@ export default async function TenantHomePage({
       id: true,
       name: true,
       slug: true,
+      defaultCurrency: true,
       settings: {
         select: {
           moduleSales: true,
@@ -38,6 +43,12 @@ export default async function TenantHomePage({
           whatsappPhoneNumberId: true,
           termiiApiKey: true,
           moduleTasks: true,
+          logoUrl: true,
+          orgEmail: true,
+          orgPhone: true,
+          financeCurrencies: true,
+          financeBankAccounts: true,
+          financePaymentModes: true,
         },
       },
     },
@@ -87,8 +98,10 @@ export default async function TenantHomePage({
   monthEnd.setMonth(monthEnd.getMonth() + 1);
 
   const moduleTasksEnabled = tenant.settings?.moduleTasks ?? true;
+  const canManageOrgSetup =
+    Boolean(session.user.isPlatformAdmin) || role === MembershipRole.ORG_ADMIN;
 
-  const [goal, preference, deals, units, leads, invoices, payments, users, projects, activitiesCount, whatsappCount, inboundWebhookLastAt, hrOnboardingStatus, myWorkTasksRaw] = await Promise.all([
+  const [goal, preference, deals, units, leads, invoices, payments, users, projects, activitiesCount, whatsappCount, inboundWebhookLastAt, hrOnboardingStatus, myWorkTasksRaw, activeMemberCount, pendingInviteCount] = await Promise.all([
     prisma.tenantGoal.findFirst({
       where: { tenantId: tenant.id, isActive: true },
       orderBy: { updatedAt: "desc" },
@@ -223,7 +236,30 @@ export default async function TenantHomePage({
           take: 8,
         })
       : Promise.resolve([]),
+    prisma.membership.count({
+      where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
+    }),
+    prisma.invitation.count({
+      where: { tenantId: tenant.id, acceptedAt: null, expiresAt: { gt: new Date() } },
+    }),
   ]);
+
+  const orgSetupSteps = buildOrgSetupSteps({
+    tenantSlug: tenant.slug,
+    tenantName: tenant.name,
+    defaultCurrency: tenant.defaultCurrency || "NGN",
+    logoUrl: tenant.settings?.logoUrl ?? null,
+    orgEmail: tenant.settings?.orgEmail ?? null,
+    orgPhone: tenant.settings?.orgPhone ?? null,
+    financeCurrencies: tenant.settings?.financeCurrencies,
+    financeBankAccounts: tenant.settings?.financeBankAccounts,
+    financePaymentModes: tenant.settings?.financePaymentModes,
+    moduleFinance: tenant.settings?.moduleFinance ?? true,
+    activeMemberCount,
+    pendingInviteCount,
+    hasActiveFiscalGoal: Boolean(goal),
+  });
+  const orgSetup = orgSetupProgress(orgSetupSteps);
 
   const preferredRoleView = normalizeRoleView(preference?.roleView || roleOptions[0]);
   const effectiveRoleView = roleOptions.includes(preferredRoleView as (typeof roleOptions)[number])
@@ -513,6 +549,12 @@ export default async function TenantHomePage({
         Boolean(session.user.isPlatformAdmin) ||
         (isActive && (role === MembershipRole.ORG_ADMIN || role === MembershipRole.FINANCE_MANAGER))
       }
+      canManageOrgSetup={canManageOrgSetup}
+      orgSetupSteps={orgSetup.steps}
+      orgSetupCriticalComplete={orgSetup.criticalComplete}
+      orgSetupPercent={orgSetup.percent}
+      userId={session.user.id}
+      initialOpenGoals={sp.openGoals === "1"}
       values={{
         revenueMtd,
         pipelineOpen,

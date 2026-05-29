@@ -3,7 +3,11 @@
 import { auth } from "@/auth";
 import { BankMatchStatus, InvoiceStatus, MembershipRole, MembershipStatus, Prisma, VendorBillStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
-import { createTenantUploadSignature } from "@/lib/cloudinary-upload-server";
+import { sendSalesReceiptEmail } from "@/lib/email";
+import { deliverInvoiceEmail, resolveInvoiceRecipientEmail } from "@/lib/finance-invoice-send";
+import { buildSalesReceiptPdf, salesReceiptPdfFileName } from "@/lib/sales-receipt-pdf";
+import { createTenantUploadSignature, uploadBufferToCloudinary } from "@/lib/cloudinary-upload-server";
+import { ClientDocumentCategory, FinanceDocumentCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { parseFinanceControls } from "@/lib/finance-controls";
 import { normalizeFinanceVendorName, vendorNamesMatch } from "@/lib/finance-vendor";
@@ -28,6 +32,7 @@ import {
   updateInvoiceInputSchema,
 } from "@/lib/validators/finance";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 type FinanceDecision = "APPROVE" | "REJECT";
@@ -586,43 +591,85 @@ export async function updateInvoiceRecord(
   return { ok: true };
 }
 
-export async function sendInvoiceRecord(tenantSlug: string, invoiceId: string): Promise<ActionResult> {
+export async function sendInvoiceRecord(
+  tenantSlug: string,
+  invoiceId: string,
+  input: { toEmail: string; customPaymentInstructions?: string },
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
-  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
+  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true, slug: true },
+  });
   if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { status: true, role: true },
+  });
   if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
     return { ok: false, error: "You do not have permission to send invoices." };
   }
 
-  const invoice = await prisma.invoice.findFirst({
-    where: { id: invoiceId, tenantId: tenant.id },
-    select: { id: true, invoiceNumber: true, status: true },
+  const result = await deliverInvoiceEmail({
+    tenantId: tenant.id,
+    tenantSlug: tenant.slug,
+    tenantName: tenant.name,
+    invoiceId,
+    toEmail: emailParsed.data,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown sender",
+    mode: "send",
+    customPaymentInstructions: input.customPaymentInstructions?.trim() || undefined,
   });
-  if (!invoice) return { ok: false, error: "Invoice not found." };
-  if (invoice.status === InvoiceStatus.VOID) return { ok: false, error: "Cannot send a void invoice." };
-  if (invoice.status === InvoiceStatus.PAID) return { ok: false, error: "Invoice is already fully paid." };
-  if (invoice.status !== InvoiceStatus.DRAFT) return { ok: false, error: "Only draft invoices can be sent." };
+  if (!result.ok) return result;
 
-  try {
-    await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { status: InvoiceStatus.SENT },
-    });
-    await writeAuditLog({
-      tenantId: tenant.id,
-      actorUserId: session.user.id,
-      actorLabel: session.user.name || session.user.email || "Unknown sender",
-      module: "FINANCE",
-      entityType: "INVOICE",
-      entityId: invoice.id,
-      action: "SEND",
-      summary: `Sent invoice ${invoice.invoiceNumber}.`,
-    });
-  } catch {
-    return { ok: false, error: "Could not send invoice right now." };
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function resendInvoiceRecord(
+  tenantSlug: string,
+  invoiceId: string,
+  input: { toEmail: string; customPaymentInstructions?: string },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
+  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true, slug: true },
+  });
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { status: true, role: true },
+  });
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to resend invoices." };
   }
+
+  const result = await deliverInvoiceEmail({
+    tenantId: tenant.id,
+    tenantSlug: tenant.slug,
+    tenantName: tenant.name,
+    invoiceId,
+    toEmail: emailParsed.data,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown sender",
+    mode: "resend",
+    customPaymentInstructions: input.customPaymentInstructions?.trim() || undefined,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/${tenantSlug}/finance`);
   return { ok: true };
@@ -673,12 +720,27 @@ export async function voidInvoiceRecord(tenantSlug: string, invoiceId: string): 
   return { ok: true };
 }
 
-export async function sendInvoiceReminder(tenantSlug: string, invoiceId: string): Promise<ActionResult> {
+export async function sendInvoiceReminder(
+  tenantSlug: string,
+  invoiceId: string,
+  input: { toEmail: string; customPaymentInstructions?: string },
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
-  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
+  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true, slug: true },
+  });
   if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { status: true, role: true },
+  });
   if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
     return { ok: false, error: "You do not have permission to send reminders." };
   }
@@ -712,24 +774,18 @@ export async function sendInvoiceReminder(tenantSlug: string, invoiceId: string)
     }
   }
 
-  try {
-    await writeAuditLog({
-      tenantId: tenant.id,
-      actorUserId: session.user.id,
-      actorLabel: session.user.name || session.user.email || "Unknown sender",
-      module: "FINANCE",
-      entityType: "INVOICE",
-      entityId: invoice.id,
-      action: "SEND_REMINDER",
-      summary: `Sent payment reminder for invoice ${invoice.invoiceNumber}.`,
-      metadata: {
-        dueDate: invoice.dueDate?.toISOString() || null,
-        balanceDue: Number(invoice.balanceDue),
-      },
-    });
-  } catch {
-    return { ok: false, error: "Could not send reminder right now." };
-  }
+  const result = await deliverInvoiceEmail({
+    tenantId: tenant.id,
+    tenantSlug: tenant.slug,
+    tenantName: tenant.name,
+    invoiceId,
+    toEmail: emailParsed.data,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown sender",
+    mode: "remind",
+    customPaymentInstructions: input.customPaymentInstructions?.trim() || undefined,
+  });
+  if (!result.ok) return result;
 
   revalidatePath(`/${tenantSlug}/finance`);
   return { ok: true };
@@ -747,6 +803,12 @@ export async function sendBulkOverdueReminders(
     return { ok: false, error: "You do not have permission to send reminders." };
   }
 
+  const tenantMeta = await prisma.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { name: true },
+  });
+  if (!tenantMeta) return { ok: false, error: "Tenant not found." };
+
   const settings = await prisma.tenantSettings.findUnique({
     where: { tenantId: tenant.id },
     select: { financeControls: true },
@@ -761,7 +823,14 @@ export async function sendBulkOverdueReminders(
       balanceDue: { gt: 0 },
       dueDate: { lt: now },
     },
-    select: { id: true, invoiceNumber: true, balanceDue: true, dueDate: true },
+    include: {
+      deal: {
+        select: {
+          lead: { select: { email: true } },
+          propertyClient: { select: { email: true } },
+        },
+      },
+    },
     take: 200,
   });
 
@@ -797,21 +866,26 @@ export async function sendBulkOverdueReminders(
       }
     }
 
-    await writeAuditLog({
+    const toEmail = resolveInvoiceRecipientEmail(invoice);
+    if (!toEmail) {
+      skipped += 1;
+      continue;
+    }
+
+    const delivered = await deliverInvoiceEmail({
       tenantId: tenant.id,
+      tenantSlug: tenant.slug,
+      tenantName: tenantMeta.name,
+      invoiceId: invoice.id,
+      toEmail,
       actorUserId: session.user.id,
       actorLabel: session.user.name || session.user.email || "Unknown sender",
-      module: "FINANCE",
-      entityType: "INVOICE",
-      entityId: invoice.id,
-      action: "SEND_REMINDER",
-      summary: `Sent payment reminder for invoice ${invoice.invoiceNumber}.`,
-      metadata: {
-        dueDate: invoice.dueDate.toISOString(),
-        balanceDue: Number(invoice.balanceDue),
-        bulk: true,
-      },
+      mode: "remind",
     });
+    if (!delivered.ok) {
+      skipped += 1;
+      continue;
+    }
     sent += 1;
   }
 
@@ -1381,6 +1455,201 @@ export async function createSalesReceiptRecord(
   }
 
   revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function sendSalesReceiptRecord(
+  tenantSlug: string,
+  receiptId: string,
+  input: { toEmail: string },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
+  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      settings: {
+        select: {
+          logoUrl: true,
+          primaryColor: true,
+          accentColor: true,
+          orgEmail: true,
+          orgPhone: true,
+          orgAddressLine: true,
+          orgCity: true,
+          orgState: true,
+          orgCountry: true,
+        },
+      },
+    },
+  });
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { status: true, role: true },
+  });
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to send receipts." };
+  }
+
+  const receipt = await prisma.salesReceipt.findFirst({
+    where: { id: receiptId, tenantId: tenant.id },
+    include: {
+      deal: {
+        select: {
+          id: true,
+          lead: { select: { email: true, name: true } },
+          propertyClient: { select: { id: true, email: true, fullName: true } },
+        },
+      },
+    },
+  });
+  if (!receipt) return { ok: false, error: "Receipt not found." };
+
+  const pdfBytes = await buildSalesReceiptPdf({
+    companyName: tenant.name,
+    receiptNumber: receipt.receiptNumber,
+    title: receipt.title,
+    customerName: receipt.customerName || receipt.deal?.propertyClient?.fullName || receipt.deal?.lead?.name,
+    amount: Number(receipt.amount),
+    currency: receipt.currency,
+    paymentMode: receipt.paymentMode,
+    depositAccount: receipt.depositAccount,
+    reference: receipt.reference,
+    note: receipt.note,
+    issuedAt: receipt.issuedAt,
+    recordedBy: receipt.createdByLabel,
+  });
+
+  const pdfFileName = salesReceiptPdfFileName(receipt.receiptNumber);
+  const uploaded = await uploadBufferToCloudinary({
+    tenantId: tenant.id,
+    tenantSlug: tenant.slug,
+    area: "finance",
+    buffer: pdfBytes,
+    fileName: pdfFileName,
+    resourceType: "raw",
+  });
+  if (!uploaded.ok) return { ok: false, error: uploaded.error };
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const viewUrl = `${baseUrl}/${tenant.slug}/finance/sales-receipts/${receipt.id}`;
+  const amountLabel = `${receipt.currency} ${Number(receipt.amount).toLocaleString("en-NG")}`;
+
+  const emailed = await sendSalesReceiptEmail({
+    to: emailParsed.data,
+    tenantName: tenant.name,
+    receiptNumber: receipt.receiptNumber,
+    title: receipt.title,
+    customerName: receipt.customerName,
+    amountLabel,
+    pdfBytes,
+    pdfFileName,
+    viewUrl,
+  });
+  if (!emailed.ok) return { ok: false, error: emailed.error };
+
+  const docTitle = `${receipt.receiptNumber} — ${receipt.title}`;
+  const actorLabel = session.user.name || session.user.email || "Unknown sender";
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.salesReceipt.update({
+        where: { id: receipt.id },
+        data: {
+          pdfUrl: uploaded.secureUrl,
+          sentAt: new Date(),
+          sentToEmail: emailParsed.data,
+        },
+      });
+
+      await tx.financeDocument.upsert({
+        where: { salesReceiptId: receipt.id },
+        create: {
+          tenantId: tenant.id,
+          category: FinanceDocumentCategory.RECEIPT,
+          title: docTitle,
+          fileUrl: uploaded.secureUrl,
+          fileName: pdfFileName,
+          salesReceiptId: receipt.id,
+          uploadedByUserId: session.user!.id,
+          uploadedByLabel: actorLabel,
+        },
+        update: {
+          title: docTitle,
+          fileUrl: uploaded.secureUrl,
+          fileName: pdfFileName,
+          uploadedByUserId: session.user!.id,
+          uploadedByLabel: actorLabel,
+        },
+      });
+
+      const clientId = receipt.deal?.propertyClient?.id;
+      if (clientId) {
+        const existingClientDoc = await tx.clientDocument.findFirst({
+          where: {
+            tenantId: tenant.id,
+            clientId,
+            title: docTitle,
+            category: ClientDocumentCategory.RECEIPT,
+          },
+          select: { id: true },
+        });
+        if (!existingClientDoc) {
+          await tx.clientDocument.create({
+            data: {
+              tenantId: tenant.id,
+              clientId,
+              category: ClientDocumentCategory.RECEIPT,
+              title: docTitle,
+              fileUrl: uploaded.secureUrl,
+              fileName: pdfFileName,
+              uploadedByUserId: session.user!.id,
+              uploadedByLabel: actorLabel,
+            },
+          });
+        } else {
+          await tx.clientDocument.update({
+            where: { id: existingClientDoc.id },
+            data: {
+              fileUrl: uploaded.secureUrl,
+              fileName: pdfFileName,
+              uploadedByUserId: session.user!.id,
+              uploadedByLabel: actorLabel,
+            },
+          });
+        }
+      }
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: tenant.id,
+          actorUserId: session.user!.id,
+          actorLabel,
+          module: "FINANCE",
+          entityType: "SALES_RECEIPT",
+          entityId: receipt.id,
+          action: "SEND",
+          summary: `Sent sales receipt ${receipt.receiptNumber} to ${emailParsed.data}.`,
+          metadata: { toEmail: emailParsed.data, pdfUrl: uploaded.secureUrl },
+        },
+      });
+    });
+  } catch {
+    return { ok: false, error: "Receipt was emailed but filing failed. Contact support." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  revalidatePath(`/${tenantSlug}/finance/documents`);
+  revalidatePath(`/${tenantSlug}/clients`);
   return { ok: true };
 }
 

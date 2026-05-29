@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, Suspense } from "react";
 import { FormAlert, FormFieldError } from "@/components/form-message";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 import { parseLoginForm, zodIssuesToFieldRecord, type LoginFieldName } from "@/lib/validators/login";
 
@@ -163,8 +164,10 @@ function LoginFormInner() {
       <button
         type="submit"
         disabled={pending}
-        className="border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        aria-busy={pending}
+        className="inline-flex items-center justify-center gap-2 border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
       >
+        {pending ? <ButtonSpinner /> : null}
         {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>

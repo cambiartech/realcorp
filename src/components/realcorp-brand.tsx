@@ -57,6 +57,32 @@ export function RealcorpLogoLink({
   );
 }
 
+/** Tenant app top bar: Realcorp mark + co-brand label; org logo stays in the sidebar. */
+export function TenantAppHeaderBrand({
+  tenantSlug,
+  tenantName,
+  className,
+}: {
+  tenantSlug: string;
+  tenantName: string;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={`/${tenantSlug}`}
+      className={["group inline-flex min-w-0 items-center gap-2", className].filter(Boolean).join(" ")}
+    >
+      <RealcorpMark variant="light" size={28} className="h-7 w-7 shrink-0 dark:hidden" />
+      <RealcorpMark variant="dark" size={28} className="hidden h-7 w-7 shrink-0 dark:block" />
+      <span className="min-w-0 truncate text-sm font-bold tracking-tight text-foreground group-hover:opacity-90">
+        Realcorp
+        <span className="font-normal text-muted"> × </span>
+        {tenantName}
+      </span>
+    </Link>
+  );
+}
+
 export function RealcorpHeroLogo({
   className,
   /** Pass to force a mark; omit to auto-switch with light/dark theme */

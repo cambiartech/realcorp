@@ -1,8 +1,11 @@
 "use client";
 
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import {
   type CommunityMemberLeaderboardEntry,
   type CommunityLeaderboardPeriod,
@@ -164,9 +167,7 @@ export function CommunityWorkspace({
         />
       )}
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(open)} onClose={() => setOpen(false)} panelClassName={MODAL_PANEL_MD}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Add partner</h2>
               <button
@@ -216,14 +217,18 @@ export function CommunityWorkspace({
                 <button type="button" onClick={() => setOpen(false)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]">
                   Cancel
                 </button>
-                <button type="submit" disabled={pending} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+                <button
+                  type="submit"
+                  disabled={pending}
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Saving…" : "Save"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
     </div>
   );
 }

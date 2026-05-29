@@ -3,6 +3,7 @@ import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { formatEnumLabel, formatUnitPurpose } from "@/lib/ui-format";
+import { resolveTenantCurrencies } from "@/lib/finance-catalog";
 import { suggestUnitLabels } from "@/lib/unit-label-suggestions";
 import { notFound } from "next/navigation";
 import { ProjectUnitsWorkspace } from "./project-units-workspace";
@@ -23,6 +24,7 @@ export default async function ProjectUnitsPage({
     select: {
       id: true,
       slug: true,
+      defaultCurrency: true,
       settings: {
         select: {
           moduleSales: true,
@@ -30,6 +32,7 @@ export default async function ProjectUnitsPage({
           moduleMarketing: true,
           moduleCommunity: true,
           roleModuleGrants: true,
+          financeCurrencies: true,
         },
       },
     },
@@ -75,6 +78,7 @@ export default async function ProjectUnitsPage({
           currency: true,
           initialDeposit: true,
           paymentDurationMonths: true,
+          _count: { select: { units: true } },
         },
       },
     },
@@ -85,12 +89,16 @@ export default async function ProjectUnitsPage({
     project.units.map((unit) => unit.label),
   );
 
+  const currencies = resolveTenantCurrencies(tenant.settings, tenant.defaultCurrency);
+
   return (
     <ProjectUnitsWorkspace
       tenantSlug={tenant.slug}
       projectId={project.id}
       projectName={project.name}
       canManage={canManage}
+      currencies={currencies}
+      defaultCurrency={tenant.defaultCurrency || currencies[0] || "NGN"}
       suggestedLabels={suggestedLabels}
       units={project.units.map((unit) => ({
         id: unit.id,
@@ -114,6 +122,7 @@ export default async function ProjectUnitsPage({
         currency: plan.currency,
         initialDeposit: plan.initialDeposit ? Number(plan.initialDeposit) : null,
         paymentDurationMonths: plan.paymentDurationMonths ?? null,
+        unitsCount: plan._count.units,
       }))}
     />
   );

@@ -1,9 +1,13 @@
 "use client";
 
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
+import { ButtonSpinner } from "@/components/button-spinner";
+import { CurrencySelect } from "@/components/finance/currency-select";
 import { getEntityTimelineLogs } from "../finance/actions";
 import { createProject, deleteProject, updateProject } from "./actions";
 
@@ -33,11 +37,15 @@ export function ProjectsWorkspace({
   projects,
   canManage,
   activeFilterChips,
+  currencies,
+  defaultCurrency,
 }: {
   tenantSlug: string;
   projects: ProjectRow[];
   canManage: boolean;
   activeFilterChips?: ActiveFilterChip[];
+  currencies: string[];
+  defaultCurrency: string;
 }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectRow | null>(null);
@@ -245,9 +253,7 @@ export function ProjectsWorkspace({
         </table>
       </div>
 
-      {isCreateOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isCreateOpen)} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Create project</h2>
               <button
@@ -293,12 +299,10 @@ export function ProjectsWorkspace({
                   <label htmlFor="project-currency" className="mb-1 block text-sm text-muted">
                     Currency
                   </label>
-                  <input
+                  <CurrencySelect
                     id="project-currency"
-                    name="currency"
-                    defaultValue="NGN"
-                    maxLength={3}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 uppercase text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                    currencies={currencies}
+                    defaultCurrency={defaultCurrency}
                   />
                 </div>
               </div>
@@ -314,19 +318,18 @@ export function ProjectsWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Creating project..." : "Create project"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
       {editingProject ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setEditingProject(null)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Edit project</h2>
               <button
@@ -371,12 +374,11 @@ export function ProjectsWorkspace({
                   <label htmlFor="project-edit-currency" className="mb-1 block text-sm text-muted">
                     Currency
                   </label>
-                  <input
+                  <CurrencySelect
                     id="project-edit-currency"
-                    name="currency"
+                    currencies={currencies}
+                    defaultCurrency={defaultCurrency}
                     defaultValue={editingProject.currency}
-                    maxLength={3}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 uppercase text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   />
                 </div>
               </div>
@@ -391,19 +393,19 @@ export function ProjectsWorkspace({
                 <button
                   type="submit"
                   disabled={editPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={editPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
+                  {editPending ? <ButtonSpinner /> : null}
                   {editPending ? "Saving..." : "Save changes"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {deletingProject ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setDeletingProject(null)} panelClassName={MODAL_PANEL_SM}>
             <h2 className="text-lg font-semibold text-foreground">Delete project?</h2>
             <p className="mt-2 text-sm text-muted">
               This will remove <strong className="text-foreground">{deletingProject.name}</strong> only if it has no
@@ -421,18 +423,23 @@ export function ProjectsWorkspace({
               <button
                 type="submit"
                 disabled={deletePending}
-                className="rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                aria-busy={deletePending}
+                className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
+                {deletePending ? <ButtonSpinner /> : null}
                 {deletePending ? "Deleting..." : "Delete"}
               </button>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {timelineProject ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-[1px]">
-          <div className="h-full w-full max-w-md overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl">
+        <ModalOverlay
+          open
+          onClose={() => setTimelineProject(null)}
+          variant="drawer"
+          panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl"
+        >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Project Timeline</h2>
@@ -465,8 +472,7 @@ export function ProjectsWorkspace({
                 ))}
               </ul>
             )}
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
     </div>
   );

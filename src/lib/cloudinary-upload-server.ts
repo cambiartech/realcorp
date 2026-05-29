@@ -102,3 +102,56 @@ export async function createTenantUploadSignature(input: {
     source: creds.source,
   };
 }
+
+export async function uploadBufferToCloudinary(input: {
+  tenantId: string;
+  tenantSlug: string;
+  area: CloudinaryArea;
+  buffer: Uint8Array;
+  fileName: string;
+  resourceType?: "raw" | "auto" | "image";
+}): Promise<{ ok: true; secureUrl: string; publicId: string } | CloudinaryUploadError> {
+  const creds = await resolveCloudinaryCredentials(input.tenantId);
+  if (!creds) {
+    return { ok: false, error: CLOUDINARY_SETUP_MESSAGE };
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder =
+    creds.source === "platform"
+      ? tenantCloudinaryFolder(input.tenantSlug, input.area)
+      : (await prisma.tenantSettings.findUnique({
+          where: { tenantId: input.tenantId },
+          select: { cloudinaryFolder: true },
+        }))?.cloudinaryFolder?.trim() || `realcorp/${input.area}`;
+
+  const safeName = safeUploadBasename(input.fileName, "document");
+  const publicId = `${input.tenantId}/${safeName}-${timestamp}`;
+  const signature = buildCloudinaryAttachmentSignature({
+    apiSecret: creds.apiSecret,
+    timestamp,
+    folder,
+    publicId,
+  });
+
+  const resourceType = input.resourceType ?? "raw";
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${creds.cloudName}/${resourceType}/upload`;
+  const body = new FormData();
+  body.append("file", new Blob([Buffer.from(input.buffer)], { type: "application/pdf" }), input.fileName);
+  body.append("api_key", creds.apiKey);
+  body.append("timestamp", String(timestamp));
+  body.append("folder", folder);
+  body.append("public_id", publicId);
+  body.append("signature", signature);
+
+  try {
+    const response = await fetch(uploadUrl, { method: "POST", body });
+    const json = (await response.json()) as { secure_url?: string; public_id?: string; error?: { message?: string } };
+    if (!response.ok || !json.secure_url) {
+      return { ok: false, error: json.error?.message || "Cloudinary upload failed." };
+    }
+    return { ok: true, secureUrl: json.secure_url, publicId: json.public_id || publicId };
+  } catch {
+    return { ok: false, error: "Could not upload file to storage." };
+  }
+}

@@ -5,6 +5,7 @@ import { MembershipRole, MembershipStatus, Prisma } from "@/generated/prisma";
 import { createTenantUploadSignature, type CloudinaryUploadSignature } from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
 import { parseRoleModuleGrantsFromFormData } from "@/lib/role-module-grants-form";
+import { DEFAULT_ORG_DEPARTMENTS, mergeOrgDepartments } from "@/lib/org-departments";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -235,6 +236,51 @@ export async function updateOrganizationName(tenantSlug: string, _prev: unknown,
   return { ok: true };
 }
 
+export async function saveOrgDepartments(tenantSlug: string, _prev: unknown, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, settings: { select: { id: true } } },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  if (!canManageOrgModules(Boolean(session.user.isPlatformAdmin), membership?.role)) {
+    return { ok: false, error: "Only an organization admin can manage departments." };
+  }
+  if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
+    return { ok: false, error: "No access." };
+  }
+
+  const parsedCustom = parseLinesList(formData.get("orgDepartmentsCsv"));
+  const orgDepartments = mergeOrgDepartments(parsedCustom).slice(0, 50);
+
+  if (!tenant.settings) {
+    await prisma.tenantSettings.create({
+      data: {
+        tenantId: tenant.id,
+        orgDepartments: orgDepartments as Prisma.InputJsonValue,
+      },
+    });
+  } else {
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { orgDepartments: orgDepartments as Prisma.InputJsonValue },
+    });
+  }
+
+  revalidatePath(`/${tenantSlug}`);
+  revalidatePath(`/${tenantSlug}/settings`);
+  revalidatePath(`/${tenantSlug}/finance`);
+  revalidatePath(`/${tenantSlug}/hr`);
+  return { ok: true };
+}
+
 export async function updateOrgModules(tenantSlug: string, _prev: unknown, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -263,11 +309,7 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
   const moduleRealtorPortal = formData.get("moduleRealtorPortal") === "on";
   const moduleHr = formData.get("moduleHr") === "on";
   const moduleTasks = formData.get("moduleTasks") === "on";
-  const DEFAULT_DEPARTMENTS = ["Finance", "Sales", "Marketing", "Community"];
-  const parsedDepartments = parseLinesList(formData.get("orgDepartmentsCsv"));
-  const orgDepartments = Array.from(
-    new Set([...DEFAULT_DEPARTMENTS, ...parsedDepartments].map((x) => x.trim()).filter(Boolean)),
-  ).slice(0, 50);
+  const moduleClients = formData.get("moduleClients") === "on";
 
   const roleModuleGrantsParsed = parseRoleModuleGrantsFromFormData(formData);
 
@@ -282,7 +324,8 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
         moduleRealtorPortal,
         moduleHr,
         moduleTasks,
-        orgDepartments: orgDepartments as Prisma.InputJsonValue,
+        moduleClients,
+        orgDepartments: [...DEFAULT_ORG_DEPARTMENTS] as Prisma.InputJsonValue,
         ...(roleModuleGrantsParsed ? { roleModuleGrants: roleModuleGrantsParsed as Prisma.InputJsonValue } : {}),
       },
     });
@@ -297,7 +340,7 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
         moduleRealtorPortal,
         moduleHr,
         moduleTasks,
-        orgDepartments: orgDepartments as Prisma.InputJsonValue,
+        moduleClients,
         roleModuleGrants: roleModuleGrantsParsed ? (roleModuleGrantsParsed as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });

@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { TenantPageShell } from "@/components/tenant-page-shell";
+import { ButtonSpinner } from "@/components/button-spinner";
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import { createWorkTask, createTaskSpace, deleteWorkTask, updateWorkTask, updateWorkTaskStatus } from "@/app/[tenantSlug]/tasks/actions";
 
 export type TaskSpaceRow = {
@@ -560,8 +563,7 @@ export function TasksWorkspace({
       </section>
 
       {taskToDelete ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setTaskToDelete(null)} panelClassName={MODAL_PANEL_XS}>
             <h2 className="text-lg font-semibold text-foreground">Delete task?</h2>
             <p className="mt-2 text-sm text-muted">
               <span className="font-medium text-foreground">&ldquo;{taskToDelete.title}&rdquo;</span> will be removed permanently. This cannot be undone.
@@ -579,18 +581,18 @@ export function TasksWorkspace({
                 type="button"
                 disabled={pending}
                 onClick={handleDeleteConfirm}
-                className="rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                aria-busy={pending}
+                className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
+                {pending ? <ButtonSpinner /> : null}
                 {pending ? "Deleting…" : "Delete task"}
               </button>
             </div>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {editingTask ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setEditingTask(null)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Edit task</h2>
               <button
@@ -713,19 +715,18 @@ export function TasksWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
                 >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Saving…" : "Save changes"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
-      {isCreateOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={isCreateOpen} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">New task</h2>
               <button
@@ -829,19 +830,17 @@ export function TasksWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
                 >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Saving…" : "Create task"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
-      {isCreateSpaceOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={isCreateSpaceOpen} onClose={() => setIsCreateSpaceOpen(false)} panelClassName={MODAL_PANEL_XS}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Add teamspace</h2>
               <button
@@ -886,15 +885,15 @@ export function TasksWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
                 >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Saving…" : "Add teamspace"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
     </TenantPageShell>
   );
 }

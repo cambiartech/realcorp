@@ -1,7 +1,8 @@
 import { auth } from "@/auth";
-import { CampaignStatus, MembershipRole, MembershipStatus } from "@/generated/prisma";
+import { CampaignStatus, LeadCaptureSessionStatus, MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { MarketingWorkspace } from "./marketing-workspace";
 
@@ -44,17 +45,47 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
     membership?.status === MembershipStatus.ACTIVE &&
     canManageMarketing(membership.role, Boolean(session.user.isPlatformAdmin));
 
-  const [campaigns, totalLeads, attributedLeads, realtorLeads] = await Promise.all([
-    prisma.campaign.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      include: { _count: { select: { leads: true } } },
-      take: 200,
-    }),
-    prisma.lead.count({ where: { tenantId: tenant.id } }),
-    prisma.lead.count({ where: { tenantId: tenant.id, campaignId: { not: null } } }),
-    prisma.lead.count({ where: { tenantId: tenant.id, realtorPartnerId: { not: null } } }),
-  ]);
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") || hdrs.get("host") || "localhost:3000";
+  const proto = hdrs.get("x-forwarded-proto") || "http";
+  const siteOrigin = `${proto}://${host}`;
+
+  const [campaigns, totalLeads, attributedLeads, realtorLeads, captureForms, partners, sessions] =
+    await Promise.all([
+      prisma.campaign.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { leads: true } } },
+        take: 200,
+      }),
+      prisma.lead.count({ where: { tenantId: tenant.id } }),
+      prisma.lead.count({ where: { tenantId: tenant.id, campaignId: { not: null } } }),
+      prisma.lead.count({ where: { tenantId: tenant.id, realtorPartnerId: { not: null } } }),
+      prisma.leadCaptureForm.findMany({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: "desc" },
+        include: {
+          campaign: { select: { name: true } },
+          realtorPartner: { select: { displayName: true } },
+        },
+        take: 100,
+      }),
+      prisma.realtorPartner.findMany({
+        where: { tenantId: tenant.id, isActive: true },
+        select: { id: true, displayName: true },
+        orderBy: { displayName: "asc" },
+        take: 200,
+      }),
+      prisma.leadCaptureFormSession.findMany({
+        where: { tenantId: tenant.id },
+        select: {
+          formId: true,
+          status: true,
+          utmSource: true,
+          localHour: true,
+        },
+      }),
+    ]);
 
   const attribution = await prisma.lead.groupBy({
     by: ["campaignId"],
@@ -70,11 +101,49 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
 
   const activeCampaigns = campaigns.filter((c) => c.status === CampaignStatus.ACTIVE).length;
 
+  const captureFormAnalytics = captureForms.map((form) => {
+    const formSessions = sessions.filter((s) => s.formId === form.id);
+    const partials = formSessions.filter(
+      (s) =>
+        s.status === LeadCaptureSessionStatus.PARTIAL ||
+        s.status === LeadCaptureSessionStatus.ABANDONED ||
+        s.status === LeadCaptureSessionStatus.STARTED,
+    ).length;
+    const sourceCounts = new Map<string, number>();
+    for (const s of formSessions) {
+      if (!s.utmSource) continue;
+      sourceCounts.set(s.utmSource, (sourceCounts.get(s.utmSource) ?? 0) + 1);
+    }
+    const topSource =
+      [...sourceCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const hourCounts = new Map<number, number>();
+    for (const s of formSessions) {
+      if (s.localHour == null) continue;
+      hourCounts.set(s.localHour, (hourCounts.get(s.localHour) ?? 0) + 1);
+    }
+    const peakHour =
+      [...hourCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+    return {
+      formId: form.id,
+      formName: form.name,
+      views: form.viewCount,
+      starts: form.startCount,
+      partials,
+      submits: form.submitCount,
+      conversionPct: form.viewCount > 0 ? Math.round((form.submitCount / form.viewCount) * 100) : 0,
+      topSource,
+      peakHour,
+    };
+  });
+
   return (
     <MarketingWorkspace
       tenantSlug={tenant.slug}
       tenantName={tenant.name}
       canEdit={canEdit}
+      currentUserId={session.user.id}
+      siteOrigin={siteOrigin}
       campaigns={campaigns.map((c) => ({
         id: c.id,
         name: c.name,
@@ -97,6 +166,21 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
         activeCampaigns,
         attributionRatePct: totalLeads > 0 ? Math.round((attributedLeads / totalLeads) * 100) : 0,
       }}
+      captureForms={captureForms.map((f) => ({
+        id: f.id,
+        name: f.name,
+        slug: f.slug,
+        title: f.title,
+        status: f.status,
+        viewCount: f.viewCount,
+        startCount: f.startCount,
+        submitCount: f.submitCount,
+        campaignName: f.campaign?.name ?? null,
+        partnerName: f.realtorPartner?.displayName ?? null,
+        createdAt: f.createdAt.toISOString().slice(0, 10),
+      }))}
+      captureFormAnalytics={captureFormAnalytics}
+      partners={partners}
     />
   );
 }

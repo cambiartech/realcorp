@@ -1,5 +1,7 @@
 "use client";
 
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -18,6 +20,7 @@ import { DealStage } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { createDeal, moveDealStage, moveDealStageDirect } from "./actions";
 import { getEntityTimelineLogs } from "../finance/actions";
 
@@ -398,9 +401,7 @@ export function DealsWorkspace({
         </DndContext>
       </div>}
 
-      {isCreateOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isCreateOpen)} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_LG}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Create deal</h2>
               <button
@@ -502,19 +503,18 @@ export function DealsWorkspace({
                 <button
                   type="submit"
                   disabled={createPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={createPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
+                  {createPending ? <ButtonSpinner /> : null}
                   {createPending ? "Creating..." : "Create deal"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
       {activeDeal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setActiveDeal(null)} panelClassName={MODAL_PANEL_SM}>
             <h2 className="text-lg font-semibold text-foreground">Move deal stage</h2>
             <p className="mt-1 text-sm text-muted">{activeDeal.leadName}</p>
             {moveState && !moveState.ok ? <FormAlert>{moveState.error}</FormAlert> : null}
@@ -537,19 +537,24 @@ export function DealsWorkspace({
                 <button
                   type="submit"
                   disabled={movePending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={movePending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
+                  {movePending ? <ButtonSpinner /> : null}
                   {movePending ? "Saving..." : "Move stage"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {timelineDeal ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-[1px]">
-          <div className="h-full w-full max-w-md overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl">
+        <ModalOverlay
+          open
+          onClose={() => setTimelineDeal(null)}
+          variant="drawer"
+          panelClassName="h-full w-full max-w-md overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl"
+        >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Deal Timeline</h2>
@@ -582,8 +587,7 @@ export function DealsWorkspace({
                 ))}
               </ul>
             )}
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
     </div>
   );

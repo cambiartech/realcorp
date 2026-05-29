@@ -11,6 +11,7 @@ import type { ProfileDetailRow } from "@/lib/hr-profile-form";
 import type { TenantBranding } from "@/lib/tenant-branding";
 import { saveSelfAppraisal } from "@/app/[tenantSlug]/hr/actions";
 import { AppraisalRatingSelect } from "@/components/hr/appraisal-rating-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { RichTextDisplay, RichTextField } from "@/components/rich-text-field";
 import { groupAppraisalActionsBySection, parseSelfAppraisalFormData } from "@/lib/appraisal-form-utils";
 import { appraisalRatingLabel } from "@/lib/appraisal-competencies";
@@ -698,8 +699,10 @@ export function HrMyDashboard({
                     <button
                       type="submit"
                       disabled={pending}
-                      className="mt-3 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                      aria-busy={pending}
+                      className="mt-3 inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
                     >
+                      {pending ? <ButtonSpinner /> : null}
                       {pending ? "Submitting…" : "Submit self-appraisal"}
                     </button>
                   ) : null}

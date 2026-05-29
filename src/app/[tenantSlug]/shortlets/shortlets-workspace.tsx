@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useSnackbar } from "@/components/snackbar";
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import { UiSelect } from "@/components/ui-select";
 import {
   createShortletReservation,
   createShortletUnit,
@@ -12,6 +15,7 @@ import {
 type Props = {
   tenantSlug: string;
   defaultCurrency: string;
+  currencies: string[];
   canManage: boolean;
   analytics: {
     totalUnits: number;
@@ -59,6 +63,7 @@ type Props = {
 export function ShortletsWorkspace({
   tenantSlug,
   defaultCurrency,
+  currencies,
   canManage,
   analytics,
   units,
@@ -340,7 +345,19 @@ export function ShortletsWorkspace({
             <Input label="Location" value={unitForm.location} onChange={(v) => setUnitForm((s) => ({ ...s, location: v }))} />
             <Input label="Nightly rate" type="number" value={unitForm.nightlyRate} onChange={(v) => setUnitForm((s) => ({ ...s, nightlyRate: v }))} />
             <Input label="Cleaning fee" type="number" value={unitForm.cleaningFee} onChange={(v) => setUnitForm((s) => ({ ...s, cleaningFee: v }))} />
-            <Input label="Currency" value={unitForm.currency} onChange={(v) => setUnitForm((s) => ({ ...s, currency: v }))} />
+            <div>
+              <label className="mb-1 block text-sm text-muted">Currency</label>
+              <UiSelect
+                value={unitForm.currency}
+                onChange={(e) => setUnitForm((s) => ({ ...s, currency: e.target.value }))}
+              >
+                {(currencies.length > 0 ? currencies : [defaultCurrency]).map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
             <div className="mt-2 flex justify-end gap-2">
               <button type="button" onClick={() => setOpenUnitModal(false)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm">Cancel</button>
               <button disabled={isPending} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background">{isPending ? "Saving..." : "Create unit"}</button>
@@ -552,8 +569,7 @@ function InsightCard({ label, children }: { label: string; children: React.React
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+    <ModalOverlay open onClose={onClose} panelClassName={MODAL_PANEL_MD}>
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <button
@@ -568,7 +584,6 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
           </button>
         </div>
         <div className="mt-4">{children}</div>
-      </div>
-    </div>
+    </ModalOverlay>
   );
 }

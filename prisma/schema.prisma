@@ -128,6 +128,13 @@ model Tenant {
   taskSpaces           TaskSpace[]
   taskProjects         TaskProject[]
   workTasks            WorkTask[]
+  propertyClients      PropertyClient[]
+  clientUnitLinks      ClientUnitLink[]
+  clientDocuments      ClientDocument[]
+  financeDocuments     FinanceDocument[]
+  leadCaptureForms     LeadCaptureForm[]
+  leadCaptureSessions  LeadCaptureFormSession[]
+  leadCaptureEvents    LeadCaptureFormEvent[]
 }
 
 model TenantSettings {
@@ -152,6 +159,7 @@ model TenantSettings {
   moduleShortLets      Boolean  @default(false)
   moduleHr             Boolean  @default(false)
   moduleTasks          Boolean  @default(true)
+  moduleClients        Boolean  @default(false)
   /// Extra nav modules per role beyond defaults, e.g. { "SALES_EXECUTIVE": ["MARKETING","FINANCE"] }
   roleModuleGrants     Json?
   orgDepartments       Json?
@@ -309,6 +317,7 @@ model ProjectPricingPlan {
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   units   Unit[]
+  clientLinks ClientUnitLink[]
 
   @@index([tenantId])
   @@index([projectId])
@@ -394,6 +403,7 @@ model Unit {
   pricingPlan  ProjectPricingPlan? @relation(fields: [pricingPlanId], references: [id], onDelete: SetNull)
   deal         Deal?
   shortletUnit ShortletUnit?
+  clientLinks  ClientUnitLink[]
 
   @@index([tenantId])
   @@index([projectId])
@@ -427,6 +437,7 @@ model Campaign {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   leads  Lead[]
+  captureForms LeadCaptureForm[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -448,6 +459,7 @@ model RealtorPartner {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   leads  Lead[]
+  captureForms LeadCaptureForm[]
 
   @@index([tenantId])
   @@index([tenantId, isActive])
@@ -464,6 +476,7 @@ model Lead {
   utmMedium        String?
   utmCampaign      String?
   utmContent       String?
+  utmTerm          String?
   realtorPartnerId String?
   projectInterest  String?
   budgetRange      String?
@@ -473,6 +486,7 @@ model Lead {
   name             String?
   email            String?
   phone            String?
+  notes            String?     @db.Text
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -481,6 +495,8 @@ model Lead {
   realtorPartner RealtorPartner? @relation(fields: [realtorPartnerId], references: [id], onDelete: SetNull)
   deals          Deal[]
   whatsappMessages WhatsAppMessage[]
+  propertyClient PropertyClient?
+  captureFormSession LeadCaptureFormSession?
 
   @@index([tenantId])
   @@index([tenantId, score])
@@ -526,6 +542,7 @@ model Deal {
   unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
   invoices Invoice[]
   salesReceipts SalesReceipt[]
+  propertyClient PropertyClient?
 
   @@index([tenantId])
   @@index([assignedUserId])
@@ -552,14 +569,18 @@ model Invoice {
   department      String?
   dueDate         DateTime?
   issuedAt        DateTime      @default(now())
+  pdfUrl          String?
+  sentAt          DateTime?
+  sentToEmail     String?
   createdByUserId String?
   createdByLabel  String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  deal     Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  payments PaymentRecord[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal            Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  payments        PaymentRecord[]
+  financeDocument FinanceDocument?
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, status])
@@ -716,18 +737,49 @@ model SalesReceipt {
   reference          String?
   note               String?
   status             String   @default("RECORDED")
+  pdfUrl             String?
+  sentAt             DateTime?
+  sentToEmail        String?
   issuedAt           DateTime @default(now())
   createdByUserId    String?
   createdByLabel     String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  deal   Deal?  @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal            Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  financeDocument FinanceDocument?
 
   @@unique([tenantId, receiptNumber])
   @@index([tenantId, issuedAt])
   @@index([tenantId, dealId])
+}
+
+enum FinanceDocumentCategory {
+  RECEIPT
+  INVOICE
+  OTHER
+}
+
+model FinanceDocument {
+  id               String                  @id @default(cuid())
+  tenantId         String
+  category         FinanceDocumentCategory @default(RECEIPT)
+  title            String
+  fileUrl          String
+  fileName         String?
+  salesReceiptId   String?                 @unique
+  invoiceId        String?                 @unique
+  uploadedByUserId String?
+  uploadedByLabel  String?
+  createdAt        DateTime                @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  salesReceipt SalesReceipt? @relation(fields: [salesReceiptId], references: [id], onDelete: SetNull)
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, category])
+  @@index([tenantId, createdAt])
 }
 
 enum BankMatchStatus {
@@ -1343,4 +1395,224 @@ model WorkTask {
   @@index([tenantId, spaceId])
   @@index([tenantId, projectId])
   @@index([tenantId, linkedEntityType, linkedEntityId])
+}
+
+// ——— Clients (property owners / investors) ———
+
+enum PropertyClientStatus {
+  PROSPECT
+  ACTIVE
+  FORMER
+}
+
+enum ClientUnitLinkRole {
+  OWNER
+  CO_OWNER
+  TENANT
+  INVESTOR
+  BENEFICIARY
+}
+
+enum ClientDocumentCategory {
+  ID
+  PURCHASE_AGREEMENT
+  ALLOCATION_LETTER
+  RECEIPT
+  DEED
+  TENANCY
+  CORRESPONDENCE
+  OTHER
+}
+
+model PropertyClient {
+  id             String               @id @default(cuid())
+  tenantId       String
+  leadId         String?              @unique
+  dealId         String?              @unique
+  fullName       String
+  email          String?
+  phone          String?
+  alternatePhone String?
+  addressLine    String?
+  city           String?
+  state          String?
+  country        String?              @default("Nigeria")
+  status         PropertyClientStatus @default(PROSPECT)
+  notes          String?              @db.Text
+  assignedUserId String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead      Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  deal      Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  unitLinks ClientUnitLink[]
+  documents ClientDocument[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, fullName])
+}
+
+model ClientUnitLink {
+  id            String             @id @default(cuid())
+  tenantId      String
+  clientId      String
+  unitId        String
+  pricingPlanId String?
+  role          ClientUnitLinkRole @default(OWNER)
+  startDate     DateTime?
+  endDate       DateTime?
+  isPrimary     Boolean            @default(true)
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client      PropertyClient      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  unit        Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  pricingPlan ProjectPricingPlan? @relation(fields: [pricingPlanId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, clientId, unitId])
+  @@index([tenantId, clientId])
+  @@index([tenantId, unitId])
+}
+
+model ClientDocument {
+  id               String                 @id @default(cuid())
+  tenantId         String
+  clientId         String
+  category         ClientDocumentCategory @default(OTHER)
+  title            String
+  fileUrl          String
+  fileName         String?
+  uploadedByUserId String?
+  uploadedByLabel  String?
+  createdAt        DateTime               @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client PropertyClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clientId])
+  @@index([tenantId, category])
+}
+
+// ——— Lead capture forms (lead magnets) ———
+
+enum LeadCaptureFormStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum LeadCaptureSessionStatus {
+  VIEWED
+  STARTED
+  PARTIAL
+  COMPLETED
+  ABANDONED
+}
+
+enum LeadCaptureFormEventType {
+  VIEW
+  START
+  FIELD_BLUR
+  PARTIAL_SAVE
+  SUBMIT
+  ABANDON
+}
+
+model LeadCaptureForm {
+  id               String                @id @default(cuid())
+  tenantId         String
+  name             String
+  slug             String
+  title            String
+  description      String?               @db.Text
+  status           LeadCaptureFormStatus @default(DRAFT)
+  fields           Json
+  thankYouMessage  String?               @db.Text
+  redirectUrl      String?
+  defaultSource    String?               @default("Lead Form")
+  campaignId       String?
+  assignedUserId   String?
+  realtorPartnerId String?
+  createdByUserId  String?
+  viewCount        Int                   @default(0)
+  startCount       Int                   @default(0)
+  partialCount     Int                   @default(0)
+  submitCount       Int                   @default(0)
+  autoWhatsAppEnabled Boolean             @default(false)
+  autoWhatsAppMessage String?             @db.Text
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign       Campaign?                @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  realtorPartner RealtorPartner?          @relation(fields: [realtorPartnerId], references: [id], onDelete: SetNull)
+  sessions       LeadCaptureFormSession[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model LeadCaptureFormSession {
+  id               String                   @id @default(cuid())
+  tenantId         String
+  formId           String
+  sessionToken     String
+  status           LeadCaptureSessionStatus @default(VIEWED)
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
+  utmTerm          String?
+  referrer         String?
+  landingUrl       String?
+  sharerUserId     String?
+  realtorPartnerId String?
+  ipCountry        String?
+  ipRegion         String?
+  ipCity           String?
+  timezone         String?
+  localHour        Int?
+  deviceType       String?
+  browser          String?
+  os               String?
+  userAgent        String?                  @db.Text
+  fieldsCompleted  Json?
+  completionPct    Int                      @default(0)
+  lastFieldKey     String?
+  leadId           String?                  @unique
+  startedAt        DateTime?
+  completedAt      DateTime?
+  lastActivityAt   DateTime                 @default(now())
+  createdAt        DateTime                 @default(now())
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  form   LeadCaptureForm    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  lead   Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  events LeadCaptureFormEvent[]
+
+  @@unique([formId, sessionToken])
+  @@index([tenantId, formId])
+  @@index([formId, status])
+}
+
+model LeadCaptureFormEvent {
+  id        String                   @id @default(cuid())
+  tenantId  String
+  formId    String
+  sessionId String
+  type      LeadCaptureFormEventType
+  fieldKey  String?
+  payload   Json?
+  createdAt DateTime                 @default(now())
+
+  tenant  Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session LeadCaptureFormSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([formId, type])
+  @@index([tenantId, formId])
 }

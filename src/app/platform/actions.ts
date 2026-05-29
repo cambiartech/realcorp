@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
+import { readTenantModuleFlagsFromForm } from "@/lib/tenant-module-definitions";
 import { revalidatePath } from "next/cache";
 
 export async function updateTenantShortLetsAddon(tenantId: string, enabled: boolean) {
@@ -48,35 +49,18 @@ export async function updateTenantModulesFromPlatform(tenantId: string, formData
   });
   if (!tenant) return { ok: false, error: "Tenant not found." };
 
-  const moduleSales = formData.get("moduleSales") === "on";
-  const moduleFinance = formData.get("moduleFinance") === "on";
-  const moduleMarketing = formData.get("moduleMarketing") === "on";
-  const moduleCommunity = formData.get("moduleCommunity") === "on";
-  const moduleRealtorPortal = formData.get("moduleRealtorPortal") === "on";
-  const moduleShortLets = formData.get("moduleShortLets") === "on";
+  const modules = readTenantModuleFlagsFromForm(formData);
 
   if (tenant.settings) {
     await prisma.tenantSettings.update({
       where: { tenantId: tenant.id },
-      data: {
-        moduleSales,
-        moduleFinance,
-        moduleMarketing,
-        moduleCommunity,
-        moduleRealtorPortal,
-        moduleShortLets,
-      },
+      data: modules,
     });
   } else {
     await prisma.tenantSettings.create({
       data: {
         tenantId: tenant.id,
-        moduleSales,
-        moduleFinance,
-        moduleMarketing,
-        moduleCommunity,
-        moduleRealtorPortal,
-        moduleShortLets,
+        ...modules,
       },
     });
   }
@@ -84,5 +68,8 @@ export async function updateTenantModulesFromPlatform(tenantId: string, formData
   revalidatePath("/platform");
   revalidatePath(`/${tenant.slug}`);
   revalidatePath(`/${tenant.slug}/settings`);
+  revalidatePath(`/${tenant.slug}/clients`);
+  revalidatePath(`/${tenant.slug}/hr`);
+  revalidatePath(`/${tenant.slug}/tasks`);
   return { ok: true };
 }

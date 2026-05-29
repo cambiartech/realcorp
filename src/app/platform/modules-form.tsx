@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ButtonSpinner } from "@/components/button-spinner";
+import {
+  normalizeTenantModuleFlags,
+  TENANT_MODULE_DEFINITIONS,
+  TENANT_MODULE_GROUPS,
+  type TenantModuleFlags,
+} from "@/lib/tenant-module-definitions";
 import { updateTenantModulesFromPlatform } from "./actions";
-
-type ModuleFlags = {
-  moduleSales: boolean;
-  moduleFinance: boolean;
-  moduleMarketing: boolean;
-  moduleCommunity: boolean;
-  moduleRealtorPortal: boolean;
-  moduleShortLets: boolean;
-};
 
 export function PlatformModulesForm({
   tenantId,
@@ -18,19 +16,20 @@ export function PlatformModulesForm({
   summary,
 }: {
   tenantId: string;
-  initial: ModuleFlags;
+  initial: Partial<TenantModuleFlags>;
   summary: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const flags = normalizeTenantModuleFlags(initial);
 
   return (
     <details className="group">
-      <summary className="cursor-pointer select-none rounded border border-foreground/20 px-2 py-1 text-xs hover:bg-foreground/[0.06]">
+      <summary className="cursor-pointer select-none rounded-md border border-foreground/15 bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-foreground/[0.04]">
         {summary}
       </summary>
       <form
-        className="mt-2 w-56 space-y-2 rounded border border-foreground/10 bg-background p-2 text-xs shadow"
+        className="mt-2 w-[min(18rem,80vw)] space-y-3 rounded-lg border border-foreground/10 bg-background p-3 text-xs shadow-lg"
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
@@ -42,18 +41,28 @@ export function PlatformModulesForm({
           });
         }}
       >
-        <ModuleCheckbox name="moduleSales" label="Sales" defaultChecked={initial.moduleSales} />
-        <ModuleCheckbox name="moduleFinance" label="Finance" defaultChecked={initial.moduleFinance} />
-        <ModuleCheckbox name="moduleMarketing" label="Marketing" defaultChecked={initial.moduleMarketing} />
-        <ModuleCheckbox name="moduleCommunity" label="Community" defaultChecked={initial.moduleCommunity} />
-        <ModuleCheckbox name="moduleRealtorPortal" label="Realtor portal" defaultChecked={initial.moduleRealtorPortal} />
-        <ModuleCheckbox name="moduleShortLets" label="Short Lets" defaultChecked={initial.moduleShortLets} />
+        {TENANT_MODULE_GROUPS.map((group) => {
+          const items = TENANT_MODULE_DEFINITIONS.filter((d) => d.group === group.id);
+          if (items.length === 0) return null;
+          return (
+            <div key={group.id}>
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">{group.label}</p>
+              <div className="space-y-2">
+                {items.map((def) => (
+                  <ModuleCheckbox key={def.key} name={def.key} label={def.label} hint={def.description} defaultChecked={flags[def.key]} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
 
         <button
           type="submit"
           disabled={pending}
-          className="mt-1 w-full rounded border border-foreground bg-foreground px-2 py-1 text-xs font-medium text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-busy={pending}
+          className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-md border border-foreground bg-foreground px-2 py-2 text-xs font-semibold text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
+          {pending ? <ButtonSpinner /> : null}
           {pending ? "Saving..." : "Save modules"}
         </button>
 
@@ -70,16 +79,21 @@ export function PlatformModulesForm({
 function ModuleCheckbox({
   name,
   label,
+  hint,
   defaultChecked,
 }: {
   name: string;
   label: string;
+  hint?: string;
   defaultChecked: boolean;
 }) {
   return (
-    <label className="flex items-center gap-2">
-      <input type="checkbox" name={name} defaultChecked={defaultChecked} />
-      <span>{label}</span>
+    <label className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-0.5 hover:bg-foreground/[0.03]">
+      <input type="checkbox" name={name} defaultChecked={defaultChecked} className="mt-0.5" />
+      <span>
+        <span className="font-medium text-foreground">{label}</span>
+        {hint ? <span className="mt-0.5 block text-[10px] leading-snug text-muted">{hint}</span> : null}
+      </span>
     </label>
   );
 }

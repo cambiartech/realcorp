@@ -10,7 +10,7 @@ import { FinanceWorkspace } from "./finance-workspace";
 
 export const dynamic = "force-dynamic";
 const DEFAULT_PAYMENT_MODES = ["Bank Transfer", "Cash", "Cheque", "POS"];
-const DEFAULT_DEPARTMENTS = ["Finance", "Sales", "Marketing", "Community"];
+import { mergeOrgDepartments } from "@/lib/org-departments";
 
 function canManageFinance(
   isPlatformAdmin: boolean,
@@ -107,9 +107,7 @@ export default async function FinanceQueuePage({
     bankAccounts: savedBanks,
     paymentModes: mergedModes,
     currencies: currenciesMerged,
-    departments: Array.from(
-      new Set([...(tenant.settings?.orgDepartments as string[] | null | undefined) ?? [], ...DEFAULT_DEPARTMENTS]),
-    ),
+    departments: mergeOrgDepartments(tenant.settings?.orgDepartments as string[] | null | undefined),
   };
 
   const logsPageSize = 50;
@@ -195,7 +193,7 @@ export default async function FinanceQueuePage({
       orderBy: { createdAt: "desc" },
       include: {
         payments: { select: { id: true, amount: true, paidAt: true }, orderBy: { paidAt: "desc" } },
-        deal: { select: { id: true, unitId: true, unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } }, lead: { select: { name: true, email: true } } } },
+        deal: { select: { id: true, unitId: true, unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } }, lead: { select: { name: true, email: true } }, propertyClient: { select: { fullName: true, email: true } } } },
       },
       take: 300,
     }),
@@ -218,7 +216,14 @@ export default async function FinanceQueuePage({
     prisma.salesReceipt.findMany({
       where: { tenantId: tenant.id },
       orderBy: { issuedAt: "desc" },
-      include: { deal: { select: { lead: { select: { name: true, email: true } } } } },
+      include: {
+        deal: {
+          select: {
+            lead: { select: { name: true, email: true } },
+            propertyClient: { select: { email: true, fullName: true } },
+          },
+        },
+      },
       take: 300,
     }),
     prisma.auditLog.findMany({
@@ -338,6 +343,15 @@ export default async function FinanceQueuePage({
         : "No payments",
       canRecordPayment: Number(invoice.balanceDue) > 0 && invoice.status !== "VOID" && invoice.status !== "DRAFT",
       canSend: invoice.status === "DRAFT",
+      canResend:
+        invoice.status !== "DRAFT" &&
+        invoice.status !== "VOID" &&
+        invoice.status !== "PAID" &&
+        Number(invoice.balanceDue) > 0,
+      defaultEmail: invoice.deal?.propertyClient?.email || invoice.deal?.lead?.email || "",
+      customerName: invoice.deal?.propertyClient?.fullName || invoice.deal?.lead?.name || "",
+      pdfUrl: invoice.pdfUrl,
+      sentToEmail: invoice.sentToEmail,
       canVoid: invoice.status !== "VOID" && Number(invoice.amount) - Number(invoice.balanceDue) <= 0,
       canSendReminder:
         invoice.status !== "DRAFT" && invoice.status !== "VOID" && invoice.status !== "PAID" && Number(invoice.balanceDue) > 0,
@@ -536,11 +550,17 @@ export default async function FinanceQueuePage({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
         title: receipt.title,
-        customerName: receipt.customerName || receipt.deal?.lead?.name || receipt.deal?.lead?.email || "—",
+        customerName: receipt.customerName || receipt.deal?.propertyClient?.fullName || receipt.deal?.lead?.name || "—",
+        defaultEmail: receipt.deal?.propertyClient?.email || receipt.deal?.lead?.email || "",
         amountLabel: `${receipt.currency} ${Number(receipt.amount).toLocaleString()}`,
         paymentMode: receipt.paymentMode || "—",
         depositAccount: receipt.depositAccount || "—",
         issuedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(receipt.issuedAt),
+        sentToEmail: receipt.sentToEmail,
+        sentAtLabel: receipt.sentAt
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(receipt.sentAt)
+          : null,
+        pdfUrl: receipt.pdfUrl,
       }))}
       masterLogs={masterLogs.map((log) => ({
         id: log.id,

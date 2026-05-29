@@ -1,9 +1,13 @@
 "use client";
 
-import { CampaignStatus } from "@/generated/prisma";
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import { CaptureFormsPanel } from "@/components/capture-forms/capture-forms-panel";
+import { CampaignStatus, LeadCaptureFormStatus } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createCampaign } from "./actions";
@@ -18,6 +22,32 @@ type CampaignRow = {
   createdAt: string;
 };
 
+type CaptureFormRow = {
+  id: string;
+  name: string;
+  slug: string;
+  title: string;
+  status: LeadCaptureFormStatus;
+  viewCount: number;
+  startCount: number;
+  submitCount: number;
+  campaignName: string | null;
+  partnerName: string | null;
+  createdAt: string;
+};
+
+type AnalyticsRow = {
+  formId: string;
+  formName: string;
+  views: number;
+  starts: number;
+  partials: number;
+  submits: number;
+  conversionPct: number;
+  topSource: string | null;
+  peakHour: number | null;
+};
+
 type ActionResult = { ok: true } | { ok: false; error: string };
 const initial: ActionResult | null = null;
 
@@ -25,13 +55,20 @@ export function MarketingWorkspace({
   tenantSlug,
   tenantName,
   canEdit,
+  currentUserId,
+  siteOrigin,
   campaigns,
   attributionRows,
   summary,
+  captureForms,
+  captureFormAnalytics,
+  partners,
 }: {
   tenantSlug: string;
   tenantName: string;
   canEdit: boolean;
+  currentUserId: string;
+  siteOrigin: string;
   campaigns: CampaignRow[];
   attributionRows: Array<{ label: string; count: number }>;
   summary: {
@@ -41,7 +78,11 @@ export function MarketingWorkspace({
     activeCampaigns: number;
     attributionRatePct: number;
   };
+  captureForms: CaptureFormRow[];
+  captureFormAnalytics: AnalyticsRow[];
+  partners: Array<{ id: string; displayName: string }>;
 }) {
+  const [tab, setTab] = useState<"campaigns" | "forms">("forms");
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createCampaign.bind(null, tenantSlug), initial);
   const { showSnackbar } = useSnackbar();
@@ -64,10 +105,11 @@ export function MarketingWorkspace({
         <div>
           <h1 className="text-2xl font-bold text-foreground">Marketing</h1>
           <p className="mt-1 text-sm text-muted">
-            Campaigns and lead attribution for <span className="font-medium text-foreground">{tenantName}</span>.
+            Campaigns, capture forms, and lead attribution for{" "}
+            <span className="font-medium text-foreground">{tenantName}</span>.
           </p>
         </div>
-        {canEdit ? (
+        {canEdit && tab === "campaigns" ? (
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -78,6 +120,41 @@ export function MarketingWorkspace({
         ) : null}
       </div>
 
+      <div className="mt-6 flex gap-2 border-b border-foreground/10">
+        {(
+          [
+            ["forms", "Capture forms"],
+            ["campaigns", "Campaigns"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${
+              tab === key ? "border-foreground text-foreground" : "border-transparent text-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "forms" ? (
+        <div className="mt-6">
+          <CaptureFormsPanel
+            tenantSlug={tenantSlug}
+            canEdit={canEdit}
+            currentUserId={currentUserId}
+            siteOrigin={siteOrigin}
+            forms={captureForms}
+            campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, code: c.code }))}
+            partners={partners}
+            analytics={captureFormAnalytics}
+          />
+        </div>
+      ) : (
+        <>
       {!canEdit ? (
         <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
           You can view campaigns here. Org admins and marketing managers can create and edit campaigns.
@@ -151,10 +228,10 @@ export function MarketingWorkspace({
           realtor portal links or landing pages.
         </p>
       </section>
+        </>
+      )}
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(open)} onClose={() => setOpen(false)} panelClassName={MODAL_PANEL_MD}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Create campaign</h2>
               <button
@@ -218,15 +295,15 @@ export function MarketingWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
                 >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Saving..." : "Create"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
     </div>
   );
 }

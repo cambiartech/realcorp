@@ -4,6 +4,7 @@ import { LeadQuality } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef } from "react";
 import { submitPortalLead, type PortalSubmitResult } from "./actions";
@@ -128,8 +129,10 @@ export function PortalLeadForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900"
+          aria-busy={pending}
+          className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900"
         >
+          {pending ? <ButtonSpinner /> : null}
           {pending ? "Submitting..." : "Submit lead"}
         </button>
       </div>

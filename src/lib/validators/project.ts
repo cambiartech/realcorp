@@ -80,3 +80,5 @@ export function parseCreatePricingPlanForm(formData: FormData) {
     paymentDurationMonths: formData.get("paymentDurationMonths"),
   });
 }
+
+export const parseUpdatePricingPlanForm = parseCreatePricingPlanForm;

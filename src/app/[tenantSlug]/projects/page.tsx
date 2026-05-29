@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
+import { resolveTenantCurrencies } from "@/lib/finance-catalog";
 import { notFound } from "next/navigation";
 import { ProjectsWorkspace } from "./projects-workspace";
 
@@ -24,6 +25,7 @@ export default async function TenantProjectsPage({
     select: {
       id: true,
       slug: true,
+      defaultCurrency: true,
       settings: {
         select: {
           moduleSales: true,
@@ -31,6 +33,7 @@ export default async function TenantProjectsPage({
           moduleMarketing: true,
           moduleCommunity: true,
           roleModuleGrants: true,
+          financeCurrencies: true,
         },
       },
     },
@@ -56,10 +59,14 @@ export default async function TenantProjectsPage({
     take: 200,
   });
 
+  const currencies = resolveTenantCurrencies(tenant.settings, tenant.defaultCurrency);
+
   return (
     <ProjectsWorkspace
       tenantSlug={tenant.slug}
       canManage={canManage}
+      currencies={currencies}
+      defaultCurrency={tenant.defaultCurrency || currencies[0] || "NGN"}
       activeFilterChips={
         projectId
           ? [

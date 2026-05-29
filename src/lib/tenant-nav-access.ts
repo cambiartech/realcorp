@@ -3,6 +3,7 @@ import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 export type TenantNavKey =
   | "dashboard"
   | "projects"
+  | "clients"
   | "leads"
   | "deals"
   | "activities"
@@ -23,12 +24,14 @@ export type TenantSettingsNavSlice = {
   moduleShortLets: boolean;
   moduleHr: boolean;
   moduleTasks: boolean;
+  moduleClients: boolean;
   roleModuleGrants: unknown;
 };
 
 const NAV_ORDER: TenantNavKey[] = [
   "dashboard",
   "projects",
+  "clients",
   "leads",
   "deals",
   "activities",
@@ -75,7 +78,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.ORG_ADMIN:
       return [...NAV_ORDER];
     case MembershipRole.FINANCE_MANAGER:
-      return [...SALES_STACK, "shortlets", "tasks", "finance", "settings"];
+      return [...SALES_STACK, "clients", "shortlets", "tasks", "finance", "settings"];
     case MembershipRole.HR_MANAGER:
       return ["dashboard", "tasks", "hr", "team", "settings"];
     case MembershipRole.MARKETING_MANAGER:
@@ -85,7 +88,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.SALES_MANAGER:
     case MembershipRole.SALES_EXECUTIVE:
     default:
-      return [...SALES_STACK, "shortlets", "tasks", "settings"];
+      return [...SALES_STACK, "clients", "shortlets", "tasks", "settings"];
   }
 }
 
@@ -97,6 +100,7 @@ function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice):
     if (k === "finance") return s.moduleFinance;
     if (k === "hr") return s.moduleHr;
     if (k === "tasks") return s.moduleTasks;
+    if (k === "clients") return s.moduleClients;
     if (k === "activities") return s.moduleSales;
     if (SALES_STACK.includes(k)) return s.moduleSales;
     return true;
@@ -140,6 +144,7 @@ export function normalizeSettingsNavSlice(
     moduleShortLets: raw?.moduleShortLets ?? false,
     moduleHr: raw?.moduleHr ?? false,
     moduleTasks: raw?.moduleTasks ?? true,
+    moduleClients: raw?.moduleClients ?? false,
     roleModuleGrants: raw?.roleModuleGrants ?? null,
   };
 }

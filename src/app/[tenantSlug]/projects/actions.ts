@@ -8,6 +8,7 @@ import {
   parseCreatePricingPlanForm,
   parseCreateProjectForm,
   parseCreateUnitForm,
+  parseUpdatePricingPlanForm,
 } from "@/lib/validators/project";
 import { revalidatePath } from "next/cache";
 
@@ -562,6 +563,111 @@ export async function createPricingPlan(
     });
   } catch {
     return { ok: false, error: "Could not create pricing plan right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/projects/${projectId}`);
+  return { ok: true };
+}
+
+export async function updatePricingPlan(
+  tenantSlug: string,
+  projectId: string,
+  planId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = parseUpdatePricingPlanForm(formData);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join(" ") };
+  }
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can edit pricing plans." };
+
+  const existing = await prisma.projectPricingPlan.findFirst({
+    where: { id: planId, tenantId: tenant.id, projectId },
+    select: { id: true, name: true },
+  });
+  if (!existing) return { ok: false, error: "Pricing plan not found." };
+
+  try {
+    await prisma.projectPricingPlan.update({
+      where: { id: existing.id },
+      data: {
+        name: parsed.data.name,
+        price: Number(parsed.data.price),
+        currency: parsed.data.currency.toUpperCase(),
+        initialDeposit: parsed.data.initialDeposit ? Number(parsed.data.initialDeposit) : null,
+        paymentDurationMonths: parsed.data.paymentDurationMonths
+          ? Number(parsed.data.paymentDurationMonths)
+          : null,
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "PROJECTS",
+      entityType: "PRICING_PLAN",
+      entityId: existing.id,
+      action: "UPDATE",
+      summary: `Updated pricing plan ${parsed.data.name}.`,
+    });
+  } catch {
+    return { ok: false, error: "Could not update pricing plan right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/projects/${projectId}`);
+  return { ok: true };
+}
+
+export async function deletePricingPlan(
+  tenantSlug: string,
+  projectId: string,
+  planId: string,
+  _prev: ActionResult | null,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can delete pricing plans." };
+
+  const existing = await prisma.projectPricingPlan.findFirst({
+    where: { id: planId, tenantId: tenant.id, projectId },
+    select: { id: true, name: true, _count: { select: { units: true } } },
+  });
+  if (!existing) return { ok: false, error: "Pricing plan not found." };
+
+  try {
+    await prisma.projectPricingPlan.delete({ where: { id: existing.id } });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "PROJECTS",
+      entityType: "PRICING_PLAN",
+      entityId: existing.id,
+      action: "DELETE",
+      summary: `Deleted pricing plan ${existing.name}${
+        existing._count.units > 0 ? ` (${existing._count.units} unit(s) unlinked)` : ""
+      }.`,
+    });
+  } catch {
+    return { ok: false, error: "Could not delete pricing plan right now." };
   }
 
   revalidatePath(`/${tenantSlug}/projects/${projectId}`);

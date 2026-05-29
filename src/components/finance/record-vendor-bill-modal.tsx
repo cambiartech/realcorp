@@ -12,7 +12,10 @@ import {
   type VendorBillRecurrenceFrequency,
 } from "@/lib/vendor-bill-recurrence";
 import { VendorNamePicker, type FinanceVendorOption } from "@/components/finance/vendor-name-picker";
+import { OrgDepartmentSelect } from "@/components/org-department-select";
 import { UiSelect } from "@/components/ui-select";
+import { MODAL_PANEL_MD } from "@/lib/modal-panel";
+import { ModalOverlay } from "@/components/modal-overlay";
 
 export type TenantFiscalYear = {
   label: string;
@@ -46,6 +49,7 @@ export function RecordVendorBillModal({
   onSaveVendor,
 }: Props) {
   const [vendorName, setVendorName] = useState("");
+  const [department, setDepartment] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [title, setTitle] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
@@ -85,6 +89,7 @@ export function RecordVendorBillModal({
   useEffect(() => {
     if (!open) {
       setVendorName("");
+      setDepartment("");
       setDueDate("");
       setTitle("");
       setIsRecurring(false);
@@ -102,15 +107,13 @@ export function RecordVendorBillModal({
     setTitle(autoTitle);
   }, [open, autoTitle, useAutoTitle]);
 
-  if (!open) return null;
-
   const fiscalEndLabel = fiscalYear
     ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(`${fiscalYear.end}T12:00:00`))
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+    <ModalOverlay open={open} onClose={onClose} panelClassName={MODAL_PANEL_MD}>
+      <div>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Record vendor bill</h2>
@@ -305,17 +308,7 @@ export function RecordVendorBillModal({
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-              <UiSelect name="department" defaultValue="">
-                <option value="">Select department</option>
-                {departments.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
-                  </option>
-                ))}
-              </UiSelect>
-            </div>
+            <OrgDepartmentSelect departments={departments} value={department} onChange={setDepartment} />
           </div>
 
           <div>
@@ -347,6 +340,6 @@ export function RecordVendorBillModal({
           </div>
         </form>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

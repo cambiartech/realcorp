@@ -1,11 +1,14 @@
 "use client";
 
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { LeadQuality } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { sendWhatsAppToLead, updateLead } from "../actions";
 import { ActivityFeed, type ActivityRow } from "@/components/activity-feed";
 
@@ -40,6 +43,9 @@ type LeadData = {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  utmContent: string | null;
+  utmTerm: string | null;
+  notes: string | null;
   realtorPartnerName: string | null;
   createdAt: string;
   updatedAt: string;
@@ -250,14 +256,23 @@ export function LeadDetailWorkspace({
             </dl>
           </section>
 
-          {(lead.utmSource || lead.utmMedium || lead.utmCampaign) ? (
+          {(lead.utmSource || lead.utmMedium || lead.utmCampaign || lead.utmContent || lead.utmTerm) ? (
             <section className="rounded-lg border border-foreground/10 bg-foreground/[0.015] p-4">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">UTM tracking</p>
               <dl className="space-y-2 text-sm">
                 <DetailRow label="utm_source" value={lead.utmSource} mono />
                 <DetailRow label="utm_medium" value={lead.utmMedium} mono />
                 <DetailRow label="utm_campaign" value={lead.utmCampaign} mono />
+                <DetailRow label="utm_content" value={lead.utmContent} mono />
+                <DetailRow label="utm_term" value={lead.utmTerm} mono />
               </dl>
+            </section>
+          ) : null}
+
+          {lead.notes ? (
+            <section className="rounded-lg border border-foreground/10 bg-foreground/[0.015] p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">Form responses</p>
+              <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">{lead.notes}</pre>
             </section>
           ) : null}
         </div>
@@ -345,9 +360,7 @@ export function LeadDetailWorkspace({
       </div>
 
       {/* Edit modal */}
-      {isEditing ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isEditing)} onClose={() => setIsEditing(false)} panelClassName={MODAL_PANEL_MD}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Edit lead</h2>
               <button
@@ -466,20 +479,18 @@ export function LeadDetailWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
                 >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Saving…" : "Save changes"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
       {/* WhatsApp modal */}
-      {isWhatsAppOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isWhatsAppOpen)} onClose={() => setIsWhatsAppOpen(false)} panelClassName={MODAL_PANEL_MD}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Send WhatsApp message</h2>
               <button
@@ -542,15 +553,15 @@ export function LeadDetailWorkspace({
                 <button
                   type="submit"
                   disabled={waPending}
-                  className="rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                  aria-busy={waPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                 >
+                  {waPending ? <ButtonSpinner /> : null}
                   {waPending ? "Sending…" : "Send WhatsApp"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
     </div>
   );
 }

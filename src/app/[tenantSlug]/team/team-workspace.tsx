@@ -6,6 +6,9 @@ import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
 import { parseTeamInviteForm, zodTeamInviteIssuesToFieldRecord, type TeamInviteFieldName } from "@/lib/validators/team-invite";
 import {
@@ -388,8 +391,7 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+    <ModalOverlay open onClose={onClose} panelClassName={MODAL_PANEL_MD}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Invite team member</h2>
@@ -486,14 +488,15 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
               <button
                 type="submit"
                 disabled={pending}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                aria-busy={pending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
               >
+                {pending ? <ButtonSpinner /> : null}
                 {pending ? "Creating invite…" : "Create invite"}
               </button>
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </ModalOverlay>
   );
 }

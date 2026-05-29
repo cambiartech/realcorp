@@ -1,8 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
 import { FormAlert } from "@/components/form-message";
+import { useSnackbar } from "@/components/snackbar";
 import type { FinanceControls } from "@/lib/finance-controls";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { saveFinanceSettings } from "../actions";
 
 export function FinanceSettingsWorkspace({
@@ -25,6 +28,8 @@ export function FinanceSettingsWorkspace({
   const [accountName, setAccountName] = useState("");
   const [modeInput, setModeInput] = useState("");
   const [currencyInput, setCurrencyInput] = useState("");
+  const router = useRouter();
+  const { showSnackbar } = useSnackbar();
 
   const [state, action, pending] = useActionState(
     saveFinanceSettings.bind(null, tenantSlug),
@@ -55,6 +60,8 @@ export function FinanceSettingsWorkspace({
         c: currencies,
       }),
     );
+    showSnackbar("Finance settings saved. Setup coach will show your next step.", "success");
+    router.refresh();
     // Only when `state` updates (e.g. after Save) — not when lists change while showing a prior success message
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
@@ -286,12 +293,14 @@ export function FinanceSettingsWorkspace({
             <button
               type="submit"
               disabled={pending}
+              aria-busy={pending}
               className={
                 isDraft
-                  ? "rounded-md border-2 border-amber-600/80 bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-md ring-2 ring-amber-500/40 transition-opacity hover:opacity-90 disabled:opacity-60"
-                  : "rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
+                  ? "inline-flex items-center gap-2 rounded-md border-2 border-amber-600/80 bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-md ring-2 ring-amber-500/40 transition-opacity hover:opacity-90 disabled:opacity-60"
+                  : "inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
               }
             >
+              {pending ? <ButtonSpinner /> : null}
               {pending ? "Saving..." : "Save finance settings"}
             </button>
           </div>

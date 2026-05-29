@@ -3,6 +3,7 @@ import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { resolveTenantCurrencies } from "@/lib/finance-catalog";
 import { notFound } from "next/navigation";
 import { ShortletsWorkspace } from "./shortlets-workspace";
 
@@ -44,11 +45,14 @@ export default async function ShortLetsPage({
           moduleCommunity: true,
           moduleShortLets: true,
           roleModuleGrants: true,
+          financeCurrencies: true,
         },
       },
     },
   });
   if (!tenant) notFound();
+
+  const currencies = resolveTenantCurrencies(tenant.settings, tenant.defaultCurrency);
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
@@ -113,6 +117,7 @@ export default async function ShortLetsPage({
     <ShortletsWorkspace
       tenantSlug={tenant.slug}
       defaultCurrency={tenant.defaultCurrency}
+      currencies={currencies}
       canManage={canManage}
       analytics={{
         totalUnits: units.length,

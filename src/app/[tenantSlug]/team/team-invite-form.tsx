@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { MembershipRole } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { UiSelect } from "@/components/ui-select";
 import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
 import { parseTeamInviteForm, zodTeamInviteIssuesToFieldRecord, type TeamInviteFieldName } from "@/lib/validators/team-invite";
@@ -104,8 +105,10 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        aria-busy={pending}
+        className="inline-flex items-center justify-center gap-2 border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
       >
+        {pending ? <ButtonSpinner /> : null}
         {pending ? "Creating invite…" : "Create invite"}
       </button>
     </form>

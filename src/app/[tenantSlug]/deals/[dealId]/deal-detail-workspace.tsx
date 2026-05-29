@@ -1,11 +1,14 @@
 "use client";
 
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { DealStage } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { ActivityFeed, type ActivityRow } from "@/components/activity-feed";
 import { updateDeal, moveDealStage } from "../actions";
 
@@ -333,9 +336,7 @@ export function DealDetailWorkspace({
       </div>
 
       {/* Edit modal */}
-      {isEditing ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isEditing)} onClose={() => setIsEditing(false)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Edit deal</h2>
               <button
@@ -390,20 +391,18 @@ export function DealDetailWorkspace({
                 <button
                   type="submit"
                   disabled={editPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                  aria-busy={editPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
                 >
+                  {editPending ? <ButtonSpinner /> : null}
                   {editPending ? "Saving…" : "Save changes"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
       {/* Move stage modal */}
-      {isMoving ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isMoving)} onClose={() => setIsMoving(false)} panelClassName={MODAL_PANEL_XS}>
             <h2 className="text-lg font-semibold text-foreground">Move stage</h2>
             <p className="mt-1 text-sm text-muted">Current: {deal.stageLabel}</p>
             {moveState && !moveState.ok ? <FormAlert>{moveState.error}</FormAlert> : null}
@@ -424,15 +423,15 @@ export function DealDetailWorkspace({
                 <button
                   type="submit"
                   disabled={movePending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                  aria-busy={movePending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
                 >
+                  {movePending ? <ButtonSpinner /> : null}
                   {movePending ? "Saving…" : "Move stage"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
     </div>
   );
 }

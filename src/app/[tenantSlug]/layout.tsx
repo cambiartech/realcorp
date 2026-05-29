@@ -1,11 +1,13 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { TenantAppHeaderBrand } from "@/components/realcorp-brand";
 import { TenantHeaderActions } from "@/components/tenant-header-actions";
 import { TenantMobileDock, TenantSidebar } from "@/components/tenant-nav";
 import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { getVisibleNavKeys, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
+import { loadOrgSetupForUser } from "@/lib/load-org-setup";
+import { OrgSetupCoachBoundary } from "@/components/org-setup-coach-boundary";
 
 export default async function TenantLayout({
   children,
@@ -36,6 +38,7 @@ export default async function TenantLayout({
           moduleShortLets: true,
           moduleHr: true,
           moduleTasks: true,
+          moduleClients: true,
           roleModuleGrants: true,
           logoUrl: true,
         },
@@ -79,6 +82,12 @@ export default async function TenantLayout({
       })
     : null;
 
+  const orgSetup = await loadOrgSetupForUser(
+    tenant.id,
+    session.user.id,
+    Boolean(session.user.isPlatformAdmin),
+  );
+
   const navProps = {
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
@@ -95,13 +104,7 @@ export default async function TenantLayout({
     <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-background text-foreground">
       <header className="shrink-0 border-b border-foreground/10 bg-background">
         <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Link href={`/${tenant.slug}`} className="inline-flex min-w-0 items-center gap-2 text-sm font-bold tracking-tight text-foreground">
-            {tenant.settings?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={tenant.settings.logoUrl} alt="" className="h-7 w-auto max-w-[100px] object-contain" />
-            ) : null}
-            <span className="truncate">{tenant.name}</span>
-          </Link>
+          <TenantAppHeaderBrand tenantSlug={tenant.slug} tenantName={tenant.name} />
           <div className="flex items-center gap-2">
             <p className="text-xs text-muted md:hidden">Tenant app</p>
             <TenantHeaderActions tenantSlug={tenant.slug} userLabel={userLabel} />
@@ -110,8 +113,16 @@ export default async function TenantLayout({
       </header>
       <div className="flex min-h-0 flex-1 w-full items-stretch overflow-hidden">
         <TenantSidebar {...navProps} />
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pb-20 md:pb-0">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pb-28 md:pb-24">{children}</main>
       </div>
+      {orgSetup.canManageOrgSetup && !orgSetup.allComplete ? (
+        <OrgSetupCoachBoundary
+          tenantSlug={orgSetup.tenantSlug}
+          userId={session.user.id}
+          tenantName={tenant.name}
+          steps={orgSetup.steps}
+        />
+      ) : null}
       <TenantMobileDock
         tenantSlug={tenant.slug}
         canAccessPlatform={Boolean(session.user.isPlatformAdmin)}

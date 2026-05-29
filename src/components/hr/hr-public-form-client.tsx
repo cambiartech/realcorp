@@ -13,6 +13,7 @@ import type { HrFormDeliveryMode, HrFormRequestStatus, HrFormType } from "@/gene
 import { HR_FORM_DELIVERY_LABELS, HR_FORM_TYPE_LABELS } from "@/lib/hr-form-types";
 import type { TenantBranding } from "@/lib/tenant-branding";
 import { brandingCssVars } from "@/lib/tenant-branding";
+import { ButtonSpinner } from "@/components/button-spinner";
 
 type InitialValues = Record<string, string>;
 
@@ -230,9 +231,11 @@ export function HrPublicFormClient({
               <button
                 type="submit"
                 disabled={pending}
-                className="w-full rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
+                aria-busy={pending}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: "var(--hr-brand-primary)" }}
               >
+                {pending ? <ButtonSpinner /> : null}
                 {pending ? "Submitting…" : "Submit form"}
               </button>
             </form>

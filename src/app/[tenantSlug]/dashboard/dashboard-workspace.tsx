@@ -21,7 +21,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSnackbar } from "@/components/snackbar";
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import { TenantPageShell } from "@/components/tenant-page-shell";
+import type { OrgSetupStep } from "@/lib/org-setup-checklist";
 import { UiSelect } from "@/components/ui-select";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { saveDashboardPreference, upsertTenantGoal } from "./actions";
@@ -377,6 +380,12 @@ export function DashboardWorkspace({
   values,
   goal,
   canManageGoals,
+  canManageOrgSetup,
+  orgSetupSteps,
+  orgSetupCriticalComplete,
+  orgSetupPercent,
+  userId,
+  initialOpenGoals,
 }: {
   tenantSlug: string;
   tenantName: string;
@@ -386,6 +395,12 @@ export function DashboardWorkspace({
   values: WidgetValue;
   goal: Goal;
   canManageGoals: boolean;
+  canManageOrgSetup: boolean;
+  orgSetupSteps: OrgSetupStep[];
+  orgSetupCriticalComplete: boolean;
+  orgSetupPercent: number;
+  userId: string;
+  initialOpenGoals?: boolean;
 }) {
   const initialUi = useMemo(
     () => getServerAlignedDashboardUi(initialRoleView, initialWidgetIds),
@@ -407,6 +422,12 @@ export function DashboardWorkspace({
 
   const draftBootstrapRef = useRef({ roleViewOptions, initialRoleView });
   draftBootstrapRef.current = { roleViewOptions, initialRoleView };
+
+  useEffect(() => {
+    if (initialOpenGoals && canManageGoals) {
+      setOpenGoal(true);
+    }
+  }, [initialOpenGoals, canManageGoals]);
 
   useEffect(() => {
     const { roleViewOptions: rvo, initialRoleView: irv } = draftBootstrapRef.current;
@@ -437,7 +458,7 @@ export function DashboardWorkspace({
   const [openScopeFilters, setOpenScopeFilters] = useState(false);
   const [openSavedViews, setOpenSavedViews] = useState(false);
   const [openOnboardingGuide, setOpenOnboardingGuide] = useState(false);
-  const [showSetupPanel, setShowSetupPanel] = useState(false);
+  const [showSetupPanel, setShowSetupPanel] = useState(!orgSetupCriticalComplete);
   const [openKpiDetail, setOpenKpiDetail] = useState<null | "LEADS_TODAY" | "DEALS_TODAY" | "PROJECTS" | "TOP_PROJECTS">(null);
   const [openFinanceDetail, setOpenFinanceDetail] = useState<
     null | "COLLECTIONS_TREND" | "OVERDUE_AGING" | "HEALTH_PROJECT_TEAM" | "TARGET_ATTAINMENT"
@@ -879,6 +900,13 @@ export function DashboardWorkspace({
 
   return (
     <TenantPageShell>
+      {canManageOrgSetup && !orgSetupCriticalComplete ? (
+        <div className="mb-4 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3 text-sm text-muted">
+          <span className="font-medium text-foreground">Setup coach</span> is active at the bottom of your screen — it
+          will guide you step by step and celebrate each completion. Only visible to org admins.
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{tenantName} Dashboard</h1>
@@ -1034,18 +1062,32 @@ export function DashboardWorkspace({
         </button>
 
         {showSetupPanel ? (
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <section className="rounded-lg border border-foreground/10 bg-background p-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Getting started</p>
-            <button
-              type="button"
-              onClick={() => setOpenOnboardingGuide(true)}
-              className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2"
-            >
-              Launch setup guide
-            </button>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization setup</p>
+            {canManageOrgSetup ? (
+              <button
+                type="button"
+                onClick={() => setOpenOnboardingGuide(true)}
+                className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2"
+              >
+                Open full guide
+              </button>
+            ) : null}
           </div>
+          {canManageOrgSetup ? (
+            <ul className="mt-2 space-y-1.5 text-sm">
+              {orgSetupSteps.map((step) => (
+                <ChecklistRow key={step.id} label={step.title} done={step.done} />
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Ask an org admin to complete workspace setup.</p>
+          )}
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-background p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; ops</p>
           <ul className="mt-2 space-y-1.5 text-sm">
             <ChecklistRow label="Connect at least one integration" done={values.onboarding.connectIntegrationDone} />
             <ChecklistRow label="Import your first leads" done={values.onboarding.importedLeadsDone} />
@@ -1570,9 +1612,14 @@ export function DashboardWorkspace({
         ) : null}
       </div>
 
-      {openKpiDetail ? (
-        <div className="fixed inset-0 z-[70] flex justify-end bg-black/30 backdrop-blur-[1px]">
-          <div className="relative flex h-full w-full max-w-5xl flex-col overflow-hidden border-l border-foreground/10 bg-background shadow-2xl">
+      <ModalOverlay
+        open={Boolean(openKpiDetail)}
+        onClose={() => setOpenKpiDetail(null)}
+        variant="drawer"
+        zClassName="z-[70]"
+        panelClassName="relative flex h-full w-full max-w-3xl shrink-0 flex-col overflow-hidden border-l border-foreground/10 bg-background shadow-2xl"
+      >
+          <div className="relative flex h-full w-full flex-col overflow-hidden">
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 px-5 py-4 pr-14">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">
@@ -1765,12 +1812,16 @@ export function DashboardWorkspace({
             ) : null}
             </div>
           </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
-      {openFinanceDetail ? (
-        <div className="fixed inset-0 z-[70] flex justify-end bg-black/30 backdrop-blur-[1px]">
-          <div className="relative flex h-full w-full max-w-5xl flex-col overflow-hidden border-l border-foreground/10 bg-background shadow-2xl">
+      <ModalOverlay
+        open={Boolean(openFinanceDetail)}
+        onClose={() => setOpenFinanceDetail(null)}
+        variant="drawer"
+        zClassName="z-[70]"
+        panelClassName="relative flex h-full w-full max-w-3xl shrink-0 flex-col overflow-hidden border-l border-foreground/10 bg-background shadow-2xl"
+      >
+          <div className="relative flex h-full w-full flex-col overflow-hidden">
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 px-5 py-4 pr-14">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">
@@ -1998,16 +2049,15 @@ export function DashboardWorkspace({
               ) : null}
             </div>
           </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
-      {openOnboardingGuide ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={openOnboardingGuide} onClose={() => setOpenOnboardingGuide(false)} panelClassName={MODAL_PANEL_XL}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Setup guide</h2>
-                <p className="mt-1 text-sm text-muted">Complete these steps to get your team live quickly.</p>
+                <p className="mt-1 text-sm text-muted">
+                  Configure organization &amp; finance first, then connect sales workflows.
+                </p>
               </div>
               <button
                 type="button"
@@ -2020,20 +2070,31 @@ export function DashboardWorkspace({
                 </svg>
               </button>
             </div>
-            <div className="mt-4 space-y-2">
-              <GuideItem done={values.onboarding.connectIntegrationDone} title="Connect integrations" href={`/${tenantSlug}/settings`} />
-              <GuideItem done={values.onboarding.importedLeadsDone} title="Import your first leads" href={`/${tenantSlug}/leads/import`} />
-              <GuideItem done={values.onboarding.createdDealDone} title="Create first deal" href={`/${tenantSlug}/deals`} />
-              <GuideItem done={values.onboarding.followUpSentDone} title="Send first follow-up" href={`/${tenantSlug}/activities?channel=WHATSAPP`} />
-              <GuideItem done={values.onboarding.firstTaskDone} title="Complete first task" href={`/${tenantSlug}/activities?status=PENDING`} />
+            <div className="mt-4 space-y-4">
+              {canManageOrgSetup ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Required for go-live</p>
+                  <div className="mt-2 space-y-2">
+                    {orgSetupSteps.map((step) => (
+                      <GuideItem key={step.id} done={step.done} title={step.title} href={step.href} />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; operations</p>
+                <div className="mt-2 space-y-2">
+                  <GuideItem done={values.onboarding.connectIntegrationDone} title="Connect integrations" href={`/${tenantSlug}/settings?tab=integrations`} />
+                  <GuideItem done={values.onboarding.importedLeadsDone} title="Import your first leads" href={`/${tenantSlug}/leads/import`} />
+                  <GuideItem done={values.onboarding.createdDealDone} title="Create first deal" href={`/${tenantSlug}/deals`} />
+                  <GuideItem done={values.onboarding.followUpSentDone} title="Send first follow-up" href={`/${tenantSlug}/activities?channel=WHATSAPP`} />
+                  <GuideItem done={values.onboarding.firstTaskDone} title="Complete first task" href={`/${tenantSlug}/activities?status=PENDING`} />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
-      {openBuilder ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-2xl">
+      <ModalOverlay open={openBuilder} onClose={() => setOpenBuilder(false)} panelClassName={MODAL_PANEL_2XL}>
             <div className="flex shrink-0 items-start justify-between border-b border-foreground/10 px-5 py-4">
               <h2 className="text-lg font-semibold text-foreground">Dashboard Builder</h2>
               <button
@@ -2120,18 +2181,16 @@ export function DashboardWorkspace({
                 type="button"
                 disabled={pending}
                 onClick={saveBuilder}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
               >
+                  {pending ? <InlineSpinner /> : null}
                 {pending ? "Saving..." : "Save dashboard"}
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
-      {openGoal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-2xl">
+      <ModalOverlay open={openGoal} onClose={() => setOpenGoal(false)} panelClassName={MODAL_PANEL_2XL}>
             <div className="flex shrink-0 items-start justify-between border-b border-foreground/10 px-5 py-4">
               <h2 className="text-lg font-semibold text-foreground">Fiscal / Business Year Goals</h2>
               <button
@@ -2181,17 +2240,22 @@ export function DashboardWorkspace({
                       name="revenueTarget"
                       inputMode="decimal"
                       defaultValue={goal?.revenueTarget != null ? String(goal.revenueTarget) : ""}
+                      placeholder="Optional (e.g. 120000000)"
                       className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm text-muted">Pipeline target</label>
+                    <label className="mb-1 block text-sm text-muted">Pipeline target (optional)</label>
                     <input
                       name="pipelineTarget"
                       inputMode="decimal"
                       defaultValue={goal?.pipelineTarget != null ? String(goal.pipelineTarget) : ""}
+                      placeholder="Optional (open pipeline value target)"
                       className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
                     />
+                    <p className="mt-1 text-[11px] text-muted">
+                      Pipeline target is the total value of active/open deals you want in the pipeline (not collected cash).
+                    </p>
                   </div>
                 </div>
               </div>
@@ -2206,16 +2270,25 @@ export function DashboardWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
                 >
+                  {pending ? <InlineSpinner /> : null}
                   {pending ? "Saving..." : "Save goals"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
     </TenantPageShell>
+  );
+}
+
+function InlineSpinner() {
+  return (
+    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
   );
 }
 

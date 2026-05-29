@@ -5,6 +5,7 @@ import { ActivityStatus, ActivityType } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { createActivity, deleteActivity, completeActivity } from "@/app/[tenantSlug]/activities/actions";
 
 export type ActivityRow = {
@@ -220,8 +221,10 @@ export function ActivityFeed({
               <button
                 type="submit"
                 disabled={pending}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+                aria-busy={pending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
               >
+                {pending ? <ButtonSpinner /> : null}
                 {pending ? "Saving…" : "Log activity"}
               </button>
             </div>

@@ -13,8 +13,26 @@ function createPrisma() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrisma();
+/** Dev hot-reload keeps a global Prisma singleton; refresh if schema/client drift after `prisma generate`. */
+function isStaleDevClient(client: PrismaClient) {
+  if (process.env.NODE_ENV === "production") return false;
+  const probe = client as PrismaClient & { financeDocument?: { findMany?: unknown } };
+  return typeof probe.financeDocument?.findMany !== "function";
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+function getPrismaClient() {
+  const cached = globalForPrisma.prisma;
+  if (cached && !isStaleDevClient(cached)) return cached;
+
+  if (cached) {
+    void cached.$disconnect().catch(() => undefined);
+  }
+
+  const client = createPrisma();
+  if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
+  return client;
+}
+
+export const prisma = getPrismaClient();
 
 export default prisma;

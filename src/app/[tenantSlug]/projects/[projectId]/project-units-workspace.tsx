@@ -1,12 +1,25 @@
 "use client";
 
+import { ModalOverlay } from "@/components/modal-overlay";
+import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { createPricingPlan, createUnit, deleteUnit, reserveUnit, unreserveUnit, updateUnit } from "../actions";
+import { CurrencySelect } from "@/components/finance/currency-select";
+import { ButtonSpinner } from "@/components/button-spinner";
+import {
+  createPricingPlan,
+  createUnit,
+  deletePricingPlan,
+  deleteUnit,
+  reserveUnit,
+  unreserveUnit,
+  updatePricingPlan,
+  updateUnit,
+} from "../actions";
 
 type UnitRow = {
   id: string;
@@ -29,6 +42,7 @@ type PricingPlanRow = {
   currency: string;
   initialDeposit: number | null;
   paymentDurationMonths: number | null;
+  unitsCount: number;
 };
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -42,6 +56,8 @@ export function ProjectUnitsWorkspace({
   suggestedLabels,
   units,
   pricingPlans,
+  currencies,
+  defaultCurrency,
 }: {
   tenantSlug: string;
   projectId: string;
@@ -50,6 +66,8 @@ export function ProjectUnitsWorkspace({
   suggestedLabels: string[];
   units: UnitRow[];
   pricingPlans: PricingPlanRow[];
+  currencies: string[];
+  defaultCurrency: string;
 }) {
   const [activeTab, setActiveTab] = useState<"units" | "pricing">("units");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -58,6 +76,8 @@ export function ProjectUnitsWorkspace({
   const [reservingUnit, setReservingUnit] = useState<UnitRow | null>(null);
   const [unreservingUnit, setUnreservingUnit] = useState<UnitRow | null>(null);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<PricingPlanRow | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState<PricingPlanRow | null>(null);
   const [state, formAction, pending] = useActionState(createUnit.bind(null, tenantSlug, projectId), initial);
   const [editState, editAction, editPending] = useActionState(
     updateUnit.bind(null, tenantSlug, projectId, editingUnit?.id ?? ""),
@@ -79,12 +99,21 @@ export function ProjectUnitsWorkspace({
     createPricingPlan.bind(null, tenantSlug, projectId),
     initial,
   );
+  const [editPlanState, editPlanAction, editPlanPending] = useActionState(
+    updatePricingPlan.bind(null, tenantSlug, projectId, editingPlan?.id ?? ""),
+    initial,
+  );
+  const [deletePlanState, deletePlanAction, deletePlanPending] = useActionState(
+    deletePricingPlan.bind(null, tenantSlug, projectId, deletingPlan?.id ?? ""),
+    initial,
+  );
   const [errors, setErrors] = useState<{ label?: string }>({});
   const [editErrors, setEditErrors] = useState<{ label?: string }>({});
   const { showSnackbar } = useSnackbar();
   const formRef = useRef<HTMLFormElement | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
   const pricingFormRef = useRef<HTMLFormElement | null>(null);
+  const editPlanFormRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     if (!state) return;
@@ -149,6 +178,26 @@ export function ProjectUnitsWorkspace({
       showSnackbar(pricingState.error, "error");
     }
   }, [pricingState, showSnackbar]);
+
+  useEffect(() => {
+    if (!editPlanState) return;
+    if (editPlanState.ok) {
+      showSnackbar("Pricing plan updated successfully.", "success");
+      setEditingPlan(null);
+    } else {
+      showSnackbar(editPlanState.error, "error");
+    }
+  }, [editPlanState, showSnackbar]);
+
+  useEffect(() => {
+    if (!deletePlanState) return;
+    if (deletePlanState.ok) {
+      showSnackbar("Pricing plan deleted.", "success");
+      setDeletingPlan(null);
+    } else {
+      showSnackbar(deletePlanState.error, "error");
+    }
+  }, [deletePlanState, showSnackbar]);
 
   function submitCreateUnit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -244,7 +293,10 @@ export function ProjectUnitsWorkspace({
           ) : (
             <div className="divide-y divide-foreground/10">
               {pricingPlans.map((plan) => (
-                <div key={plan.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-4">
+                <div
+                  key={plan.id}
+                  className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[1.2fr_1fr_1fr_1fr_auto] sm:items-center"
+                >
                   <p className="font-medium text-foreground">{plan.name}</p>
                   <p className="text-muted">
                     {plan.currency} {plan.price.toLocaleString()}
@@ -256,6 +308,24 @@ export function ProjectUnitsWorkspace({
                   <p className="text-muted">
                     Duration: {plan.paymentDurationMonths != null ? `${plan.paymentDurationMonths} months` : "—"}
                   </p>
+                  {canManage ? (
+                    <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setEditingPlan(plan)}
+                        className="text-xs font-semibold text-foreground underline decoration-foreground/30 underline-offset-2"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingPlan(plan)}
+                        className="text-xs font-semibold text-error underline decoration-error/30 underline-offset-2"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -334,9 +404,7 @@ export function ProjectUnitsWorkspace({
       </div>
       )}
 
-      {isCreateOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isCreateOpen)} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_XL}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Add unit</h2>
               <button
@@ -384,57 +452,56 @@ export function ProjectUnitsWorkspace({
                 {errors.label ? <FormFieldError>{errors.label}</FormFieldError> : null}
               </div>
 
-              <div>
-                <label htmlFor="unit-purpose" className="mb-1 block text-sm text-muted">
-                  Purpose
-                </label>
-                <UiSelect id="unit-purpose" name="purpose" defaultValue={UnitPurpose.SALE}>
-                  <option value={UnitPurpose.SALE}>For sale</option>
-                  <option value={UnitPurpose.SHORT_LET}>Short let</option>
-                  <option value={UnitPurpose.RENTAL}>Rental</option>
-                  <option value={UnitPurpose.HOSTEL}>Hostel</option>
-                </UiSelect>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="unit-purpose" className="mb-1 block text-sm text-muted">
+                    Purpose
+                  </label>
+                  <UiSelect id="unit-purpose" name="purpose" defaultValue={UnitPurpose.SALE}>
+                    <option value={UnitPurpose.SALE}>For sale</option>
+                    <option value={UnitPurpose.SHORT_LET}>Short let</option>
+                    <option value={UnitPurpose.RENTAL}>Rental</option>
+                    <option value={UnitPurpose.HOSTEL}>Hostel</option>
+                  </UiSelect>
+                </div>
+                <div>
+                  <label htmlFor="unit-status" className="mb-1 block text-sm text-muted">
+                    Status
+                  </label>
+                  <UiSelect id="unit-status" name="status" defaultValue={UnitStatus.AVAILABLE}>
+                    <option value={UnitStatus.AVAILABLE}>Available</option>
+                    <option value={UnitStatus.UNDER_CONSTRUCTION}>Under Construction</option>
+                    <option value={UnitStatus.RESERVED}>Reserved</option>
+                    <option value={UnitStatus.SOLD}>Sold</option>
+                  </UiSelect>
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="unit-type" className="mb-1 block text-sm text-muted">
-                  Layout (optional)
-                </label>
-                <input
-                  id="unit-type"
-                  name="unitType"
-                  placeholder="e.g. 3 Bedroom Duplex"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="unit-status" className="mb-1 block text-sm text-muted">
-                  Status
-                </label>
-                <UiSelect
-                  id="unit-status"
-                  name="status"
-                  defaultValue={UnitStatus.AVAILABLE}
-                >
-                  <option value={UnitStatus.AVAILABLE}>Available</option>
-                  <option value={UnitStatus.UNDER_CONSTRUCTION}>Under Construction</option>
-                  <option value={UnitStatus.RESERVED}>Reserved</option>
-                  <option value={UnitStatus.SOLD}>Sold</option>
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="unit-pricing-plan" className="mb-1 block text-sm text-muted">
-                  Pricing plan (optional)
-                </label>
-                <UiSelect id="unit-pricing-plan" name="pricingPlanId" defaultValue="">
-                  <option value="">No plan</option>
-                  {pricingPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name}
-                    </option>
-                  ))}
-                </UiSelect>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="unit-type" className="mb-1 block text-sm text-muted">
+                    Layout (optional)
+                  </label>
+                  <input
+                    id="unit-type"
+                    name="unitType"
+                    placeholder="e.g. 3 Bedroom Duplex"
+                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="unit-pricing-plan" className="mb-1 block text-sm text-muted">
+                    Pricing plan (optional)
+                  </label>
+                  <UiSelect id="unit-pricing-plan" name="pricingPlanId" defaultValue="">
+                    <option value="">No plan</option>
+                    {pricingPlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name}
+                      </option>
+                    ))}
+                  </UiSelect>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2">
@@ -448,19 +515,18 @@ export function ProjectUnitsWorkspace({
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={pending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
+                  {pending ? <ButtonSpinner /> : null}
                   {pending ? "Adding unit..." : "Add unit"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
       {editingUnit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setEditingUnit(null)} panelClassName={MODAL_PANEL_XL}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Edit unit</h2>
               <button
@@ -489,55 +555,59 @@ export function ProjectUnitsWorkspace({
                 />
                 {editErrors.label ? <FormFieldError>{editErrors.label}</FormFieldError> : null}
               </div>
-              <div>
-                <label htmlFor="unit-edit-purpose" className="mb-1 block text-sm text-muted">
-                  Purpose
-                </label>
-                <UiSelect id="unit-edit-purpose" name="purpose" defaultValue={editingUnit.purposeValue}>
-                  <option value={UnitPurpose.SALE}>For sale</option>
-                  <option value={UnitPurpose.SHORT_LET}>Short let</option>
-                  <option value={UnitPurpose.RENTAL}>Rental</option>
-                  <option value={UnitPurpose.HOSTEL}>Hostel</option>
-                </UiSelect>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="unit-edit-purpose" className="mb-1 block text-sm text-muted">
+                    Purpose
+                  </label>
+                  <UiSelect id="unit-edit-purpose" name="purpose" defaultValue={editingUnit.purposeValue}>
+                    <option value={UnitPurpose.SALE}>For sale</option>
+                    <option value={UnitPurpose.SHORT_LET}>Short let</option>
+                    <option value={UnitPurpose.RENTAL}>Rental</option>
+                    <option value={UnitPurpose.HOSTEL}>Hostel</option>
+                  </UiSelect>
+                </div>
+                <div>
+                  <label htmlFor="unit-edit-status" className="mb-1 block text-sm text-muted">
+                    Status
+                  </label>
+                  <UiSelect id="unit-edit-status" name="status" defaultValue={editingUnit.statusValue}>
+                    <option value={UnitStatus.AVAILABLE}>Available</option>
+                    <option value={UnitStatus.UNDER_CONSTRUCTION}>Under Construction</option>
+                    <option value={UnitStatus.RESERVED}>Reserved</option>
+                    <option value={UnitStatus.SOLD}>Sold</option>
+                  </UiSelect>
+                </div>
               </div>
-              <div>
-                <label htmlFor="unit-edit-type" className="mb-1 block text-sm text-muted">
-                  Layout (optional)
-                </label>
-                <input
-                  id="unit-edit-type"
-                  name="unitType"
-                  defaultValue={editingUnit.unitType === "Unspecified" ? "" : editingUnit.unitType}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label htmlFor="unit-edit-status" className="mb-1 block text-sm text-muted">
-                  Status
-                </label>
-                <UiSelect id="unit-edit-status" name="status" defaultValue={editingUnit.statusValue}>
-                  <option value={UnitStatus.AVAILABLE}>Available</option>
-                  <option value={UnitStatus.UNDER_CONSTRUCTION}>Under Construction</option>
-                  <option value={UnitStatus.RESERVED}>Reserved</option>
-                  <option value={UnitStatus.SOLD}>Sold</option>
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="unit-edit-pricing-plan" className="mb-1 block text-sm text-muted">
-                  Pricing plan (optional)
-                </label>
-                <UiSelect
-                  id="unit-edit-pricing-plan"
-                  name="pricingPlanId"
-                  defaultValue={editingUnit.pricingPlanId ?? ""}
-                >
-                  <option value="">No plan</option>
-                  {pricingPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name}
-                    </option>
-                  ))}
-                </UiSelect>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="unit-edit-type" className="mb-1 block text-sm text-muted">
+                    Layout (optional)
+                  </label>
+                  <input
+                    id="unit-edit-type"
+                    name="unitType"
+                    defaultValue={editingUnit.unitType === "Unspecified" ? "" : editingUnit.unitType}
+                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="unit-edit-pricing-plan" className="mb-1 block text-sm text-muted">
+                    Pricing plan (optional)
+                  </label>
+                  <UiSelect
+                    id="unit-edit-pricing-plan"
+                    name="pricingPlanId"
+                    defaultValue={editingUnit.pricingPlanId ?? ""}
+                  >
+                    <option value="">No plan</option>
+                    {pricingPlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name}
+                      </option>
+                    ))}
+                  </UiSelect>
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <button
@@ -550,19 +620,19 @@ export function ProjectUnitsWorkspace({
                 <button
                   type="submit"
                   disabled={editPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={editPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
+                  {editPending ? <ButtonSpinner /> : null}
                   {editPending ? "Saving..." : "Save changes"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {deletingUnit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setDeletingUnit(null)} panelClassName={MODAL_PANEL_SM}>
             <h2 className="text-lg font-semibold text-foreground">Delete unit?</h2>
             <p className="mt-2 text-sm text-muted">
               This will permanently remove <strong className="text-foreground">{deletingUnit.label}</strong>.
@@ -584,18 +654,18 @@ export function ProjectUnitsWorkspace({
               <button
                 type="submit"
                 disabled={deletePending || !deletingUnit.canDelete}
-                className="rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                aria-busy={deletePending}
+                className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
+                {deletePending ? <ButtonSpinner /> : null}
                 {deletePending ? "Deleting..." : "Delete"}
               </button>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {reservingUnit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setReservingUnit(null)} panelClassName={MODAL_PANEL_SM}>
             <h2 className="text-lg font-semibold text-foreground">Reserve unit?</h2>
             <p className="mt-2 text-sm text-muted">
               Reserve <strong className="text-foreground">{reservingUnit.label}</strong> for deal creation. This is
@@ -616,18 +686,18 @@ export function ProjectUnitsWorkspace({
               <button
                 type="submit"
                 disabled={reservePending || !reservingUnit.canReserve}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                aria-busy={reservePending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
               >
+                {reservePending ? <ButtonSpinner /> : null}
                 {reservePending ? "Reserving..." : "Reserve unit"}
               </button>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {unreservingUnit ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setUnreservingUnit(null)} panelClassName={MODAL_PANEL_SM}>
             <h2 className="text-lg font-semibold text-foreground">Unreserve unit?</h2>
             <p className="mt-2 text-sm text-muted">
               This will return <strong className="text-foreground">{unreservingUnit.label}</strong> to available.
@@ -647,18 +717,17 @@ export function ProjectUnitsWorkspace({
               <button
                 type="submit"
                 disabled={unreservePending || !unreservingUnit.canUnreserve}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                aria-busy={unreservePending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
               >
+                {unreservePending ? <ButtonSpinner /> : null}
                 {unreservePending ? "Unreserving..." : "Unreserve"}
               </button>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
-      {isPricingOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isPricingOpen)} onClose={() => setIsPricingOpen(false)} panelClassName={MODAL_PANEL_XL}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Add pricing plan</h2>
               <button
@@ -702,12 +771,10 @@ export function ProjectUnitsWorkspace({
                   <label htmlFor="plan-currency" className="mb-1 block text-sm text-muted">
                     Currency
                   </label>
-                  <input
+                  <CurrencySelect
                     id="plan-currency"
-                    name="currency"
-                    defaultValue="NGN"
-                    maxLength={3}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 uppercase text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                    currencies={currencies}
+                    defaultCurrency={defaultCurrency}
                   />
                 </div>
               </div>
@@ -748,14 +815,152 @@ export function ProjectUnitsWorkspace({
                 <button
                   type="submit"
                   disabled={pricingPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                  aria-busy={pricingPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
+                  {pricingPending ? <ButtonSpinner /> : null}
                   {pricingPending ? "Saving..." : "Save plan"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+      </ModalOverlay>
+
+      {editingPlan ? (
+        <ModalOverlay open onClose={() => setEditingPlan(null)} panelClassName={MODAL_PANEL_XL}>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-foreground">Edit pricing plan</h2>
+              <button
+                type="button"
+                onClick={() => setEditingPlan(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+                aria-label="Close modal"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+            <form ref={editPlanFormRef} action={editPlanAction} className="mt-4 space-y-3">
+              {editPlanState && !editPlanState.ok ? <FormAlert>{editPlanState.error}</FormAlert> : null}
+              <div>
+                <label htmlFor="plan-edit-name" className="mb-1 block text-sm text-muted">
+                  Plan name
+                </label>
+                <input
+                  id="plan-edit-name"
+                  name="name"
+                  defaultValue={editingPlan.name}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="plan-edit-price" className="mb-1 block text-sm text-muted">
+                    Price
+                  </label>
+                  <input
+                    id="plan-edit-price"
+                    name="price"
+                    inputMode="decimal"
+                    defaultValue={String(editingPlan.price)}
+                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="plan-edit-currency" className="mb-1 block text-sm text-muted">
+                    Currency
+                  </label>
+                  <CurrencySelect
+                    id="plan-edit-currency"
+                    currencies={currencies}
+                    defaultCurrency={defaultCurrency}
+                    defaultValue={editingPlan.currency}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="plan-edit-deposit" className="mb-1 block text-sm text-muted">
+                    Initial deposit (optional)
+                  </label>
+                  <input
+                    id="plan-edit-deposit"
+                    name="initialDeposit"
+                    inputMode="decimal"
+                    defaultValue={editingPlan.initialDeposit != null ? String(editingPlan.initialDeposit) : ""}
+                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="plan-edit-duration" className="mb-1 block text-sm text-muted">
+                    Duration (months)
+                  </label>
+                  <input
+                    id="plan-edit-duration"
+                    name="paymentDurationMonths"
+                    inputMode="numeric"
+                    defaultValue={
+                      editingPlan.paymentDurationMonths != null ? String(editingPlan.paymentDurationMonths) : ""
+                    }
+                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingPlan(null)}
+                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editPlanPending}
+                  aria-busy={editPlanPending}
+                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {editPlanPending ? <ButtonSpinner /> : null}
+                  {editPlanPending ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            </form>
+        </ModalOverlay>
+      ) : null}
+
+      {deletingPlan ? (
+        <ModalOverlay open onClose={() => setDeletingPlan(null)} panelClassName={MODAL_PANEL_SM}>
+            <h2 className="text-lg font-semibold text-foreground">Delete pricing plan?</h2>
+            <p className="mt-2 text-sm text-muted">
+              This will remove <strong className="text-foreground">{deletingPlan.name}</strong>.
+              {deletingPlan.unitsCount > 0 ? (
+                <>
+                  {" "}
+                  {deletingPlan.unitsCount} unit{deletingPlan.unitsCount === 1 ? "" : "s"} linked to this plan will
+                  show as having no plan.
+                </>
+              ) : null}
+            </p>
+            {deletePlanState && !deletePlanState.ok ? <FormAlert>{deletePlanState.error}</FormAlert> : null}
+            <form action={deletePlanAction} className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeletingPlan(null)}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={deletePlanPending}
+                aria-busy={deletePlanPending}
+                className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {deletePlanPending ? <ButtonSpinner /> : null}
+                {deletePlanPending ? "Deleting..." : "Delete plan"}
+              </button>
+            </form>
+        </ModalOverlay>
       ) : null}
     </div>
   );

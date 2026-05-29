@@ -1,5 +1,8 @@
 "use client";
 
+import { MODAL_PANEL_SM, MODAL_PANEL_XL } from "@/lib/modal-panel";
+import { SendFinanceEmailModal, type FinanceEmailModalMode } from "@/components/finance/send-finance-email-modal";
+import { ModalOverlay } from "@/components/modal-overlay";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -9,6 +12,7 @@ import {
   createExpenseRecord,
   createInvoiceRecord,
   createSalesReceiptRecord,
+  sendSalesReceiptRecord,
   createVendorBill,
   saveFinanceVendor,
   recordVendorBillPayment,
@@ -27,6 +31,7 @@ import {
   recordStandalonePayment,
   resolvePendingFinance,
   sendInvoiceRecord,
+  resendInvoiceRecord,
   sendInvoiceReminder,
   updateInvoiceRecord,
   voidInvoiceRecord,
@@ -83,8 +88,13 @@ type InvoiceRecordItem = {
   lastPaymentLabel: string;
   canRecordPayment: boolean;
   canSend: boolean;
+  canResend: boolean;
   canVoid: boolean;
   canSendReminder: boolean;
+  defaultEmail: string;
+  customerName: string;
+  pdfUrl: string | null;
+  sentToEmail: string | null;
   isOverdue: boolean;
   overdueDays: number;
   reminderCount: number;
@@ -221,10 +231,14 @@ type SalesReceiptRow = {
   receiptNumber: string;
   title: string;
   customerName: string;
+  defaultEmail: string;
   amountLabel: string;
   paymentMode: string;
   depositAccount: string;
   issuedAtLabel: string;
+  sentToEmail: string | null;
+  sentAtLabel: string | null;
+  pdfUrl: string | null;
 };
 
 type MasterLogRow = {
@@ -532,6 +546,8 @@ export function FinanceWorkspace({
   const [showFinanceOverviewHelp, setShowFinanceOverviewHelp] = useState(false);
   const [paymentsViewTab, setPaymentsViewTab] = useState<"all" | "invoiced" | "direct">("all");
   const [isCreateDirectPaymentOpen, setIsCreateDirectPaymentOpen] = useState(false);
+  const [sendReceipt, setSendReceipt] = useState<SalesReceiptRow | null>(null);
+  const [emailInvoice, setEmailInvoice] = useState<{ invoice: InvoiceRecordItem; mode: FinanceEmailModalMode } | null>(null);
 
   useEffect(() => {
     setVendorOptions(financeVendors);
@@ -891,6 +907,43 @@ export function FinanceWorkspace({
     router.refresh();
   }
 
+  async function handleSendInvoiceEmail(input: { email: string; customPaymentInstructions: string }) {
+    if (!emailInvoice || actionPending) return;
+    setActionPending(true);
+    const { invoice, mode } = emailInvoice;
+    const payload = { toEmail: input.email, customPaymentInstructions: input.customPaymentInstructions || undefined };
+    const result =
+      mode === "remind"
+        ? await sendInvoiceReminder(tenantSlug, invoice.id, payload)
+        : mode === "resend"
+          ? await resendInvoiceRecord(tenantSlug, invoice.id, payload)
+          : await sendInvoiceRecord(tenantSlug, invoice.id, payload);
+    setActionPending(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    const label =
+      mode === "remind" ? "Reminder sent" : mode === "resend" ? "Invoice resent" : "Invoice sent";
+    showSnackbar(`${label} to ${input.email}. Copy filed in Finance documents.`, "success");
+    setEmailInvoice(null);
+    router.refresh();
+  }
+
+  async function handleSendSalesReceipt(input: { email: string; customPaymentInstructions: string }) {
+    if (!sendReceipt || actionPending) return;
+    setActionPending(true);
+    const result = await sendSalesReceiptRecord(tenantSlug, sendReceipt.id, { toEmail: input.email });
+    setActionPending(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar(`Receipt sent to ${input.email}. Copy filed in Finance documents.`, "success");
+    setSendReceipt(null);
+    router.refresh();
+  }
+
   async function uploadExpenseAttachment(file: File) {
     if (uploadPending) return;
     setUploadPending(true);
@@ -937,18 +990,14 @@ export function FinanceWorkspace({
     }
   }
 
-  async function handleSendInvoice(invoice: InvoiceRecordItem) {
+  function handleSendInvoice(invoice: InvoiceRecordItem) {
     if (actionPending || !invoice.canSend) return;
-    setActionPending(true);
-    const result = await sendInvoiceRecord(tenantSlug, invoice.id);
-    if (!result.ok) {
-      showSnackbar(result.error, "error");
-      setActionPending(false);
-      return;
-    }
-    showSnackbar("Invoice sent.", "success");
-    setActionPending(false);
-    router.refresh();
+    setEmailInvoice({ invoice, mode: "send" });
+  }
+
+  function handleResendInvoice(invoice: InvoiceRecordItem) {
+    if (actionPending || !invoice.canResend) return;
+    setEmailInvoice({ invoice, mode: "resend" });
   }
 
   async function handleVoidInvoice(invoice: InvoiceRecordItem) {
@@ -965,18 +1014,9 @@ export function FinanceWorkspace({
     router.refresh();
   }
 
-  async function handleSendReminder(invoice: InvoiceRecordItem) {
+  function handleSendReminder(invoice: InvoiceRecordItem) {
     if (actionPending || !invoice.canSendReminder) return;
-    setActionPending(true);
-    const result = await sendInvoiceReminder(tenantSlug, invoice.id);
-    if (!result.ok) {
-      showSnackbar(result.error, "error");
-      setActionPending(false);
-      return;
-    }
-    showSnackbar("Reminder sent.", "success");
-    setActionPending(false);
-    router.refresh();
+    setEmailInvoice({ invoice, mode: "remind" });
   }
 
   async function handleBulkReminders() {
@@ -2052,13 +2092,21 @@ export function FinanceWorkspace({
                       New expense
                     </button>
                   ) : recordsTab === "receipts" ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsCreateReceiptOpen(true)}
-                      className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
-                    >
-                      New sales receipt
-                    </button>
+                    <>
+                      <Link
+                        href={`/${tenantSlug}/finance/documents`}
+                        className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-foreground/[0.06]"
+                      >
+                        Finance documents
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreateReceiptOpen(true)}
+                        className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
+                      >
+                        New sales receipt
+                      </button>
+                    </>
                   ) : recordsTab === "invoices" ? (
                     <button
                       type="button"
@@ -2163,6 +2211,14 @@ export function FinanceWorkspace({
                               </button>
                               <button
                                 type="button"
+                                disabled={!invoice.canResend || actionPending}
+                                onClick={() => handleResendInvoice(invoice)}
+                                className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
+                              >
+                                Resend
+                              </button>
+                              <button
+                                type="button"
                                 disabled={!invoice.canSendReminder || actionPending}
                                 onClick={() => handleSendReminder(invoice)}
                                 className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
@@ -2200,6 +2256,8 @@ export function FinanceWorkspace({
                         <th className="px-3 py-2">Payment Mode</th>
                         <th className="px-3 py-2">Deposit Account</th>
                         <th className="px-3 py-2">Issued</th>
+                        <th className="px-3 py-2">Sent</th>
+                        {canManageFinance ? <th className="px-3 py-2">Actions</th> : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
@@ -2214,6 +2272,48 @@ export function FinanceWorkspace({
                           <td className="px-3 py-2">{receipt.paymentMode}</td>
                           <td className="px-3 py-2">{receipt.depositAccount}</td>
                           <td className="px-3 py-2">{receipt.issuedAtLabel}</td>
+                          <td className="px-3 py-2 text-muted">
+                            {receipt.sentAtLabel ? (
+                              <>
+                                <p className="text-xs">{receipt.sentAtLabel}</p>
+                                {receipt.sentToEmail ? (
+                                  <p className="text-xs text-muted">{receipt.sentToEmail}</p>
+                                ) : null}
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          {canManageFinance ? (
+                            <td className="px-3 py-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Link
+                                  href={`/${tenantSlug}/finance/sales-receipts/${receipt.id}`}
+                                  className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                                >
+                                  View
+                                </Link>
+                                {receipt.pdfUrl ? (
+                                  <a
+                                    href={receipt.pdfUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                                  >
+                                    Download
+                                  </a>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  disabled={actionPending}
+                                  onClick={() => setSendReceipt(receipt)}
+                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
+                                >
+                                  {receipt.sentAtLabel ? "Resend" : "Send"}
+                                </button>
+                              </div>
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                     </tbody>
@@ -3615,9 +3715,7 @@ export function FinanceWorkspace({
       ) : null}
 
 
-      {isCreateInvoiceOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isCreateInvoiceOpen)} onClose={() => setIsCreateInvoiceOpen(false)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Create invoice</h2>
               <button
@@ -3723,13 +3821,10 @@ export function FinanceWorkspace({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
-      {isCreateReceiptOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isCreateReceiptOpen)} onClose={() => setIsCreateReceiptOpen(false)} panelClassName={MODAL_PANEL_XL}>
+        
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Create sales receipt</h2>
@@ -3857,13 +3952,9 @@ export function FinanceWorkspace({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
-      {isCreateExpenseOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isCreateExpenseOpen)} onClose={() => setIsCreateExpenseOpen(false)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Create expense</h2>
               <button
@@ -4008,9 +4099,7 @@ export function FinanceWorkspace({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
       <RecordVendorBillModal
         open={isCreateBillOpen}
@@ -4026,8 +4115,7 @@ export function FinanceWorkspace({
       />
 
       {paymentBill ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setPaymentBill(null)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Pay vendor bill</h2>
               <button
@@ -4090,13 +4178,11 @@ export function FinanceWorkspace({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {paymentInvoice ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setPaymentInvoice(null)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Record payment</h2>
               <button
@@ -4230,13 +4316,10 @@ export function FinanceWorkspace({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
-      {isCreateDirectPaymentOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+      <ModalOverlay open={Boolean(isCreateDirectPaymentOpen)} onClose={() => setIsCreateDirectPaymentOpen(false)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Record direct payment</h2>
               <button
@@ -4357,13 +4440,10 @@ export function FinanceWorkspace({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+      </ModalOverlay>
 
       {editingInvoice ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl">
+        <ModalOverlay open onClose={() => setEditingInvoice(null)} panelClassName={MODAL_PANEL_SM}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Edit invoice</h2>
               <button
@@ -4466,13 +4546,16 @@ export function FinanceWorkspace({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalOverlay>
       ) : null}
 
       {timelineTarget ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-[1px]">
-          <div className="h-full w-full max-w-md overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl">
+        <ModalOverlay
+          open
+          onClose={() => setTimelineTarget(null)}
+          variant="drawer"
+          panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl"
+        >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Entity Timeline</h2>
@@ -4506,8 +4589,39 @@ export function FinanceWorkspace({
                 ))}
               </ul>
             )}
-          </div>
-        </div>
+        </ModalOverlay>
+      ) : null}
+
+      {sendReceipt ? (
+        <SendFinanceEmailModal
+          open
+          onClose={() => setSendReceipt(null)}
+          mode="send"
+          documentLabel="receipt"
+          documentNumber={sendReceipt.receiptNumber}
+          customerName={sendReceipt.customerName === "—" ? "" : sendReceipt.customerName}
+          defaultEmail={sendReceipt.defaultEmail}
+          tenantSlug={tenantSlug}
+          hasBankAccounts={financeOptions.bankAccounts.length > 0}
+          pending={actionPending}
+          onSend={handleSendSalesReceipt}
+        />
+      ) : null}
+
+      {emailInvoice ? (
+        <SendFinanceEmailModal
+          open
+          onClose={() => setEmailInvoice(null)}
+          mode={emailInvoice.mode}
+          documentLabel="invoice"
+          documentNumber={emailInvoice.invoice.invoiceNumber}
+          customerName={emailInvoice.invoice.customerName}
+          defaultEmail={emailInvoice.invoice.defaultEmail || emailInvoice.invoice.sentToEmail || ""}
+          tenantSlug={tenantSlug}
+          hasBankAccounts={financeOptions.bankAccounts.length > 0}
+          pending={actionPending}
+          onSend={handleSendInvoiceEmail}
+        />
       ) : null}
     </div>
   );

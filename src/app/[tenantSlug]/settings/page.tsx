@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { MembershipRole } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { mergeOrgDepartments } from "@/lib/org-departments";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { SettingsWorkspace } from "./settings-workspace";
@@ -26,6 +27,7 @@ const settingsSelect = {
   moduleShortLets: true,
   moduleHr: true,
   moduleTasks: true,
+  moduleClients: true,
   roleModuleGrants: true,
   orgDepartments: true,
   metaVerifyToken: true,
@@ -41,12 +43,23 @@ const settingsSelect = {
   financeCurrencies: true,
 } as const;
 
+const SETTINGS_TABS = ["profile", "organization", "modules", "integrations", "about"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+function parseSettingsTab(value: string | undefined): SettingsTab | undefined {
+  if (!value) return undefined;
+  return SETTINGS_TABS.includes(value as SettingsTab) ? (value as SettingsTab) : undefined;
+}
+
 export default async function TenantSettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
+  searchParams?: Promise<{ tab?: string }>;
 }) {
   const { tenantSlug } = await params;
+  const sp = searchParams ? await searchParams : {};
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -109,6 +122,7 @@ export default async function TenantSettingsPage({
     moduleShortLets: tenant.settings?.moduleShortLets ?? false,
     moduleHr: tenant.settings?.moduleHr ?? false,
     moduleTasks: tenant.settings?.moduleTasks ?? true,
+    moduleClients: tenant.settings?.moduleClients ?? false,
   };
 
   const roleModuleGrantsJson = JSON.stringify(
@@ -116,12 +130,7 @@ export default async function TenantSettingsPage({
     null,
     2,
   );
-  const orgDepartments = (tenant.settings?.orgDepartments as string[] | null | undefined) ?? [
-    "Finance",
-    "Sales",
-    "Marketing",
-    "Community",
-  ];
+  const orgDepartments = mergeOrgDepartments(tenant.settings?.orgDepartments as string[] | null | undefined);
 
   return (
     <div className="w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
@@ -132,6 +141,7 @@ export default async function TenantSettingsPage({
         <SettingsWorkspace
           tenantSlug={tenant.slug}
           tenantName={tenant.name}
+          initialTab={parseSettingsTab(sp.tab)}
           userDisplayName={user?.name || user?.email || "User"}
           userEmail={user?.email ?? null}
           canManageOrg={canManageOrg}

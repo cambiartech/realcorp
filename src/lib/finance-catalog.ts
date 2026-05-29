@@ -44,3 +44,10 @@ export function mergeCurrencyOptions(saved: unknown, defaultCurrency: string): s
   const merged = dc ? [dc, ...base.filter((x) => x.toUpperCase() !== dc)] : base;
   return Array.from(new Set(merged.map((x) => x.toUpperCase())));
 }
+
+export function resolveTenantCurrencies(
+  settings: { financeCurrencies?: unknown } | null | undefined,
+  defaultCurrency?: string | null,
+): string[] {
+  return mergeCurrencyOptions(settings?.financeCurrencies, defaultCurrency?.trim() || "NGN");
+}
