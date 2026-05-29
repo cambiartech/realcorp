@@ -13,7 +13,13 @@ export default async function PlatformHomePage() {
   const tenants = await prisma.tenant.findMany({
     orderBy: { createdAt: "desc" },
     take: 50,
-    include: { settings: true },
+    include: {
+      settings: true,
+      invitations: {
+        where: { acceptedAt: null },
+        select: { id: true, expiresAt: true },
+      },
+    },
   });
 
   return (
@@ -44,18 +50,23 @@ export default async function PlatformHomePage() {
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Modules</th>
               <th className="px-4 py-3">Created</th>
+              <th className="px-4 py-3">Invites</th>
             </tr>
           </thead>
           <tbody>
             {tenants.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-muted">
+                <td colSpan={7} className="px-4 py-12 text-center text-muted">
                   No tenants yet. Use{" "}
                   <strong className="text-foreground/90">Onboard new organization</strong>.
                 </td>
               </tr>
             ) : (
-              tenants.map((t) => (
+              tenants.map((t) => {
+                const now = new Date();
+                const pendingValid = t.invitations.filter((i) => i.expiresAt > now).length;
+                const pendingExpired = t.invitations.length - pendingValid;
+                return (
                 <tr
                   key={t.id}
                   className="border-b border-foreground/5 transition-colors hover:bg-foreground/[0.02]"
@@ -76,8 +87,21 @@ export default async function PlatformHomePage() {
                     />
                   </td>
                   <td className="px-4 py-3 text-muted">{t.createdAt.toISOString().slice(0, 10)}</td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/platform/tenants/${t.slug}`}
+                      className="text-xs font-semibold text-foreground underline underline-offset-2"
+                    >
+                      {t.invitations.length === 0
+                        ? "Send invite"
+                        : pendingExpired > 0 && pendingValid === 0
+                          ? "Expired — fix"
+                          : `${pendingValid} pending`}
+                    </Link>
+                  </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>

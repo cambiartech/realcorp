@@ -1,12 +1,12 @@
 "use server";
 
-import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
-import { getInviteBaseUrl, sendInviteEmail } from "@/lib/email";
+import { sendInviteEmail } from "@/lib/email";
+import { buildInviteUrl, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
 import { parseTeamInviteForm } from "@/lib/validators/team-invite";
 import { z } from "zod";
 
@@ -59,9 +59,8 @@ export async function inviteTenantMember(
 
   const email = parsed.data.email.toLowerCase();
   const role = parsed.data.role as MembershipRole;
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 14);
+  const token = newInviteToken();
+  const expiresAt = inviteExpiresAt();
 
   try {
     await prisma.invitation.create({
@@ -87,8 +86,7 @@ export async function inviteTenantMember(
     return { ok: false, error: "Could not create invite right now. Try again." };
   }
 
-  const base = getInviteBaseUrl();
-  const inviteUrl = `${base}/join?token=${token}`;
+  const inviteUrl = buildInviteUrl(token);
 
   const inviterLabel = session.user.name || session.user.email || "Organization admin";
   const emailResult = await sendInviteEmail({
@@ -230,16 +228,15 @@ export async function resendInvitation(
   let token = invite.token;
   let expiresAt = invite.expiresAt;
   if (expiresAt <= new Date()) {
-    token = randomBytes(32).toString("hex");
-    expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 14);
+    token = newInviteToken();
+    expiresAt = inviteExpiresAt();
     await prisma.invitation.update({
       where: { id: invite.id },
       data: { token, expiresAt },
     });
   }
 
-  const inviteUrl = `${getInviteBaseUrl()}/join?token=${token}`;
+  const inviteUrl = buildInviteUrl(token);
   const actorLabel = session.user.name || session.user.email || "Organization admin";
   const emailResult = await sendInviteEmail({
     to: invite.email,
@@ -260,6 +257,65 @@ export async function resendInvitation(
     summary: emailResult.ok
       ? `Resent invitation email to ${invite.email}.`
       : `Resend failed for ${invite.email}: ${emailResult.error}`,
+    metadata: { email: invite.email, role: invite.role, ok: emailResult.ok },
+  });
+
+  revalidatePath(`/${tenantSlug}/team`);
+  return emailResult.ok ? { ok: true } : { ok: false, error: emailResult.error || "Failed to send invite email." };
+}
+
+export async function refreshInvitationToken(
+  tenantSlug: string,
+  invitationId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true, name: true } });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  const canManage =
+    session.user.isPlatformAdmin ||
+    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
+  if (!canManage) return { ok: false, error: "Only organization admins can manage invites." };
+
+  const invite = await prisma.invitation.findFirst({
+    where: { id: invitationId, tenantId: tenant.id, acceptedAt: null },
+    select: { id: true, email: true, role: true },
+  });
+  if (!invite) return { ok: false, error: "Invite not found or already accepted." };
+
+  const token = newInviteToken();
+  await prisma.invitation.update({
+    where: { id: invite.id },
+    data: { token, expiresAt: inviteExpiresAt() },
+  });
+
+  const inviteUrl = buildInviteUrl(token);
+  const actorLabel = session.user.name || session.user.email || "Organization admin";
+  const emailResult = await sendInviteEmail({
+    to: invite.email,
+    tenantName: tenant.name,
+    inviterLabel: actorLabel,
+    inviteUrl,
+    roleLabel: invite.role,
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "TEAM",
+    entityType: "INVITATION",
+    entityId: invite.id,
+    action: emailResult.ok ? "REFRESH_TOKEN_SENT" : "REFRESH_TOKEN_EMAIL_FAILED",
+    summary: emailResult.ok
+      ? `Refreshed invite token and emailed ${invite.email}.`
+      : `Token refreshed but email failed for ${invite.email}: ${emailResult.error}`,
     metadata: { email: invite.email, role: invite.role, ok: emailResult.ok },
   });
 

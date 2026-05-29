@@ -64,18 +64,32 @@ export function OnboardingForm() {
             {state.tenantSlug}
           </code>
         </p>
-        <p className="mt-4 text-muted">
-          Send this invite link to the org admin (wire email in production):
-        </p>
+        {state.emailSent ? (
+          <p className="mt-4 text-muted">Invite email sent to the org admin.</p>
+        ) : (
+          <p className="mt-4 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-foreground">
+            Email could not be sent{state.emailError ? `: ${state.emailError}` : ""}. Copy the link below and send it
+            manually, or use Platform → Invites to resend later.
+          </p>
+        )}
+        <p className="mt-4 text-muted">Invite link (valid 14 days):</p>
         <p className="mt-2 break-all border border-foreground/10 bg-field p-3 font-mono text-xs text-foreground">
           {state.inviteUrl}
         </p>
-        <a
-          href="/platform"
-          className="mt-6 inline-block border border-foreground bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-        >
-          Back to platform
-        </a>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <a
+            href={`/platform/tenants/${state.tenantSlug}`}
+            className="inline-block border border-foreground bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          >
+            Manage invites
+          </a>
+          <a
+            href="/platform"
+            className="inline-block border border-foreground/15 px-4 py-2 text-sm font-medium text-foreground hover:bg-foreground/[0.06]"
+          >
+            Back to platform
+          </a>
+        </div>
       </div>
     );
   }

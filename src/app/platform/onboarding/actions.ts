@@ -4,12 +4,12 @@ import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { MembershipRole, TenantPlan, TenantStatus } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
-import { randomBytes } from "crypto";
+import { sendInviteEmail } from "@/lib/email";
+import { buildInviteUrl, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
 import { parseOrganizationOnboardingForm } from "@/lib/validators/organization";
-import { getInviteBaseUrl, sendInviteEmail } from "@/lib/email";
 
 export type OnboardResult =
-  | { ok: true; tenantSlug: string; inviteUrl: string }
+  | { ok: true; tenantSlug: string; inviteUrl: string; emailSent: boolean; emailError?: string }
   | { ok: false; error: string };
 
 export async function createOrganization(
@@ -43,9 +43,8 @@ export async function createOrganization(
     return { ok: false, error: "That organization URL slug is already taken." };
   }
 
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 14);
+  const token = newInviteToken();
+  const expiresAt = inviteExpiresAt();
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -82,11 +81,10 @@ export async function createOrganization(
 
   revalidatePath("/platform");
 
-  const base = getInviteBaseUrl();
-  const inviteUrl = `${base}/join?token=${token}`;
+  const inviteUrl = buildInviteUrl(token);
 
   const inviterLabel = session.user.name || session.user.email || "Platform admin";
-  void sendInviteEmail({
+  const emailResult = await sendInviteEmail({
     to: parsed.data.adminEmail,
     tenantName: parsed.data.organizationName,
     inviterLabel,
@@ -98,5 +96,7 @@ export async function createOrganization(
     ok: true,
     tenantSlug: parsed.data.slug,
     inviteUrl,
+    emailSent: emailResult.ok,
+    ...(emailResult.ok ? {} : { emailError: emailResult.error }),
   };
 }

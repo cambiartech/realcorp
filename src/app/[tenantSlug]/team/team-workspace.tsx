@@ -14,6 +14,7 @@ import { parseTeamInviteForm, zodTeamInviteIssuesToFieldRecord, type TeamInviteF
 import {
   deleteInvitation,
   inviteTenantMember,
+  refreshInvitationToken,
   resendInvitation,
   setMembershipStatus,
   updateMembershipRole,
@@ -284,6 +285,15 @@ function InvitesTable({
     router.refresh();
   }
 
+  async function handleRefresh(invite: PendingInviteRow) {
+    setPendingInviteId(invite.id);
+    const result = await refreshInvitationToken(tenantSlug, invite.id);
+    setPendingInviteId(null);
+    if (result.ok) showSnackbar(`New link sent to ${invite.email}.`, "success");
+    else showSnackbar(result.error, "error");
+    router.refresh();
+  }
+
   async function handleDelete(invite: PendingInviteRow) {
     setPendingInviteId(invite.id);
     const result = await deleteInvitation(tenantSlug, invite.id);
@@ -324,6 +334,14 @@ function InvitesTable({
                       className="rounded border border-foreground/20 px-2 py-1 text-xs hover:bg-foreground/[0.06] disabled:opacity-50"
                     >
                       Resend
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleRefresh(invite)}
+                      disabled={pendingInviteId === invite.id}
+                      className="rounded border border-foreground/20 px-2 py-1 text-xs font-semibold hover:bg-foreground/[0.06] disabled:opacity-50"
+                    >
+                      New link
                     </button>
                     <button
                       type="button"
