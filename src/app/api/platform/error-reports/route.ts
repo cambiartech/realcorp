@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { Prisma } from "@/generated/prisma";
-import prisma from "@/lib/db";
+import {
+  capturePlatformErrorEvent,
+  cleanErrorMetadata,
+  normalizeErrorDigest,
+} from "@/lib/platform-error-capture";
+
+async function parseBody(request: Request): Promise<Record<string, unknown>> {
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return (await request.json()) as Record<string, unknown>;
+  }
+  const text = await request.text();
+  if (!text.trim()) return {};
+  return JSON.parse(text) as Record<string, unknown>;
+}
 
 function cleanText(value: unknown, max = 2000): string | null {
   if (typeof value !== "string") return null;
@@ -10,80 +23,33 @@ function cleanText(value: unknown, max = 2000): string | null {
   return trimmed.slice(0, max);
 }
 
-function cleanDigest(value: unknown): string | null {
-  const digest = cleanText(value, 128);
-  if (!digest) return null;
-  return digest.replace(/\s+/g, "");
-}
-
-function guessTenantSlug(pathname: string | null): string | null {
-  if (!pathname) return null;
-  const first = pathname.split("/").filter(Boolean)[0] || null;
-  if (!first) return null;
-  const reserved = new Set([
-    "api",
-    "platform",
-    "login",
-    "join",
-    "auth",
-    "f",
-    "privacy",
-    "terms",
-  ]);
-  return reserved.has(first) ? null : first;
-}
-
-function cleanMetadata(value: unknown): Prisma.InputJsonValue | undefined {
-  if (value === null || value === undefined) return undefined;
-  if (typeof value !== "object") return undefined;
-  try {
-    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-  } catch {
-    return undefined;
-  }
-}
-
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, unknown>;
-    const digest = cleanDigest(body.digest);
+    const body = await parseBody(request);
+    const digest = normalizeErrorDigest(body.digest);
     if (!digest) {
       return NextResponse.json({ ok: false, error: "Missing error reference." }, { status: 400 });
     }
 
     const pathname = cleanText(body.pathname, 512);
-    const requestUrl = cleanText(body.requestUrl, 1200);
     const session = await auth();
-    const userId = session?.user?.id || null;
-    const userEmail = session?.user?.email || null;
 
-    const tenantSlug = guessTenantSlug(pathname);
-    const tenant = tenantSlug
-      ? await prisma.tenant.findUnique({
-          where: { slug: tenantSlug },
-          select: { id: true },
-        })
-      : null;
-
-    await prisma.platformErrorEvent.create({
-      data: {
-        digest,
-        name: cleanText(body.name, 128),
-        message: cleanText(body.message, 2000),
-        stack: cleanText(body.stack, 12000),
-        routePath: pathname,
-        requestUrl,
-        tenantSlug,
-        tenantId: tenant?.id ?? null,
-        userId,
-        userEmail,
-        userAgent: cleanText(body.userAgent, 1024),
-        metadata: cleanMetadata(body.metadata),
-      },
+    await capturePlatformErrorEvent({
+      digest,
+      name: cleanText(body.name, 128),
+      message: cleanText(body.message, 2000),
+      stack: cleanText(body.stack, 12000),
+      routePath: pathname,
+      requestUrl: cleanText(body.requestUrl, 1200),
+      userId: session?.user?.id || null,
+      userEmail: session?.user?.email || null,
+      userAgent: cleanText(body.userAgent, 1024),
+      metadata: cleanErrorMetadata(body.metadata ?? { source: "global-error-boundary" }),
     });
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error("[platform-error-reports] capture failed", err);
     return NextResponse.json({ ok: false, error: "Could not capture error report." }, { status: 500 });
   }
 }

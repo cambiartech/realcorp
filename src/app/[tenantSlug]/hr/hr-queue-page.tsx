@@ -568,7 +568,12 @@ export default async function HrQueuePage({
     ),
     appraisalActionIds: monthlyAppraisalActionIds,
     leads: scoreLeads,
-    deals: scoreDeals,
+    deals: scoreDeals.map((d) => ({
+      assignedUserId: d.assignedUserId,
+      stage: d.stage,
+      value: d.value != null ? Number(d.value) : 0,
+      updatedAt: d.updatedAt,
+    })),
     activities: scoreActivities,
     goals: goals.map((g) => ({
       employeeProfileId: g.employeeProfileId,

@@ -25,21 +25,14 @@ export default function GlobalError({
       metadata: { source: "global-error-boundary" },
     });
 
-    try {
-      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-        const blob = new Blob([payload], { type: "application/json" });
-        navigator.sendBeacon("/api/platform/error-reports", blob);
-        return;
-      }
-      void fetch("/api/platform/error-reports", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: payload,
-        keepalive: true,
-      });
-    } catch {
+    void fetch("/api/platform/error-reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {
       // best-effort telemetry only
-    }
+    });
   }, [error]);
 
   return (
