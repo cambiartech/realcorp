@@ -232,6 +232,69 @@ export async function platformLookupInviteToken(token: string): Promise<
   };
 }
 
+export async function platformLookupErrorReference(reference: string): Promise<
+  | {
+      ok: true;
+      digest: string;
+      count: number;
+      events: Array<{
+        id: string;
+        createdAt: string;
+        tenantSlug: string | null;
+        tenantName: string | null;
+        routePath: string | null;
+        requestUrl: string | null;
+        name: string | null;
+        message: string | null;
+        userEmail: string | null;
+        userAgent: string | null;
+        stack: string | null;
+      }>;
+    }
+  | { ok: false; error: string }
+> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const digest = reference.trim().replace(/\s+/g, "");
+  if (!digest) return { ok: false, error: "Paste an error reference." };
+
+  const [count, events] = await Promise.all([
+    prisma.platformErrorEvent.count({ where: { digest } }),
+    prisma.platformErrorEvent.findMany({
+      where: { digest },
+      include: {
+        tenant: { select: { name: true, slug: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+    }),
+  ]);
+
+  if (count === 0) {
+    return { ok: false, error: "No matching error reports yet for this reference." };
+  }
+
+  return {
+    ok: true,
+    digest,
+    count,
+    events: events.map((event) => ({
+      id: event.id,
+      createdAt: event.createdAt.toISOString(),
+      tenantSlug: event.tenant?.slug ?? event.tenantSlug ?? null,
+      tenantName: event.tenant?.name ?? null,
+      routePath: event.routePath,
+      requestUrl: event.requestUrl,
+      name: event.name,
+      message: event.message,
+      userEmail: event.userEmail,
+      userAgent: event.userAgent,
+      stack: event.stack,
+    })),
+  };
+}
+
 export async function updateTenantShortLetsAddon(tenantId: string, enabled: boolean) {
   const session = await auth();
   if (!session?.user?.isPlatformAdmin) {

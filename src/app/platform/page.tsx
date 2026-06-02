@@ -2,6 +2,7 @@ import Link from "next/link";
 import prisma from "@/lib/db";
 import { normalizeTenantModuleFlags, tenantModuleSummary } from "@/lib/tenant-module-definitions";
 import { PlatformModulesForm } from "./modules-form";
+import { ErrorReferenceLookup } from "./error-reference-lookup";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,8 @@ export default async function PlatformHomePage() {
       >
         Onboard new organization
       </Link>
+
+      <ErrorReferenceLookup />
 
       <div className="mt-10 overflow-hidden border border-foreground/10">
         <table className="w-full text-left text-sm">

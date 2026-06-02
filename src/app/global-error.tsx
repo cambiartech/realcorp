@@ -11,6 +11,35 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("[global-error]", error);
+    const digest = typeof error.digest === "string" ? error.digest : null;
+    if (!digest || typeof window === "undefined") return;
+
+    const payload = JSON.stringify({
+      digest,
+      name: error.name || null,
+      message: error.message || null,
+      stack: typeof error.stack === "string" ? error.stack : null,
+      pathname: window.location.pathname,
+      requestUrl: window.location.href,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      metadata: { source: "global-error-boundary" },
+    });
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        const blob = new Blob([payload], { type: "application/json" });
+        navigator.sendBeacon("/api/platform/error-reports", blob);
+        return;
+      }
+      void fetch("/api/platform/error-reports", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: payload,
+        keepalive: true,
+      });
+    } catch {
+      // best-effort telemetry only
+    }
   }, [error]);
 
   return (

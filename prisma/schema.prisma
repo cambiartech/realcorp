@@ -135,6 +135,7 @@ model Tenant {
   leadCaptureForms     LeadCaptureForm[]
   leadCaptureSessions  LeadCaptureFormSession[]
   leadCaptureEvents    LeadCaptureFormEvent[]
+  platformErrorEvents  PlatformErrorEvent[]
 }
 
 model TenantSettings {
@@ -943,6 +944,29 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, module])
   @@index([tenantId, entityType])
+}
+
+model PlatformErrorEvent {
+  id         String   @id @default(cuid())
+  digest     String
+  name       String?
+  message    String?
+  stack      String?
+  routePath  String?
+  requestUrl String?
+  tenantSlug String?
+  tenantId   String?
+  userId     String?
+  userEmail  String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([digest, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantSlug, createdAt])
 }
 
 // ——— Human Resources (People management) ———

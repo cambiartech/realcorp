@@ -30,8 +30,10 @@ export function PayslipPrintView({
   calc: PayslipCalculation;
 }) {
   const money = (n: number) => `${currency} ${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const earningsRows = Array.isArray(calc.earnings) ? calc.earnings : [];
+  const deductionRows = Array.isArray(calc.deductions) ? calc.deductions : [];
 
-  const bht = calc.earnings
+  const bht = earningsRows
     .filter((e) => ["B", "H", "T"].includes(e.code))
     .reduce((sum, e) => sum + e.amount, 0);
 
@@ -79,7 +81,7 @@ export function PayslipPrintView({
           </tr>
         </thead>
         <tbody>
-          {calc.earnings.map((row) => (
+          {earningsRows.map((row) => (
             <tr key={row.code}>
               <td className="border border-slate-200 px-3 py-2">{row.label.replace(/\s*\(\d+%\)/, "")}</td>
               <td className="border border-slate-200 px-3 py-2 text-right text-slate-600">{row.percent}%</td>
@@ -108,7 +110,7 @@ export function PayslipPrintView({
           </tr>
         </thead>
         <tbody>
-          {calc.deductions.map((row) => (
+          {deductionRows.map((row) => (
             <tr key={row.code}>
               <td className="border border-slate-200 px-3 py-2">{row.label}</td>
               <td className="border border-slate-200 px-3 py-2 text-right font-medium">{money(row.amount)}</td>

@@ -37,6 +37,46 @@ function bankField(bank: unknown, key: string): string {
   return typeof v === "string" ? v : "";
 }
 
+function normalizePayslipEarnings(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const item = row as Record<string, unknown>;
+      const code = typeof item.code === "string" ? item.code : "";
+      const label = typeof item.label === "string" ? item.label : "";
+      const percent = Number(item.percent);
+      const amount = Number(item.amount);
+      if (!code) return null;
+      return {
+        code,
+        label,
+        percent: Number.isFinite(percent) ? percent : 0,
+        amount: Number.isFinite(amount) ? amount : 0,
+      };
+    })
+    .filter((row): row is { code: string; label: string; percent: number; amount: number } => Boolean(row));
+}
+
+function normalizePayslipDeductions(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const item = row as Record<string, unknown>;
+      const code = typeof item.code === "string" ? item.code : "";
+      const label = typeof item.label === "string" ? item.label : "";
+      const amount = Number(item.amount);
+      if (!code) return null;
+      return {
+        code,
+        label,
+        amount: Number.isFinite(amount) ? amount : 0,
+      };
+    })
+    .filter((row): row is { code: string; label: string; amount: number } => Boolean(row));
+}
+
 export default async function HrQueuePage({
   params,
   tab,
@@ -635,8 +675,8 @@ export default async function HrQueuePage({
         statusValue: r.status,
         payslipCount: r.payslips.length,
         payslips: r.payslips.map((s) => {
-          const earnings = (s.earningsBreakdown as { code: string; label: string; percent: number; amount: number }[]) || [];
-          const deductions = (s.deductionsBreakdown as { code: string; label: string; amount: number }[]) || [];
+          const earnings = normalizePayslipEarnings(s.earningsBreakdown);
+          const deductions = normalizePayslipDeductions(s.deductionsBreakdown);
           return {
             id: s.id,
             employeeName: s.profile.fullName || "Unnamed",

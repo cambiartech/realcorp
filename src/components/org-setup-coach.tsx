@@ -149,9 +149,9 @@ export function OrgSetupCoach({
           <div className="p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                {/* <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
                   Setup coach · optional steps can be skipped
-                </p>
+                </p> */}
                 <p className="mt-0.5 text-sm font-semibold text-foreground">
                   {skipMessage
                     ? "Okay, moving on"
