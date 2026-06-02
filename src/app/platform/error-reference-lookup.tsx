@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { platformLookupErrorReference } from "./actions";
 
-export function ErrorReferenceLookup() {
+export function ErrorReferenceLookup({ className = "mt-8" }: { className?: string }) {
   const [reference, setReference] = useState("");
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof platformLookupErrorReference>> | null>(null);
@@ -18,17 +18,16 @@ export function ErrorReferenceLookup() {
   }
 
   return (
-    <section className="mt-8 rounded-lg border border-foreground/10 p-5">
-      <h2 className="text-base font-semibold text-foreground">Error reference lookup</h2>
+    <section className={`${className} rounded-lg border border-foreground/10 p-5`}>
+      <h2 className="text-base font-semibold text-foreground">Look up reference</h2>
       <p className="mt-1 text-sm text-muted">
-        Paste a reference from the error page (for example <code className="text-xs">2304455338</code>) to inspect tenant,
-        route, message, and stack traces.
+        Paste the error reference from the failed page, then click Look up error.
       </p>
       <form onSubmit={handleLookup} className="mt-4 flex flex-wrap gap-2">
         <input
           value={reference}
           onChange={(e) => setReference(e.target.value)}
-          placeholder="2304455338"
+          placeholder="1520750018"
           className="min-w-[220px] flex-1 border border-foreground/15 bg-field px-3 py-2 font-mono text-xs text-foreground"
         />
         <button

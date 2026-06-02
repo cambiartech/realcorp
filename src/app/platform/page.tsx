@@ -2,8 +2,6 @@ import Link from "next/link";
 import prisma from "@/lib/db";
 import { normalizeTenantModuleFlags, tenantModuleSummary } from "@/lib/tenant-module-definitions";
 import { PlatformModulesForm } from "./modules-form";
-import { ErrorReferenceLookup } from "./error-reference-lookup";
-
 export const dynamic = "force-dynamic";
 
 export const metadata = {
@@ -41,7 +39,12 @@ export default async function PlatformHomePage() {
         Onboard new organization
       </Link>
 
-      <ErrorReferenceLookup />
+      <p className="mt-4 text-sm text-muted">
+        Debug a production crash?{" "}
+        <Link href="/platform/errors" className="font-semibold text-foreground underline underline-offset-2">
+          Error lookup →
+        </Link>
+      </p>
 
       <div className="mt-10 overflow-hidden border border-foreground/10">
         <table className="w-full text-left text-sm">
