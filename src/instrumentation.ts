@@ -1,6 +1,4 @@
-import { cleanErrorMetadata, capturePlatformErrorEvent, guessTenantSlugFromPath } from "@/lib/platform-error-capture";
-
-/** Server-side error capture — runs when RSC / route handlers throw (reliable digest logging). */
+/** Server-side error capture — use dynamic imports only, never top-level Prisma imports. */
 export async function onRequestError(
   error: Error & { digest?: string },
   request: { path: string; method: string },
@@ -11,6 +9,7 @@ export async function onRequestError(
     renderSource?: string;
   },
 ) {
+  // Only run in Node.js runtime — Prisma/pg don't work in Edge
   if (process.env.NEXT_RUNTIME === "edge") return;
   if (request.path.startsWith("/api/platform/error-reports")) return;
 
@@ -18,6 +17,10 @@ export async function onRequestError(
   if (!digest) return;
 
   try {
+    // Dynamic import keeps Prisma out of the Edge bundle entirely
+    const { capturePlatformErrorEvent, cleanErrorMetadata, guessTenantSlugFromPath } =
+      await import("@/lib/platform-error-capture");
+
     await capturePlatformErrorEvent({
       digest,
       name: error.name || "Error",
@@ -35,7 +38,7 @@ export async function onRequestError(
         renderSource: context.renderSource ?? null,
       }),
     });
-  } catch (reportErr) {
-    console.error("[platform-error-capture] onRequestError failed", reportErr);
+  } catch {
+    // best-effort — never crash the app over telemetry
   }
 }
