@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 function cleanText(value: unknown, max = 2000): string | null {
@@ -30,6 +31,16 @@ function guessTenantSlug(pathname: string | null): string | null {
     "terms",
   ]);
   return reserved.has(first) ? null : first;
+}
+
+function cleanMetadata(value: unknown): Prisma.InputJsonValue | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "object") return undefined;
+  try {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function POST(request: Request) {
@@ -67,10 +78,7 @@ export async function POST(request: Request) {
         userId,
         userEmail,
         userAgent: cleanText(body.userAgent, 1024),
-        metadata:
-          body.metadata && typeof body.metadata === "object"
-            ? (body.metadata as Record<string, unknown>)
-            : undefined,
+        metadata: cleanMetadata(body.metadata),
       },
     });
 
