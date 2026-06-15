@@ -1,4 +1,4 @@
-import { sendWhatsAppText } from "@/lib/whatsapp";
+import { sendWhatsAppText, toWhatsAppPhone } from "@/lib/whatsapp";
 import prisma from "@/lib/db";
 
 const DEFAULT_AUTO_MESSAGE =
@@ -15,14 +15,9 @@ export function renderCaptureFormWhatsAppMessage(
     .replace(/\{org_name\}/gi, vars.tenantName);
 }
 
-/** Normalize phone for WhatsApp Cloud API (digits only, Nigeria-friendly). */
+/** Normalize phone for WhatsApp Cloud API. Delegates to the shared helper. */
 export function normalizeWhatsAppPhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  if (digits.startsWith("234")) return digits;
-  if (digits.startsWith("0")) return `234${digits.slice(1)}`;
-  if (digits.length === 10) return `234${digits}`;
-  return digits;
+  return toWhatsAppPhone(raw);
 }
 
 export async function sendCaptureFormAutoWhatsApp(params: {
@@ -55,6 +50,7 @@ export async function sendCaptureFormAutoWhatsApp(params: {
       tenantId: params.tenantId,
       leadId: params.leadId,
       direction: "OUTBOUND",
+      waMessageId: sent.messageId,
       body: params.message,
       fromPhone: settings.whatsappPhoneNumberId,
       toPhone: to,

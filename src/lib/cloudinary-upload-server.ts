@@ -148,7 +148,7 @@ export async function uploadBufferToCloudinary(input: {
     const response = await fetch(uploadUrl, { method: "POST", body });
     const json = (await response.json()) as { secure_url?: string; public_id?: string; error?: { message?: string } };
     if (!response.ok || !json.secure_url) {
-      return { ok: false, error: json.error?.message || "Cloudinary upload failed." };
+      return { ok: false, error: json.error?.message || "File upload failed." };
     }
     return { ok: true, secureUrl: json.secure_url, publicId: json.public_id || publicId };
   } catch {

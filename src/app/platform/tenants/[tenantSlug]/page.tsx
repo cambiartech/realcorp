@@ -8,6 +8,8 @@ import {
   classifyInvite,
   inviteStatusLabel,
 } from "@/lib/invitation-utils";
+import { normalizeTenantModuleFlags, tenantModuleSummary } from "@/lib/tenant-module-definitions";
+import { PlatformModulesForm } from "../../modules-form";
 import { TenantInvitesWorkspace, type PlatformInviteRow } from "./tenant-invites-workspace";
 import { InviteTokenLookup } from "../../invite-token-lookup";
 
@@ -34,6 +36,7 @@ export default async function PlatformTenantInvitesPage({
       id: true,
       name: true,
       slug: true,
+      settings: true,
       invitations: {
         orderBy: { createdAt: "desc" },
         take: 50,
@@ -75,8 +78,21 @@ export default async function PlatformTenantInvitesPage({
       </Link>
       <h1 className="mt-4 text-2xl font-bold text-foreground">{tenant.name}</h1>
       <p className="mt-1 text-sm text-muted">
-        Manage onboarding invites for <code className="font-mono text-xs">/{tenant.slug}</code>
+        Manage onboarding invites and module entitlements for <code className="font-mono text-xs">/{tenant.slug}</code>
       </p>
+
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <PlatformModulesForm
+          tenantId={tenant.id}
+          tenantName={tenant.name}
+          tenantSlug={tenant.slug}
+          summary={tenantModuleSummary(tenant.settings)}
+          initial={normalizeTenantModuleFlags(tenant.settings)}
+        />
+        <Link href={`/${tenant.slug}`} className="text-sm text-muted underline underline-offset-2 hover:text-foreground">
+          Open tenant workspace →
+        </Link>
+      </div>
 
       <div className="mt-8 space-y-8">
         <InviteTokenLookup />

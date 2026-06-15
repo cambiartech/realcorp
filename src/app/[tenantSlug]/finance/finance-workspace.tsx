@@ -4079,7 +4079,7 @@ export function FinanceWorkspace({
                     ? `Attached: ${expenseAttachment.name}`
                     : uploadPending
                       ? "Uploading..."
-                      : "If Cloudinary is not configured yet, continue without attachment."}
+                      : "If file storage is not configured yet, continue without attachment."}
                 </p>
               </div>
               <div className="flex justify-end gap-2">
@@ -4293,7 +4293,7 @@ export function FinanceWorkspace({
                     ? `Attached: ${paymentAttachment.name}`
                     : uploadPending
                       ? "Uploading..."
-                      : "If Cloudinary is not set yet, continue and add later."}
+                      : "If file storage is not set yet, continue and add later."}
                 </p>
               </div>
               <div className="flex justify-end gap-2">

@@ -1,8 +1,9 @@
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { isPortalOnlyRole } from "@/lib/tenant-nav-access";
 import prisma from "@/lib/db";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { DashboardWorkspace } from "./dashboard/dashboard-workspace";
 import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
 import { buildOrgSetupSteps, orgSetupProgress } from "@/lib/org-setup-checklist";
@@ -70,6 +71,10 @@ export default async function TenantHomePage({
   const isActive = membership?.status === MembershipStatus.ACTIVE;
   const canView = Boolean(session.user.isPlatformAdmin) || isActive;
   if (!canView) notFound();
+  // Investors / listing owners land on their portfolio, not the sales dashboard
+  if (!session.user.isPlatformAdmin && isPortalOnlyRole(membership?.role)) {
+    redirect(`/${tenantSlug}/portal`);
+  }
   assertTenantNavAccess(session, membership, tenant.settings, "dashboard");
 
   const role = (membership?.role || MembershipRole.SALES_EXECUTIVE) as MembershipRole;

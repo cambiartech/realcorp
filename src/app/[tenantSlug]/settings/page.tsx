@@ -38,6 +38,10 @@ const settingsSelect = {
   whatsappAccessToken: true,
   whatsappPhoneNumberId: true,
   whatsappVerifyToken: true,
+  whatsappBotEnabled: true,
+  moduleWhatsApp: true,
+  moduleListings: true,
+  moduleInvestorPortal: true,
   financeBankAccounts: true,
   financePaymentModes: true,
   financeCurrencies: true,
@@ -123,6 +127,9 @@ export default async function TenantSettingsPage({
     moduleHr: tenant.settings?.moduleHr ?? false,
     moduleTasks: tenant.settings?.moduleTasks ?? true,
     moduleClients: tenant.settings?.moduleClients ?? false,
+    moduleWhatsApp: tenant.settings?.moduleWhatsApp !== false,
+    moduleListings: tenant.settings?.moduleListings !== false,
+    moduleInvestorPortal: tenant.settings?.moduleInvestorPortal ?? false,
   };
 
   const roleModuleGrantsJson = JSON.stringify(
@@ -169,6 +176,8 @@ export default async function TenantSettingsPage({
             whatsappAccessToken: tenant.settings?.whatsappAccessToken ?? null,
             whatsappPhoneNumberId: tenant.settings?.whatsappPhoneNumberId ?? null,
             whatsappVerifyToken: tenant.settings?.whatsappVerifyToken ?? null,
+            whatsappBotEnabled: tenant.settings?.whatsappBotEnabled ?? false,
+            moduleWhatsApp: tenant.settings?.moduleWhatsApp !== false,
             logoUrl: tenant.settings?.logoUrl ?? null,
             financeBankAccounts: (tenant.settings?.financeBankAccounts as string[] | null | undefined) ?? [],
             financePaymentModes: (tenant.settings?.financePaymentModes as string[] | null | undefined) ?? [],

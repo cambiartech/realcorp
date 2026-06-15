@@ -58,7 +58,27 @@ type WhatsAppRow = {
   timestamp: string;
   fromPhone: string | null;
   toPhone: string | null;
+  status: string | null;
 };
+
+/** WhatsApp-style status ticks for outbound messages. */
+function WaStatusTicks({ status }: { status: string | null }) {
+  if (!status) return null;
+  if (status === "failed") {
+    return <span className="font-medium text-red-600" title="Failed to deliver">Failed</span>;
+  }
+  const double = status === "delivered" || status === "read";
+  const read = status === "read";
+  return (
+    <span
+      className={read ? "text-sky-500" : "text-muted"}
+      title={status === "sent" ? "Sent" : status === "delivered" ? "Delivered" : "Read"}
+      aria-label={status}
+    >
+      {double ? "✓✓" : "✓"}
+    </span>
+  );
+}
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 const initial: ActionResult | null = null;
@@ -322,7 +342,9 @@ export function LeadDetailWorkspace({
             </p>
             <div className="mb-6 rounded-lg border border-foreground/10 bg-foreground/[0.015] p-3">
               {whatsappMessages.length === 0 ? (
-                <p className="text-sm text-muted">No inbound WhatsApp messages yet.</p>
+                <p className="text-sm text-muted">
+                  No WhatsApp messages yet. Use the WhatsApp button above to start the conversation.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {whatsappMessages.map((msg) => {
@@ -333,8 +355,11 @@ export function LeadDetailWorkspace({
                         className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${inbound ? "mr-auto bg-foreground/[0.06]" : "ml-auto bg-emerald-500/10"}`}
                       >
                         <p className="whitespace-pre-wrap text-foreground">{msg.body}</p>
-                        <p className="mt-1 text-[11px] text-muted">
-                          {inbound ? "Inbound" : "Outbound"} · {new Date(msg.timestamp).toLocaleString()}
+                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
+                          <span>
+                            {inbound ? "Inbound" : "Outbound"} · {new Date(msg.timestamp).toLocaleString()}
+                          </span>
+                          {!inbound ? <WaStatusTicks status={msg.status} /> : null}
                         </p>
                       </div>
                     );

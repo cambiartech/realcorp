@@ -5,8 +5,7 @@ import { ActivityStatus, ActivityType, MembershipRole, MembershipStatus } from "
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
 import { touchLeadActivity } from "@/lib/lead-scoring";
-import { canonicalPhone } from "@/lib/phone";
-import { sendWhatsAppText } from "@/lib/whatsapp";
+import { sendWhatsAppText, toWhatsAppPhone } from "@/lib/whatsapp";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -240,14 +239,17 @@ export async function replyWhatsApp(
     where: { id: tenant.id },
     select: {
       id: true,
-      settings: { select: { whatsappAccessToken: true, whatsappPhoneNumberId: true } },
+      settings: { select: { whatsappAccessToken: true, whatsappPhoneNumberId: true, moduleWhatsApp: true } },
     },
   });
+  if (tenantWithSettings?.settings?.moduleWhatsApp === false) {
+    return { ok: false, error: "WhatsApp is not enabled on your plan. Contact your platform admin." };
+  }
   if (!tenantWithSettings?.settings?.whatsappAccessToken || !tenantWithSettings.settings.whatsappPhoneNumberId) {
     return { ok: false, error: "WhatsApp API is not configured." };
   }
 
-  const targetPhone = canonicalPhone(toPhone);
+  const targetPhone = toWhatsAppPhone(toPhone);
   if (!targetPhone) return { ok: false, error: "Invalid recipient phone." };
 
   const sent = await sendWhatsAppText({

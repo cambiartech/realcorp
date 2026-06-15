@@ -4,65 +4,8 @@ import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { completeActivity, deleteActivity, replyWhatsApp } from "./actions";
-
-async function CompleteForm({ tenantSlug, activityId }: { tenantSlug: string; activityId: string }) {
-  async function action() {
-    "use server";
-    await completeActivity(tenantSlug, activityId);
-  }
-  return (
-    <form action={action}>
-      <button type="submit" className="text-green-700 underline decoration-green-400/50 underline-offset-2">
-        Mark done
-      </button>
-    </form>
-  );
-}
-
-async function DeleteForm({ tenantSlug, activityId }: { tenantSlug: string; activityId: string }) {
-  async function action() {
-    "use server";
-    await deleteActivity(tenantSlug, activityId);
-  }
-  return (
-    <form action={action}>
-      <button type="submit" className="text-error underline decoration-error/40 underline-offset-2">
-        Delete
-      </button>
-    </form>
-  );
-}
-
-async function WhatsAppReplyForm({
-  tenantSlug,
-  leadId,
-  toPhone,
-}: {
-  tenantSlug: string;
-  leadId: string;
-  toPhone: string;
-}) {
-  async function action(formData: FormData) {
-    "use server";
-    await replyWhatsApp(tenantSlug, leadId, toPhone, formData);
-  }
-  return (
-    <form action={action} className="mt-2 flex flex-wrap items-center gap-2">
-      <input
-        name="message"
-        placeholder="Reply on WhatsApp..."
-        className="w-64 rounded-md border border-foreground/15 bg-background px-2 py-1 text-xs text-foreground"
-      />
-      <button
-        type="submit"
-        className="rounded-md border border-emerald-600/40 bg-emerald-600/10 px-2 py-1 text-xs font-medium text-emerald-700"
-      >
-        Send reply
-      </button>
-    </form>
-  );
-}
+import { EmptyState } from "@/components/empty-state";
+import { ActivityRowActions, WhatsAppReplyBox } from "./activity-item-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -228,9 +171,10 @@ export default async function ActivitiesPage({
       </div>
 
       {combinedItems.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-foreground/15 p-10 text-center text-sm text-muted">
-          No inbox items match these filters.
-        </div>
+        <EmptyState
+          title="No inbox items match these filters"
+          hint="Activities you log on leads and deals, plus WhatsApp messages, show up here."
+        />
       ) : (
         <div className="space-y-2">
           {combinedItems.map((item) => {
@@ -251,6 +195,19 @@ export default async function ActivitiesPage({
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${inbound ? "bg-emerald-600/15 text-emerald-700" : "bg-blue-600/15 text-blue-700"}`}>
                             {m.direction}
                           </span>
+                          {!inbound && m.status ? (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                m.status === "failed"
+                                  ? "bg-red-600/15 text-red-700"
+                                  : m.status === "read"
+                                    ? "bg-sky-600/15 text-sky-700"
+                                    : "bg-foreground/[0.08] text-muted"
+                              }`}
+                            >
+                              {m.status}
+                            </span>
+                          ) : null}
                         </div>
                         <p className="mt-0.5 text-xs text-foreground/90">{m.body}</p>
                         <p className="mt-1 text-xs text-muted">
@@ -270,7 +227,7 @@ export default async function ActivitiesPage({
                           )}
                         </p>
                         {m.leadId && m.toPhone ? (
-                          <WhatsAppReplyForm
+                          <WhatsAppReplyBox
                             tenantSlug={tenantSlug}
                             leadId={m.leadId}
                             toPhone={m.direction === "INBOUND" ? (m.fromPhone ?? m.toPhone) : m.toPhone}
@@ -323,10 +280,11 @@ export default async function ActivitiesPage({
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 text-[11px]">
-                    {isTask && isPending ? (
-                      <CompleteForm tenantSlug={tenantSlug} activityId={activity.id} />
-                    ) : null}
-                    <DeleteForm tenantSlug={tenantSlug} activityId={activity.id} />
+                    <ActivityRowActions
+                      tenantSlug={tenantSlug}
+                      activityId={activity.id}
+                      showComplete={isTask && isPending}
+                    />
                   </div>
                 </div>
               </div>

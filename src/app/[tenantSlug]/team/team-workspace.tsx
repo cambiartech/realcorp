@@ -8,8 +8,10 @@ import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import { MODAL_PANEL_MD } from "@/lib/modal-panel";
 import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
+import type { AssignableMemberModule, MembershipModulePermissions } from "@/lib/membership-module-permissions";
+import { MemberModuleAccessModal } from "./member-module-access-modal";
 import { parseTeamInviteForm, zodTeamInviteIssuesToFieldRecord, type TeamInviteFieldName } from "@/lib/validators/team-invite";
 import {
   deleteInvitation,
@@ -31,6 +33,7 @@ type TeamMemberRow = {
   role: string;
   roleValue: MembershipRole;
   status: MembershipStatus;
+  modulePermissions: MembershipModulePermissions;
 };
 
 type PendingInviteRow = {
@@ -58,6 +61,7 @@ export function TeamWorkspace({
   tenantName,
   tenantSlug,
   canInvite,
+  entitledModules,
   members,
   invites,
   currentUserId,
@@ -65,6 +69,7 @@ export function TeamWorkspace({
   tenantName: string;
   tenantSlug: string;
   canInvite: boolean;
+  entitledModules: AssignableMemberModule[];
   members: TeamMemberRow[];
   invites: PendingInviteRow[];
   currentUserId: string;
@@ -120,6 +125,7 @@ export function TeamWorkspace({
           tenantSlug={tenantSlug}
           canManageRoles={canInvite}
           currentUserId={currentUserId}
+          entitledModules={entitledModules}
         />
       ) : (
         <InvitesTable invites={invites} tenantSlug={tenantSlug} canManageInvites={canInvite} />
@@ -158,15 +164,18 @@ function MembersTable({
   tenantSlug,
   canManageRoles,
   currentUserId,
+  entitledModules,
 }: {
   members: TeamMemberRow[];
   tenantSlug: string;
   canManageRoles: boolean;
   currentUserId: string;
+  entitledModules: AssignableMemberModule[];
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [moduleAccessMember, setModuleAccessMember] = useState<TeamMemberRow | null>(null);
 
   async function handleRoleChange(memberId: string, previousRole: MembershipRole, nextRole: string) {
     if (nextRole === previousRole) return;
@@ -206,6 +215,7 @@ function MembersTable({
             <th className="px-4 py-3">Name</th>
             <th className="px-4 py-3">Email</th>
             <th className="min-w-[200px] px-4 py-3">Job role</th>
+            {canManageRoles ? <th className="min-w-[140px] px-4 py-3">Module access</th> : null}
             <th className="px-4 py-3">Status</th>
             {canManageRoles ? <th className="px-4 py-3">Actions</th> : null}
           </tr>
@@ -234,6 +244,17 @@ function MembersTable({
                   <span className="text-foreground/90">{member.role}</span>
                 )}
               </td>
+              {canManageRoles ? (
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setModuleAccessMember(member)}
+                    className="rounded border border-foreground/20 px-2 py-1 text-xs hover:bg-foreground/[0.06]"
+                  >
+                    {Object.keys(member.modulePermissions).length > 0 ? "Custom access" : "Assign modules"}
+                  </button>
+                </td>
+              ) : null}
               <td className="px-4 py-3 text-foreground/90">{member.status === MembershipStatus.ACTIVE ? "Active" : "Disabled"}</td>
               {canManageRoles ? (
                 <td className="px-4 py-3">
@@ -254,10 +275,25 @@ function MembersTable({
       </table>
       {canManageRoles ? (
         <p className="border-t border-foreground/10 bg-foreground/[0.02] px-4 py-2 text-xs text-muted">
-          Job role controls the default sidebar (e.g. <strong className="font-medium text-foreground/80">Marketing manager</strong>). Only{" "}
-          <strong className="font-medium text-foreground/80">organization admins</strong> see <strong className="font-medium text-foreground/80">Team</strong> in
-          the nav. Use Settings → Modules for optional add-ons and org-wide toggles.
+          <strong className="font-medium text-foreground/80">Job role</strong> sets the default sidebar. Use{" "}
+          <strong className="font-medium text-foreground/80">Assign modules</strong> to grant or restrict access per person — read only, view &amp; edit, or full — for any module on your plan.
         </p>
+      ) : null}
+
+      {moduleAccessMember ? (
+        <MemberModuleAccessModal
+          tenantSlug={tenantSlug}
+          memberId={moduleAccessMember.id}
+          memberName={moduleAccessMember.name}
+          memberRole={moduleAccessMember.roleValue}
+          entitledModules={entitledModules}
+          initialPermissions={moduleAccessMember.modulePermissions}
+          onClose={() => setModuleAccessMember(null)}
+          onSaved={() => {
+            showSnackbar("Module access saved.", "success");
+            router.refresh();
+          }}
+        />
       ) : null}
     </div>
   );

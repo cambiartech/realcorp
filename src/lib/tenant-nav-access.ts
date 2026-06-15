@@ -1,7 +1,13 @@
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
+import {
+  applyUserModulePermissionsToNavKeys,
+  type MembershipModulePermissions,
+} from "@/lib/membership-module-permissions";
+import type { TenantModuleFlags } from "@/lib/tenant-module-definitions";
 
 export type TenantNavKey =
   | "dashboard"
+  | "portal"
   | "projects"
   | "clients"
   | "leads"
@@ -9,6 +15,8 @@ export type TenantNavKey =
   | "activities"
   | "tasks"
   | "marketing"
+  | "listings"
+  | "stakeholders"
   | "community"
   | "shortlets"
   | "finance"
@@ -25,11 +33,15 @@ export type TenantSettingsNavSlice = {
   moduleHr: boolean;
   moduleTasks: boolean;
   moduleClients: boolean;
+  moduleListings?: boolean;
+  moduleWhatsApp?: boolean;
+  moduleInvestorPortal?: boolean;
   roleModuleGrants: unknown;
 };
 
 const NAV_ORDER: TenantNavKey[] = [
   "dashboard",
+  "portal",
   "projects",
   "clients",
   "leads",
@@ -37,6 +49,8 @@ const NAV_ORDER: TenantNavKey[] = [
   "activities",
   "tasks",
   "marketing",
+  "listings",
+  "stakeholders",
   "community",
   "shortlets",
   "finance",
@@ -46,6 +60,16 @@ const NAV_ORDER: TenantNavKey[] = [
 ];
 
 const SALES_STACK: TenantNavKey[] = ["dashboard", "projects", "leads", "deals", "activities"];
+
+/** Roles that only ever see the stakeholder portal (investors / listing owners). */
+export const PORTAL_ONLY_ROLES: MembershipRole[] = [
+  MembershipRole.INVESTOR,
+  MembershipRole.LISTING_OWNER,
+];
+
+export function isPortalOnlyRole(role: MembershipRole | null | undefined): boolean {
+  return role != null && PORTAL_ONLY_ROLES.includes(role);
+}
 
 function parseGrants(raw: unknown): Partial<Record<MembershipRole, string[]>> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -72,20 +96,28 @@ const GRANT_TO_NAV: Record<string, TenantNavKey> = {
 
 function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): TenantNavKey[] {
   if (isPlatformAdmin) {
-    return [...NAV_ORDER];
+    return NAV_ORDER.filter((k) => k !== "portal");
   }
   switch (role) {
+    case MembershipRole.INVESTOR:
+    case MembershipRole.LISTING_OWNER:
+      return ["portal", "settings"];
     case MembershipRole.ORG_ADMIN:
-      return [...NAV_ORDER];
+      return NAV_ORDER.filter((k) => k !== "portal");
     case MembershipRole.FINANCE_MANAGER:
       return [...SALES_STACK, "clients", "shortlets", "tasks", "finance", "settings"];
     case MembershipRole.HR_MANAGER:
       return ["dashboard", "tasks", "hr", "team", "settings"];
     case MembershipRole.MARKETING_MANAGER:
-      return ["dashboard", "projects", "leads", "tasks", "marketing", "settings"];
+      return ["dashboard", "projects", "leads", "tasks", "marketing", "listings", "activities", "settings"];
     case MembershipRole.COMMUNITY_MANAGER:
       return ["dashboard", "tasks", "community", "settings"];
+    case MembershipRole.HOUSEKEEPING_MANAGER:
+      return ["dashboard", "shortlets", "settings"];
+    case MembershipRole.FNB_STAFF:
+      return ["dashboard", "shortlets", "settings"];
     case MembershipRole.SALES_MANAGER:
+      return [...SALES_STACK, "clients", "shortlets", "tasks", "listings", "stakeholders", "settings"];
     case MembershipRole.SALES_EXECUTIVE:
     default:
       return [...SALES_STACK, "clients", "shortlets", "tasks", "settings"];
@@ -94,6 +126,9 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
 
 function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice): TenantNavKey[] {
   return keys.filter((k) => {
+    if (k === "portal") return s.moduleInvestorPortal !== false;
+    if (k === "listings") return s.moduleListings !== false;
+    if (k === "stakeholders") return s.moduleInvestorPortal === true;
     if (k === "marketing") return s.moduleMarketing;
     if (k === "community") return s.moduleCommunity;
     if (k === "shortlets") return s.moduleShortLets;
@@ -145,6 +180,9 @@ export function normalizeSettingsNavSlice(
     moduleHr: raw?.moduleHr ?? false,
     moduleTasks: raw?.moduleTasks ?? true,
     moduleClients: raw?.moduleClients ?? false,
+    moduleListings: raw?.moduleListings,
+    moduleWhatsApp: raw?.moduleWhatsApp,
+    moduleInvestorPortal: raw?.moduleInvestorPortal,
     roleModuleGrants: raw?.roleModuleGrants ?? null,
   };
 }
@@ -154,24 +192,30 @@ export function getVisibleNavKeys(opts: {
   isPlatformAdmin: boolean;
   membershipStatus?: MembershipStatus | null;
   settings: TenantSettingsNavSlice;
+  userModulePermissions?: MembershipModulePermissions | null;
 }): TenantNavKey[] {
-  const { role, isPlatformAdmin, settings, membershipStatus } = opts;
+  const { role, isPlatformAdmin, settings, membershipStatus, userModulePermissions } = opts;
   const r = role ?? MembershipRole.SALES_EXECUTIVE;
   let keys = defaultNavForRole(r, isPlatformAdmin);
   keys = applyOrgModuleToggles(keys, settings);
   const grants = parseGrants(settings.roleModuleGrants);
   keys = applyRoleGrants(keys, r, grants, settings);
   keys = applyOrgModuleToggles(keys, settings);
+  // Portal-only roles (investors / listing owners) never gain extra modules.
+  const portalOnly = !isPlatformAdmin && isPortalOnlyRole(r);
   const active = isPlatformAdmin || membershipStatus === MembershipStatus.ACTIVE;
-  if (settings.moduleHr && active && !keys.includes("hr")) {
+  if (!portalOnly && settings.moduleHr && active && !keys.includes("hr")) {
     const set = new Set(keys);
     set.add("hr");
     keys = NAV_ORDER.filter((k) => set.has(k));
   }
-  if (settings.moduleTasks && active && !keys.includes("tasks")) {
+  if (!portalOnly && settings.moduleTasks && active && !keys.includes("tasks")) {
     const set = new Set(keys);
     set.add("tasks");
     keys = NAV_ORDER.filter((k) => set.has(k));
+  }
+  if (!isPlatformAdmin && r !== MembershipRole.ORG_ADMIN && !portalOnly) {
+    keys = applyUserModulePermissionsToNavKeys(keys, userModulePermissions, settings as Partial<TenantModuleFlags>);
   }
   return NAV_ORDER.filter((k) => keys.includes(k));
 }

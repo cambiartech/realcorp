@@ -1,4 +1,4 @@
-import { ShortletReservationStatus, ShortletUnitStatus } from "../../src/generated/prisma";
+import { ShortletHousekeepingStatus, ShortletReservationStatus } from "../../src/generated/prisma";
 import { daysAgo, daysFromNow } from "./helpers";
 import type { DemoSeedContext, SalesSeedRefs } from "./types";
 
@@ -34,11 +34,34 @@ export async function seedShortlets(ctx: DemoSeedContext, sales: SalesSeedRefs) 
         nightlyRate: spec.rate,
         cleaningFee: "15000",
         currency: "NGN",
-        status: ShortletUnitStatus.AVAILABLE,
+        housekeepingStatus: ShortletHousekeepingStatus.VACANT_CLEAN,
       },
       update: { nightlyRate: spec.rate },
     });
     units.push(unit);
+  }
+
+  const defaultServices = [
+    { dept: "FNB" as const, name: "Continental breakfast", price: "8500" },
+    { dept: "FNB" as const, name: "Room service dinner", price: "15000" },
+    { dept: "LAUNDRY" as const, name: "Wash & fold (per kg)", price: "3500" },
+    { dept: "LOUNGE" as const, name: "Lounge access (day)", price: "5000" },
+    { dept: "GYM" as const, name: "Gym session", price: "3000" },
+  ];
+  for (const svc of defaultServices) {
+    const svcId = `${tenantId}-shortlet-svc-${svc.dept}-${svc.name.replace(/\s+/g, "-").toLowerCase()}`;
+    await prisma.shortletServiceItem.upsert({
+      where: { id: svcId },
+      create: {
+        id: svcId,
+        tenantId,
+        department: svc.dept,
+        name: svc.name,
+        price: svc.price,
+        currency: "NGN",
+      },
+      update: { price: svc.price },
+    });
   }
 
   const reservations = [
@@ -154,7 +177,10 @@ export async function seedShortlets(ctx: DemoSeedContext, sales: SalesSeedRefs) 
     if (row.status === ShortletReservationStatus.CHECKED_IN) {
       await prisma.shortletUnit.update({
         where: { id: unit.id },
-        data: { status: ShortletUnitStatus.OCCUPIED, activeReservationId: res.id },
+        data: {
+          housekeepingStatus: ShortletHousekeepingStatus.OCCUPIED,
+          activeReservationId: res.id,
+        },
       });
     }
   }

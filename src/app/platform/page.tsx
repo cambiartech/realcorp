@@ -88,6 +88,8 @@ export default async function PlatformHomePage() {
                   <td className="px-4 py-3 text-muted">
                     <PlatformModulesForm
                       tenantId={t.id}
+                      tenantName={t.name}
+                      tenantSlug={t.slug}
                       summary={tenantModuleSummary(t.settings)}
                       initial={normalizeTenantModuleFlags(t.settings)}
                     />

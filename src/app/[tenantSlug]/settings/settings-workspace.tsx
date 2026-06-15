@@ -16,6 +16,7 @@ import { formatEnumLabel } from "@/lib/ui-format";
 import {
   getOrgLogoUploadSignature,
   saveIntegrationSettings,
+  sendWhatsAppTestMessage,
   updateMyDisplayName,
   updateMyPassword,
   saveOrganizationBranding,
@@ -57,6 +58,9 @@ type SettingsWorkspaceProps = {
     moduleHr: boolean;
     moduleTasks: boolean;
     moduleClients: boolean;
+    moduleWhatsApp: boolean;
+    moduleListings: boolean;
+    moduleInvestorPortal: boolean;
   };
   roleModuleGrantsJson: string;
   orgDepartments: string[];
@@ -81,6 +85,8 @@ type SettingsWorkspaceProps = {
     whatsappAccessToken: string | null;
     whatsappPhoneNumberId: string | null;
     whatsappVerifyToken: string | null;
+    whatsappBotEnabled: boolean;
+    moduleWhatsApp?: boolean;
     logoUrl: string | null;
     financeBankAccounts: string[];
     financePaymentModes: string[];
@@ -569,15 +575,14 @@ export function SettingsWorkspace({
           <div id="settings-panel-modules" role="tabpanel" aria-labelledby="settings-tab-modules">
             <h2 className="text-sm font-semibold text-foreground">Modules & access</h2>
             <p className="mt-2 text-xs text-muted">
-              <strong className="font-medium text-foreground/90">Job roles</strong> (Org admin, Marketing manager, Sales executive, etc.) are set on{" "}
+              <strong className="font-medium text-foreground/90">Job roles</strong> are managed on{" "}
               <Link
                 href={`/${tenantSlug}/team`}
                 className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/60"
               >
                 Team
               </Link>
-              : invite someone with that role, or change an existing member&apos;s <strong className="font-medium text-foreground/90">Job role</strong>{" "}
-              dropdown (org admins). This page does not assign job titles—it only turns modules on for the org and adds optional sidebar extras per role.
+              . Module entitlements (what your organization has paid for) are controlled by Realcorp platform admin — contact support to add or change modules.
             </p>
             {modulesState && !modulesState.ok ? (
               <div className="mt-2">
@@ -585,57 +590,61 @@ export function SettingsWorkspace({
               </div>
             ) : null}
             {modulesState?.ok ? (
-              <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Module settings saved.</p>
+              <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Role access saved.</p>
             ) : null}
-            <form action={modulesAction} className="mt-4 space-y-6">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization modules</p>
-                <p className="mt-1 text-xs text-muted">When a module is off, nobody sees it—including extras below.</p>
-                <div className="mt-4 space-y-5">
-                  {TENANT_MODULE_GROUPS.map((group) => {
-                    const items = TENANT_MODULE_DEFINITIONS.filter(
-                      (d) => d.group === group.id && d.key !== "moduleShortLets",
-                    );
-                    if (items.length === 0) return null;
-                    return (
-                      <div key={group.id}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted">{group.label}</p>
-                        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                          {items.map((def) => (
-                            <ModuleToggle
-                              key={def.key}
-                              name={def.key}
-                              label={def.description ? `${def.label} — ${def.description}` : def.label}
-                              defaultChecked={modules[def.key]}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-4 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
-                  <p className="font-medium text-foreground">Short lets add-on</p>
-                  <p className="mt-1">
-                    Toggle from Platform admin (Tenants → Modules), or ask Realcorp support.
-                    {" "}
-                    <span className="text-foreground/90">Current: {modules.moduleShortLets ? "ON" : "OFF"}</span>
-                  </p>
-                </div>
-              </div>
 
+            <div className="mt-4 space-y-5">
+              {TENANT_MODULE_GROUPS.map((group) => {
+                const items = TENANT_MODULE_DEFINITIONS.filter((d) => d.group === group.id);
+                if (items.length === 0) return null;
+                return (
+                  <section key={group.id}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted">{group.label}</p>
+                    <ul className="mt-2 divide-y divide-foreground/10 rounded-lg border border-foreground/10 text-sm">
+                      {items.map((def) => {
+                        const on = modules[def.key as keyof typeof modules];
+                        return (
+                          <li key={def.key} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground">{def.label}</p>
+                              {def.description ? <p className="mt-0.5 text-xs text-muted">{def.description}</p> : null}
+                              {def.subpages.length > 0 ? (
+                                <p className="mt-1 text-[11px] text-muted">
+                                  Includes: {def.subpages.join(" · ")}
+                                </p>
+                              ) : null}
+                            </div>
+                            <span
+                              className={[
+                                "shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+                                on
+                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                  : "bg-foreground/[0.06] text-muted",
+                              ].join(" ")}
+                            >
+                              {on ? "Enabled" : "Not on plan"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+
+            <form action={modulesAction} className="mt-6 space-y-6">
               <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">{formatEnumLabel(MembershipRole.ORG_ADMIN)}</p>
                 <p className="mt-1 text-xs text-muted">
-                  Always has the full sidebar for every module you enable above. No checkboxes needed.
+                  Always has the full sidebar for every module enabled on your plan. No checkboxes needed.
                 </p>
               </div>
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Optional add-ons by role</p>
                 <p className="mt-1 text-xs text-muted">
-                  Sales, Marketing, Community, and Finance. Tick to add sidebar areas that role doesn&apos;t get by default. Greyed out = turn that organization
-                  module on above first.
+                  Grant extra sidebar areas beyond each role&apos;s defaults. Greyed out = that module is not on your plan.
                 </p>
                 <RoleExtraAccessMatrix modules={modules} initialGrants={initialRoleGrants} />
               </div>
@@ -647,7 +656,7 @@ export function SettingsWorkspace({
                 className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
               >
                 {modulesPending ? <ButtonSpinner /> : null}
-                {modulesPending ? "Saving…" : "Save modules"}
+                {modulesPending ? "Saving…" : "Save role access"}
               </button>
             </form>
           </div>
@@ -662,7 +671,9 @@ export function SettingsWorkspace({
               <input type="hidden" name="logoUrl" value={logoUrl} />
               <div className="rounded-lg border border-foreground/10 p-4">
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-violet-600/10 text-xs font-bold text-violet-700">🏢</span>
+                  {/* <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-violet-600/10 text-xs font-bold text-violet-700">
+
+                  </span> */}
                   <span className="text-sm font-semibold text-foreground">Branding (Company Logo)</span>
                 </div>
                 <p className="mb-3 text-xs text-muted">
@@ -699,7 +710,7 @@ export function SettingsWorkspace({
                   <div className="mt-3 rounded-md border border-foreground/10 bg-background p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={logoUrl} alt="Company logo preview" className="h-16 w-auto object-contain" />
-                    <p className="mt-2 text-[11px] text-muted break-all">{logoUrl}</p>
+                    {/* <p className="mt-2 text-[11px] text-muted break-all">{logoUrl}</p> */}
                   </div>
                 ) : (
                   <p className="mt-2 text-xs text-muted">No logo uploaded yet.</p>
@@ -740,8 +751,8 @@ export function SettingsWorkspace({
                     <input
                       name="metaPageAccessToken"
                       type="password"
-                      defaultValue={integrations.metaPageAccessToken ?? ""}
-                      placeholder="EAA… (long-lived page token)"
+                      defaultValue=""
+                      placeholder={integrations.metaPageAccessToken ? "Saved — leave blank to keep" : "EAA… (long-lived page token)"}
                       className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
                     />
                     <p className="mt-1 text-[11px] text-muted">Used to fetch full lead field data from the Graph API. Keep this secret.</p>
@@ -770,8 +781,8 @@ export function SettingsWorkspace({
                     <input
                       name="termiiApiKey"
                       type="password"
-                      defaultValue={integrations.termiiApiKey ?? ""}
-                      placeholder="TL_xxxxxxxxxxxx"
+                      defaultValue=""
+                      placeholder={integrations.termiiApiKey ? "Saved — leave blank to keep" : "TL_xxxxxxxxxxxx"}
                       className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
                     />
                   </div>
@@ -789,6 +800,18 @@ export function SettingsWorkspace({
               </div>
 
               {/* WhatsApp Cloud API */}
+              {integrations.moduleWhatsApp === false ? (
+                <div className="rounded-lg border border-dashed border-foreground/15 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-foreground/[0.06] text-xs font-bold text-muted">WA</span>
+                    <span className="text-sm font-semibold text-foreground">WhatsApp CRM + Bot</span>
+                  </div>
+                  <p className="text-xs text-muted">
+                    Not included in your current plan. Contact your platform administrator to enable the WhatsApp
+                    inbox, follow-ups, and the auto-reply listings bot.
+                  </p>
+                </div>
+              ) : (
               <div className="rounded-lg border border-foreground/10 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600/10 text-xs font-bold text-emerald-700">WA</span>
@@ -803,8 +826,8 @@ export function SettingsWorkspace({
                     <input
                       name="whatsappAccessToken"
                       type="password"
-                      defaultValue={integrations.whatsappAccessToken ?? ""}
-                      placeholder="EAAB..."
+                      defaultValue=""
+                      placeholder={integrations.whatsappAccessToken ? "Saved — leave blank to keep" : "EAAB..."}
                       className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30"
                     />
                   </div>
@@ -834,7 +857,24 @@ export function SettingsWorkspace({
                     {typeof window !== "undefined" ? window.location.origin : "https://yourapp.com"}/api/webhooks/whatsapp/{tenantSlug}
                   </code>
                 </div>
+                <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    name="whatsappBotEnabled"
+                    defaultChecked={integrations.whatsappBotEnabled}
+                    className="mt-0.5 h-4 w-4 accent-emerald-600"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">Enable Realcorp Bot</span>
+                    <span className="block text-xs text-muted">
+                      Auto-replies to inbound WhatsApp messages with a menu of your published listings, books
+                      viewings, and creates leads + follow-up tasks for your team.
+                    </span>
+                  </span>
+                </label>
+                <WhatsAppTestSend tenantSlug={tenantSlug} />
               </div>
+              )}
 
               <div className="rounded-lg border border-foreground/10 p-4">
                 <div className="mb-3 flex items-center gap-2">
@@ -1018,5 +1058,64 @@ function ModuleToggle({
       <input type="checkbox" name={name} defaultChecked={defaultChecked} className="mt-1" />
       <span className="text-foreground">{label}</span>
     </label>
+  );
+}
+
+function WhatsAppTestSend({ tenantSlug }: { tenantSlug: string }) {
+  const { showSnackbar } = useSnackbar();
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function runTest() {
+    if (sending) return;
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      showSnackbar("Enter a phone number to send the test to.", "error");
+      return;
+    }
+    setSending(true);
+    try {
+      const result = await sendWhatsAppTestMessage(tenantSlug, trimmed);
+      if (result.ok) {
+        showSnackbar("Test message sent. Check the phone's WhatsApp.", "success");
+      } else {
+        showSnackbar(result.error, "error");
+      }
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-dashed border-foreground/15 p-2.5">
+      <p className="mb-2 text-xs font-medium text-foreground">Test your setup</p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void runTest();
+            }
+          }}
+          placeholder="Your WhatsApp number, e.g. 0803 123 4567"
+          className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-foreground/30 sm:max-w-xs"
+        />
+        <button
+          type="button"
+          onClick={() => void runTest()}
+          disabled={sending}
+          aria-busy={sending}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-foreground/[0.06] disabled:opacity-60"
+        >
+          {sending ? <ButtonSpinner /> : null}
+          {sending ? "Sending…" : "Send test message"}
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted">
+        Uses your saved credentials. Save the form first if you just changed them.
+      </p>
+    </div>
   );
 }

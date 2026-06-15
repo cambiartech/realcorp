@@ -302,30 +302,12 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
     return { ok: false, error: "No access." };
   }
 
-  const moduleSales = formData.get("moduleSales") === "on";
-  const moduleFinance = formData.get("moduleFinance") === "on";
-  const moduleMarketing = formData.get("moduleMarketing") === "on";
-  const moduleCommunity = formData.get("moduleCommunity") === "on";
-  const moduleRealtorPortal = formData.get("moduleRealtorPortal") === "on";
-  const moduleHr = formData.get("moduleHr") === "on";
-  const moduleTasks = formData.get("moduleTasks") === "on";
-  const moduleClients = formData.get("moduleClients") === "on";
-
   const roleModuleGrantsParsed = parseRoleModuleGrantsFromFormData(formData);
 
   if (!tenant.settings) {
     await prisma.tenantSettings.create({
       data: {
         tenantId: tenant.id,
-        moduleSales,
-        moduleFinance,
-        moduleMarketing,
-        moduleCommunity,
-        moduleRealtorPortal,
-        moduleHr,
-        moduleTasks,
-        moduleClients,
-        orgDepartments: [...DEFAULT_ORG_DEPARTMENTS] as Prisma.InputJsonValue,
         ...(roleModuleGrantsParsed ? { roleModuleGrants: roleModuleGrantsParsed as Prisma.InputJsonValue } : {}),
       },
     });
@@ -333,14 +315,6 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
     await prisma.tenantSettings.update({
       where: { tenantId: tenant.id },
       data: {
-        moduleSales,
-        moduleFinance,
-        moduleMarketing,
-        moduleCommunity,
-        moduleRealtorPortal,
-        moduleHr,
-        moduleTasks,
-        moduleClients,
         roleModuleGrants: roleModuleGrantsParsed ? (roleModuleGrantsParsed as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
@@ -372,16 +346,29 @@ export async function saveIntegrationSettings(tenantSlug: string, _prev: unknown
     return { ok: false, error: "Only admins can change integration settings." };
   }
 
+  const existingSecrets = tenant.settings
+    ? await prisma.tenantSettings.findUnique({
+        where: { tenantId: tenant.id },
+        select: { metaPageAccessToken: true, termiiApiKey: true, whatsappAccessToken: true },
+      })
+    : null;
+
+  // Secrets: a blank input means "keep the saved value" so re-saving the form
+  // never silently wipes a working integration. Other fields save as typed.
+  const keepIfBlank = (field: string, existing: string | null | undefined) =>
+    (formData.get(field) as string)?.trim() || existing || null;
+
   const data = {
     logoUrl: (formData.get("logoUrl") as string)?.trim() || null,
     metaVerifyToken: (formData.get("metaVerifyToken") as string)?.trim() || null,
-    metaPageAccessToken: (formData.get("metaPageAccessToken") as string)?.trim() || null,
+    metaPageAccessToken: keepIfBlank("metaPageAccessToken", existingSecrets?.metaPageAccessToken),
     metaDefaultSource: (formData.get("metaDefaultSource") as string)?.trim() || "Facebook",
-    termiiApiKey: (formData.get("termiiApiKey") as string)?.trim() || null,
+    termiiApiKey: keepIfBlank("termiiApiKey", existingSecrets?.termiiApiKey),
     termiiSenderId: (formData.get("termiiSenderId") as string)?.trim() || "Realcorp",
-    whatsappAccessToken: (formData.get("whatsappAccessToken") as string)?.trim() || null,
+    whatsappAccessToken: keepIfBlank("whatsappAccessToken", existingSecrets?.whatsappAccessToken),
     whatsappPhoneNumberId: (formData.get("whatsappPhoneNumberId") as string)?.trim() || null,
     whatsappVerifyToken: (formData.get("whatsappVerifyToken") as string)?.trim() || null,
+    whatsappBotEnabled: formData.get("whatsappBotEnabled") === "on",
     // File uploads use platform CLOUDINARY_* in server .env — not configured per tenant here.
     // Finance dropdown catalogs are edited only on Finance → Settings; do not wipe them here.
   };
@@ -394,6 +381,53 @@ export async function saveIntegrationSettings(tenantSlug: string, _prev: unknown
 
   revalidatePath(`/${tenantSlug}/settings`);
   revalidatePath(`/${tenantSlug}`, "layout");
+  return { ok: true };
+}
+
+/** Send a WhatsApp test message using the saved credentials so admins can verify the integration. */
+export async function sendWhatsAppTestMessage(
+  tenantSlug: string,
+  testPhone: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: {
+      id: true,
+      name: true,
+      settings: { select: { whatsappAccessToken: true, whatsappPhoneNumberId: true, moduleWhatsApp: true } },
+    },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (tenant.settings?.moduleWhatsApp === false) {
+    return { ok: false, error: "WhatsApp is not enabled on your plan. Contact your platform admin." };
+  }
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true },
+  });
+  if (!session.user.isPlatformAdmin && !canManageOrgModules(false, membership?.role)) {
+    return { ok: false, error: "Only admins can test integrations." };
+  }
+
+  if (!tenant.settings?.whatsappAccessToken || !tenant.settings.whatsappPhoneNumberId) {
+    return { ok: false, error: "Save your WhatsApp Access Token and Phone Number ID first." };
+  }
+
+  const { sendWhatsAppText, toWhatsAppPhone } = await import("@/lib/whatsapp");
+  const to = toWhatsAppPhone(testPhone);
+  if (!to) return { ok: false, error: "Enter a valid phone number (e.g. 0803 123 4567)." };
+
+  const sent = await sendWhatsAppText({
+    accessToken: tenant.settings.whatsappAccessToken,
+    phoneNumberId: tenant.settings.whatsappPhoneNumberId,
+    to,
+    body: `${tenant.name} — WhatsApp integration test from Realcorp. If you received this, your setup works.`,
+  });
+  if (!sent.ok) return { ok: false, error: sent.error };
   return { ok: true };
 }
 

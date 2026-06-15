@@ -6,6 +6,7 @@ import { TenantMobileDock, TenantSidebar } from "@/components/tenant-nav";
 import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { getVisibleNavKeys, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
+import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { loadOrgSetupForUser } from "@/lib/load-org-setup";
 import { OrgSetupCoachBoundary } from "@/components/org-setup-coach-boundary";
 
@@ -39,6 +40,9 @@ export default async function TenantLayout({
           moduleHr: true,
           moduleTasks: true,
           moduleClients: true,
+          moduleInvestorPortal: true,
+          moduleListings: true,
+          moduleWhatsApp: true,
           roleModuleGrants: true,
           logoUrl: true,
         },
@@ -57,7 +61,7 @@ export default async function TenantLayout({
         userId: session.user.id,
       },
     },
-    select: { role: true, status: true },
+    select: { role: true, status: true, modulePermissions: true },
   });
 
   const allowed = session.user.isPlatformAdmin || (membership && membership.status === "ACTIVE");
@@ -71,6 +75,7 @@ export default async function TenantLayout({
     isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
     membershipStatus: membership?.status,
     settings: settingsNav,
+    userModulePermissions: parseMembershipModulePermissions(membership?.modulePermissions),
   });
 
   const userLabel = session.user.name || session.user.email || "Signed in";
@@ -96,6 +101,7 @@ export default async function TenantLayout({
     canManageHr: manageHr,
     hasHrEmployeeProfile: Boolean(hrEmployeeProfile),
     visibleNavKeys,
+    moduleWhatsApp: tenant.settings?.moduleWhatsApp !== false,
     userName: session.user.name ?? null,
     userEmail: session.user.email ?? null,
   };

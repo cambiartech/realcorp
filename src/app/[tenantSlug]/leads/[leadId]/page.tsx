@@ -179,6 +179,7 @@ export default async function LeadDetailPage({
         timestamp: Date;
         fromPhone: string | null;
         toPhone: string | null;
+        status: string | null;
       }) => ({
         id: m.id,
         direction: m.direction,
@@ -186,6 +187,7 @@ export default async function LeadDetailPage({
         timestamp: m.timestamp.toISOString(),
         fromPhone: m.fromPhone,
         toPhone: m.toPhone,
+        status: m.status,
       }))}
     />
   );

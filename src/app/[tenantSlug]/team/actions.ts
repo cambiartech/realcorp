@@ -8,6 +8,11 @@ import prisma from "@/lib/db";
 import { sendInviteEmail } from "@/lib/email";
 import { buildInviteUrl, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
 import { parseTeamInviteForm } from "@/lib/validators/team-invite";
+import { Prisma } from "@/generated/prisma";
+import {
+  membershipModulePermissionsToJson,
+  parseMembershipModulePermissionsFromForm,
+} from "@/lib/membership-module-permissions";
 import { z } from "zod";
 
 export type TeamInviteResult =
@@ -415,6 +420,62 @@ export async function setMembershipStatus(
     action: status === "ACTIVE" ? "ENABLE_MEMBER" : "DISABLE_MEMBER",
     summary: `${status === "ACTIVE" ? "Enabled" : "Disabled"} member account.`,
     metadata: { membershipId: target.id, status },
+  });
+
+  revalidatePath(`/${tenantSlug}/team`);
+  revalidatePath(`/${tenantSlug}`, "layout");
+  return { ok: true };
+}
+
+export async function saveMembershipModulePermissions(
+  tenantSlug: string,
+  membershipId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const actorMembership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  const canManage =
+    session.user.isPlatformAdmin ||
+    (actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN);
+  if (!canManage) return { ok: false, error: "Only organization admins can change module access." };
+
+  const target = await prisma.membership.findFirst({
+    where: { id: membershipId, tenantId: tenant.id },
+    select: { id: true, userId: true, role: true },
+  });
+  if (!target) return { ok: false, error: "Member not found." };
+  if (target.role === MembershipRole.ORG_ADMIN) {
+    return { ok: false, error: "Organization admins always have full module access." };
+  }
+
+  const parsed = parseMembershipModulePermissionsFromForm(formData);
+  const json = membershipModulePermissionsToJson(parsed);
+
+  await prisma.membership.update({
+    where: { id: target.id },
+    data: {
+      modulePermissions: json === null ? Prisma.JsonNull : (json as Prisma.InputJsonValue),
+    },
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    module: "TEAM",
+    entityType: "MEMBERSHIP",
+    entityId: target.id,
+    action: "UPDATE",
+    summary: "Updated per-user module permissions.",
+    metadata: { membershipId: target.id, modulePermissions: json },
   });
 
   revalidatePath(`/${tenantSlug}/team`);

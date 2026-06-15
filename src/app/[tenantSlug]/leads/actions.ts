@@ -359,10 +359,13 @@ export async function sendWhatsAppToLead(
     where: { slug: tenantSlug },
     select: {
       id: true,
-      settings: { select: { whatsappAccessToken: true, whatsappPhoneNumberId: true } },
+      settings: { select: { whatsappAccessToken: true, whatsappPhoneNumberId: true, moduleWhatsApp: true } },
     },
   });
   if (!tenant) return { ok: false, error: "Organization not found." };
+  if (tenant.settings?.moduleWhatsApp === false) {
+    return { ok: false, error: "WhatsApp is not enabled on your plan. Contact your platform admin." };
+  }
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
@@ -383,11 +386,14 @@ export async function sendWhatsAppToLead(
   if (!lead) return { ok: false, error: "Lead not found." };
   if (!lead.phone) return { ok: false, error: "Lead has no phone number." };
 
-  const { sendWhatsAppText } = await import("@/lib/whatsapp");
+  const { sendWhatsAppText, toWhatsAppPhone } = await import("@/lib/whatsapp");
+  const to = toWhatsAppPhone(lead.phone);
+  if (!to) return { ok: false, error: "Lead phone number is not a valid WhatsApp number." };
+
   const sent = await sendWhatsAppText({
     accessToken: tenant.settings.whatsappAccessToken,
     phoneNumberId: tenant.settings.whatsappPhoneNumberId,
-    to: lead.phone,
+    to,
     body: message,
   });
   if (!sent.ok) return { ok: false, error: sent.error };
@@ -399,7 +405,7 @@ export async function sendWhatsAppToLead(
       direction: "OUTBOUND",
       waMessageId: sent.messageId || null,
       fromPhone: null,
-      toPhone: lead.phone,
+      toPhone: to,
       body: message,
       timestamp: new Date(),
     },

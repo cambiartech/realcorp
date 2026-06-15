@@ -11,6 +11,10 @@ import {
   parseUpdatePricingPlanForm,
 } from "@/lib/validators/project";
 import { revalidatePath } from "next/cache";
+import {
+  createTenantUploadSignature,
+  type CloudinaryUploadSignature,
+} from "@/lib/cloudinary-upload-server";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -210,6 +214,255 @@ export async function updateProject(
   revalidatePath(`/${tenantSlug}/projects`);
   revalidatePath(`/${tenantSlug}/projects/${projectId}`);
   return { ok: true };
+}
+
+/** Save the public listing details for a project (Explore page / API / widget). */
+export async function updateProjectListing(
+  tenantSlug: string,
+  projectId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can edit listings." };
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: tenant.id },
+    select: { id: true, name: true, isPublished: true },
+  });
+  if (!project) return { ok: false, error: "Project not found." };
+
+  const text = (field: string, max = 300) =>
+    (formData.get(field) as string)?.trim().slice(0, max) || null;
+
+  const isPublished = formData.get("isPublished") === "on";
+  const galleryUrls = ((formData.get("galleryUrls") as string) ?? "")
+    .split(/\n+/)
+    .map((u) => u.trim())
+    .filter((u) => /^https?:\/\//i.test(u))
+    .slice(0, 12);
+  const amenities = ((formData.get("amenities") as string) ?? "")
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+
+  try {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: {
+        isPublished,
+        publishedAt: isPublished && !project.isPublished ? new Date() : undefined,
+        listingDescription: text("listingDescription", 2000),
+        locationCity: text("locationCity", 120),
+        locationState: text("locationState", 120),
+        locationAddress: text("locationAddress", 300),
+        coverImageUrl: text("coverImageUrl", 600),
+        galleryUrls,
+        amenities,
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "PROJECTS",
+      entityType: "PROJECT",
+      entityId: project.id,
+      action: isPublished ? "LISTING_PUBLISHED" : "LISTING_UPDATED",
+      summary: `${isPublished ? "Published" : "Updated"} public listing for ${project.name}.`,
+    });
+  } catch (error) {
+    logProjectActionError("updateProjectListing", tenantSlug, error);
+    return { ok: false, error: "Could not save the listing right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/projects`);
+  revalidatePath(`/${tenantSlug}/listings`);
+  revalidatePath(`/explore/${tenantSlug}`);
+  return { ok: true };
+}
+
+/** Link an investor / listing-owner member to a project with an allocation amount. */
+export async function addProjectStakeholder(
+  tenantSlug: string,
+  projectId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can manage stakeholders." };
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: tenant.id },
+    select: { id: true, name: true },
+  });
+  if (!project) return { ok: false, error: "Project not found." };
+
+  const userId = ((formData.get("userId") as string) ?? "").trim();
+  if (!userId) return { ok: false, error: "Pick a member to add." };
+
+  // The member must hold one of the portal roles; their role decides the stake type.
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId } },
+    select: { role: true, status: true, user: { select: { name: true, email: true } } },
+  });
+  if (
+    !membership ||
+    membership.status !== MembershipStatus.ACTIVE ||
+    (membership.role !== MembershipRole.INVESTOR && membership.role !== MembershipRole.LISTING_OWNER)
+  ) {
+    return { ok: false, error: "Pick an active member with the Investor or Listing owner role." };
+  }
+
+  const allocationRaw = Number(((formData.get("investmentAmount") as string) ?? "").replace(/[,\s]/g, ""));
+  if (!Number.isFinite(allocationRaw) || allocationRaw <= 0) {
+    return { ok: false, error: "Enter an allocation amount for this stakeholder." };
+  }
+  const investmentAmount = allocationRaw;
+
+  const existingStakes = await prisma.projectStakeholder.findMany({
+    where: { projectId: project.id },
+    select: { userId: true, investmentAmount: true },
+  });
+  let totalAllocation = investmentAmount;
+  for (const row of existingStakes) {
+    if (row.userId === userId) continue;
+    const amount = row.investmentAmount != null ? Number(row.investmentAmount) : 0;
+    if (amount > 0) totalAllocation += amount;
+  }
+  const sharePercent =
+    totalAllocation > 0 ? Math.round((investmentAmount / totalAllocation) * 10000) / 100 : 100;
+
+  const notes = ((formData.get("notes") as string) ?? "").trim().slice(0, 500) || null;
+
+  try {
+    await prisma.projectStakeholder.upsert({
+      where: { projectId_userId: { projectId: project.id, userId } },
+      create: {
+        tenantId: tenant.id,
+        projectId: project.id,
+        userId,
+        type: membership.role === MembershipRole.INVESTOR ? "INVESTOR" : "LISTING_OWNER",
+        sharePercent,
+        investmentAmount,
+        notes,
+      },
+      update: { sharePercent, investmentAmount, notes },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "PROJECTS",
+      entityType: "PROJECT_STAKEHOLDER",
+      entityId: project.id,
+      action: "STAKEHOLDER_ADDED",
+      summary: `Linked ${membership.user.name || membership.user.email || "a member"} to ${project.name} (allocation ${investmentAmount.toLocaleString()}).`,
+      metadata: { projectId: project.id, userId, investmentAmount },
+    });
+  } catch (error) {
+    logProjectActionError("addProjectStakeholder", tenantSlug, error);
+    return { ok: false, error: "Could not save the stakeholder right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/projects`);
+  revalidatePath(`/${tenantSlug}/stakeholders`);
+  revalidatePath(`/${tenantSlug}/portal`);
+  return { ok: true };
+}
+
+export async function removeProjectStakeholder(
+  tenantSlug: string,
+  stakeholderId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can manage stakeholders." };
+
+  const stake = await prisma.projectStakeholder.findFirst({
+    where: { id: stakeholderId, tenantId: tenant.id },
+    select: { id: true, project: { select: { name: true } }, user: { select: { name: true, email: true } } },
+  });
+  if (!stake) return { ok: false, error: "Stakeholder not found." };
+
+  try {
+    await prisma.projectStakeholder.delete({ where: { id: stake.id } });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "PROJECTS",
+      entityType: "PROJECT_STAKEHOLDER",
+      entityId: stake.id,
+      action: "STAKEHOLDER_REMOVED",
+      summary: `Removed ${stake.user.name || stake.user.email || "a member"} from ${stake.project.name}.`,
+    });
+  } catch (error) {
+    logProjectActionError("removeProjectStakeholder", tenantSlug, error);
+    return { ok: false, error: "Could not remove the stakeholder right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/projects`);
+  revalidatePath(`/${tenantSlug}/stakeholders`);
+  revalidatePath(`/${tenantSlug}/portal`);
+  return { ok: true };
+}
+
+export async function getListingImageUploadSignature(
+  tenantSlug: string,
+  input?: { fileName?: string; projectId?: string },
+): Promise<CloudinaryUploadSignature | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can upload listing images." };
+
+  const tenantRow = await prisma.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { slug: true, settings: { select: { moduleListings: true } } },
+  });
+  if (tenantRow?.settings?.moduleListings === false) {
+    return { ok: false, error: "Public listings are not enabled on your plan." };
+  }
+
+  const prefix = input?.projectId ? `listing-${input.projectId}` : "listing";
+  return createTenantUploadSignature({
+    tenantId: tenant.id,
+    tenantSlug: tenantRow!.slug,
+    area: "listings",
+    fileName: input?.fileName || "photo",
+    publicIdPrefix: prefix,
+  });
 }
 
 export async function deleteProject(

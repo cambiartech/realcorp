@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
+import { entitledMemberModules, parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
+import { normalizeTenantModuleFlags } from "@/lib/tenant-module-definitions";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { TeamWorkspace } from "./team-workspace";
@@ -29,6 +31,12 @@ export default async function TenantTeamPage({
           moduleFinance: true,
           moduleMarketing: true,
           moduleCommunity: true,
+          moduleShortLets: true,
+          moduleHr: true,
+          moduleTasks: true,
+          moduleClients: true,
+          moduleListings: true,
+          moduleInvestorPortal: true,
           roleModuleGrants: true,
         },
       },
@@ -43,7 +51,7 @@ export default async function TenantTeamPage({
         userId: session.user.id,
       },
     },
-    select: { role: true, status: true },
+    select: { role: true, status: true, modulePermissions: true },
   });
 
   assertTenantNavAccess(session, membership, tenant.settings, "team");
@@ -51,6 +59,8 @@ export default async function TenantTeamPage({
   const canInvite =
     session.user.isPlatformAdmin ||
     (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
+
+  const entitledModules = entitledMemberModules(normalizeTenantModuleFlags(tenant.settings));
 
   const [members, invites] = await Promise.all([
     prisma.membership.findMany({
@@ -71,6 +81,7 @@ export default async function TenantTeamPage({
       tenantName={tenant.name}
       tenantSlug={tenant.slug}
       canInvite={canInvite}
+      entitledModules={entitledModules}
       members={members.map((member) => ({
         id: member.id,
         userId: member.user.id,
@@ -79,6 +90,7 @@ export default async function TenantTeamPage({
         role: formatEnumLabel(member.role),
         roleValue: member.role,
         status: member.status,
+        modulePermissions: parseMembershipModulePermissions(member.modulePermissions),
       }))}
       invites={invites.map((invite) => ({
         id: invite.id,

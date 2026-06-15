@@ -5,12 +5,16 @@ import { useRef, useState } from "react";
 
 export function FileDropZone({
   onFile,
+  onFiles,
+  multiple = false,
   disabled,
   uploading,
   accept,
   hint = "PDF, Word, Excel, or images",
 }: {
-  onFile: (file: File) => void;
+  onFile?: (file: File) => void;
+  onFiles?: (files: File[]) => void;
+  multiple?: boolean;
   disabled?: boolean;
   uploading?: boolean;
   accept?: string;
@@ -19,9 +23,15 @@ export function FileDropZone({
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function pick(file: File | undefined) {
-    if (!file || disabled || uploading) return;
-    onFile(file);
+  function pickList(fileList: FileList | undefined) {
+    if (!fileList?.length || disabled || uploading) return;
+    const files = Array.from(fileList);
+    if (multiple || files.length > 1) {
+      onFiles?.(files);
+      if (!onFiles && onFile) onFile(files[0]);
+    } else {
+      onFile?.(files[0]);
+    }
   }
 
   return (
@@ -46,7 +56,7 @@ export function FileDropZone({
       onDrop={(e) => {
         e.preventDefault();
         setDragOver(false);
-        pick(e.dataTransfer.files[0]);
+        pickList(e.dataTransfer.files);
       }}
       onClick={() => inputRef.current?.click()}
       className={[
@@ -62,9 +72,10 @@ export function FileDropZone({
         type="file"
         className="sr-only"
         accept={accept ?? ".pdf,.doc,.docx,.xls,.xlsx,image/*"}
+        multiple={multiple}
         disabled={disabled || uploading}
         onChange={(e) => {
-          pick(e.target.files?.[0]);
+          pickList(e.target.files ?? undefined);
           e.currentTarget.value = "";
         }}
       />
@@ -72,7 +83,15 @@ export function FileDropZone({
         <Upload className={`h-7 w-7 text-foreground ${uploading ? "animate-pulse" : ""}`} strokeWidth={1.5} />
       </div>
       <p className="mt-3 text-sm font-semibold text-foreground">
-        {uploading ? "Uploading…" : dragOver ? "Drop file here" : "Drag & drop a file here"}
+        {uploading
+          ? "Uploading…"
+          : dragOver
+            ? multiple
+              ? "Drop files here"
+              : "Drop file here"
+            : multiple
+              ? "Drag & drop photos here"
+              : "Drag & drop a file here"}
       </p>
       <p className="mt-1 text-xs text-muted">or click to browse · {hint}</p>
     </div>

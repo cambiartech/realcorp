@@ -19,7 +19,7 @@ export function isPlatformCloudinaryReady() {
 }
 
 export const CLOUDINARY_SETUP_MESSAGE =
-  "Cloudinary is not configured. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to .env (uppercase), or set CLOUDINARY_URL. Restart the dev server after saving.";
+  "File uploads are not configured on this server. Contact your platform administrator.";
 
 /** Browser upload using a server-issued signature. */
 export async function uploadViaCloudinarySignature(
@@ -37,12 +37,12 @@ export async function uploadViaCloudinarySignature(
   const res = await fetch(sig.uploadUrl, { method: "POST", body });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    return { ok: false, error: text || `Upload failed (${res.status}). Check Cloudinary credentials and folder.` };
+    return { ok: false, error: text || `Upload failed (${res.status}). Check storage configuration.` };
   }
 
   const payload = (await res.json()) as { secure_url?: string; error?: { message?: string } };
   if (!payload.secure_url) {
-    return { ok: false, error: payload.error?.message || "Cloudinary did not return a file URL." };
+    return { ok: false, error: payload.error?.message || "Upload did not return a file URL." };
   }
   return { ok: true, secureUrl: payload.secure_url };
 }

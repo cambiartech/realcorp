@@ -9,7 +9,14 @@ import { useSnackbar } from "@/components/snackbar";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { CurrencySelect } from "@/components/finance/currency-select";
 import { getEntityTimelineLogs } from "../finance/actions";
-import { createProject, deleteProject, updateProject } from "./actions";
+import { ListingEditorModal } from "@/components/listing-editor-modal";
+import { AddStakeholderForm } from "@/components/stakeholders/add-stakeholder-form";
+import {
+  createProject,
+  deleteProject,
+  removeProjectStakeholder,
+  updateProject,
+} from "./actions";
 
 type ProjectRow = {
   id: string;
@@ -18,6 +25,30 @@ type ProjectRow = {
   createdAt: string;
   basePrice: number | null;
   currency: string;
+  isPublished: boolean;
+  listingDescription: string | null;
+  locationCity: string | null;
+  locationState: string | null;
+  locationAddress: string | null;
+  coverImageUrl: string | null;
+  galleryUrls: string[];
+  amenities: string[];
+};
+
+type StakeholderRow = {
+  id: string;
+  projectId: string;
+  userId: string;
+  type: "INVESTOR" | "LISTING_OWNER";
+  sharePercent: number;
+  investmentAmount: number | null;
+  label: string;
+};
+
+type PortalMember = {
+  userId: string;
+  role: "INVESTOR" | "LISTING_OWNER";
+  label: string;
 };
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -39,6 +70,10 @@ export function ProjectsWorkspace({
   activeFilterChips,
   currencies,
   defaultCurrency,
+  stakeholders = [],
+  portalMembers = [],
+  listingsEnabled = true,
+  portalEnabled = true,
 }: {
   tenantSlug: string;
   projects: ProjectRow[];
@@ -46,9 +81,16 @@ export function ProjectsWorkspace({
   activeFilterChips?: ActiveFilterChip[];
   currencies: string[];
   defaultCurrency: string;
+  stakeholders?: StakeholderRow[];
+  portalMembers?: PortalMember[];
+  listingsEnabled?: boolean;
+  portalEnabled?: boolean;
 }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectRow | null>(null);
+  const [listingProject, setListingProject] = useState<ProjectRow | null>(null);
+  const [stakeholderProject, setStakeholderProject] = useState<ProjectRow | null>(null);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState<ProjectRow | null>(null);
   const [timelineProject, setTimelineProject] = useState<ProjectRow | null>(null);
   const [timelineLogs, setTimelineLogs] = useState<TimelineLogRow[]>([]);
@@ -173,15 +215,26 @@ export function ProjectsWorkspace({
             </div>
           ) : null}
         </div>
-        {canManage ? (
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="inline-flex items-center justify-center rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-          >
-            New project
-          </button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {listingsEnabled ? (
+            <button
+              type="button"
+              onClick={() => setIsShareOpen(true)}
+              className="inline-flex items-center justify-center rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-foreground/[0.06]"
+            >
+              Explore &amp; embed
+            </button>
+          ) : null}
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="inline-flex items-center justify-center rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+            >
+              New project
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
@@ -191,6 +244,7 @@ export function ProjectsWorkspace({
               <th className="px-4 py-3">Project</th>
               <th className="px-4 py-3">Base price</th>
               <th className="px-4 py-3">Units</th>
+              <th className="px-4 py-3">Listing</th>
               <th className="px-4 py-3">Created</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -198,7 +252,7 @@ export function ProjectsWorkspace({
           <tbody className="divide-y divide-foreground/10">
             {projects.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-sm text-muted">
+                <td colSpan={6} className="px-4 py-8 text-sm text-muted">
                   No projects yet.
                 </td>
               </tr>
@@ -210,6 +264,17 @@ export function ProjectsWorkspace({
                     {project.basePrice != null ? `${project.currency} ${project.basePrice.toLocaleString()}` : "—"}
                   </td>
                   <td className="px-4 py-3 text-muted">{project.unitsCount}</td>
+                  <td className="px-4 py-3">
+                    {project.isPublished ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                        Published
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.06] px-2.5 py-0.5 text-xs font-semibold text-muted">
+                        Hidden
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-muted">{project.createdAt}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap items-center gap-3">
@@ -228,6 +293,27 @@ export function ProjectsWorkspace({
                       </button>
                       {canManage ? (
                         <>
+                          {listingsEnabled ? (
+                            <button
+                              type="button"
+                              onClick={() => setListingProject(project)}
+                              className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                            >
+                              Listing
+                            </button>
+                          ) : null}
+                          {portalEnabled ? (
+                            <button
+                              type="button"
+                              onClick={() => setStakeholderProject(project)}
+                              className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                            >
+                              Stakeholders
+                              {stakeholders.some((s) => s.projectId === project.id)
+                                ? ` (${stakeholders.filter((s) => s.projectId === project.id).length})`
+                                : ""}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => setEditingProject(project)}
@@ -433,6 +519,28 @@ export function ProjectsWorkspace({
         </ModalOverlay>
       ) : null}
 
+      {listingProject ? (
+        <ListingEditorModal
+          tenantSlug={tenantSlug}
+          project={listingProject}
+          onClose={() => setListingProject(null)}
+        />
+      ) : null}
+
+      {stakeholderProject ? (
+        <StakeholdersModal
+          tenantSlug={tenantSlug}
+          project={stakeholderProject}
+          stakeholders={stakeholders.filter((s) => s.projectId === stakeholderProject.id)}
+          portalMembers={portalMembers}
+          onClose={() => setStakeholderProject(null)}
+        />
+      ) : null}
+
+      {isShareOpen ? (
+        <ShareExploreModal tenantSlug={tenantSlug} onClose={() => setIsShareOpen(false)} />
+      ) : null}
+
       {timelineProject ? (
         <ModalOverlay
           open
@@ -474,6 +582,209 @@ export function ProjectsWorkspace({
             )}
         </ModalOverlay>
       ) : null}
+    </div>
+  );
+}
+
+const LISTING_FIELD_CLASS =
+  "w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20";
+
+const STAKE_TYPE_LABEL: Record<StakeholderRow["type"], string> = {
+  INVESTOR: "Investor",
+  LISTING_OWNER: "Listing owner",
+};
+
+function StakeholdersModal({
+  tenantSlug,
+  project,
+  stakeholders,
+  portalMembers,
+  onClose,
+}: {
+  tenantSlug: string;
+  project: ProjectRow;
+  stakeholders: StakeholderRow[];
+  portalMembers: PortalMember[];
+  onClose: () => void;
+}) {
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const { showSnackbar } = useSnackbar();
+
+  async function handleRemove(stakeholderId: string) {
+    setRemovingId(stakeholderId);
+    const result = await removeProjectStakeholder(tenantSlug, stakeholderId);
+    setRemovingId(null);
+    if (result.ok) {
+      showSnackbar("Stakeholder removed.", "success");
+    } else {
+      showSnackbar(result.error, "error");
+    }
+  }
+
+  return (
+    <ModalOverlay open onClose={onClose} panelClassName={MODAL_PANEL_MD}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Stakeholders</h2>
+          <p className="text-xs text-muted">
+            {project.name} — investors and listing owners see this project (and their earnings share) in their portal.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+          aria-label="Close modal"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {stakeholders.length === 0 ? (
+          <p className="rounded-md border border-dashed border-foreground/15 px-3 py-4 text-center text-sm text-muted">
+            No stakeholders linked yet.
+          </p>
+        ) : (
+          stakeholders.map((stake) => (
+            <div
+              key={stake.id}
+              className="flex items-center justify-between gap-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-foreground">{stake.label}</p>
+                <p className="text-xs text-muted">
+                  {STAKE_TYPE_LABEL[stake.type]} ·{" "}
+                  {stake.investmentAmount != null
+                    ? `${stake.investmentAmount.toLocaleString()} allocation`
+                    : "No allocation"}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={removingId === stake.id}
+                onClick={() => handleRemove(stake.id)}
+                className="shrink-0 text-xs text-error underline decoration-error/40 underline-offset-2 disabled:opacity-50"
+              >
+                {removingId === stake.id ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mt-5 border-t border-foreground/10 pt-5">
+        <AddStakeholderForm
+          tenantSlug={tenantSlug}
+          projectId={project.id}
+          portalMembers={portalMembers}
+          onSuccess={() => showSnackbar("Stakeholder saved.", "success")}
+        />
+      </div>
+    </ModalOverlay>
+  );
+}
+
+function ShareExploreModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () => void }) {
+  const { showSnackbar } = useSnackbar();
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const exploreUrl = `${origin}/explore/${tenantSlug}`;
+  const embedUrl = `${origin}/explore/embed/${tenantSlug}`;
+  const apiUrl = `${origin}/api/public/listings/${tenantSlug}`;
+  const iframeSnippet = `<iframe src="${embedUrl}" style="width:100%;min-height:640px;border:0;" loading="lazy" title="Available listings"></iframe>`;
+
+  async function copy(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      showSnackbar(`${label} copied.`, "success");
+    } catch {
+      showSnackbar("Could not copy — select and copy manually.", "error");
+    }
+  }
+
+  return (
+    <ModalOverlay open onClose={onClose} panelClassName={MODAL_PANEL_MD}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Explore page &amp; embed</h2>
+          <p className="text-xs text-muted">
+            Share your public listings page, embed it on any website or blog, or pull listings into ads via the API.
+            Only projects marked <strong className="text-foreground">Published</strong> appear.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+          aria-label="Close modal"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <ShareRow label="Public Explore page" value={exploreUrl} onCopy={() => copy(exploreUrl, "Link")} openHref={exploreUrl} />
+        <ShareRow label="Embed code (iframe)" value={iframeSnippet} onCopy={() => copy(iframeSnippet, "Embed code")} mono />
+        <ShareRow label="JSON API (for ads / custom sites)" value={apiUrl} onCopy={() => copy(apiUrl, "API URL")} mono />
+        <p className="text-[11px] text-muted">
+          API supports <code className="font-mono">?q=</code>, <code className="font-mono">?city=</code>,{" "}
+          <code className="font-mono">?purpose=SALE|SHORT_LET|RENTAL</code>,{" "}
+          <code className="font-mono">?minPrice=</code> and <code className="font-mono">?maxPrice=</code>.
+        </p>
+      </div>
+    </ModalOverlay>
+  );
+}
+
+function ShareRow({
+  label,
+  value,
+  onCopy,
+  openHref,
+  mono,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  openHref?: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium text-foreground">{label}</p>
+      <div className="flex items-start gap-2">
+        <code
+          className={[
+            "min-w-0 flex-1 select-all break-all rounded-md border border-foreground/10 bg-foreground/[0.03] px-2.5 py-2 text-xs text-foreground",
+            mono ? "font-mono" : "",
+          ].join(" ")}
+        >
+          {value}
+        </code>
+        <div className="flex shrink-0 flex-col gap-1">
+          <button
+            type="button"
+            onClick={onCopy}
+            className="rounded-md border border-foreground/15 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-foreground/[0.06]"
+          >
+            Copy
+          </button>
+          {openHref ? (
+            <a
+              href={openHref}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-foreground/15 px-2.5 py-1.5 text-center text-xs font-medium text-foreground hover:bg-foreground/[0.06]"
+            >
+              Open
+            </a>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

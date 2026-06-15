@@ -9,4 +9,8 @@ export const TEAM_MEMBERSHIP_ROLE_OPTIONS: { value: MembershipRole; label: strin
   { value: MembershipRole.SALES_EXECUTIVE, label: "Sales executive" },
   { value: MembershipRole.MARKETING_MANAGER, label: "Marketing manager" },
   { value: MembershipRole.COMMUNITY_MANAGER, label: "Community manager" },
+  { value: MembershipRole.HOUSEKEEPING_MANAGER, label: "Housekeeping manager" },
+  { value: MembershipRole.FNB_STAFF, label: "Kitchen / F&B staff" },
+  { value: MembershipRole.INVESTOR, label: "Investor (portal only)" },
+  { value: MembershipRole.LISTING_OWNER, label: "Listing owner (portal only)" },
 ];

@@ -11,6 +11,7 @@ import {
   newInviteToken,
 } from "@/lib/invitation-utils";
 import { readTenantModuleFlagsFromForm } from "@/lib/tenant-module-definitions";
+import { tenantModuleRevalidatePaths } from "@/lib/tenant-module-revalidate";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -322,8 +323,9 @@ export async function updateTenantShortLetsAddon(tenantId: string, enabled: bool
   }
 
   revalidatePath("/platform");
-  revalidatePath(`/${tenant.slug}/settings`);
-  revalidatePath(`/${tenant.slug}`);
+  for (const path of tenantModuleRevalidatePaths(tenant.slug, { moduleShortLets: enabled })) {
+    revalidatePath(path);
+  }
   return { ok: true };
 }
 
@@ -356,10 +358,8 @@ export async function updateTenantModulesFromPlatform(tenantId: string, formData
   }
 
   revalidatePath("/platform");
-  revalidatePath(`/${tenant.slug}`);
-  revalidatePath(`/${tenant.slug}/settings`);
-  revalidatePath(`/${tenant.slug}/clients`);
-  revalidatePath(`/${tenant.slug}/hr`);
-  revalidatePath(`/${tenant.slug}/tasks`);
+  for (const path of tenantModuleRevalidatePaths(tenant.slug, modules)) {
+    revalidatePath(path);
+  }
   return { ok: true };
 }
