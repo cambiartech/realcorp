@@ -47,7 +47,7 @@ DATABASE_URL="postgresql://postgres.[ref]:[password]@aws-0-eu-west-1.pooler.supa
 DIRECT_URL="postgresql://postgres.[ref]:[password]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
 ```
 
-`prisma.config.ts` uses `DIRECT_URL` for migrate; the app prefers `DIRECT_URL` then `DATABASE_URL` in `src/lib/db.ts`.
+`prisma.config.ts` uses `DIRECT_URL` for migrate only. **Runtime** (`src/lib/db.ts`) uses `DATABASE_URL` (pooled) — never `DIRECT_URL`.
 
 ### Auth
 
