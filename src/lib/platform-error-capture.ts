@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { isSanitizedProductionErrorMessage } from "@/lib/platform-error-details";
 
 export type PlatformErrorCaptureInput = {
   digest: string;
@@ -50,6 +51,15 @@ export function cleanErrorMetadata(value: unknown): Prisma.InputJsonValue | unde
 export async function capturePlatformErrorEvent(input: PlatformErrorCaptureInput): Promise<void> {
   const digest = normalizeErrorDigest(input.digest);
   if (!digest) return;
+
+  const meta = input.metadata as { source?: string } | null | undefined;
+  const fromClientBoundary =
+    meta?.source === "global-error-boundary" || meta?.source === "tenant-error-boundary";
+
+  // Client boundaries only receive Next.js sanitized messages in production — skip noise.
+  if (fromClientBoundary && isSanitizedProductionErrorMessage(input.message)) {
+    return;
+  }
 
   const routePath = cleanText(input.routePath, 512);
   const tenantSlug = input.tenantSlug ?? guessTenantSlugFromPath(routePath);

@@ -71,6 +71,77 @@ export function parseCreateUnitForm(formData: FormData) {
   });
 }
 
+const bulkUnitSharedSchema = z.object({
+  purpose: z.nativeEnum(UnitPurpose),
+  unitType: z.string().trim().max(80, "Unit type is too long.").optional(),
+  status: z.nativeEnum(UnitStatus).optional(),
+  pricingPlanId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+});
+
+export const createUnitsBulkSchema = bulkUnitSharedSchema.extend({
+  labels: z
+    .array(z.string().trim().min(1, "Unit label is required.").max(80, "Unit label is too long."))
+    .min(1, "Add at least one unit.")
+    .max(50, "You can add up to 50 units at once."),
+});
+
+export function parseCreateUnitsBulkForm(formData: FormData) {
+  const purposeRaw = formData.get("purpose");
+  const purposeValues = Object.values(UnitPurpose) as string[];
+  const purpose =
+    typeof purposeRaw === "string" && purposeRaw !== "" && purposeValues.includes(purposeRaw)
+      ? (purposeRaw as UnitPurpose)
+      : UnitPurpose.SALE;
+
+  let labels: string[] = [];
+  const rawLabels = formData.get("labels");
+  if (typeof rawLabels === "string" && rawLabels.trim()) {
+    try {
+      const parsed = JSON.parse(rawLabels) as unknown;
+      if (Array.isArray(parsed)) {
+        labels = parsed.filter((x): x is string => typeof x === "string").map((s) => s.trim()).filter(Boolean);
+      }
+    } catch {
+      labels = [];
+    }
+  }
+
+  return createUnitsBulkSchema.safeParse({
+    labels,
+    purpose,
+    unitType: formData.get("unitType") || undefined,
+    status: formData.get("status") || UnitStatus.AVAILABLE,
+    pricingPlanId: formData.get("pricingPlanId") || undefined,
+  });
+}
+
+export function parseAmenitiesFromForm(formData: FormData): string[] {
+  const raw = formData.get("amenities");
+  if (typeof raw === "string" && raw.trim().startsWith("[")) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((a): a is string => typeof a === "string")
+          .map((a) => a.trim())
+          .filter(Boolean)
+          .slice(0, 20);
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return ((raw as string) ?? "")
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
 export function parseCreatePricingPlanForm(formData: FormData) {
   return createPricingPlanSchema.safeParse({
     name: formData.get("name"),

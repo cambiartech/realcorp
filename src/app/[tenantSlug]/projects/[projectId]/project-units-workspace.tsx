@@ -3,7 +3,8 @@
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
@@ -13,6 +14,7 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import {
   createPricingPlan,
   createUnit,
+  createUnitsBulk,
   deletePricingPlan,
   deleteUnit,
   reserveUnit,
@@ -20,6 +22,7 @@ import {
   updatePricingPlan,
   updateUnit,
 } from "../actions";
+import { AddUnitsModal } from "./add-units-modal";
 
 type UnitRow = {
   id: string;
@@ -78,7 +81,8 @@ export function ProjectUnitsWorkspace({
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PricingPlanRow | null>(null);
   const [deletingPlan, setDeletingPlan] = useState<PricingPlanRow | null>(null);
-  const [state, formAction, pending] = useActionState(createUnit.bind(null, tenantSlug, projectId), initial);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createPending, startCreateTransition] = useTransition();
   const [editState, editAction, editPending] = useActionState(
     updateUnit.bind(null, tenantSlug, projectId, editingUnit?.id ?? ""),
     initial,
@@ -107,25 +111,12 @@ export function ProjectUnitsWorkspace({
     deletePricingPlan.bind(null, tenantSlug, projectId, deletingPlan?.id ?? ""),
     initial,
   );
-  const [errors, setErrors] = useState<{ label?: string }>({});
   const [editErrors, setEditErrors] = useState<{ label?: string }>({});
   const { showSnackbar } = useSnackbar();
-  const formRef = useRef<HTMLFormElement | null>(null);
+  const router = useRouter();
   const editFormRef = useRef<HTMLFormElement | null>(null);
   const pricingFormRef = useRef<HTMLFormElement | null>(null);
   const editPlanFormRef = useRef<HTMLFormElement | null>(null);
-
-  useEffect(() => {
-    if (!state) return;
-    if (state.ok) {
-      showSnackbar("Unit added successfully.", "success");
-      formRef.current?.reset();
-      setIsCreateOpen(false);
-      setErrors({});
-    } else {
-      showSnackbar(state.error, "error");
-    }
-  }, [showSnackbar, state]);
 
   useEffect(() => {
     if (!editState) return;
@@ -199,17 +190,23 @@ export function ProjectUnitsWorkspace({
     }
   }, [deletePlanState, showSnackbar]);
 
-  function submitCreateUnit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const label = String(formData.get("label") ?? "").trim();
-    if (!label) {
-      setErrors({ label: "Unit label is required." });
-      return;
-    }
-    setErrors({});
-    formAction(formData);
+  function submitCreateUnits(formData: FormData) {
+    setCreateError(null);
+    startCreateTransition(async () => {
+      const isBulk = formData.has("labels");
+      const res = isBulk
+        ? await createUnitsBulk(tenantSlug, projectId, null, formData)
+        : await createUnit(tenantSlug, projectId, null, formData);
+      if (res.ok) {
+        const count = "count" in res && typeof res.count === "number" ? res.count : 1;
+        showSnackbar(count > 1 ? `${count} units added.` : "Unit added successfully.", "success");
+        setIsCreateOpen(false);
+        router.refresh();
+      } else {
+        setCreateError(res.error);
+        showSnackbar(res.error, "error");
+      }
+    });
   }
 
   function submitEditUnit(e: React.FormEvent<HTMLFormElement>) {
@@ -404,126 +401,20 @@ export function ProjectUnitsWorkspace({
       </div>
       )}
 
-      <ModalOverlay open={Boolean(isCreateOpen)} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_XL}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Add unit</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-
-            <form ref={formRef} noValidate onSubmit={submitCreateUnit} className="mt-4 space-y-4">
-              {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
-
-              <div>
-                <label htmlFor="unit-label" className="mb-1 block text-sm text-muted">
-                  Unit label
-                </label>
-                <input
-                  id="unit-label"
-                  name="label"
-                  placeholder={suggestedLabels[0] ? `e.g. ${suggestedLabels[0]}` : "e.g. A-12"}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-                {suggestedLabels.length > 0 ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {suggestedLabels.map((label) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => {
-                          const input = formRef.current?.elements.namedItem("label") as HTMLInputElement | null;
-                          if (input) input.value = label;
-                        }}
-                        className="rounded-md border border-foreground/15 bg-background px-2 py-1 text-xs text-foreground hover:bg-foreground/[0.06]"
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {errors.label ? <FormFieldError>{errors.label}</FormFieldError> : null}
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="unit-purpose" className="mb-1 block text-sm text-muted">
-                    Purpose
-                  </label>
-                  <UiSelect id="unit-purpose" name="purpose" defaultValue={UnitPurpose.SALE}>
-                    <option value={UnitPurpose.SALE}>For sale</option>
-                    <option value={UnitPurpose.SHORT_LET}>Short let</option>
-                    <option value={UnitPurpose.RENTAL}>Rental</option>
-                    <option value={UnitPurpose.HOSTEL}>Hostel</option>
-                  </UiSelect>
-                </div>
-                <div>
-                  <label htmlFor="unit-status" className="mb-1 block text-sm text-muted">
-                    Status
-                  </label>
-                  <UiSelect id="unit-status" name="status" defaultValue={UnitStatus.AVAILABLE}>
-                    <option value={UnitStatus.AVAILABLE}>Available</option>
-                    <option value={UnitStatus.UNDER_CONSTRUCTION}>Under Construction</option>
-                    <option value={UnitStatus.RESERVED}>Reserved</option>
-                    <option value={UnitStatus.SOLD}>Sold</option>
-                  </UiSelect>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="unit-type" className="mb-1 block text-sm text-muted">
-                    Layout (optional)
-                  </label>
-                  <input
-                    id="unit-type"
-                    name="unitType"
-                    placeholder="e.g. 3 Bedroom Duplex"
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="unit-pricing-plan" className="mb-1 block text-sm text-muted">
-                    Pricing plan (optional)
-                  </label>
-                  <UiSelect id="unit-pricing-plan" name="pricingPlanId" defaultValue="">
-                    <option value="">No plan</option>
-                    {pricingPlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {pending ? <ButtonSpinner /> : null}
-                  {pending ? "Adding unit..." : "Add unit"}
-                </button>
-              </div>
-            </form>
-      </ModalOverlay>
+      <AddUnitsModal
+        open={isCreateOpen}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setCreateError(null);
+        }}
+        projectName={projectName}
+        existingLabels={units.map((u) => u.label)}
+        suggestedLabels={suggestedLabels}
+        pricingPlans={pricingPlans.map((p) => ({ id: p.id, name: p.name }))}
+        pending={createPending}
+        error={createError}
+        onSubmit={submitCreateUnits}
+      />
 
       {editingUnit ? (
         <ModalOverlay open onClose={() => setEditingUnit(null)} panelClassName={MODAL_PANEL_XL}>

@@ -10,6 +10,7 @@ import {
   inviteExpiresAt,
   newInviteToken,
 } from "@/lib/invitation-utils";
+import { pickBestErrorEvent } from "@/lib/platform-error-details";
 import { readTenantModuleFlagsFromForm } from "@/lib/tenant-module-definitions";
 import { tenantModuleRevalidatePaths } from "@/lib/tenant-module-revalidate";
 import { revalidatePath } from "next/cache";
@@ -238,6 +239,21 @@ export async function platformLookupErrorReference(reference: string): Promise<
       ok: true;
       digest: string;
       count: number;
+      hasActionableDetail: boolean;
+      bestEvent: {
+        id: string;
+        createdAt: string;
+        tenantSlug: string | null;
+        tenantName: string | null;
+        routePath: string | null;
+        requestUrl: string | null;
+        name: string | null;
+        message: string | null;
+        userEmail: string | null;
+        userAgent: string | null;
+        stack: string | null;
+        source: string | null;
+      } | null;
       events: Array<{
         id: string;
         createdAt: string;
@@ -250,6 +266,8 @@ export async function platformLookupErrorReference(reference: string): Promise<
         userEmail: string | null;
         userAgent: string | null;
         stack: string | null;
+        source: string | null;
+        isSanitized: boolean;
       }>;
     }
   | { ok: false; error: string }
@@ -276,11 +294,14 @@ export async function platformLookupErrorReference(reference: string): Promise<
     return { ok: false, error: "No matching error reports yet for this reference." };
   }
 
-  return {
-    ok: true,
-    digest,
-    count,
-    events: events.map((event) => ({
+  const mapped = events.map((event) => {
+    const meta = event.metadata as { source?: string } | null;
+    const source = meta?.source ?? null;
+    const isSanitized =
+      Boolean(event.message && /omitted in production builds/i.test(event.message)) ||
+      source === "global-error-boundary" ||
+      source === "tenant-error-boundary";
+    return {
       id: event.id,
       createdAt: event.createdAt.toISOString(),
       tenantSlug: event.tenant?.slug ?? event.tenantSlug ?? null,
@@ -292,7 +313,39 @@ export async function platformLookupErrorReference(reference: string): Promise<
       userEmail: event.userEmail,
       userAgent: event.userAgent,
       stack: event.stack,
-    })),
+      source,
+      isSanitized,
+      metadata: event.metadata,
+    };
+  });
+
+  const best = pickBestErrorEvent(mapped);
+  const hasActionableDetail = Boolean(
+    best && best.message && !best.isSanitized && (best.stack || !/Server Components render/i.test(best.message)),
+  );
+
+  return {
+    ok: true,
+    digest,
+    count,
+    hasActionableDetail,
+    bestEvent: best
+      ? {
+          id: best.id,
+          createdAt: best.createdAt,
+          tenantSlug: best.tenantSlug,
+          tenantName: best.tenantName,
+          routePath: best.routePath,
+          requestUrl: best.requestUrl,
+          name: best.name,
+          message: best.message,
+          userEmail: best.userEmail,
+          userAgent: best.userAgent,
+          stack: best.stack,
+          source: best.source,
+        }
+      : null,
+    events: mapped.map(({ metadata: _m, ...rest }) => rest),
   };
 }
 

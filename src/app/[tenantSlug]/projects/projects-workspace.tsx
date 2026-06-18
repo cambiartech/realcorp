@@ -10,6 +10,7 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { CurrencySelect } from "@/components/finance/currency-select";
 import { getEntityTimelineLogs } from "../finance/actions";
 import { ListingEditorModal } from "@/components/listing-editor-modal";
+import { ListingImageUpload } from "@/components/listing-image-upload";
 import { AddStakeholderForm } from "@/components/stakeholders/add-stakeholder-form";
 import {
   createProject,
@@ -106,6 +107,8 @@ export function ProjectsWorkspace({
   );
   const [nameError, setNameError] = useState<string | null>(null);
   const [editNameError, setEditNameError] = useState<string | null>(null);
+  const [editCoverUrl, setEditCoverUrl] = useState("");
+  const [editGalleryUrls, setEditGalleryUrls] = useState<string[]>([]);
   const { showSnackbar } = useSnackbar();
   const formRef = useRef<HTMLFormElement | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
@@ -146,6 +149,12 @@ export function ProjectsWorkspace({
       showSnackbar(deleteState.error, "error");
     }
   }, [deleteState, showSnackbar]);
+
+  useEffect(() => {
+    if (!editingProject) return;
+    setEditCoverUrl(editingProject.coverImageUrl ?? "");
+    setEditGalleryUrls(editingProject.galleryUrls ?? []);
+  }, [editingProject]);
 
   function submitCreateProject(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -415,7 +424,7 @@ export function ProjectsWorkspace({
       </ModalOverlay>
 
       {editingProject ? (
-        <ModalOverlay open onClose={() => setEditingProject(null)} panelClassName={MODAL_PANEL_SM}>
+        <ModalOverlay open onClose={() => setEditingProject(null)} panelClassName={MODAL_PANEL_LG}>
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Edit project</h2>
               <button
@@ -468,6 +477,16 @@ export function ProjectsWorkspace({
                   />
                 </div>
               </div>
+
+              <ListingImageUpload
+                tenantSlug={tenantSlug}
+                projectId={editingProject.id}
+                coverUrl={editCoverUrl}
+                galleryUrls={editGalleryUrls}
+                onCoverChange={setEditCoverUrl}
+                onGalleryChange={setEditGalleryUrls}
+              />
+
               <div className="flex justify-end gap-2">
                 <button
                   type="button"

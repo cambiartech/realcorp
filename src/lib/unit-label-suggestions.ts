@@ -36,3 +36,35 @@ export function suggestUnitLabels(projectName: string, existingLabels: string[])
   const nextLetter = nextAlphabetBucket(existingLabels);
   return [`${projectName} ${next}`, `${code}-${padded}`, `${nextLetter}-${next}`];
 }
+
+/** Build N sequential unit labels from a base name or pricing plan name. */
+export function generateBulkUnitLabels(opts: {
+  count: number;
+  existingLabels: string[];
+  baseLabel?: string;
+  pricingPlanName?: string;
+  projectName: string;
+}): string[] {
+  const count = Math.min(Math.max(opts.count, 1), 50);
+  const start = maxTrailingNumber(opts.existingLabels) + 1;
+
+  let prefix = opts.baseLabel?.trim();
+  if (!prefix && opts.pricingPlanName?.trim()) {
+    prefix = opts.pricingPlanName.trim();
+  }
+  if (!prefix) {
+    prefix = opts.projectName.trim() || "Unit";
+  }
+
+  const trailingNum = prefix.match(/^(.*?)(\d+)$/);
+  const stem = trailingNum ? trailingNum[1].trimEnd() : prefix;
+  const padWidth = trailingNum ? trailingNum[2].length : 2;
+
+  const out: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const n = start + i;
+    const num = String(n).padStart(padWidth, "0");
+    out.push(stem ? `${stem} ${num}` : num);
+  }
+  return out;
+}

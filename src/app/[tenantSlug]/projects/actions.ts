@@ -5,9 +5,11 @@ import { DealStage, MembershipRole, MembershipStatus, UnitPurpose, UnitStatus } 
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
 import {
+  parseAmenitiesFromForm,
   parseCreatePricingPlanForm,
   parseCreateProjectForm,
   parseCreateUnitForm,
+  parseCreateUnitsBulkForm,
   parseUpdatePricingPlanForm,
 } from "@/lib/validators/project";
 import { revalidatePath } from "next/cache";
@@ -159,6 +161,88 @@ export async function createUnit(
   return { ok: true };
 }
 
+export async function createUnitsBulk(
+  tenantSlug: string,
+  projectId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult & { count?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = parseCreateUnitsBulkForm(formData);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join(" ") };
+  }
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can create units." };
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: tenant.id },
+    select: { id: true, units: { select: { label: true } } },
+  });
+  if (!project) return { ok: false, error: "Project not found." };
+
+  const existing = new Set(project.units.map((u) => u.label.toLowerCase()));
+  const uniqueLabels = [...new Set(parsed.data.labels.map((l) => l.trim()))];
+  const duplicate = uniqueLabels.find((l) => existing.has(l.toLowerCase()));
+  if (duplicate) {
+    return { ok: false, error: `Unit "${duplicate}" already exists in this project.` };
+  }
+
+  try {
+    const pricingPlan = parsed.data.pricingPlanId
+      ? await prisma.projectPricingPlan.findFirst({
+          where: { id: parsed.data.pricingPlanId, tenantId: tenant.id, projectId: project.id },
+          select: { id: true },
+        })
+      : null;
+    if (parsed.data.pricingPlanId && !pricingPlan) {
+      return { ok: false, error: "Selected pricing plan is invalid for this project." };
+    }
+
+    await prisma.$transaction(
+      uniqueLabels.map((label) =>
+        prisma.unit.create({
+          data: {
+            tenantId: tenant.id,
+            projectId: project.id,
+            pricingPlanId: parsed.data.pricingPlanId || null,
+            label,
+            purpose: parsed.data.purpose ?? UnitPurpose.SALE,
+            unitType: parsed.data.unitType || null,
+            status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
+          },
+        }),
+      ),
+    );
+
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "PROJECTS",
+      entityType: "UNIT",
+      entityId: project.id,
+      action: "CREATE",
+      summary: `Created ${uniqueLabels.length} units (${uniqueLabels.slice(0, 3).join(", ")}${uniqueLabels.length > 3 ? "…" : ""}).`,
+      metadata: { labels: uniqueLabels, count: uniqueLabels.length },
+    });
+  } catch (error) {
+    logProjectActionError("createUnitsBulk", tenantSlug, error);
+    return { ok: false, error: "Could not create units right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/projects/${projectId}`);
+  return { ok: true, count: uniqueLabels.length };
+}
+
 export async function updateProject(
   tenantSlug: string,
   projectId: string,
@@ -188,12 +272,21 @@ export async function updateProject(
     });
     if (!project) return { ok: false, error: "Project not found." };
 
+    const galleryUrls = ((formData.get("galleryUrls") as string) ?? "")
+      .split(/\n+/)
+      .map((u) => u.trim())
+      .filter((u) => /^https?:\/\//i.test(u))
+      .slice(0, 12);
+    const coverImageUrl = ((formData.get("coverImageUrl") as string) ?? "").trim().slice(0, 600) || null;
+
     await prisma.project.update({
       where: { id: project.id },
       data: {
         name: parsed.data.name,
         basePrice: parsed.data.basePrice ? Number(parsed.data.basePrice) : null,
         currency: (parsed.data.currency || "NGN").toUpperCase(),
+        coverImageUrl,
+        galleryUrls,
       },
     });
     await writeAuditLog({
@@ -249,11 +342,7 @@ export async function updateProjectListing(
     .map((u) => u.trim())
     .filter((u) => /^https?:\/\//i.test(u))
     .slice(0, 12);
-  const amenities = ((formData.get("amenities") as string) ?? "")
-    .split(",")
-    .map((a) => a.trim())
-    .filter(Boolean)
-    .slice(0, 20);
+  const amenities = parseAmenitiesFromForm(formData);
 
   try {
     await prisma.project.update({

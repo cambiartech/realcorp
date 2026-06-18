@@ -6,6 +6,7 @@ import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ListingImageUpload } from "@/components/listing-image-upload";
+import { TagInput } from "@/components/tag-input";
 import { MODAL_PANEL_LG } from "@/lib/modal-panel";
 import { updateProjectListing } from "@/app/[tenantSlug]/projects/actions";
 
@@ -119,13 +120,8 @@ export function ListingEditorModal({
         />
 
         <div>
-          <label className="mb-1 block text-sm text-muted">Amenities (comma separated)</label>
-          <input
-            name="amenities"
-            defaultValue={project.amenities.join(", ")}
-            placeholder="24/7 power, Gym, Pool, Gated estate"
-            className={FIELD_CLASS}
-          />
+          <label className="mb-1 block text-sm text-muted">Amenities</label>
+          <TagInput name="amenities" initialTags={project.amenities} placeholder="e.g. Swimming pool" />
         </div>
 
         <div className="flex justify-end gap-2">
