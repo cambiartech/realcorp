@@ -45,6 +45,8 @@ export default async function ClientDetailPage({
   });
   assertTenantNavAccess(session, membership, tenant.settings, "clients");
 
+  const moduleShortLets = Boolean(tenant.settings?.moduleShortLets);
+
   const client = await prisma.propertyClient.findFirst({
     where: { id: clientId, tenantId: tenant.id },
     include: {
@@ -54,51 +56,146 @@ export default async function ClientDetailPage({
           pricingPlan: { select: { name: true } },
         },
       },
+      shortletLinks: {
+        include: {
+          shortletUnit: {
+            select: {
+              name: true,
+              location: true,
+              nightlyRate: true,
+              currency: true,
+              property: { select: { name: true } },
+            },
+          },
+        },
+      },
       documents: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!client) notFound();
 
-  const [projects, linkedUnitIds] = await Promise.all([
-    prisma.project.findMany({
-      where: { tenantId: tenant.id },
-      select: {
-        name: true,
-        units: {
-          select: {
-            id: true,
-            label: true,
-            pricingPlanId: true,
-            pricingPlan: { select: { name: true } },
+  const [projects, linkedUnitIds, linkedShortletIds, shortletProperties, standaloneShortlets] =
+    await Promise.all([
+      prisma.project.findMany({
+        where: { tenantId: tenant.id },
+        select: {
+          id: true,
+          name: true,
+          units: {
+            select: {
+              id: true,
+              label: true,
+              pricingPlanId: true,
+              pricingPlan: { select: { name: true } },
+            },
+            orderBy: { label: "asc" },
           },
-          orderBy: { label: "asc" },
         },
-        pricingPlans: { select: { id: true, name: true } },
-      },
-      orderBy: { name: "asc" },
-    }),
-    prisma.clientUnitLink.findMany({
-      where: { tenantId: tenant.id, clientId: client.id },
-      select: { unitId: true },
-    }),
-  ]);
+        orderBy: { name: "asc" },
+      }),
+      prisma.clientUnitLink.findMany({
+        where: { tenantId: tenant.id, clientId: client.id },
+        select: { unitId: true },
+      }),
+      moduleShortLets
+        ? prisma.clientShortletLink.findMany({
+            where: { tenantId: tenant.id, clientId: client.id },
+            select: { shortletUnitId: true },
+          })
+        : Promise.resolve([]),
+      moduleShortLets
+        ? prisma.shortletProperty.findMany({
+            where: { tenantId: tenant.id, isActive: true },
+            select: {
+              id: true,
+              name: true,
+              units: {
+                where: { isActive: true },
+                select: {
+                  id: true,
+                  name: true,
+                  location: true,
+                  nightlyRate: true,
+                  currency: true,
+                },
+                orderBy: { name: "asc" },
+              },
+            },
+            orderBy: { sortOrder: "asc" },
+          })
+        : Promise.resolve([]),
+      moduleShortLets
+        ? prisma.shortletUnit.findMany({
+            where: { tenantId: tenant.id, propertyId: null, isActive: true },
+            select: {
+              id: true,
+              name: true,
+              location: true,
+              nightlyRate: true,
+              currency: true,
+            },
+            orderBy: { name: "asc" },
+          })
+        : Promise.resolve([]),
+    ]);
 
-  const alreadyLinked = new Set(linkedUnitIds.map((l) => l.unitId));
-  const unitOptions = projects.flatMap((project) =>
-    project.units
-      .filter((u) => !alreadyLinked.has(u.id))
-      .map((u) => ({
-        id: u.id,
-        label: u.label,
-        projectName: project.name,
-        defaultPricingPlanName: u.pricingPlan?.name ?? null,
-      })),
-  );
+  const alreadyLinkedUnits = new Set(linkedUnitIds.map((l) => l.unitId));
+  const alreadyLinkedShortlets = new Set(linkedShortletIds.map((l) => l.shortletUnitId));
+
+  const projectOptions = projects
+    .map((project) => ({
+      id: project.id,
+      name: project.name,
+      units: project.units
+        .filter((u) => !alreadyLinkedUnits.has(u.id))
+        .map((u) => ({
+          id: u.id,
+          label: u.label,
+          defaultPricingPlanName: u.pricingPlan?.name ?? null,
+        })),
+    }))
+    .filter((p) => p.units.length > 0);
+
+  const shortletPropertyOptions = [
+    ...shortletProperties
+      .map((property) => ({
+        id: property.id,
+        name: property.name,
+        units: property.units
+          .filter((u) => !alreadyLinkedShortlets.has(u.id))
+          .map((u) => ({
+            id: u.id,
+            name: u.name,
+            location: u.location ?? "",
+            nightlyRate: u.nightlyRate.toString(),
+            currency: u.currency,
+          })),
+      }))
+      .filter((p) => p.units.length > 0),
+    ...(standaloneShortlets.filter((u) => !alreadyLinkedShortlets.has(u.id)).length > 0
+      ? [
+          {
+            id: "__standalone__",
+            name: "Standalone apartments",
+            units: standaloneShortlets
+              .filter((u) => !alreadyLinkedShortlets.has(u.id))
+              .map((u) => ({
+                id: u.id,
+                name: u.name,
+                location: u.location ?? "",
+                nightlyRate: u.nightlyRate.toString(),
+                currency: u.currency,
+              })),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <ClientDetailWorkspace
       tenantSlug={tenant.slug}
       canManage={canManageClients(Boolean(session.user.isPlatformAdmin), membership)}
+      moduleShortLets={moduleShortLets}
       client={{
         id: client.id,
         fullName: client.fullName,
@@ -121,7 +218,16 @@ export default async function ClientDetailPage({
         role: formatEnumLabel(link.role),
         roleValue: link.role,
       }))}
-      unitOptions={unitOptions}
+      shortletLinks={client.shortletLinks.map((link) => ({
+        id: link.id,
+        unitName: link.shortletUnit.name,
+        propertyName: link.shortletUnit.property?.name ?? link.shortletUnit.location ?? "Standalone",
+        nightlyRateLabel: `${link.shortletUnit.currency} ${Number(link.shortletUnit.nightlyRate).toLocaleString()}/night`,
+        role: formatEnumLabel(link.role),
+        roleValue: link.role,
+      }))}
+      projectOptions={projectOptions}
+      shortletPropertyOptions={shortletPropertyOptions}
       documents={client.documents.map((doc) => ({
         id: doc.id,
         clientId: client.id,
@@ -132,6 +238,7 @@ export default async function ClientDetailPage({
         fileUrl: doc.fileUrl,
         fileName: doc.fileName ?? doc.title,
         uploadedAtLabel: doc.createdAt.toISOString().slice(0, 10),
+        visibleInPortal: doc.visibleInPortal,
       }))}
     />
   );

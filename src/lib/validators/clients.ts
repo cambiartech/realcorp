@@ -38,6 +38,7 @@ export const addClientDocumentSchema = z.object({
   title: z.string().trim().min(1, "Title is required.").max(200),
   fileUrl: z.string().url(),
   fileName: z.string().trim().max(255).optional(),
+  visibleInPortal: z.boolean().optional(),
 });
 
 export function parseCreatePropertyClientForm(formData: FormData) {
@@ -67,6 +68,27 @@ export function parseUpdatePropertyClientForm(formData: FormData) {
     state: formData.get("state") || undefined,
     country: formData.get("country") || undefined,
     status: formData.get("status") || PropertyClientStatus.ACTIVE,
+    notes: formData.get("notes") || undefined,
+  });
+}
+
+export const linkClientShortletSchema = z.object({
+  shortletUnitId: z.string().trim().min(1, "Select an apartment."),
+  role: z.nativeEnum(ClientUnitLinkRole).optional(),
+  notes: z.string().trim().max(500).optional(),
+});
+
+export function parseLinkClientShortletForm(formData: FormData) {
+  const roleRaw = formData.get("role");
+  const roleValues = Object.values(ClientUnitLinkRole) as string[];
+  const role =
+    typeof roleRaw === "string" && roleValues.includes(roleRaw)
+      ? (roleRaw as ClientUnitLinkRole)
+      : ClientUnitLinkRole.TENANT;
+
+  return linkClientShortletSchema.safeParse({
+    shortletUnitId: formData.get("shortletUnitId"),
+    role,
     notes: formData.get("notes") || undefined,
   });
 }

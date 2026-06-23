@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/db";
 import { MembershipStatus } from "@/generated/prisma";
+import { classifyInvite } from "@/lib/invitation-utils";
 import { parseJoinForm } from "@/lib/validators/join";
 
 export type AcceptInviteResult =
@@ -25,8 +26,22 @@ export async function acceptInvite(
     include: { tenant: true },
   });
 
-  if (!invitation || invitation.acceptedAt || invitation.expiresAt <= now) {
-    return { ok: false, error: "This invite link is invalid or expired. Request a new invite." };
+  if (!invitation) {
+    return { ok: false, error: "This invite link is not recognized. Ask your admin for a new invite." };
+  }
+
+  const inviteStatus = classifyInvite(invitation);
+  if (inviteStatus === "accepted") {
+    return {
+      ok: false,
+      error: "This invite was already used. Sign in with your email and password instead.",
+    };
+  }
+  if (inviteStatus === "expired") {
+    return {
+      ok: false,
+      error: `This invite expired on ${new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(invitation.expiresAt)}. Ask for a fresh invite link.`,
+    };
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
@@ -87,6 +102,16 @@ export async function acceptInvite(
       });
     });
   } catch {
+    const again = await prisma.invitation.findUnique({
+      where: { token },
+      select: { acceptedAt: true },
+    });
+    if (again?.acceptedAt) {
+      return {
+        ok: false,
+        error: "This invite was already used. Sign in with your email and password instead.",
+      };
+    }
     return { ok: false, error: "Could not accept invite right now. Please try again." };
   }
 

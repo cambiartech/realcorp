@@ -205,6 +205,8 @@ export function applyUserModulePermissionsToNavKeys(
   const order: TenantNavKey[] = [
     "dashboard",
     "portal",
+    "portalShortlets",
+    "portalDocuments",
     "projects",
     "clients",
     "leads",

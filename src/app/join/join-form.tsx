@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormAlert, FormFieldError } from "@/components/form-message";
@@ -31,6 +32,8 @@ export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(acceptInvite.bind(null, token), initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<JoinFieldName, string>>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (state?.ok) {
@@ -86,24 +89,26 @@ export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
         />
       </div>
 
-      <Field
+      <PasswordField
         name="password"
         label="Password"
-        type="password"
         autoComplete="new-password"
         placeholder="Minimum 8 characters"
         required
         error={fieldErrors.password}
+        visible={showPassword}
+        onToggle={() => setShowPassword((v) => !v)}
       />
 
-      <Field
+      <PasswordField
         name="confirmPassword"
         label="Confirm password"
-        type="password"
         autoComplete="new-password"
         placeholder="Repeat password"
         required
         error={fieldErrors.confirmPassword}
+        visible={showConfirmPassword}
+        onToggle={() => setShowConfirmPassword((v) => !v)}
       />
 
       <button
@@ -163,6 +168,58 @@ function Field({
         aria-describedby={error ? `${id}-error` : undefined}
         className={fieldClass(Boolean(error))}
       />
+      {error ? <FormFieldError id={`${id}-error`}>{error}</FormFieldError> : null}
+    </div>
+  );
+}
+
+function PasswordField({
+  name,
+  label,
+  placeholder,
+  autoComplete,
+  required,
+  error,
+  visible,
+  onToggle,
+}: {
+  name: JoinFieldName;
+  label: string;
+  placeholder?: string;
+  autoComplete?: string;
+  required?: boolean;
+  error?: string;
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  const id = `join-${name}`;
+
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-sm text-muted">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          name={name}
+          type={visible ? "text" : "password"}
+          required={required}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={[fieldClass(Boolean(error)), "pr-10"].join(" ")}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center text-muted hover:text-foreground"
+          aria-label={visible ? "Hide password" : "Show password"}
+        >
+          {visible ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+        </button>
+      </div>
       {error ? <FormFieldError id={`${id}-error`}>{error}</FormFieldError> : null}
     </div>
   );

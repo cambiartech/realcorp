@@ -121,6 +121,25 @@ export function ReportsWorkspace(props: Props) {
               headers={["Metric", "Value"]}
               keys={["metric", "value"]}
               rows={performanceRows}
+              reportTitle="Short Lets Performance"
+              companyName={props.tenantName}
+              periodLabel={`${props.from} – ${props.to}`}
+              currency={props.currency}
+              kpis={[
+                { label: "Occupancy", value: props.occupancyLabel, tone: "highlight" },
+                { label: "ADR", value: props.adrLabel },
+                { label: "Period revenue", value: props.periodRevenueLabel, tone: "positive" },
+                { label: "Outstanding", value: props.outstandingLabel, tone: "negative" },
+              ]}
+              breakdowns={[
+                {
+                  title: "Folio revenue by department",
+                  rows: props.folioByDept.map((r) => ({
+                    label: r.department,
+                    value: parseFloat(r.totalLabel.replace(/[^\d.-]/g, "")) || 0,
+                  })),
+                },
+              ]}
             />
           </div>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -159,10 +178,16 @@ export function ReportsWorkspace(props: Props) {
             </div>
             <DataExportMenu
               filename="shortlets-in-house"
-              sheetName="In-house"
+              sheetName="In-house guests"
               headers={["Guest", "Room", "Check-in", "Check-out", "Balance"]}
               keys={["guest", "room", "checkIn", "checkOut", "balance"]}
               rows={inHouseRows}
+              reportTitle="In-house Guest List"
+              companyName={props.tenantName}
+              kpis={[
+                { label: "Guests in-house", value: inHouseRows.length, tone: "highlight" },
+                { label: "Occupancy", value: props.occupancyLabel },
+              ]}
             />
           </div>
           <InHouseTable guests={props.inHouseGuests} />
@@ -182,6 +207,10 @@ export function ReportsWorkspace(props: Props) {
               keys={["date", "closedAt", "occupancy", "adr", "inHouse"]}
               rows={auditRows}
               showPdf={false}
+              reportTitle="Night Audit History"
+              companyName={props.tenantName}
+              periodLabel={`${props.from} – ${props.to}`}
+              kpis={[{ label: "Closed days", value: auditRows.length, tone: "highlight" }]}
             />
           </div>
           <div className="overflow-x-auto rounded-lg border border-foreground/10">

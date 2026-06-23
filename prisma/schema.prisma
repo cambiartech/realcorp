@@ -140,6 +140,7 @@ model Tenant {
   workTasks            WorkTask[]
   propertyClients      PropertyClient[]
   clientUnitLinks      ClientUnitLink[]
+  clientShortletLinks  ClientShortletLink[]
   clientDocuments      ClientDocument[]
   financeDocuments     FinanceDocument[]
   leadCaptureForms     LeadCaptureForm[]
@@ -1042,6 +1043,7 @@ model ShortletUnit {
   activeReservation ShortletReservation?  @relation("ActiveShortletReservation", fields: [activeReservationId], references: [id], onDelete: SetNull)
   reservations      ShortletReservation[]
   checkoutInspections ShortletCheckoutInspection[]
+  clientLinks         ClientShortletLink[]
 
   @@index([tenantId, housekeepingStatus])
   @@index([tenantId, propertyId])
@@ -1789,6 +1791,7 @@ model PropertyClient {
   deal      Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
   portalUser User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   unitLinks ClientUnitLink[]
+  shortletLinks ClientShortletLink[]
   documents ClientDocument[]
   shortletReservations ShortletReservation[]
   shortletGuests       ShortletGuest[]
@@ -1823,6 +1826,28 @@ model ClientUnitLink {
   @@index([tenantId, unitId])
 }
 
+model ClientShortletLink {
+  id             String             @id @default(cuid())
+  tenantId       String
+  clientId       String
+  shortletUnitId String
+  role           ClientUnitLinkRole @default(TENANT)
+  startDate      DateTime?
+  endDate        DateTime?
+  isPrimary      Boolean            @default(false)
+  notes          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client       PropertyClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  shortletUnit ShortletUnit   @relation(fields: [shortletUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, clientId, shortletUnitId])
+  @@index([tenantId, clientId])
+  @@index([tenantId, shortletUnitId])
+}
+
 model ClientDocument {
   id               String                 @id @default(cuid())
   tenantId         String
@@ -1833,6 +1858,7 @@ model ClientDocument {
   fileName         String?
   uploadedByUserId String?
   uploadedByLabel  String?
+  visibleInPortal  Boolean                @default(false)
   createdAt        DateTime               @default(now())
 
   tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)

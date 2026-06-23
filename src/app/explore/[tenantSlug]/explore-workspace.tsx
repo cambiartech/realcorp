@@ -273,7 +273,7 @@ function InquiryModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Inquire about ${listing.name}`}
-        className="w-full max-w-md rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 shadow-xl"
+        className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-2xl"
       >
         {submitted ? (
           <div className="py-6 text-center">

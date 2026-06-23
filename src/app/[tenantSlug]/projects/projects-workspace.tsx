@@ -3,7 +3,8 @@
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { DataExportMenu } from "@/components/shortlets/data-export-menu";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { ButtonSpinner } from "@/components/button-spinner";
@@ -66,6 +67,7 @@ const initial: ActionResult | null = null;
 
 export function ProjectsWorkspace({
   tenantSlug,
+  tenantName,
   projects,
   canManage,
   activeFilterChips,
@@ -77,6 +79,7 @@ export function ProjectsWorkspace({
   portalEnabled = true,
 }: {
   tenantSlug: string;
+  tenantName: string;
   projects: ProjectRow[];
   canManage: boolean;
   activeFilterChips?: ActiveFilterChip[];
@@ -156,6 +159,30 @@ export function ProjectsWorkspace({
     setEditGalleryUrls(editingProject.galleryUrls ?? []);
   }, [editingProject]);
 
+  const projectExportRows = useMemo(
+    () =>
+      projects.map((p) => ({
+        name: p.name,
+        units: p.unitsCount,
+        basePrice: p.basePrice != null ? `${p.currency} ${p.basePrice.toLocaleString()}` : "—",
+        location: [p.locationCity, p.locationState].filter(Boolean).join(", ") || "—",
+        published: p.isPublished ? "Yes" : "No",
+        createdAt: p.createdAt,
+      })),
+    [projects],
+  );
+
+  const inventoryBreakdown = useMemo(
+    () =>
+      projects
+        .map((p) => ({ label: p.name, value: p.unitsCount }))
+        .sort((a, b) => b.value - a.value),
+    [projects],
+  );
+
+  const totalUnits = projects.reduce((s, p) => s + p.unitsCount, 0);
+  const publishedCount = projects.filter((p) => p.isPublished).length;
+
   function submitCreateProject(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
@@ -225,6 +252,22 @@ export function ProjectsWorkspace({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          <DataExportMenu
+            filename={`projects-${new Date().toISOString().slice(0, 10)}`}
+            sheetName="Projects"
+            headers={["Project", "Units", "Base price", "Location", "Published", "Created"]}
+            keys={["name", "units", "basePrice", "location", "published", "createdAt"]}
+            rows={projectExportRows}
+            reportTitle="Projects Portfolio"
+            companyName={tenantName}
+            kpis={[
+              { label: "Projects", value: projects.length, tone: "highlight" },
+              { label: "Total units", value: totalUnits },
+              { label: "Published listings", value: publishedCount, tone: "positive" },
+              { label: "Draft", value: projects.length - publishedCount },
+            ]}
+            breakdowns={[{ title: "Units by project", rows: inventoryBreakdown }]}
+          />
           {listingsEnabled ? (
             <button
               type="button"

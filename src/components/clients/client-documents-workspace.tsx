@@ -16,7 +16,7 @@ import {
 import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { addClientDocument, getClientUploadSignature } from "@/app/[tenantSlug]/clients/actions";
+import { addClientDocument, getClientUploadSignature, setClientDocumentPortalVisibility } from "@/app/[tenantSlug]/clients/actions";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 
 const DOC_CATEGORIES = [
@@ -42,6 +42,7 @@ export type ClientDocumentItem = {
   fileUrl: string;
   fileName: string;
   uploadedAtLabel: string;
+  visibleInPortal: boolean;
 };
 
 function fileKind(fileName: string): "pdf" | "image" | "other" {
@@ -79,7 +80,9 @@ export function ClientDocumentsWorkspace({
   const [uploadClientId, setUploadClientId] = useState(preselectClientId ?? "");
   const [uploadCategory, setUploadCategory] = useState("PURCHASE_AGREEMENT");
   const [uploadTitle, setUploadTitle] = useState("");
+  const [shareInPortal, setShareInPortal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [togglingDocId, setTogglingDocId] = useState<string | null>(null);
   const [showUploadPanel, setShowUploadPanel] = useState(Boolean(preselectClientId));
 
   useEffect(() => {
@@ -142,13 +145,27 @@ export function ClientDocumentsWorkspace({
       title,
       fileUrl: uploaded.secureUrl,
       fileName: file.name,
+      visibleInPortal: shareInPortal,
     });
     if (!result.ok) {
       showSnackbar(result.error || "Could not save document.", "error");
       return;
     }
-    showSnackbar("Document uploaded.", "success");
+    showSnackbar(shareInPortal ? "Document uploaded and shared in portal." : "Document uploaded.", "success");
     setUploadTitle("");
+    setShareInPortal(false);
+    router.refresh();
+  }
+
+  async function togglePortalVisibility(doc: ClientDocumentItem) {
+    setTogglingDocId(doc.id);
+    const result = await setClientDocumentPortalVisibility(tenantSlug, doc.id, !doc.visibleInPortal);
+    setTogglingDocId(null);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar(doc.visibleInPortal ? "Hidden from client portal." : "Shared in client portal.", "success");
     router.refresh();
   }
 
@@ -222,6 +239,20 @@ export function ClientDocumentsWorkspace({
                 placeholder="e.g. Signed allocation — Unit A-12"
                 className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
               />
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={shareInPortal}
+                  onChange={(e) => setShareInPortal(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium text-foreground">Share in client portal</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Investor can view and download this file under My documents.
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
         </div>
@@ -316,8 +347,32 @@ export function ClientDocumentsWorkspace({
                       </Link>
                       {" · "}
                       {doc.category} · {doc.uploadedAtLabel}
+                      {doc.visibleInPortal ? (
+                        <span className="ml-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-800 dark:text-sky-300">
+                          In portal
+                        </span>
+                      ) : null}
                     </p>
                   </div>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      disabled={togglingDocId === doc.id}
+                      onClick={() => togglePortalVisibility(doc)}
+                      className={[
+                        "shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold",
+                        doc.visibleInPortal
+                          ? "border-sky-500/30 text-sky-800 dark:text-sky-300"
+                          : "border-foreground/15 text-muted",
+                      ].join(" ")}
+                    >
+                      {togglingDocId === doc.id
+                        ? "…"
+                        : doc.visibleInPortal
+                          ? "Hide from portal"
+                          : "Share in portal"}
+                    </button>
+                  ) : null}
                   <ChevronRight className="h-4 w-4 text-muted" />
                 </li>
               ))}

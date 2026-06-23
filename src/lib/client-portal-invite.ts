@@ -67,7 +67,6 @@ export async function sendPropertyClientPortalInvite(input: {
     }
   }
 
-  const now = new Date();
   const pendingInvite = await prisma.invitation.findFirst({
     where: {
       tenantId: input.tenantId,
@@ -82,14 +81,14 @@ export async function sendPropertyClientPortalInvite(input: {
   let token = pendingInvite?.token ?? newInviteToken();
   let expiresAt = pendingInvite?.expiresAt ?? inviteExpiresAt();
 
-  if (pendingInvite && expiresAt <= now) {
+  if (pendingInvite) {
     token = newInviteToken();
     expiresAt = inviteExpiresAt();
     await prisma.invitation.update({
       where: { id: pendingInvite.id },
-      data: { token, expiresAt },
+      data: { token, expiresAt, email },
     });
-  } else if (!pendingInvite) {
+  } else {
     await prisma.invitation.create({
       data: {
         tenantId: input.tenantId,

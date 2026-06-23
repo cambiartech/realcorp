@@ -4,7 +4,8 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { DataExportMenu } from "@/components/shortlets/data-export-menu";
 import { LeadQuality } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
@@ -62,6 +63,7 @@ const initial: ActionResult | null = null;
 
 export function LeadsWorkspace({
   tenantSlug,
+  tenantName,
   leads,
   users,
   canCreate,
@@ -71,6 +73,7 @@ export function LeadsWorkspace({
   activeFilterChips,
 }: {
   tenantSlug: string;
+  tenantName: string;
   leads: LeadRow[];
   users: TeamUser[];
   canCreate: boolean;
@@ -96,6 +99,32 @@ export function LeadsWorkspace({
       showSnackbar(state.error, "error");
     }
   }, [showSnackbar, state]);
+
+  const leadExportRows = useMemo(
+    () =>
+      leads.map((l) => ({
+        name: l.name,
+        email: l.email,
+        phone: l.phone,
+        source: l.source,
+        quality: l.quality,
+        score: l.score,
+        owner: l.owner,
+        createdAt: l.createdAt,
+      })),
+    [leads],
+  );
+
+  const sourceBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const l of leads) map.set(l.source || "Unknown", (map.get(l.source || "Unknown") || 0) + 1);
+    return Array.from(map.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [leads]);
+
+  const hotCount = leads.filter((l) => l.score >= 70).length;
+  const warmCount = leads.filter((l) => l.score >= 40 && l.score < 70).length;
 
   return (
     <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
@@ -125,8 +154,25 @@ export function LeadsWorkspace({
             </div>
           ) : null}
         </div>
+        <div className="flex items-center gap-2">
+          <DataExportMenu
+            filename={`leads-${new Date().toISOString().slice(0, 10)}`}
+            sheetName="Leads"
+            headers={["Name", "Email", "Phone", "Source", "Quality", "Score", "Owner", "Created"]}
+            keys={["name", "email", "phone", "source", "quality", "score", "owner", "createdAt"]}
+            rows={leadExportRows}
+            reportTitle="Leads Report"
+            companyName={tenantName}
+            kpis={[
+              { label: "Total leads", value: leads.length, tone: "highlight" },
+              { label: "Hot (70+)", value: hotCount, tone: "positive" },
+              { label: "Warm", value: warmCount },
+              { label: "Cold", value: leads.length - hotCount - warmCount },
+            ]}
+            breakdowns={[{ title: "Leads by source", rows: sourceBreakdown }]}
+          />
         {canCreate ? (
-          <div className="flex items-center gap-2">
+          <>
             <Link
               href={`/${tenantSlug}/leads/import`}
               className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
@@ -140,8 +186,9 @@ export function LeadsWorkspace({
             >
               New lead
             </button>
-          </div>
+          </>
         ) : null}
+        </div>
       </div>
 
       {campaignOptions.length > 0 ? (

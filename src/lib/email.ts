@@ -27,6 +27,14 @@ function getResendClient() {
   return new Resend(apiKey);
 }
 
+function parseResendSendResult(result: { data: unknown; error: unknown }) {
+  if (result.error) {
+    const err = result.error as { message?: string };
+    return { ok: false as const, error: err.message || "Failed to send email." };
+  }
+  return { ok: true as const };
+}
+
 export async function sendInviteEmail(input: {
   to: string;
   tenantName: string;
@@ -59,14 +67,14 @@ export async function sendInviteEmail(input: {
   `;
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from,
       to: input.to,
       subject,
       html,
       ...(replyTo ? { replyTo } : {}),
     });
-    return { ok: true as const };
+    return parseResendSendResult(result);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to send email.";
     return { ok: false as const, error: msg };
@@ -117,7 +125,7 @@ export async function sendSalesReceiptEmail(input: {
   `;
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from,
       to: input.to,
       subject,
@@ -130,7 +138,7 @@ export async function sendSalesReceiptEmail(input: {
         },
       ],
     });
-    return { ok: true as const };
+    return parseResendSendResult(result);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to send email.";
     return { ok: false as const, error: msg };
@@ -199,7 +207,7 @@ export async function sendInvoiceEmail(input: {
   `;
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from,
       to: input.to,
       subject,
@@ -212,7 +220,7 @@ export async function sendInvoiceEmail(input: {
         },
       ],
     });
-    return { ok: true as const };
+    return parseResendSendResult(result);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Failed to send email.";
     return { ok: false as const, error: msg };

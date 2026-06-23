@@ -3,6 +3,7 @@ import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import {
   loadInvestorOrganizations,
+  loadInvestorShortletPortfolio,
   loadPortalDiscoverListings,
   loadStakeholderPortfolio,
 } from "@/lib/portal";
@@ -57,19 +58,36 @@ export default async function StakeholderPortalPage({
     assertTenantNavAccess(session, membership, tenant.settings, "portal");
   }
 
-  const [portfolio, discoverListings, allOrganizations, brand] = await Promise.all([
+  const [portfolio, shortletPortfolio, discoverListings, allOrganizations, brand, investorContact] =
+    await Promise.all([
     loadStakeholderPortfolio(tenant.id, session.user.id),
+    tenant.settings?.moduleShortLets
+      ? loadInvestorShortletPortfolio(tenant.id, session.user.id)
+      : Promise.resolve({ units: [], totals: { currency: "NGN", collected: 0, earnings: 0, units: 0 } }),
     loadPortalDiscoverListings(tenant.slug, session.user.id),
     loadInvestorOrganizations(session.user.id),
     loadPublicListingBrand(tenant.slug),
+    prisma.propertyClient.findFirst({
+      where: { tenantId: tenant.id, userId: session.user.id },
+      select: { fullName: true, email: true, phone: true, alternatePhone: true },
+    }),
   ]);
+
+  const contact = {
+    name: investorContact?.fullName || session.user.name || session.user.email?.split("@")[0] || "Investor",
+    email: session.user.email || investorContact?.email || "",
+    phone: investorContact?.phone || investorContact?.alternatePhone || null,
+  };
 
   return (
     <PortalWorkspace
       tenantSlug={tenant.slug}
       tenantName={tenant.name}
       userName={session.user.name ?? null}
+      investorContact={contact}
       portfolio={portfolio}
+      shortletPortfolio={shortletPortfolio}
+      showShortlets={Boolean(tenant.settings?.moduleShortLets)}
       discoverListings={discoverListings}
       allOrganizations={allOrganizations}
       accentColor={brand?.accentColor ?? null}

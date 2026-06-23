@@ -27,6 +27,7 @@ export default async function TenantLeadsPage({
     select: {
       id: true,
       slug: true,
+      name: true,
       settings: {
         select: {
           moduleSales: true,
@@ -128,6 +129,7 @@ export default async function TenantLeadsPage({
     <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-sm text-muted">Loading leads…</div>}>
     <LeadsWorkspace
       tenantSlug={tenant.slug}
+      tenantName={tenant.name}
       canCreate={canCreate}
       activeFilterChips={activeFilterChips}
       projectOptions={projects.map((project) => ({ id: project.id, name: project.name }))}

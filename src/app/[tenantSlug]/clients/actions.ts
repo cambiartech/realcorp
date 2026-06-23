@@ -19,6 +19,7 @@ import {
   addClientDocumentSchema,
   parseCreatePropertyClientForm,
   parseLinkClientUnitForm,
+  parseLinkClientShortletForm,
   parseUpdatePropertyClientForm,
 } from "@/lib/validators/clients";
 import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
@@ -169,16 +170,31 @@ export async function updatePropertyClient(
 
   const existing = await prisma.propertyClient.findFirst({
     where: { id: clientId, tenantId: tenant.id },
-    select: { id: true },
+    select: { id: true, email: true, userId: true },
   });
   if (!existing) return { ok: false, error: "Client not found." };
+
+  const newEmail = parsed.data.email?.trim().toLowerCase() || null;
+  const oldEmail = existing.email?.trim().toLowerCase() || null;
+  const emailChanged = Boolean(oldEmail && newEmail && oldEmail !== newEmail);
+
+  let clearUserId = false;
+  if (emailChanged && existing.userId) {
+    const linkedUser = await prisma.user.findUnique({
+      where: { id: existing.userId },
+      select: { email: true },
+    });
+    if (linkedUser?.email?.toLowerCase() !== newEmail) {
+      clearUserId = true;
+    }
+  }
 
   try {
     await prisma.propertyClient.update({
       where: { id: existing.id },
       data: {
         fullName: parsed.data.fullName,
-        email: parsed.data.email || null,
+        email: newEmail,
         phone: parsed.data.phone || null,
         alternatePhone: parsed.data.alternatePhone || null,
         addressLine: parsed.data.addressLine || null,
@@ -187,8 +203,29 @@ export async function updatePropertyClient(
         country: parsed.data.country || "Nigeria",
         status: parsed.data.status ?? PropertyClientStatus.ACTIVE,
         notes: parsed.data.notes || null,
+        ...(clearUserId ? { userId: null } : {}),
       },
     });
+
+    if (emailChanged && oldEmail) {
+      const otherClientsWithOldEmail = await prisma.propertyClient.count({
+        where: {
+          tenantId: tenant.id,
+          id: { not: existing.id },
+          email: { equals: oldEmail, mode: "insensitive" },
+        },
+      });
+      if (otherClientsWithOldEmail === 0) {
+        await prisma.invitation.deleteMany({
+          where: {
+            tenantId: tenant.id,
+            email: oldEmail,
+            acceptedAt: null,
+            role: { in: [MembershipRole.INVESTOR, MembershipRole.LISTING_OWNER] },
+          },
+        });
+      }
+    }
     await writeAuditLog({
       tenantId: tenant.id,
       actorUserId: session.user.id,
@@ -264,6 +301,91 @@ export async function linkClientUnit(
     return { ok: false, error: "This unit may already be linked to this client." };
   }
 
+  revalidateClients(tenantSlug, clientId);
+  return { ok: true };
+}
+
+export async function linkClientShortlet(
+  tenantSlug: string,
+  clientId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = parseLinkClientShortletForm(formData);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+  }
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const client = await prisma.propertyClient.findFirst({
+    where: { id: clientId, tenantId: tenant.id },
+    select: { id: true, fullName: true },
+  });
+  if (!client) return { ok: false, error: "Client not found." };
+
+  const shortletUnit = await prisma.shortletUnit.findFirst({
+    where: { id: parsed.data.shortletUnitId, tenantId: tenant.id, isActive: true },
+    select: { id: true, name: true },
+  });
+  if (!shortletUnit) return { ok: false, error: "Apartment not found." };
+
+  try {
+    await prisma.clientShortletLink.create({
+      data: {
+        tenantId: tenant.id,
+        clientId: client.id,
+        shortletUnitId: shortletUnit.id,
+        role: parsed.data.role,
+        notes: parsed.data.notes || null,
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "CLIENTS",
+      entityType: "CLIENT_SHORTLET_LINK",
+      entityId: shortletUnit.id,
+      action: "CREATE",
+      summary: `Linked short-let ${shortletUnit.name} to client ${client.fullName}.`,
+    });
+  } catch {
+    return { ok: false, error: "This apartment may already be linked to this client." };
+  }
+
+  revalidateClients(tenantSlug, clientId);
+  return { ok: true };
+}
+
+export async function unlinkClientShortlet(
+  tenantSlug: string,
+  clientId: string,
+  linkId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const link = await prisma.clientShortletLink.findFirst({
+    where: { id: linkId, tenantId: tenant.id, clientId },
+    select: { id: true },
+  });
+  if (!link) return { ok: false, error: "Link not found." };
+
+  await prisma.clientShortletLink.delete({ where: { id: link.id } });
   revalidateClients(tenantSlug, clientId);
   return { ok: true };
 }
@@ -399,11 +521,41 @@ export async function addClientDocument(
       title: parsed.data.title,
       fileUrl: parsed.data.fileUrl,
       fileName: parsed.data.fileName || null,
+      visibleInPortal: parsed.data.visibleInPortal ?? false,
       uploadedByUserId: session.user.id,
       uploadedByLabel: session.user.name || session.user.email || "Team",
     },
   });
   revalidateClients(tenantSlug, client.id);
+  return { ok: true };
+}
+
+export async function setClientDocumentPortalVisibility(
+  tenantSlug: string,
+  documentId: string,
+  visibleInPortal: boolean,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const doc = await prisma.clientDocument.findFirst({
+    where: { id: documentId, tenantId: tenant.id },
+    select: { id: true, clientId: true },
+  });
+  if (!doc) return { ok: false, error: "Document not found." };
+
+  await prisma.clientDocument.update({
+    where: { id: doc.id },
+    data: { visibleInPortal },
+  });
+  revalidateClients(tenantSlug, doc.clientId);
+  revalidatePath(`/${tenantSlug}/portal/documents`);
   return { ok: true };
 }
 

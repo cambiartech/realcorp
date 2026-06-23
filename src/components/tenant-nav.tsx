@@ -63,6 +63,8 @@ type NavItem = { key: TenantNavKey; label: string; href: string; mobileLabel: st
 const ALL_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "", mobileLabel: "Dash" },
   { key: "portal", label: "My portfolio", href: "/portal", mobileLabel: "Portfolio" },
+  { key: "portalShortlets", label: "My shortlets", href: "/portal/shortlets", mobileLabel: "Shortlets" },
+  { key: "portalDocuments", label: "My documents", href: "/portal/documents", mobileLabel: "Documents" },
   { key: "projects", label: "Projects", href: "/projects", mobileLabel: "Projects" },
   { key: "clients", label: "Clients", href: "/clients", mobileLabel: "Clients" },
   { key: "leads", label: "Leads", href: "/leads", mobileLabel: "Leads" },
@@ -83,6 +85,8 @@ const ALL_ITEMS: NavItem[] = [
 const NAV_ICONS: Record<TenantNavKey, LucideIcon> = {
   dashboard: LayoutDashboard,
   portal: TrendingUp,
+  portalShortlets: BedDouble,
+  portalDocuments: FileText,
   projects: FolderOpen,
   clients: Building2,
   leads: Search,
@@ -107,6 +111,8 @@ const SALES_GROUP_KEYS: TenantNavKey[] = ["leads", "deals"];
 const TOP_LEVEL_KEYS: TenantNavKey[] = [
   "dashboard",
   "portal",
+  "portalShortlets",
+  "portalDocuments",
   "projects",
   "clients",
   "tasks",
@@ -132,6 +138,14 @@ function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   const isTenantRoot = href.split("/").length === 2 && href.startsWith("/");
   if (isTenantRoot) return pathname === href;
+
+  // Portal hub is only active on /portal and /portal/projects/* — not /portal/shortlets or /portal/documents
+  if (href.endsWith("/portal")) {
+    if (pathname.startsWith(`${href}/shortlets`) || pathname.startsWith(`${href}/documents`)) {
+      return false;
+    }
+  }
+
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

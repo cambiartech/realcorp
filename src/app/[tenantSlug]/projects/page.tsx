@@ -25,6 +25,7 @@ export default async function TenantProjectsPage({
     select: {
       id: true,
       slug: true,
+      name: true,
       defaultCurrency: true,
       settings: {
         select: {
@@ -94,6 +95,7 @@ export default async function TenantProjectsPage({
   return (
     <ProjectsWorkspace
       tenantSlug={tenant.slug}
+      tenantName={tenant.name}
       canManage={canManage}
       listingsEnabled={tenant.settings?.moduleListings !== false}
       portalEnabled={tenant.settings?.moduleInvestorPortal === true}

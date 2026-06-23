@@ -4,6 +4,7 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { DataExportMenu } from "@/components/shortlets/data-export-menu";
 import {
   closestCorners,
   DndContext,
@@ -79,6 +80,7 @@ const STAGE_LABEL: Record<DealStage, string> = {
 
 export function DealsWorkspace({
   tenantSlug,
+  tenantName,
   deals,
   leads,
   units,
@@ -88,6 +90,7 @@ export function DealsWorkspace({
   initialView = "kanban",
 }: {
   tenantSlug: string;
+  tenantName: string;
   deals: DealCard[];
   leads: SelectOption[];
   units: SelectOption[];
@@ -149,6 +152,41 @@ export function DealsWorkspace({
     }
     return out;
   }, [boardDeals]);
+
+  function parseDealValue(raw: string) {
+    return parseFloat(raw.replace(/[^\d.-]/g, "")) || 0;
+  }
+
+  const dealExportRows = useMemo(
+    () =>
+      boardDeals.map((d) => ({
+        lead: d.leadName,
+        project: d.projectName,
+        unit: d.unitLabel,
+        stage: STAGE_LABEL[d.stage],
+        value: d.value,
+        owner: d.owner,
+        createdAt: d.createdAt,
+      })),
+    [boardDeals],
+  );
+
+  const stageBreakdown = useMemo(
+    () =>
+      STAGE_ORDER.map((stage) => ({
+        label: STAGE_LABEL[stage],
+        value: boardDeals.filter((d) => d.stage === stage).length,
+      })).filter((x) => x.value > 0),
+    [boardDeals],
+  );
+
+  const pipelineValue = useMemo(
+    () => boardDeals.filter((d) => d.stage !== "CLOSED_LOST").reduce((s, d) => s + parseDealValue(d.value), 0),
+    [boardDeals],
+  );
+
+  const wonCount = boardDeals.filter((d) => d.stage === "CLOSED_WON").length;
+  const openCount = boardDeals.filter((d) => d.stage !== "CLOSED_WON" && d.stage !== "CLOSED_LOST").length;
 
   async function handleDrop(targetStage: DealStage) {
     if (isDraggingSavePending) return;
@@ -281,6 +319,22 @@ export function DealsWorkspace({
               </svg>
             </button>
           </div>
+          <DataExportMenu
+            filename={`sales-pipeline-${new Date().toISOString().slice(0, 10)}`}
+            sheetName="Deals"
+            headers={["Lead", "Project", "Unit", "Stage", "Value", "Owner", "Created"]}
+            keys={["lead", "project", "unit", "stage", "value", "owner", "createdAt"]}
+            rows={dealExportRows}
+            reportTitle="Sales Pipeline"
+            companyName={tenantName}
+            kpis={[
+              { label: "Open deals", value: openCount, tone: "highlight" },
+              { label: "Closed won", value: wonCount, tone: "positive" },
+              { label: "Pipeline value", value: pipelineValue, tone: "default" },
+              { label: "Total deals", value: boardDeals.length },
+            ]}
+            breakdowns={[{ title: "Deals by stage", rows: stageBreakdown }]}
+          />
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}

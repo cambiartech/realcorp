@@ -1,4 +1,20 @@
 import ExcelJS from "exceljs";
+import {
+  addBreakdownTable,
+  addComparisonBars,
+  addKpiCards,
+  addReportBanner,
+  addSectionTitle,
+  addStyledDataTable,
+  autoWidth,
+  downloadWorkbook,
+  moneyFormat,
+  REPORT_THEME,
+  solidFill,
+  styleHeaderRow,
+  toneFont,
+  type ReportMeta,
+} from "@/lib/report-xlsx-theme";
 
 export type ReportExportKind = "pnl" | "cashflow" | "expenses" | "balance";
 
@@ -14,82 +30,134 @@ type CashflowRow = { month: string; inflow: number; outflow: number; net: number
 type ExpenseRow = { category: string; count: number; total: number };
 type BalanceLine = { section: string; label: string; amount: number; tone?: "overdue" | "equity" };
 
-const COLORS = {
-  headerBg: "FF111827",
-  headerFg: "FFFFFFFF",
-  titleBg: "FFF3F4F6",
-  assetBg: "FFDCFCE7",
-  assetFg: "FF166534",
-  liabilityBg: "FFFEE2E2",
-  liabilityFg: "FF991B1B",
-  equityBg: "FFDBEAFE",
-  equityFg: "FF1E40AF",
-  posFg: "FF059669",
-  negFg: "FFDC2626",
-  overdueFg: "FFDC2626",
-  border: "FFE5E7EB",
-} as const;
+type TransactionRow = {
+  date: string;
+  amount: number;
+  description: string;
+  category: string;
+};
 
-function moneyFormat(currency: string) {
-  return `#,##0.00 "${currency}"`;
+export type FinanceReportKpis = {
+  totalInvoiced: number;
+  totalCollected: number;
+  totalExpenses: number;
+  netCashflow: number;
+  receivables: number;
+  overdueReceivables: number;
+};
+
+function metaToReport(meta: ReportExportMeta, title: string): ReportMeta {
+  return {
+    title,
+    companyName: meta.companyName,
+    generatedAtLabel: meta.generatedAtLabel,
+    currency: meta.currency,
+    periodLabel: meta.windowMonths ? `Last ${meta.windowMonths} months` : undefined,
+  };
 }
 
-function styleMetaLabel(cell: ExcelJS.Cell) {
-  cell.font = { bold: true, color: { argb: "FF374151" } };
-  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.titleBg } };
+function sum(rows: PnlRow[]) {
+  return rows.reduce(
+    (acc, r) => ({
+      invoiced: acc.invoiced + r.invoiced,
+      collected: acc.collected + r.collected,
+      expenses: acc.expenses + r.expenses,
+      net: acc.net + r.net,
+    }),
+    { invoiced: 0, collected: 0, expenses: 0, net: 0 },
+  );
 }
 
-function styleHeaderRow(row: ExcelJS.Row) {
-  row.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: COLORS.headerFg } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.headerBg } };
-    cell.alignment = { vertical: "middle" };
-    cell.border = {
-      bottom: { style: "thin", color: { argb: COLORS.border } },
-    };
-  });
-  row.height = 22;
-}
+function addFinanceSummarySheet(
+  sheet: ExcelJS.Worksheet,
+  meta: ReportExportMeta,
+  data: {
+    pnl: PnlRow[];
+    expenses: ExpenseRow[];
+    kpis?: FinanceReportKpis;
+  },
+) {
+  addReportBanner(sheet, metaToReport(meta, "Finance Report"), 10);
+  const totals = sum(data.pnl);
+  const kpis = data.kpis ?? {
+    totalInvoiced: totals.invoiced,
+    totalCollected: totals.collected,
+    totalExpenses: totals.expenses,
+    netCashflow: totals.net,
+    receivables: 0,
+    overdueReceivables: 0,
+  };
 
-function toneFont(amount: number, bold = false): Partial<ExcelJS.Font> {
-  const color = amount > 0 ? COLORS.posFg : amount < 0 ? COLORS.negFg : "FF6B7280";
-  return { bold, color: { argb: color } };
-}
+  let row = addKpiCards(
+    sheet,
+    5,
+    [
+      { label: "Total collected", value: kpis.totalCollected, tone: "highlight" },
+      { label: "Total expenses", value: kpis.totalExpenses, tone: "default" },
+      { label: "Net cash flow", value: kpis.netCashflow, tone: kpis.netCashflow >= 0 ? "positive" : "negative" },
+      { label: "Outstanding receivables", value: kpis.receivables, tone: kpis.receivables > 0 ? "negative" : "default" },
+    ],
+    meta.currency,
+  );
 
-function sectionStyle(section: string): { bg: string; fg: string } {
-  if (section === "What you own") return { bg: COLORS.assetBg, fg: COLORS.assetFg };
-  if (section === "What you owe") return { bg: COLORS.liabilityBg, fg: COLORS.liabilityFg };
-  return { bg: COLORS.equityBg, fg: COLORS.equityFg };
-}
+  row = addSectionTitle(sheet, row, "Income vs expenses", 10);
+  row = addComparisonBars(
+    sheet,
+    row,
+    [
+      {
+        label: "Expenses",
+        primary: kpis.totalExpenses,
+        secondary: kpis.totalCollected,
+        primaryLabel: "Expenses (outflow)",
+        secondaryLabel: "Income collected (inflow)",
+      },
+    ],
+    meta.currency,
+  );
 
-function addMetaBlock(sheet: ExcelJS.Worksheet, meta: ReportExportMeta) {
-  const rows: Array<[string, string]> = [
-    ["Company", meta.companyName],
-    ["Generated", meta.generatedAtLabel],
-  ];
-  if (meta.windowMonths) rows.push(["Period", `Last ${meta.windowMonths} months`]);
-  for (const [label, value] of rows) {
-    const row = sheet.addRow([label, value]);
-    styleMetaLabel(row.getCell(1));
+  if (data.pnl.length >= 2) {
+    const first = data.pnl[0];
+    const last = data.pnl[data.pnl.length - 1];
+    row = addSectionTitle(sheet, row, "Period comparison", 10);
+    row = addComparisonBars(
+      sheet,
+      row,
+      [
+        {
+          label: "Opening month net",
+          primary: first.net,
+          secondary: last.net,
+          primaryLabel: first.month,
+          secondaryLabel: last.month,
+        },
+        {
+          label: "Opening month collected",
+          primary: first.collected,
+          secondary: last.collected,
+          primaryLabel: first.month,
+          secondaryLabel: last.month,
+        },
+      ],
+      meta.currency,
+    );
   }
-  sheet.addRow([]);
-}
 
-function autoWidth(sheet: ExcelJS.Worksheet, min = 12, max = 44) {
-  sheet.columns.forEach((column) => {
-    if (!column) return;
-    let width = min;
-    column.eachCell?.({ includeEmpty: false }, (cell) => {
-      const len = String(cell.value ?? "").length;
-      width = Math.max(width, Math.min(max, len + 2));
-    });
-    column.width = width;
-  });
+  if (data.expenses.length > 0) {
+    row = addBreakdownTable(
+      sheet,
+      row,
+      "Expenses by category",
+      data.expenses.map((e) => ({ label: e.category, value: e.total })),
+      meta.currency,
+    );
+  }
+
+  autoWidth(sheet);
 }
 
 function addPnlSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows: PnlRow[]) {
-  sheet.name = "Profit & Loss";
-  addMetaBlock(sheet, meta);
+  addReportBanner(sheet, metaToReport(meta, "Profit & Loss"), 6);
   const header = sheet.addRow(["Month", "Invoiced", "Collected", "Expenses", "Net"]);
   styleHeaderRow(header);
   for (const row of rows) {
@@ -100,12 +168,21 @@ function addPnlSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows: Pnl
     excelRow.getCell(5).numFmt = moneyFormat(meta.currency);
     excelRow.getCell(5).font = toneFont(row.net, true);
   }
+  const totals = sum(rows);
+  const totalRow = sheet.addRow(["Total", totals.invoiced, totals.collected, totals.expenses, totals.net]);
+  totalRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: REPORT_THEME.green } };
+    cell.fill = solidFill(REPORT_THEME.greenLight);
+  });
+  totalRow.getCell(2).numFmt = moneyFormat(meta.currency);
+  totalRow.getCell(3).numFmt = moneyFormat(meta.currency);
+  totalRow.getCell(4).numFmt = moneyFormat(meta.currency);
+  totalRow.getCell(5).numFmt = moneyFormat(meta.currency);
   autoWidth(sheet);
 }
 
 function addCashflowSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows: CashflowRow[]) {
-  sheet.name = "Cash Flow";
-  addMetaBlock(sheet, meta);
+  addReportBanner(sheet, metaToReport(meta, "Cash Flow"), 5);
   const header = sheet.addRow(["Month", "Inflow", "Outflow", "Net"]);
   styleHeaderRow(header);
   for (const row of rows) {
@@ -119,40 +196,72 @@ function addCashflowSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows
 }
 
 function addExpensesSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows: ExpenseRow[]) {
-  sheet.name = "Expenses";
-  addMetaBlock(sheet, meta);
-  const header = sheet.addRow(["Category", "Count", "Total"]);
+  addReportBanner(sheet, metaToReport(meta, "Expense Analysis"), 6);
+  addBreakdownTable(sheet, 5, "Category breakdown", rows.map((r) => ({ label: r.category, value: r.total })), meta.currency);
+  const headerRow = (sheet.lastRow?.number ?? 10) + 2;
+  const header = sheet.getRow(headerRow);
+  header.values = ["Category", "Transactions", "Total"];
   styleHeaderRow(header);
-  for (const row of rows) {
-    const excelRow = sheet.addRow([row.category, row.count, row.total]);
+  rows.forEach((row, idx) => {
+    const excelRow = sheet.getRow(headerRow + 1 + idx);
+    excelRow.values = [row.category, row.count, row.total];
     excelRow.getCell(3).numFmt = moneyFormat(meta.currency);
-  }
+    if (idx % 2 === 1) excelRow.eachCell((c) => { c.fill = solidFill(REPORT_THEME.stripe); });
+  });
   autoWidth(sheet);
 }
 
 function addBalanceSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, lines: BalanceLine[]) {
-  sheet.name = "Balance Sheet";
-  addMetaBlock(sheet, meta);
+  addReportBanner(sheet, metaToReport(meta, "Balance Sheet"), 4);
   const header = sheet.addRow(["Section", "Line item", "Amount"]);
   styleHeaderRow(header);
   for (const line of lines) {
     const excelRow = sheet.addRow([line.section, line.label, line.amount]);
-    const section = sectionStyle(line.section);
-    excelRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: section.bg } };
-    excelRow.getCell(1).font = { bold: true, color: { argb: section.fg } };
-    excelRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: section.bg } };
+    excelRow.getCell(3).numFmt = moneyFormat(meta.currency);
     if (line.label.startsWith("Total")) {
-      excelRow.getCell(2).font = { bold: true, color: { argb: section.fg } };
-      excelRow.getCell(3).font = { bold: true, color: { argb: section.fg } };
+      excelRow.getCell(2).font = { bold: true };
+      excelRow.getCell(3).font = { bold: true };
     } else if (line.tone === "overdue") {
-      excelRow.getCell(2).font = { color: { argb: COLORS.overdueFg }, italic: true };
-      excelRow.getCell(3).font = { bold: true, color: { argb: COLORS.overdueFg } };
+      excelRow.getCell(2).font = { color: { argb: REPORT_THEME.red }, italic: true };
+      excelRow.getCell(3).font = { bold: true, color: { argb: REPORT_THEME.red } };
     } else if (line.tone === "equity") {
       excelRow.getCell(3).font = toneFont(line.amount, true);
     }
-    excelRow.getCell(3).numFmt = moneyFormat(meta.currency);
   }
   autoWidth(sheet);
+}
+
+function addTransactionsSheet(
+  sheet: ExcelJS.Worksheet,
+  meta: ReportExportMeta,
+  income: TransactionRow[],
+  expenses: TransactionRow[],
+) {
+  addReportBanner(sheet, metaToReport(meta, "Transactions"), 8);
+
+  let row = addSectionTitle(sheet, 5, "Income (collections)", 8);
+  addStyledDataTable(
+    sheet,
+    ["Date", "Amount", "Description", "Category"],
+    income.map((t) => [t.date, t.amount, t.description, t.category]),
+    { currency: meta.currency, moneyColumns: [2], startRow: row },
+  );
+
+  row = (sheet.lastRow?.number ?? row) + 2;
+  row = addSectionTitle(sheet, row, "Expenses", 8);
+  addStyledDataTable(
+    sheet,
+    ["Date", "Amount", "Description", "Category"],
+    expenses.map((t) => [t.date, t.amount, t.description, t.category]),
+    { currency: meta.currency, moneyColumns: [2], startRow: row },
+  );
+}
+
+function createWorkbook() {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Realcorp";
+  workbook.created = new Date();
+  return workbook;
 }
 
 export async function downloadFinanceReportXlsx(
@@ -163,28 +272,46 @@ export async function downloadFinanceReportXlsx(
     cashflow?: CashflowRow[];
     expenses?: ExpenseRow[];
     balance?: BalanceLine[];
+    kpis?: FinanceReportKpis;
+    incomeTransactions?: TransactionRow[];
+    expenseTransactions?: TransactionRow[];
   },
 ) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Realcorp Finance";
-  workbook.created = new Date();
-
-  if (kind === "pnl") addPnlSheet(workbook.addWorksheet("Profit & Loss"), meta, data.pnl || []);
-  if (kind === "cashflow") addCashflowSheet(workbook.addWorksheet("Cash Flow"), meta, data.cashflow || []);
-  if (kind === "expenses") addExpensesSheet(workbook.addWorksheet("Expenses"), meta, data.expenses || []);
-  if (kind === "balance") addBalanceSheet(workbook.addWorksheet("Balance Sheet"), meta, data.balance || []);
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
+  const workbook = createWorkbook();
   const stamp = new Date().toISOString().slice(0, 10);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `finance-${kind}-${stamp}.xlsx`;
-  a.click();
-  URL.revokeObjectURL(url);
+
+  if (kind === "pnl") {
+    addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
+      pnl: data.pnl || [],
+      expenses: data.expenses || [],
+      kpis: data.kpis,
+    });
+    addPnlSheet(workbook.addWorksheet("Profit & Loss"), meta, data.pnl || []);
+  }
+  if (kind === "cashflow") {
+    addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
+      pnl: data.pnl || [],
+      expenses: data.expenses || [],
+      kpis: data.kpis,
+    });
+    addCashflowSheet(workbook.addWorksheet("Cash Flow"), meta, data.cashflow || []);
+  }
+  if (kind === "expenses") {
+    addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
+      pnl: data.pnl || [],
+      expenses: data.expenses || [],
+      kpis: data.kpis,
+    });
+    addExpensesSheet(workbook.addWorksheet("Expenses"), meta, data.expenses || []);
+    if (data.expenseTransactions?.length) {
+      addTransactionsSheet(workbook.addWorksheet("Transactions"), meta, [], data.expenseTransactions);
+    }
+  }
+  if (kind === "balance") {
+    addBalanceSheet(workbook.addWorksheet("Balance Sheet"), meta, data.balance || []);
+  }
+
+  await downloadWorkbook(workbook, `finance-${kind}-${stamp}.xlsx`);
 }
 
 export async function downloadFinanceReportPackXlsx(
@@ -194,40 +321,30 @@ export async function downloadFinanceReportPackXlsx(
     cashflow: CashflowRow[];
     expenses: ExpenseRow[];
     balance: BalanceLine[];
+    kpis?: FinanceReportKpis;
+    incomeTransactions?: TransactionRow[];
+    expenseTransactions?: TransactionRow[];
   },
 ) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Realcorp Finance";
-  workbook.created = new Date();
+  const workbook = createWorkbook();
 
-  const summary = workbook.addWorksheet("Summary");
-  summary.addRow(["Finance report pack", meta.companyName]);
-  summary.getCell("A1").font = { bold: true, size: 14 };
-  summary.addRow(["Generated", meta.generatedAtLabel]);
-  summary.addRow(["Currency", meta.currency]);
-  if (meta.windowMonths) summary.addRow(["Period", `Last ${meta.windowMonths} months`]);
-  summary.addRow([]);
-  summary.addRow(["Sheets included", "Profit & Loss, Cash Flow, Expenses, Balance Sheet"]);
-  styleMetaLabel(summary.getCell("A2"));
-  styleMetaLabel(summary.getCell("A3"));
-  styleMetaLabel(summary.getCell("A4"));
-  autoWidth(summary);
-
+  addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
+    pnl: data.pnl,
+    expenses: data.expenses,
+    kpis: data.kpis,
+  });
   addPnlSheet(workbook.addWorksheet("Profit & Loss"), meta, data.pnl);
   addCashflowSheet(workbook.addWorksheet("Cash Flow"), meta, data.cashflow);
   addExpensesSheet(workbook.addWorksheet("Expenses"), meta, data.expenses);
   addBalanceSheet(workbook.addWorksheet("Balance Sheet"), meta, data.balance);
+  addTransactionsSheet(
+    workbook.addWorksheet("Transactions"),
+    meta,
+    data.incomeTransactions || [],
+    data.expenseTransactions || [],
+  );
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `finance-report-pack-${new Date().toISOString().slice(0, 10)}.xlsx`;
-  a.click();
-  URL.revokeObjectURL(url);
+  await downloadWorkbook(workbook, `finance-report-pack-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 export function buildBalanceExportLines(
@@ -260,3 +377,5 @@ export function buildBalanceExportLines(
   lines.push({ section: "Owner position", label: "Total equity", amount: sections.equityTotal, tone: "equity" });
   return lines;
 }
+
+export type { TransactionRow };

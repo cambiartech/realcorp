@@ -8,6 +8,8 @@ import type { TenantModuleFlags } from "@/lib/tenant-module-definitions";
 export type TenantNavKey =
   | "dashboard"
   | "portal"
+  | "portalShortlets"
+  | "portalDocuments"
   | "projects"
   | "clients"
   | "leads"
@@ -42,6 +44,8 @@ export type TenantSettingsNavSlice = {
 const NAV_ORDER: TenantNavKey[] = [
   "dashboard",
   "portal",
+  "portalShortlets",
+  "portalDocuments",
   "projects",
   "clients",
   "leads",
@@ -101,7 +105,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
   switch (role) {
     case MembershipRole.INVESTOR:
     case MembershipRole.LISTING_OWNER:
-      return ["portal", "settings"];
+      return ["portal", "portalShortlets", "portalDocuments", "settings"];
     case MembershipRole.ORG_ADMIN:
       return NAV_ORDER.filter((k) => k !== "portal");
     case MembershipRole.FINANCE_MANAGER:
@@ -127,6 +131,8 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
 function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice): TenantNavKey[] {
   return keys.filter((k) => {
     if (k === "portal") return s.moduleInvestorPortal !== false;
+    if (k === "portalShortlets") return s.moduleShortLets;
+    if (k === "portalDocuments") return s.moduleClients;
     if (k === "listings") return s.moduleListings !== false;
     if (k === "stakeholders") return s.moduleInvestorPortal === true;
     if (k === "marketing") return s.moduleMarketing;
@@ -216,6 +222,16 @@ export function getVisibleNavKeys(opts: {
   }
   if (!isPlatformAdmin && r !== MembershipRole.ORG_ADMIN && !portalOnly) {
     keys = applyUserModulePermissionsToNavKeys(keys, userModulePermissions, settings as Partial<TenantModuleFlags>);
+  }
+  if (portalOnly && settings.moduleShortLets) {
+    const set = new Set(keys);
+    set.add("portalShortlets");
+    keys = NAV_ORDER.filter((k) => set.has(k));
+  }
+  if (portalOnly && settings.moduleClients) {
+    const set = new Set(keys);
+    set.add("portalDocuments");
+    keys = NAV_ORDER.filter((k) => set.has(k));
   }
   return NAV_ORDER.filter((k) => keys.includes(k));
 }

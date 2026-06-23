@@ -103,6 +103,7 @@ export default async function ClientsPage({
         fileUrl: doc.fileUrl,
         fileName: doc.fileName ?? doc.title,
         uploadedAtLabel: doc.createdAt.toISOString().slice(0, 10),
+        visibleInPortal: doc.visibleInPortal,
       }))}
     />
   );

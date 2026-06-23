@@ -24,6 +24,7 @@ export default async function DealsPage({
     select: {
       id: true,
       slug: true,
+      name: true,
       settings: {
         select: {
           moduleSales: true,
@@ -126,6 +127,7 @@ export default async function DealsPage({
   return (
     <DealsWorkspace
       tenantSlug={tenant.slug}
+      tenantName={tenant.name}
       defaultLeadId={leadId}
       activeFilterChips={activeFilterChips}
       initialView={view === "list" ? "list" : "kanban"}

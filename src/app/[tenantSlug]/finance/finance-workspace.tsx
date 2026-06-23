@@ -1416,13 +1416,14 @@ export function FinanceWorkspace({
 
   async function exportReportExcel(kind: ReportExportKind) {
     const meta = reportExportMeta();
+    const payload = financeExportPayload();
     try {
       if (kind === "pnl") {
-        await downloadFinanceReportXlsx("pnl", meta, { pnl: visiblePnlBreakdown });
+        await downloadFinanceReportXlsx("pnl", meta, { ...payload, pnl: visiblePnlBreakdown });
       } else if (kind === "cashflow") {
-        await downloadFinanceReportXlsx("cashflow", meta, { cashflow: visibleCashflowBreakdown });
+        await downloadFinanceReportXlsx("cashflow", meta, { ...payload, cashflow: visibleCashflowBreakdown, pnl: visiblePnlBreakdown });
       } else if (kind === "expenses") {
-        await downloadFinanceReportXlsx("expenses", meta, { expenses: visibleExpenseBreakdown });
+        await downloadFinanceReportXlsx("expenses", meta, { ...payload, expenses: visibleExpenseBreakdown, pnl: visiblePnlBreakdown });
       } else {
         await downloadFinanceReportXlsx("balance", meta, {
           balance: buildBalanceExportLines(balanceSheetSections),
@@ -1433,6 +1434,40 @@ export function FinanceWorkspace({
     }
   }
 
+  function financeExportPayload() {
+    const totals = visiblePnlBreakdown.reduce(
+      (acc, r) => ({
+        invoiced: acc.invoiced + r.invoiced,
+        collected: acc.collected + r.collected,
+        expenses: acc.expenses + r.expenses,
+        net: acc.net + r.net,
+      }),
+      { invoiced: 0, collected: 0, expenses: 0, net: 0 },
+    );
+    return {
+      kpis: {
+        totalInvoiced: totals.invoiced,
+        totalCollected: totals.collected,
+        totalExpenses: totals.expenses,
+        netCashflow: totals.net,
+        receivables: filteredBalanceSnapshot.receivables,
+        overdueReceivables: filteredBalanceSnapshot.overdueReceivables,
+      },
+      incomeTransactions: filteredPayments.map((p) => ({
+        date: p.paidAtLabel,
+        amount: p.amountValue,
+        description: p.isDirect ? p.invoiceLabel : p.invoiceLabel,
+        category: p.department || "Collections",
+      })),
+      expenseTransactions: filteredExpenses.map((e) => ({
+        date: e.expenseDateLabel,
+        amount: e.amountValue,
+        description: e.vendorName !== "—" ? `${e.vendorName}${e.reference ? ` · ${e.reference}` : ""}` : e.reference || e.category,
+        category: e.category,
+      })),
+    };
+  }
+
   async function exportReportPack() {
     try {
       await downloadFinanceReportPackXlsx(reportExportMeta(), {
@@ -1440,6 +1475,7 @@ export function FinanceWorkspace({
         cashflow: visibleCashflowBreakdown,
         expenses: visibleExpenseBreakdown,
         balance: buildBalanceExportLines(balanceSheetSections),
+        ...financeExportPayload(),
       });
     } catch {
       showSnackbar("Could not generate report pack. Try again.", "error");
@@ -2846,10 +2882,13 @@ export function FinanceWorkspace({
                       onClick={() => void exportReportPack()}
                       className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90"
                     >
-                      Export all (Excel)
+                      Export report pack
                     </button>
                   </div>
                 </div>
+                <p className="text-xs text-muted">
+                  Excel exports include a Summary dashboard with KPIs and charts, plus detail sheets. Use CSV only when you need raw import data.
+                </p>
 
                 <div className="grid gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 md:grid-cols-3">
                   <UiSelect value={reportProjectFilter} onChange={(e) => setReportProjectFilter(e.target.value)}>
