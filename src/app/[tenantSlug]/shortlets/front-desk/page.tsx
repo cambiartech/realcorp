@@ -1,6 +1,7 @@
 import prisma from "@/lib/db";
 import { MembershipStatus } from "@/generated/prisma";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { ACTIVE_FOLIO_STATUS_VALUES } from "@/lib/shortlets-reservation-status";
 import { loadShortletsContext } from "@/lib/shortlets-loaders";
 import { isCheckoutDueSoon, isCheckoutOverdue } from "@/lib/shortlets-settings";
 import { loadInHouseGuests } from "@/lib/shortlets-night-audit";
@@ -21,13 +22,13 @@ export default async function FrontDeskPage({ params }: { params: Promise<{ tena
     prisma.shortletReservation.findMany({
       where: {
         tenantId: ctx.tenant.id,
-        status: { in: ["RESERVED", "CHECKED_IN"] },
+        status: { in: [...ACTIVE_FOLIO_STATUS_VALUES] },
         OR: [
           { checkIn: { gte: todayStart, lt: todayEnd } },
           { checkOut: { gte: todayStart, lt: todayEnd } },
         ],
       },
-      include: { unit: { select: { name: true } } },
+      include: { unit: { select: { name: true } }, property: { select: { name: true } } },
       orderBy: { checkIn: "asc" },
     }),
     prisma.shortletUnit.findMany({
@@ -37,7 +38,7 @@ export default async function FrontDeskPage({ params }: { params: Promise<{ tena
     }),
     prisma.shortletReservation.findMany({
       where: { tenantId: ctx.tenant.id, status: "CHECKED_IN" },
-      include: { unit: { select: { name: true } } },
+      include: { unit: { select: { name: true } }, property: { select: { name: true } } },
       orderBy: { checkIn: "asc" },
     }),
     prisma.shortletReservation.findMany({
@@ -60,9 +61,11 @@ export default async function FrontDeskPage({ params }: { params: Promise<{ tena
     .map((r) => ({
       id: r.id,
       guestName: r.guestName,
-      unitName: r.unit.name,
+      unitName: r.unit?.name || r.property?.name || "Apartment TBD",
       checkInLabel: fmt(r.checkIn),
       status: formatEnumLabel(r.status),
+      statusValue: r.status,
+      hasApartment: Boolean(r.unitId),
     }));
 
   const departures = reservations
@@ -73,7 +76,7 @@ export default async function FrontDeskPage({ params }: { params: Promise<{ tena
       return {
         id: r.id,
         guestName: r.guestName,
-        unitName: r.unit.name,
+        unitName: r.unit?.name || r.property?.name || "Apartment TBD",
         checkOutLabel: fmt(r.checkOut),
         balanceLabel: `${r.currency} ${Number(r.balanceDue).toLocaleString()}`,
         alertLevel: overdue ? ("overdue" as const) : dueSoon ? ("due-soon" as const) : ("normal" as const),

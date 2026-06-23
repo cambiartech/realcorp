@@ -10,7 +10,8 @@ import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { ClientDocumentsWorkspace, type ClientDocumentItem } from "@/components/clients/client-documents-workspace";
-import { createPropertyClient } from "./actions";
+import type { ClientPortalStatus } from "@/lib/client-portal-invite";
+import { createPropertyClient, sendClientPortalInvite } from "./actions";
 
 type ClientRow = {
   id: string;
@@ -22,10 +23,35 @@ type ClientRow = {
   unitsCount: number;
   documentsCount: number;
   createdAtLabel: string;
+  portalStatus: ClientPortalStatus;
 };
 
+type CreateClientResult =
+  | { ok: true; inviteSent?: boolean; inviteError?: string; alreadyOnPortal?: boolean }
+  | { ok: false; error: string };
+
 type ActionResult = { ok: true } | { ok: false; error: string };
-const initial: ActionResult | null = null;
+const initial: CreateClientResult | null = null;
+
+function portalStatusLabel(status: ClientPortalStatus) {
+  switch (status) {
+    case "active":
+      return "On portal";
+    case "invited":
+      return "Invite sent";
+    case "no_email":
+      return "No email";
+    default:
+      return "Not invited";
+  }
+}
+
+function portalStatusBadgeClass(status: ClientPortalStatus) {
+  if (status === "active") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+  if (status === "invited") return "bg-sky-500/10 text-sky-800 dark:text-sky-300";
+  if (status === "no_email") return "bg-foreground/10 text-muted";
+  return "bg-amber-500/10 text-amber-800 dark:text-amber-300";
+}
 
 function statusBadgeClass(status: string) {
   if (status === "ACTIVE") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
@@ -52,20 +78,51 @@ export function ClientsWorkspace({
   const { showSnackbar } = useSnackbar();
   const [tab, setTab] = useState(activeTab);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createEmail, setCreateEmail] = useState("");
+  const [sendPortalInvite, setSendPortalInvite] = useState(true);
+  const [invitingClientId, setInvitingClientId] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(createPropertyClient.bind(null, tenantSlug), initial);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     if (!state) return;
     if (state.ok) {
-      showSnackbar("Client added.", "success");
+      if (state.alreadyOnPortal) {
+        showSnackbar("Client added. They already have portal access for this organization.", "success");
+      } else if (state.inviteSent) {
+        showSnackbar("Client added and portal invite sent.", "success");
+      } else if (state.inviteError) {
+        showSnackbar(`Client added, but invite email failed: ${state.inviteError}`, "error");
+      } else {
+        showSnackbar("Client added.", "success");
+      }
       formRef.current?.reset();
+      setCreateEmail("");
+      setSendPortalInvite(true);
       setIsCreateOpen(false);
       router.refresh();
     } else {
       showSnackbar(state.error, "error");
     }
   }, [router, showSnackbar, state]);
+
+  async function handleSendInvite(clientId: string) {
+    setInvitingClientId(clientId);
+    const result = await sendClientPortalInvite(tenantSlug, clientId);
+    setInvitingClientId(null);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    if (result.alreadyOnPortal) {
+      showSnackbar("This client already has portal access.", "success");
+    } else if (result.emailSent) {
+      showSnackbar("Portal invite sent.", "success");
+    } else {
+      showSnackbar(result.emailError || "Could not send invite email.", "error");
+    }
+    router.refresh();
+  }
 
   const stats = useMemo(() => {
     const active = clients.filter((c) => c.statusValue === "ACTIVE").length;
@@ -152,15 +209,17 @@ export function ClientsWorkspace({
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Contact</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Portal</th>
                 <th className="px-4 py-3">Units</th>
                 <th className="px-4 py-3">Documents</th>
                 <th className="px-4 py-3">Added</th>
+                {canManage ? <th className="px-4 py-3" /> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-foreground/10">
               {clients.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted">
+                  <td colSpan={canManage ? 8 : 7} className="px-4 py-10 text-center text-sm text-muted">
                     No clients yet.{" "}
                     {canManage ? (
                       <>
@@ -194,9 +253,28 @@ export function ClientsWorkspace({
                         {client.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${portalStatusBadgeClass(client.portalStatus)}`}>
+                        {portalStatusLabel(client.portalStatus)}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-foreground">{client.unitsCount}</td>
                     <td className="px-4 py-3 text-foreground">{client.documentsCount}</td>
                     <td className="px-4 py-3 text-muted">{client.createdAtLabel}</td>
+                    {canManage ? (
+                      <td className="px-4 py-3 text-right">
+                        {client.portalStatus !== "active" && client.portalStatus !== "no_email" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSendInvite(client.id)}
+                            disabled={invitingClientId === client.id}
+                            className="text-xs font-semibold text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60 disabled:opacity-50"
+                          >
+                            {invitingClientId === client.id ? "Sending…" : client.portalStatus === "invited" ? "Resend invite" : "Send invite"}
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
                   </tr>
                 ))
               )}
@@ -245,9 +323,32 @@ export function ClientsWorkspace({
                 <label htmlFor="client-email" className="mb-1 block text-sm text-muted">
                   Email
                 </label>
-                <input id="client-email" name="email" type="email" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+                <input
+                  id="client-email"
+                  name="email"
+                  type="email"
+                  value={createEmail}
+                  onChange={(e) => setCreateEmail(e.target.value)}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
               </div>
             </div>
+            <label className="flex items-start gap-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-3">
+              <input
+                type="checkbox"
+                name="sendPortalInvite"
+                checked={sendPortalInvite && Boolean(createEmail.trim())}
+                disabled={!createEmail.trim()}
+                onChange={(e) => setSendPortalInvite(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">Send portal invitation</span>
+                <span className="mt-0.5 block text-xs text-muted">
+                  Email them a link to sign in and view their units at /portal. Existing Realcorp users are linked to this organization automatically.
+                </span>
+              </span>
+            </label>
             <div>
               <label htmlFor="client-status" className="mb-1 block text-sm text-muted">
                 Status

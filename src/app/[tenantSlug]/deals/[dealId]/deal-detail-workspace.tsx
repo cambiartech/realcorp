@@ -300,16 +300,24 @@ export function DealDetailWorkspace({
             ) : (
               <div className="divide-y divide-foreground/10 overflow-hidden rounded-lg border border-foreground/10">
                 {invoices.map((inv) => (
-                  <div key={inv.id} className="grid grid-cols-2 gap-2 px-4 py-3 text-sm sm:grid-cols-4">
+                  <div key={inv.id} className="grid grid-cols-2 gap-2 px-4 py-3 text-sm sm:grid-cols-5">
                     <div>
                       <p className="font-medium text-foreground">{inv.invoiceNumber}</p>
                       <p className="text-xs text-muted">Issued {inv.issuedAt}</p>
                     </div>
                     <p className="text-muted">{inv.status}</p>
                     <p className="text-muted">{inv.amount}</p>
-                    <div className="text-right">
+                    <div>
                       <p className="text-xs text-muted">Balance: {inv.balanceDue}</p>
                       <p className="text-xs text-muted">Due {inv.dueDate}</p>
+                    </div>
+                    <div className="text-right">
+                      <Link
+                        href={`/${tenantSlug}/finance/invoices/${inv.id}`}
+                        className="text-xs font-semibold text-foreground underline decoration-foreground/30 hover:decoration-foreground"
+                      >
+                        View
+                      </Link>
                     </div>
                   </div>
                 ))}

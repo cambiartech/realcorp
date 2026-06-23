@@ -66,3 +66,18 @@ export function brandingCssVars(brand: TenantBranding): CSSProperties {
     ["--hr-brand-accent" as string]: brand.accentColor,
   };
 }
+
+/** Brand block for finance PDF generation (logo + org contact). */
+export function financePdfBrandFromSettings(
+  companyName: string,
+  settings: Parameters<typeof brandingFromSettings>[1],
+) {
+  const brand = brandingFromSettings(companyName, settings);
+  return {
+    companyName: brand.companyName,
+    logoUrl: brand.logoUrl,
+    orgAddress: formatOrgAddress(brand) || null,
+    orgEmail: brand.orgEmail,
+    orgPhone: brand.orgPhone,
+  };
+}

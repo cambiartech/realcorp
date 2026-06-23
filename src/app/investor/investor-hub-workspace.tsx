@@ -74,7 +74,7 @@ export function InvestorHubWorkspace({
               <Link
                 key={org.tenantSlug}
                 href={`/${org.tenantSlug}/portal`}
-                className="group flex items-center gap-4 rounded-xl border border-foreground/10 bg-background p-4 shadow-sm transition-all hover:border-foreground/20 hover:shadow-md"
+                className="group flex items-center gap-4 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm transition-all hover:border-foreground/20 hover:shadow-md"
               >
                 {org.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element

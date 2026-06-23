@@ -15,6 +15,13 @@ type Props = {
   required?: boolean;
   inputName?: string;
   onAddVendor?: (name: string) => Promise<boolean>;
+  fieldLabel?: string;
+  savedItemsLabel?: string;
+  placeholder?: string;
+  newItemNoun?: string;
+  saveNowLabel?: string;
+  normalizeName?: (raw: string) => string;
+  namesMatch?: (a: string, b: string) => boolean;
 };
 
 export function VendorNamePicker({
@@ -24,27 +31,34 @@ export function VendorNamePicker({
   required,
   inputName = "vendorName",
   onAddVendor,
+  fieldLabel = "Vendor",
+  savedItemsLabel = "Saved vendors",
+  placeholder,
+  newItemNoun = "vendor",
+  saveNowLabel = "Save vendor now",
+  normalizeName = normalizeFinanceVendorName,
+  namesMatch = vendorNamesMatch,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [adding, setAdding] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const normalizedQuery = normalizeFinanceVendorName(value);
+  const normalizedQuery = normalizeName(value);
   const exactMatch = useMemo(
-    () => vendors.find((v) => vendorNamesMatch(v.name, normalizedQuery)),
-    [vendors, normalizedQuery],
+    () => vendors.find((v) => namesMatch(v.name, normalizedQuery)),
+    [vendors, normalizedQuery, namesMatch],
   );
 
   const filtered = useMemo(() => {
     const q = normalizedQuery.toLowerCase();
-    const list = q
-      ? vendors.filter((v) => v.name.toLowerCase().includes(q))
-      : vendors;
+    const list = q ? vendors.filter((v) => v.name.toLowerCase().includes(q)) : vendors;
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [vendors, normalizedQuery]);
 
   const isNewName = normalizedQuery.length >= 2 && !exactMatch;
+  const resolvedPlaceholder =
+    placeholder || (vendors.length > 0 ? `Search or type a new ${newItemNoun}` : `Type ${newItemNoun} name`);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -68,7 +82,7 @@ export function VendorNamePicker({
   return (
     <div ref={rootRef} className="relative">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <label className="text-sm text-muted">Vendor</label>
+        <label className="text-sm text-muted">{fieldLabel}</label>
         <button
           type="button"
           onClick={() => {
@@ -77,7 +91,7 @@ export function VendorNamePicker({
           }}
           className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2"
         >
-          {showAll ? "Hide list" : `Saved vendors (${vendors.length})`}
+          {showAll ? "Hide list" : `${savedItemsLabel} (${vendors.length})`}
         </button>
       </div>
 
@@ -91,7 +105,7 @@ export function VendorNamePicker({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder={vendors.length > 0 ? "Search or type a new vendor" : "Type vendor name"}
+          placeholder={resolvedPlaceholder}
           autoComplete="off"
           className="w-full border border-foreground/15 bg-field px-3 py-2 pr-9 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
         />
@@ -104,7 +118,8 @@ export function VendorNamePicker({
 
       {isNewName ? (
         <p className="mt-1 text-xs text-muted">
-          <span className="font-medium text-foreground">{normalizedQuery}</span> is new — it will be saved when you record the bill.
+          <span className="font-medium text-foreground">{normalizedQuery}</span> is new — it will be saved when you record
+          the {newItemNoun === "category" ? "expense" : "bill"}.
           {onAddVendor ? (
             <>
               {" "}
@@ -114,13 +129,15 @@ export function VendorNamePicker({
                 onClick={() => void handleExplicitAdd()}
                 className="text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-50"
               >
-                {adding ? "Saving…" : "Save vendor now"}
+                {adding ? "Saving…" : saveNowLabel}
               </button>
             </>
           ) : null}
         </p>
       ) : exactMatch ? (
-        <p className="mt-1 text-xs text-muted">Using saved vendor: {exactMatch.name}</p>
+        <p className="mt-1 text-xs text-muted">
+          Using saved {newItemNoun}: {exactMatch.name}
+        </p>
       ) : null}
 
       {open && (filtered.length > 0 || isNewName) ? (
@@ -177,7 +194,7 @@ export function VendorNamePicker({
 
       {showAll && vendors.length > 0 ? (
         <div className="mt-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-2">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">All saved vendors</p>
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">All saved {newItemNoun}s</p>
           <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
             {vendors.map((vendor) => (
               <button
@@ -189,7 +206,7 @@ export function VendorNamePicker({
                 }}
                 className={[
                   "rounded-md border px-2 py-1 text-xs transition-colors",
-                  vendorNamesMatch(vendor.name, value)
+                  namesMatch(vendor.name, value)
                     ? "border-foreground bg-foreground text-background"
                     : "border-foreground/15 text-foreground hover:bg-foreground/[0.06]",
                 ].join(" ")}

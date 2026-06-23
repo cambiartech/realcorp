@@ -2,7 +2,7 @@ import prisma from "@/lib/db";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { loadShortletsContext } from "@/lib/shortlets-loaders";
 import { formatReservationFolioBundle, FOLIO_RESERVATION_INCLUDE } from "@/lib/shortlets-folio";
-import { guestClientProfileHref } from "@/lib/shortlets-guest-crm";
+import { isActiveFolioStatus, formatReservationStatusLabel } from "@/lib/shortlets-reservation-status";
 import { ReservationsWorkspace } from "./reservations-workspace";
 
 export const dynamic = "force-dynamic";
@@ -13,23 +13,21 @@ export default async function ReservationsPage({ params }: { params: Promise<{ t
   const now = new Date();
   const calendarMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const [reservations, units, projectUnits] = await Promise.all([
+  const [reservations, units] = await Promise.all([
     prisma.shortletReservation.findMany({
       where: { tenantId: ctx.tenant.id },
       orderBy: { checkIn: "desc" },
-      include: FOLIO_RESERVATION_INCLUDE,
+      include: {
+        ...FOLIO_RESERVATION_INCLUDE,
+        unit: { select: { name: true } },
+        property: { select: { name: true } },
+      },
       take: 300,
     }),
     prisma.shortletUnit.findMany({
       where: { tenantId: ctx.tenant.id },
       select: { id: true, name: true, housekeepingStatus: true },
       orderBy: { name: "asc" },
-    }),
-    prisma.unit.findMany({
-      where: { tenantId: ctx.tenant.id, shortletUnit: null },
-      select: { id: true, label: true, unitType: true, status: true, project: { select: { name: true } } },
-      orderBy: [{ project: { name: "asc" } }, { label: "asc" }],
-      take: 500,
     }),
   ]);
 
@@ -38,7 +36,7 @@ export default async function ReservationsPage({ params }: { params: Promise<{ t
 
   const folioByReservationId = Object.fromEntries(
     reservations
-      .filter((r) => r.status === "RESERVED" || r.status === "CHECKED_IN")
+      .filter((r) => isActiveFolioStatus(r.status))
       .map((r) => [r.id, formatReservationFolioBundle(r)]),
   );
 
@@ -46,24 +44,21 @@ export default async function ReservationsPage({ params }: { params: Promise<{ t
     <ReservationsWorkspace
       tenantSlug={ctx.tenant.slug}
       canManage={ctx.access.canManage}
-      defaultCheckInTime={ctx.pmsSettings.checkInTime}
-      defaultCheckOutTime={ctx.pmsSettings.checkOutTime}
-      defaultCurrency={ctx.tenant.defaultCurrency}
-      currencies={ctx.currencies}
       calendarMonth={calendarMonth}
       folioByReservationId={folioByReservationId}
       reservations={reservations.map((r) => ({
         id: r.id,
-        unitName: r.unit.name,
+        bookingNumber: r.bookingNumber,
+        unitName: r.unit?.name || r.property?.name || "Apartment TBD",
+        hasApartment: Boolean(r.unitId),
         guestName: r.guestName,
-        guestClientId: r.guestClientId,
-        guestProfileHref: guestClientProfileHref(ctx.tenant.slug, r.guestClientId, ctx.moduleClients),
         source: formatEnumLabel(r.source),
         stayLabel: fmtStay(r.checkIn, r.checkOut),
         nights: r.nights,
         totalAmountLabel: `${r.currency} ${Number(r.totalAmount).toLocaleString()}`,
         balanceLabel: `${r.currency} ${Number(r.balanceDue).toLocaleString()}`,
-        status: formatEnumLabel(r.status),
+        cautionFeeLabel: r.cautionFee != null ? `${r.currency} ${Number(r.cautionFee).toLocaleString()}` : null,
+        status: formatReservationStatusLabel(r.status),
         statusValue: r.status,
         checkIn: r.checkIn.toISOString().slice(0, 10),
         checkOut: r.checkOut.toISOString().slice(0, 10),
@@ -71,10 +66,6 @@ export default async function ReservationsPage({ params }: { params: Promise<{ t
       unitOptions={units.map((u) => ({
         id: u.id,
         label: `${u.name} (${formatEnumLabel(u.housekeepingStatus).toLowerCase()})`,
-      }))}
-      projectUnitOptions={projectUnits.map((u) => ({
-        id: u.id,
-        label: `${u.project.name} · ${u.label}`,
       }))}
     />
   );

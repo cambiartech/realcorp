@@ -38,7 +38,7 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body className="flex min-h-dvh items-center justify-center bg-background px-4 py-10 text-foreground">
-        <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-sm">
+        <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 shadow-sm">
           <h1 className="text-lg font-semibold">This page could not load</h1>
           <p className="mt-2 text-sm text-muted">A server error occurred. Reload and try again.</p>
           {error.digest ? (

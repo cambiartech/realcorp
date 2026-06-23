@@ -84,13 +84,18 @@ export default async function FinanceQueuePage({
 
   const canManage = canManageFinance(Boolean(session.user.isPlatformAdmin), membership);
 
-  const [activeFiscalGoal, financeVendors] = await Promise.all([
+  const [activeFiscalGoal, financeVendors, financeExpenseCategories] = await Promise.all([
     prisma.tenantGoal.findFirst({
       where: { tenantId: tenant.id, isActive: true },
       orderBy: { updatedAt: "desc" },
       select: { label: true, fiscalYearStart: true, fiscalYearEnd: true },
     }),
     prisma.financeVendor.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.financeExpenseCategory.findMany({
       where: { tenantId: tenant.id },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
@@ -467,10 +472,37 @@ export default async function FinanceQueuePage({
     .sort((a, b) => b.total - a.total)
     .slice(0, 20);
 
+  const openVendorBills = vendorBills.filter(
+    (b) => b.status !== "VOID" && b.status !== "PAID" && Number(b.balanceDue) > 0,
+  );
+  const payablesOutstanding = openVendorBills.reduce((sum, b) => sum + Number(b.balanceDue), 0);
+  const payablesOverdueCount = openVendorBills.filter(
+    (b) => b.dueDate && b.dueDate.getTime() < startOfToday.getTime(),
+  ).length;
+  const currentMonthExpenses = expenses
+    .filter((e) => e.expenseDate >= monthStart)
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+  const bankingUnmatched = Array.from(bankStatsMap.values()).reduce((sum, s) => sum + s.unmatched, 0);
+  const currency = tenant.defaultCurrency || "NGN";
+  const money = (n: number) => `${currency} ${n.toLocaleString()}`;
+
   return (
     <FinanceWorkspace
       tenantSlug={tenant.slug}
       canManageFinance={canManage}
+      overviewStats={{
+        outstandingReceivables: money(outstanding),
+        overdueReceivables: money(overdueOutstanding),
+        overdueInvoiceCount: overdueInvoices.length,
+        openPayables: money(payablesOutstanding),
+        payablesOverdueCount,
+        collectedThisMonth: money(currentMonthCash),
+        expensesThisMonth: money(currentMonthExpenses),
+        pendingFinanceChecks: deals.length,
+        openInvoiceCount: openInvoices.length,
+        openPayableCount: openVendorBills.length,
+        bankingUnmatched,
+      }}
       deals={deals.map((deal) => ({
         id: deal.id,
         title: deal.lead?.name || deal.lead?.email || "Untitled deal",
@@ -698,6 +730,7 @@ export default async function FinanceQueuePage({
           : null
       }
       financeVendors={financeVendors}
+      financeExpenseCategories={financeExpenseCategories}
       vendorBills={vendorBills.map((bill) => {
         const dueDate = bill.dueDate;
         const isOpen = bill.status !== "VOID" && bill.status !== "PAID" && Number(bill.balanceDue) > 0;

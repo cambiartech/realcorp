@@ -10,7 +10,7 @@ export default async function ChannelsPage({ params }: { params: Promise<{ tenan
   const ctx = await loadShortletsContext(tenantSlug);
   if (!ctx.access.canManage) notFound();
 
-  const [leads, units] = await Promise.all([
+  const [leads, units, properties] = await Promise.all([
     prisma.lead.findMany({
       where: {
         tenantId: ctx.tenant.id,
@@ -30,6 +30,11 @@ export default async function ChannelsPage({ params }: { params: Promise<{ tenan
     prisma.shortletUnit.findMany({
       where: { tenantId: ctx.tenant.id },
       select: { id: true, name: true, property: { select: { name: true } } },
+      orderBy: { name: "asc" },
+    }),
+    prisma.shortletProperty.findMany({
+      where: { tenantId: ctx.tenant.id, isActive: true },
+      select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -56,6 +61,7 @@ export default async function ChannelsPage({ params }: { params: Promise<{ tenan
         id: u.id,
         label: u.property ? `${u.property.name} · ${u.name}` : u.name,
       }))}
+      propertyOptions={properties.map((p) => ({ id: p.id, label: p.name }))}
     />
   );
 }

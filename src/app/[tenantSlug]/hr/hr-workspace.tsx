@@ -316,7 +316,7 @@ export function HrWorkspace(props: {
         <p className="mt-0.5 text-sm text-muted">{heading.subtitle}</p>
       </div>
 
-      <section className="mt-6 rounded-xl border border-foreground/10 bg-background p-4 sm:p-5">
+      <section className="mt-6 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
         {activeTab === "people" && canManageHr ? (
           <HrPeopleWorkspace
             tenantSlug={tenantSlug}

@@ -250,7 +250,7 @@ export function ActivityFeed({
             return (
               <div
                 key={activity.id}
-                className="rounded-lg border border-foreground/10 bg-background px-4 py-3"
+                className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2.5">

@@ -9,6 +9,7 @@ import { UiSelect } from "@/components/ui-select";
 import { InHouseTable } from "@/components/shortlets/night-audit-report";
 import { ReservationFolioPanel, type FolioLineRow, type FolioPaymentRow } from "@/components/shortlets/reservation-folio-panel";
 import { createShortletReservation, updateShortletReservationStatus } from "../actions";
+import { isPreArrivalStatus } from "@/lib/shortlets-reservation-status";
 
 type Arrival = {
   id: string;
@@ -16,6 +17,8 @@ type Arrival = {
   unitName: string;
   checkInLabel: string;
   status: string;
+  statusValue: string;
+  hasApartment: boolean;
 };
 
 type DepartureFolio = {
@@ -144,7 +147,7 @@ export function FrontDeskWorkspace({
             <thead className="bg-foreground/[0.03] text-left text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Guest</th>
-                <th className="px-4 py-3">Unit</th>
+                <th className="px-4 py-3">Apartment</th>
                 <th className="px-4 py-3">Check-in</th>
                 <th className="px-4 py-3">Status</th>
                 {canManage ? <th className="px-4 py-3">Action</th> : null}
@@ -164,14 +167,14 @@ export function FrontDeskWorkspace({
                     <td className="px-4 py-3">{row.status}</td>
                     {canManage ? (
                       <td className="px-4 py-3">
-                        {row.status === "Reserved" ? (
+                        {isPreArrivalStatus(row.statusValue) ? (
                           <button
                             type="button"
                             disabled={isPending}
                             onClick={() => runAction(() => updateShortletReservationStatus(tenantSlug, row.id, "CHECKED_IN"), "Guest checked in.")}
                             className="rounded border border-foreground/15 px-2 py-1 text-xs hover:bg-foreground/[0.06]"
                           >
-                            Check in
+                            {row.hasApartment ? "Check in" : "Assign & check in"}
                           </button>
                         ) : "—"}
                       </td>
@@ -192,7 +195,7 @@ export function FrontDeskWorkspace({
             <thead className="bg-foreground/[0.03] text-left text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Guest</th>
-                <th className="px-4 py-3">Unit</th>
+                <th className="px-4 py-3">Apartment</th>
                 <th className="px-4 py-3">Check-out</th>
                 <th className="px-4 py-3">Balance</th>
                 {canManage ? <th className="px-4 py-3">Action</th> : null}
@@ -268,7 +271,7 @@ export function FrontDeskWorkspace({
               }}
             >
               <label className="block text-sm text-muted">
-                Room
+                Apartment
                 <UiSelect className="mt-1" value={form.unitId} onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))}>
                   {walkInUnitOptions.map((o) => (
                     <option key={o.id} value={o.id}>{o.label}</option>

@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { ACTIVE_FOLIO_STATUS_VALUES } from "@/lib/shortlets-reservation-status";
 import { loadShortletsContext } from "@/lib/shortlets-loaders";
 import { FolioWorkspace } from "./folio-workspace";
 import { notFound } from "next/navigation";
@@ -13,8 +14,8 @@ export default async function FolioPage({ params }: { params: Promise<{ tenantSl
 
   const [activeStays, serviceItems, folioLines] = await Promise.all([
     prisma.shortletReservation.findMany({
-      where: { tenantId: ctx.tenant.id, status: { in: ["RESERVED", "CHECKED_IN"] } },
-      include: { unit: { select: { name: true } } },
+      where: { tenantId: ctx.tenant.id, status: { in: [...ACTIVE_FOLIO_STATUS_VALUES] } },
+      include: { unit: { select: { name: true } }, property: { select: { name: true } } },
       orderBy: { checkIn: "asc" },
     }),
     prisma.shortletServiceItem.findMany({
@@ -26,7 +27,7 @@ export default async function FolioPage({ params }: { params: Promise<{ tenantSl
       orderBy: { postedAt: "desc" },
       include: {
         reservation: {
-          select: { guestName: true, unit: { select: { name: true } } },
+          select: { guestName: true, unit: { select: { name: true } }, property: { select: { name: true } } },
         },
       },
       take: 100,
@@ -38,7 +39,7 @@ export default async function FolioPage({ params }: { params: Promise<{ tenantSl
       tenantSlug={ctx.tenant.slug}
       activeStays={activeStays.map((r) => ({
         id: r.id,
-        label: `${r.guestName} — ${r.unit.name}`,
+        label: `${r.guestName} — ${r.unit?.name || r.property?.name || "Apartment TBD"}`,
       }))}
       serviceItems={serviceItems.map((s) => ({
         id: s.id,
@@ -50,7 +51,7 @@ export default async function FolioPage({ params }: { params: Promise<{ tenantSl
       recentLines={folioLines.map((l) => ({
         id: l.id,
         guestName: l.reservation.guestName,
-        unitName: l.reservation.unit.name,
+        unitName: l.reservation.unit?.name || l.reservation.property?.name || "Apartment TBD",
         department: formatEnumLabel(l.department),
         description: l.description,
         amountLabel: `${l.currency} ${Number(l.amount).toLocaleString()}`,

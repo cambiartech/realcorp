@@ -193,7 +193,7 @@ export function ClientDocumentsWorkspace({
       </div>
 
       {canManage && showUploadPanel ? (
-        <div className="rounded-xl border border-foreground/10 bg-background p-4">
+        <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="mb-3 text-sm font-semibold">Upload client document</p>
           <div className="grid gap-4 lg:grid-cols-[1fr_minmax(220px,280px)]">
             <FileDropZone onFile={uploadFile} uploading={uploading} disabled={!uploadClientId} />

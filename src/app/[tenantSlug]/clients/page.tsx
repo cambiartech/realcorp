@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import { canManageClients } from "@/lib/clients-access";
+import { batchResolveClientPortalStatus, type ClientPortalStatus } from "@/lib/client-portal-invite";
 import prisma from "@/lib/db";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
@@ -69,6 +70,11 @@ export default async function ClientsPage({
     }),
   ]);
 
+  const portalStatusByClient = await batchResolveClientPortalStatus(
+    tenant.id,
+    clients.map((c) => ({ id: c.id, email: c.email, userId: c.userId })),
+  );
+
   return (
     <ClientsWorkspace
       tenantSlug={tenant.slug}
@@ -84,6 +90,7 @@ export default async function ClientsPage({
         unitsCount: c._count.unitLinks,
         documentsCount: c._count.documents,
         createdAtLabel: c.createdAt.toISOString().slice(0, 10),
+        portalStatus: portalStatusByClient.get(c.id) ?? ("none" as ClientPortalStatus),
       }))}
       documentClients={clients.map((c) => ({ id: c.id, fullName: c.fullName }))}
       documents={documents.map((doc) => ({

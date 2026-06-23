@@ -21,9 +21,15 @@ import {
   parseLinkClientUnitForm,
   parseUpdatePropertyClientForm,
 } from "@/lib/validators/clients";
+import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
+import { sendPropertyClientPortalInvite } from "@/lib/client-portal-invite";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
+
+type CreateClientResult =
+  | { ok: true; inviteSent?: boolean; inviteError?: string; alreadyOnPortal?: boolean }
+  | { ok: false; error: string };
 
 async function getTenantAndMembership(tenantSlug: string, userId: string) {
   const tenant = await prisma.tenant.findUnique({
@@ -46,9 +52,9 @@ function revalidateClients(tenantSlug: string, clientId?: string) {
 
 export async function createPropertyClient(
   tenantSlug: string,
-  _prev: ActionResult | null,
+  _prev: CreateClientResult | null,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<CreateClientResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
@@ -63,6 +69,13 @@ export async function createPropertyClient(
     return { ok: false, error: "You do not have permission to add clients." };
   }
 
+  const tenantRecord = await prisma.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { id: true, name: true },
+  });
+  if (!tenantRecord) return { ok: false, error: "Organization not found." };
+
+  let clientId: string;
   try {
     const client = await prisma.propertyClient.create({
       data: {
@@ -89,12 +102,49 @@ export async function createPropertyClient(
       action: "CREATE",
       summary: `Created client ${client.fullName}.`,
     });
+    clientId = client.id;
   } catch {
     return { ok: false, error: "Could not create client right now." };
   }
 
   revalidateClients(tenantSlug);
-  return { ok: true };
+
+  const shouldInvite = parsed.data.sendPortalInvite && parsed.data.email?.trim();
+  if (!shouldInvite) return { ok: true };
+
+  const inviteResult = await sendPropertyClientPortalInvite({
+    tenantId: tenantRecord.id,
+    tenantName: tenantRecord.name,
+    email: parsed.data.email!,
+    inviterLabel: session.user.name || session.user.email || "Organization admin",
+    clientId,
+  });
+
+  if (!inviteResult.ok) {
+    return { ok: true, inviteError: inviteResult.error };
+  }
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    module: "CLIENTS",
+    entityType: "INVITATION",
+    action: inviteResult.emailSent ? "EMAIL_SENT" : inviteResult.alreadyActive ? "SKIPPED" : "EMAIL_FAILED",
+    summary: inviteResult.alreadyActive
+      ? `Client ${parsed.data.fullName} already has portal access.`
+      : inviteResult.emailSent
+        ? `Portal invite sent to ${parsed.data.email}.`
+        : `Portal invite email failed for ${parsed.data.email}: ${inviteResult.emailError}`,
+    metadata: { email: parsed.data.email, clientId },
+  });
+
+  return {
+    ok: true,
+    inviteSent: inviteResult.emailSent,
+    alreadyOnPortal: inviteResult.alreadyActive,
+    ...(inviteResult.emailError ? { inviteError: inviteResult.emailError } : {}),
+  };
 }
 
 export async function updatePropertyClient(
@@ -189,25 +239,13 @@ export async function linkClientUnit(
   });
   if (!unit) return { ok: false, error: "Unit not found." };
 
-  if (parsed.data.pricingPlanId) {
-    const plan = await prisma.projectPricingPlan.findFirst({
-      where: {
-        id: parsed.data.pricingPlanId,
-        tenantId: tenant.id,
-        projectId: unit.projectId,
-      },
-      select: { id: true },
-    });
-    if (!plan) return { ok: false, error: "Pricing plan is invalid for this unit's project." };
-  }
-
   try {
     await prisma.clientUnitLink.create({
       data: {
         tenantId: tenant.id,
         clientId: client.id,
         unitId: unit.id,
-        pricingPlanId: parsed.data.pricingPlanId ?? unit.pricingPlanId ?? null,
+        pricingPlanId: unit.pricingPlanId ?? null,
         role: parsed.data.role,
         notes: parsed.data.notes || null,
       },
@@ -253,6 +291,64 @@ export async function unlinkClientUnit(
   await prisma.clientUnitLink.delete({ where: { id: link.id } });
   revalidateClients(tenantSlug, clientId);
   return { ok: true };
+}
+
+export async function sendClientPortalInvite(
+  tenantSlug: string,
+  clientId: string,
+): Promise<
+  | { ok: true; emailSent: boolean; alreadyOnPortal?: boolean; emailError?: string }
+  | { ok: false; error: string }
+> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const [tenantRecord, client] = await Promise.all([
+    prisma.tenant.findUnique({ where: { id: tenant.id }, select: { id: true, name: true } }),
+    prisma.propertyClient.findFirst({
+      where: { id: clientId, tenantId: tenant.id },
+      select: { id: true, fullName: true, email: true },
+    }),
+  ]);
+
+  if (!tenantRecord) return { ok: false, error: "Organization not found." };
+  if (!client) return { ok: false, error: "Client not found." };
+  if (!client.email?.trim()) return { ok: false, error: "Add an email address before sending a portal invite." };
+
+  const inviteResult = await sendPropertyClientPortalInvite({
+    tenantId: tenantRecord.id,
+    tenantName: tenantRecord.name,
+    email: client.email,
+    inviterLabel: session.user.name || session.user.email || "Organization admin",
+    clientId: client.id,
+  });
+
+  if (!inviteResult.ok) return inviteResult;
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    module: "CLIENTS",
+    entityType: "INVITATION",
+    entityId: client.id,
+    action: inviteResult.emailSent ? "EMAIL_SENT" : inviteResult.alreadyActive ? "SKIPPED" : "EMAIL_FAILED",
+    summary: inviteResult.alreadyActive
+      ? `${client.fullName} already has portal access.`
+      : inviteResult.emailSent
+        ? `Portal invite sent to ${client.email}.`
+        : `Portal invite email failed for ${client.email}: ${inviteResult.emailError}`,
+    metadata: { email: client.email, clientId: client.id },
+  });
+
+  revalidateClients(tenantSlug, clientId);
+  return inviteResult;
 }
 
 export async function getClientUploadSignature(
@@ -326,43 +422,16 @@ export async function createClientFromDeal(
 
   const deal = await prisma.deal.findFirst({
     where: { id: dealId, tenantId: tenant.id },
-    include: {
-      lead: { select: { id: true, name: true, email: true, phone: true } },
-      unit: { select: { id: true, pricingPlanId: true } },
-      propertyClient: { select: { id: true } },
-    },
+    select: { id: true, propertyClient: { select: { id: true } } },
   });
   if (!deal) return { ok: false, error: "Deal not found." };
   if (deal.propertyClient) return { ok: true, clientId: deal.propertyClient.id };
 
-  const fullName = deal.lead?.name?.trim() || "Client";
   try {
-    const client = await prisma.$transaction(async (tx) => {
-      const created = await tx.propertyClient.create({
-        data: {
-          tenantId: tenant.id,
-          dealId: deal.id,
-          leadId: deal.leadId,
-          fullName,
-          email: deal.lead?.email || null,
-          phone: deal.lead?.phone || null,
-          status: PropertyClientStatus.ACTIVE,
-        },
-      });
-      if (deal.unit) {
-        await tx.clientUnitLink.create({
-          data: {
-            tenantId: tenant.id,
-            clientId: created.id,
-            unitId: deal.unit.id,
-            pricingPlanId: deal.unit.pricingPlanId,
-          },
-        });
-      }
-      return created;
-    });
-    revalidateClients(tenantSlug, client.id);
-    return { ok: true, clientId: client.id };
+    const result = await ensureClientFromDeal(tenant.id, dealId);
+    if (!result) return { ok: false, error: "Deal not found." };
+    revalidateClients(tenantSlug, result.clientId);
+    return { ok: true, clientId: result.clientId };
   } catch {
     return { ok: false, error: "Could not create client from deal." };
   }

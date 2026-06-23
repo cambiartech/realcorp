@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Building2,
+  ClipboardCheck,
   BarChart2,
   BedDouble,
   CalendarDays,
   ConciergeBell,
+  MapPin,
   Radio,
   Receipt,
   Settings,
+  Users,
 } from "lucide-react";
 
 type Props = {
@@ -43,6 +47,10 @@ export function ShortletsSubnav({
     { id: "front-desk", label: "Front desk", icon: ConciergeBell, show: canManage },
     { id: "rooms", label: "Room board", icon: BedDouble, show: canManage || canHousekeeping },
     { id: "reservations", label: "Reservations", icon: CalendarDays, show: canManage },
+    { id: "locations", label: "Locations", icon: MapPin, show: canManage },
+    { id: "apartments", label: "Apartments", icon: Building2, show: canManage },
+    { id: "guests", label: "Guests", icon: Users, show: canManage },
+    { id: "inspections", label: "Inspections", icon: ClipboardCheck, show: canManage || canHousekeeping },
     { id: "channels", label: "Channels", icon: Radio, show: canManage },
     { id: "folio", label: "Guest bill", icon: Receipt, show: canPostFolio },
     { id: "reports", label: "Reports", icon: BarChart2, show: canReports },
@@ -54,7 +62,12 @@ export function ShortletsSubnav({
       <div className="flex gap-1 overflow-x-auto pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const href = `${base}/${item.id}`;
-          const active = pathname === href || (item.id === "front-desk" && pathname === base);
+          const active =
+            pathname === href ||
+            (item.id === "front-desk" && pathname === base) ||
+            (item.id === "locations" && pathname.startsWith(`${base}/locations`)) ||
+            (item.id === "apartments" && pathname.startsWith(`${base}/apartments`)) ||
+            (item.id === "reservations" && pathname.startsWith(`${base}/reservations`));
           const Icon = item.icon;
           return (
             <Link

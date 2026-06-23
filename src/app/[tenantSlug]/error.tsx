@@ -39,7 +39,7 @@ export default function TenantError({
 
   return (
     <div className="flex w-full items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 text-center shadow-sm">
+      <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 text-center shadow-sm">
         <h1 className="text-lg font-semibold text-foreground">Something went wrong on this page</h1>
         <p className="mt-2 text-sm text-muted">
           The rest of the app is fine — try again, or head back to your dashboard.

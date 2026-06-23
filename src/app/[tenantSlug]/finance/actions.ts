@@ -3,13 +3,16 @@
 import { auth } from "@/auth";
 import { BankMatchStatus, InvoiceStatus, MembershipRole, MembershipStatus, Prisma, VendorBillStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
+import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
 import { sendSalesReceiptEmail } from "@/lib/email";
 import { deliverInvoiceEmail, resolveInvoiceRecipientEmail } from "@/lib/finance-invoice-send";
 import { buildSalesReceiptPdf, salesReceiptPdfFileName } from "@/lib/sales-receipt-pdf";
+import { financePdfBrandFromSettings } from "@/lib/tenant-branding";
 import { createTenantUploadSignature, uploadBufferToCloudinary } from "@/lib/cloudinary-upload-server";
 import { ClientDocumentCategory, FinanceDocumentCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { parseFinanceControls } from "@/lib/finance-controls";
+import { normalizeFinanceExpenseCategory, expenseCategoryNamesMatch } from "@/lib/finance-expense-category";
 import { normalizeFinanceVendorName, vendorNamesMatch } from "@/lib/finance-vendor";
 import {
   buildRecurrenceRangeInput,
@@ -196,6 +199,27 @@ async function ensureFinanceVendor(
   return name;
 }
 
+async function ensureFinanceExpenseCategory(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  rawName: string,
+): Promise<string> {
+  const name = normalizeFinanceExpenseCategory(rawName);
+  if (name.length < 2) return name;
+
+  const existing = await tx.financeExpenseCategory.findMany({
+    where: { tenantId },
+    select: { name: true },
+  });
+  const match = existing.find((row) => expenseCategoryNamesMatch(row.name, name));
+  if (match) return match.name;
+
+  await tx.financeExpenseCategory.create({
+    data: { tenantId, name },
+  });
+  return name;
+}
+
 async function canViewAuditDetails(tenantSlug: string, userId: string, isPlatformAdmin: boolean) {
   const { membership } = await getTenantAndMembership(tenantSlug, userId);
   return canManageFinance(isPlatformAdmin, membership);
@@ -256,12 +280,30 @@ export async function resolvePendingFinance(
       action: decision === "APPROVE" ? "FINANCE_APPROVED" : "FINANCE_REJECTED",
       summary: `Finance ${decision.toLowerCase()}d pending check on deal.`,
     });
+
+    if (decision === "APPROVE") {
+      const clientResult = await ensureClientFromDeal(tenant.id, existing.id);
+      if (clientResult) {
+        await writeAuditLog({
+          tenantId: tenant.id,
+          actorUserId: session.user.id,
+          actorLabel: reviewerLabel,
+          module: "CLIENTS",
+          entityType: "PROPERTY_CLIENT",
+          entityId: clientResult.clientId,
+          action: "CREATE",
+          summary: "Client record created from finance-approved deal.",
+          metadata: { dealId: existing.id },
+        });
+      }
+    }
   } catch {
     return { ok: false, error: "Could not update finance decision right now." };
   }
 
   revalidatePath(`/${tenantSlug}/finance`);
   revalidatePath(`/${tenantSlug}/deals`);
+  revalidatePath(`/${tenantSlug}/clients`);
   return { ok: true };
 }
 
@@ -974,13 +1016,17 @@ export async function createExpenseRecord(
 
   try {
     let expenseVendorName = parsed.data.vendorName || null;
-    if (expenseVendorName) {
-      expenseVendorName = await prisma.$transaction((tx) => ensureFinanceVendor(tx, tenant.id, expenseVendorName!));
-    }
+    const category = await prisma.$transaction(async (tx) => {
+      const savedCategory = await ensureFinanceExpenseCategory(tx, tenant.id, parsed.data.category);
+      if (expenseVendorName) {
+        expenseVendorName = await ensureFinanceVendor(tx, tenant.id, expenseVendorName);
+      }
+      return savedCategory;
+    });
     const created = await prisma.expense.create({
       data: {
         tenantId: tenant.id,
-        category: parsed.data.category,
+        category,
         department: parsed.data.department || null,
         vendorName: expenseVendorName,
         amount: parsed.data.amount,
@@ -1224,6 +1270,53 @@ export async function saveFinanceVendor(
 
   revalidatePath(`/${tenantSlug}/finance`);
   return { ok: true, vendorId: saved.id, name: saved.name };
+}
+
+export async function saveFinanceExpenseCategory(
+  tenantSlug: string,
+  rawName: string,
+): Promise<{ ok: true; categoryId: string; name: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const name = normalizeFinanceExpenseCategory(rawName);
+  if (name.length < 2) return { ok: false, error: "Category must be at least 2 characters." };
+  if (name.length > 120) return { ok: false, error: "Category is too long." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to manage expense categories." };
+  }
+
+  let saved: { id: string; name: string };
+  try {
+    saved = await prisma.$transaction(async (tx) => {
+      const canonical = await ensureFinanceExpenseCategory(tx, tenant.id, name);
+      const row = await tx.financeExpenseCategory.findFirst({
+        where: { tenantId: tenant.id, name: canonical },
+        select: { id: true, name: true },
+      });
+      if (!row) throw new Error("missing category");
+      return row;
+    });
+
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown recorder",
+      module: "FINANCE",
+      entityType: "EXPENSE",
+      entityId: saved.id,
+      action: "CREATE",
+      summary: `Saved expense category ${saved.name}.`,
+    });
+  } catch {
+    return { ok: false, error: "Could not save category right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true, categoryId: saved.id, name: saved.name };
 }
 
 export async function recordVendorBillPayment(
@@ -1515,7 +1608,7 @@ export async function sendSalesReceiptRecord(
   if (!receipt) return { ok: false, error: "Receipt not found." };
 
   const pdfBytes = await buildSalesReceiptPdf({
-    companyName: tenant.name,
+    brand: financePdfBrandFromSettings(tenant.name, tenant.settings),
     receiptNumber: receipt.receiptNumber,
     title: receipt.title,
     customerName: receipt.customerName || receipt.deal?.propertyClient?.fullName || receipt.deal?.lead?.name,

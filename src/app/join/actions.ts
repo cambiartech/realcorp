@@ -77,6 +77,14 @@ export async function acceptInvite(
       if (markAccepted.count !== 1) {
         throw new Error("Invite was already accepted.");
       }
+
+      await tx.propertyClient.updateMany({
+        where: {
+          tenantId: invitation.tenantId,
+          email: { equals: inviteEmail, mode: "insensitive" },
+        },
+        data: { userId: user.id },
+      });
     });
   } catch {
     return { ok: false, error: "Could not accept invite right now. Please try again." };

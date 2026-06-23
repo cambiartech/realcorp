@@ -253,7 +253,7 @@ export function HrDocumentsWorkspace({
       </div>
 
       {showUploadPanel ? (
-        <div className="rounded-xl border border-foreground/10 bg-background p-4 shadow-sm">
+        <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm">
           <p className="mb-3 text-sm font-semibold text-foreground">Upload & map to employee</p>
           <div className="grid gap-4 lg:grid-cols-[1fr_minmax(220px,280px)]">
             <FileDropZone onFile={uploadFile} uploading={uploading} disabled={!uploadEmployeeId && !employees.length} />
@@ -408,7 +408,7 @@ export function HrDocumentsWorkspace({
                       key={cat.value}
                       type="button"
                       onClick={() => selectTypeFolder(cat.value)}
-                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-background p-4 text-center transition hover:border-amber-500/40 hover:bg-amber-500/5"
+                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 text-center transition hover:border-amber-500/40 hover:bg-amber-500/5"
                     >
                       <Folder className="h-12 w-12 text-amber-600" fill="currentColor" fillOpacity={0.18} strokeWidth={1} />
                       <span className="mt-2 line-clamp-2 text-xs font-semibold text-foreground">{cat.label}</span>
@@ -428,7 +428,7 @@ export function HrDocumentsWorkspace({
                       key={e.userId}
                       type="button"
                       onClick={() => selectEmployee(e)}
-                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-background p-4 transition hover:border-amber-500/40 hover:bg-amber-500/5"
+                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition hover:border-amber-500/40 hover:bg-amber-500/5"
                     >
                       <Folder className="h-12 w-12 text-amber-600" fill="currentColor" fillOpacity={0.18} />
                       <span className="mt-2 line-clamp-2 text-center text-xs font-semibold">{e.fullName}</span>
@@ -465,7 +465,7 @@ export function HrDocumentsWorkspace({
                   {visibleDocuments.map((d) => (
                     <div
                       key={d.id}
-                      className="group flex gap-3 rounded-lg border border-foreground/10 bg-background p-3 shadow-sm transition hover:border-foreground/20 hover:shadow-md"
+                      className="group flex gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 shadow-sm transition hover:border-foreground/20 hover:shadow-md"
                     >
                       <div
                         className={[

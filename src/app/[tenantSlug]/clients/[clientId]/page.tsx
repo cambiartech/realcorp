@@ -65,7 +65,12 @@ export default async function ClientDetailPage({
       select: {
         name: true,
         units: {
-          select: { id: true, label: true, pricingPlanId: true },
+          select: {
+            id: true,
+            label: true,
+            pricingPlanId: true,
+            pricingPlan: { select: { name: true } },
+          },
           orderBy: { label: "asc" },
         },
         pricingPlans: { select: { id: true, name: true } },
@@ -86,8 +91,7 @@ export default async function ClientDetailPage({
         id: u.id,
         label: u.label,
         projectName: project.name,
-        pricingPlanId: u.pricingPlanId,
-        pricingPlans: project.pricingPlans,
+        defaultPricingPlanName: u.pricingPlan?.name ?? null,
       })),
   );
 

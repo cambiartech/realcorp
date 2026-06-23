@@ -553,7 +553,7 @@ export function DealsWorkspace({
           open
           onClose={() => setTimelineDeal(null)}
           variant="drawer"
-          panelClassName="h-full w-full max-w-md overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl"
+          panelClassName="h-full w-full max-w-md overflow-y-auto border-l border-foreground/10 bg-foreground/[0.02] p-4 shadow-2xl"
         >
             <div className="flex items-start justify-between gap-3">
               <div>

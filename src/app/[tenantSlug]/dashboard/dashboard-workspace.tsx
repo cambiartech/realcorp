@@ -1063,7 +1063,7 @@ export function DashboardWorkspace({
 
         {showSetupPanel ? (
           <div className="mt-3 grid gap-3 lg:grid-cols-3">
-        <section className="rounded-lg border border-foreground/10 bg-background p-4">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization setup</p>
             {canManageOrgSetup ? (
@@ -1086,7 +1086,7 @@ export function DashboardWorkspace({
             <p className="mt-2 text-sm text-muted">Ask an org admin to complete workspace setup.</p>
           )}
         </section>
-        <section className="rounded-lg border border-foreground/10 bg-background p-4">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; ops</p>
           <ul className="mt-2 space-y-1.5 text-sm">
             <ChecklistRow label="Connect at least one integration" done={values.onboarding.connectIntegrationDone} />
@@ -1096,7 +1096,7 @@ export function DashboardWorkspace({
             <ChecklistRow label="Complete first task/activity" done={values.onboarding.firstTaskDone} />
           </ul>
         </section>
-        <section className="rounded-lg border border-foreground/10 bg-background p-4">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Integration health</p>
           <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
             <HealthPill label="Meta Leads" ok={values.integrationHealth.metaLeads} />
@@ -1117,7 +1117,7 @@ export function DashboardWorkspace({
       </div>
 
       {globalRange !== "1M" || moduleFilter !== "ALL" || ownerFilter || projectFilter || sourceFilter ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 py-2.5">
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
           {globalRange !== "1M" ? (
             <button
               type="button"
@@ -1391,7 +1391,7 @@ export function DashboardWorkspace({
 
       <div className="fixed bottom-6 right-6 z-30 flex flex-col items-end gap-2">
         {openFabMenu ? (
-          <div className="w-52 rounded-lg border border-foreground/10 bg-background p-2 shadow-2xl">
+          <div className="w-52 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-2 shadow-2xl">
             <button
               type="button"
               onClick={() => {
@@ -1435,7 +1435,7 @@ export function DashboardWorkspace({
       </div>
 
       {openSavedViews ? (
-        <div className="fixed bottom-20 right-6 z-40 flex max-h-[min(70vh,520px)] w-[min(92vw,560px)] flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-2xl">
+        <div className="fixed bottom-20 right-6 z-40 flex max-h-[min(70vh,520px)] w-[min(92vw,560px)] flex-col overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.02] shadow-2xl">
           <div className="shrink-0 border-b border-foreground/10 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1558,7 +1558,7 @@ export function DashboardWorkspace({
           <button
             type="button"
             onClick={() => setOpenFinanceDetail("COLLECTIONS_TREND")}
-            className="rounded-lg border border-foreground/10 bg-background p-3 text-left hover:bg-foreground/[0.03]"
+            className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 text-left hover:bg-foreground/[0.03]"
           >
             <p className="text-xs uppercase tracking-wide text-muted">Collections trend</p>
             <p className="mt-1 text-sm text-foreground">
@@ -1568,7 +1568,7 @@ export function DashboardWorkspace({
           <button
             type="button"
             onClick={() => setOpenFinanceDetail("OVERDUE_AGING")}
-            className="rounded-lg border border-foreground/10 bg-background p-3 text-left hover:bg-foreground/[0.03]"
+            className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 text-left hover:bg-foreground/[0.03]"
           >
             <p className="text-xs uppercase tracking-wide text-muted">Overdue aging buckets</p>
             <p className="mt-1 text-sm text-foreground">
@@ -1578,7 +1578,7 @@ export function DashboardWorkspace({
           <button
             type="button"
             onClick={() => setOpenFinanceDetail("HEALTH_PROJECT_TEAM")}
-            className="rounded-lg border border-foreground/10 bg-background p-3 text-left hover:bg-foreground/[0.03]"
+            className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 text-left hover:bg-foreground/[0.03]"
           >
             <p className="text-xs uppercase tracking-wide text-muted">Invoice/payment health</p>
             <p className="mt-1 text-sm text-foreground">By project and by owner/team</p>
@@ -1586,7 +1586,7 @@ export function DashboardWorkspace({
           <button
             type="button"
             onClick={() => setOpenFinanceDetail("TARGET_ATTAINMENT")}
-            className="rounded-lg border border-foreground/10 bg-background p-3 text-left hover:bg-foreground/[0.03]"
+            className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 text-left hover:bg-foreground/[0.03]"
           >
             <p className="text-xs uppercase tracking-wide text-muted">Target attainment</p>
             <p className="mt-1 text-sm text-foreground">By fiscal periods</p>
@@ -2631,7 +2631,7 @@ function WidgetCard({
   }
 
   return (
-    <article className="rounded-xl border border-foreground/10 bg-background p-4 shadow-sm">
+    <article className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       {body}
     </article>

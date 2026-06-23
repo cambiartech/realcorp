@@ -8,6 +8,7 @@ import { normalizeFinanceOptionList } from "@/lib/finance-catalog";
 import { buildInvoicePdf, invoicePdfFileName } from "@/lib/invoice-pdf";
 import { uploadBufferToCloudinary } from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
+import { financePdfBrandFromSettings } from "@/lib/tenant-branding";
 
 export type DeliverInvoiceEmailInput = {
   tenantId: string;
@@ -52,7 +53,16 @@ export async function deliverInvoiceEmail(
 
   const settings = await prisma.tenantSettings.findUnique({
     where: { tenantId: input.tenantId },
-    select: { financeBankAccounts: true },
+    select: {
+      financeBankAccounts: true,
+      logoUrl: true,
+      orgEmail: true,
+      orgPhone: true,
+      orgAddressLine: true,
+      orgCity: true,
+      orgState: true,
+      orgCountry: true,
+    },
   });
   const bankAccountLines = normalizeFinanceOptionList(settings?.financeBankAccounts);
   const bankAccounts = parseBankAccounts(bankAccountLines);
@@ -61,7 +71,7 @@ export async function deliverInvoiceEmail(
     invoice.deal?.propertyClient?.fullName || invoice.deal?.lead?.name || null;
 
   const pdfBytes = await buildInvoicePdf({
-    companyName: input.tenantName,
+    brand: financePdfBrandFromSettings(input.tenantName, settings),
     invoiceNumber: invoice.invoiceNumber,
     title: invoice.title,
     customerName,

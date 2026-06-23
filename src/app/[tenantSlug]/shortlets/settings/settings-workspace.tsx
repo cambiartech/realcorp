@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
@@ -7,30 +8,10 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_LG } from "@/lib/modal-panel";
 import { UiSelect } from "@/components/ui-select";
 import {
-  assignShortletUnitProperty,
-  createShortletUnit,
   runShortletEndOfDay,
   saveShortletPmsSettings,
-  saveShortletProperty,
   saveShortletServiceItem,
 } from "../actions";
-
-type PropertyRow = {
-  id: string;
-  name: string;
-  address: string;
-  isActive: boolean;
-  unitCount: number;
-};
-
-type UnitRow = {
-  id: string;
-  name: string;
-  location: string;
-  nightlyRateLabel: string;
-  propertyId: string;
-  propertyLabel: string;
-};
 
 type ServiceRow = {
   id: string;
@@ -43,7 +24,7 @@ type ServiceRow = {
   active: boolean;
 };
 
-type SettingsTab = "operations" | "inventory" | "catalog";
+type SettingsTab = "operations" | "catalog";
 
 type Props = {
   tab: SettingsTab;
@@ -58,10 +39,7 @@ type Props = {
     financeSync: boolean;
   };
   moduleFinance: boolean;
-  properties: PropertyRow[];
-  units: UnitRow[];
   serviceItems: ServiceRow[];
-  projectUnitOptions: Array<{ id: string; label: string }>;
 };
 
 const DEPT_OPTIONS = [
@@ -79,32 +57,17 @@ export function SettingsWorkspace({
   currencies,
   pmsSettings,
   moduleFinance,
-  properties,
-  units,
   serviceItems,
-  projectUnitOptions,
 }: Props) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const [isPending, startTransition] = useTransition();
   const [settings, setSettings] = useState(pmsSettings);
-  const [propertyForm, setPropertyForm] = useState({ name: "", address: "" });
-  const [unitOpen, setUnitOpen] = useState(false);
   const [editService, setEditService] = useState<ServiceRow | null>(null);
   const [serviceForm, setServiceForm] = useState({
     department: "FNB" as "FNB" | "LAUNDRY" | "LOUNGE" | "GYM" | "OTHER",
     name: "",
     price: "",
-    currency: defaultCurrency,
-  });
-  const [unitForm, setUnitForm] = useState({
-    source: "CUSTOM" as "CUSTOM" | "PROJECT_UNIT",
-    projectUnitId: projectUnitOptions[0]?.id || "",
-    propertyId: properties[0]?.id || "",
-    name: "",
-    location: "",
-    nightlyRate: "",
-    cleaningFee: "",
     currency: defaultCurrency,
   });
 
@@ -124,9 +87,23 @@ export function SettingsWorkspace({
     <div className="space-y-6">
       <div className="flex gap-1 border-b border-foreground/10">
         <SettingsTabBtn active={tab === "operations"} label="Operating times" onClick={() => router.push(`/${tenantSlug}/shortlets/settings?tab=operations`)} />
-        <SettingsTabBtn active={tab === "inventory"} label="Properties & rooms" onClick={() => router.push(`/${tenantSlug}/shortlets/settings?tab=inventory`)} />
         <SettingsTabBtn active={tab === "catalog"} label="Service catalog" onClick={() => router.push(`/${tenantSlug}/shortlets/settings?tab=catalog`)} />
       </div>
+
+      <section className="rounded-lg border border-foreground/10 p-4">
+        <h2 className="font-semibold">Inventory</h2>
+        <p className="mt-1 text-sm text-muted">
+          Locations and apartments are managed under Short Lets — not tied to sales Projects unless you explicitly import a project unit.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href={`/${tenantSlug}/shortlets/locations`} className="rounded-md border border-foreground/15 px-3 py-2 text-sm font-medium hover:bg-foreground/[0.03]">
+            Manage locations
+          </Link>
+          <Link href={`/${tenantSlug}/shortlets/apartments`} className="rounded-md border border-foreground/15 px-3 py-2 text-sm font-medium hover:bg-foreground/[0.03]">
+            Manage apartments
+          </Link>
+        </div>
+      </section>
 
       {tab === "operations" ? (
       <section className="rounded-lg border border-foreground/10 p-4">
@@ -196,130 +173,6 @@ export function SettingsWorkspace({
       </section>
       ) : null}
 
-      {tab === "inventory" ? (
-      <>
-      {units.length === 0 ? (
-        <section className="rounded-lg border border-foreground/20 bg-foreground/[0.03] p-4">
-          <h2 className="font-semibold">Getting started — short-let only</h2>
-          <p className="mt-2 text-sm text-muted">
-            You don&apos;t need Projects, Deals, or sales inventory. Add your property (optional), then add each room with a nightly rate below.
-            Turn on Finance sync under Operating times if you want payments to flow into Finance automatically.
-          </p>
-          <button
-            type="button"
-            onClick={() => setUnitOpen(true)}
-            className="mt-4 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
-          >
-            Add your first room
-          </button>
-        </section>
-      ) : null}
-
-      <section className="rounded-lg border border-foreground/10 p-4">
-        <h2 className="font-semibold">Properties</h2>
-        <p className="mt-1 text-sm text-muted">Group rooms by building or location — Royal Residences, Annex, etc.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <input className="rounded-md border px-3 py-2 text-sm" placeholder="Property name" value={propertyForm.name} onChange={(e) => setPropertyForm((f) => ({ ...f, name: e.target.value }))} />
-          <input className="rounded-md border px-3 py-2 text-sm" placeholder="Address (optional)" value={propertyForm.address} onChange={(e) => setPropertyForm((f) => ({ ...f, address: e.target.value }))} />
-          <button
-            type="button"
-            disabled={isPending || propertyForm.name.trim().length < 2}
-            onClick={() => {
-              run(
-                () => saveShortletProperty(tenantSlug, { name: propertyForm.name, address: propertyForm.address || undefined }),
-                "Property added.",
-              );
-              setPropertyForm({ name: "", address: "" });
-            }}
-            className="rounded-md border border-foreground bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50"
-          >
-            Add property
-          </button>
-        </div>
-        {properties.length > 0 ? (
-          <ul className="mt-4 divide-y divide-foreground/10 rounded-lg border border-foreground/10 text-sm">
-            {properties.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <div>
-                  <span className="font-medium">{p.name}</span>
-                  {p.address ? <span className="ml-2 text-muted">· {p.address}</span> : null}
-                  <span className="ml-2 text-xs text-muted">{p.unitCount} room{p.unitCount === 1 ? "" : "s"}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {units.length > 0 ? (
-          <div className="mt-4">
-            <p className="text-xs uppercase tracking-wide text-muted">Assign rooms to property</p>
-            <ul className="mt-2 space-y-2 text-sm">
-              {units.map((u) => (
-                <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-foreground/10 px-3 py-2">
-                  <span>{u.name}</span>
-                  <UiSelect
-                    className="min-w-[180px] text-sm"
-                    value={u.propertyId}
-                    onChange={(e) =>
-                      run(
-                        () => assignShortletUnitProperty(tenantSlug, { unitId: u.id, propertyId: e.target.value || undefined }),
-                        "Room assigned.",
-                      )
-                    }
-                  >
-                    <option value="">Unassigned</option>
-                    {properties.filter((p) => p.isActive).map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </UiSelect>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="rounded-lg border border-foreground/10 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Rooms</h2>
-            <p className="mt-1 text-sm text-muted">
-              Add each rentable room here — no link to Projects required. Use &quot;Custom room&quot; for standalone short-let businesses.
-            </p>
-          </div>
-          <button type="button" onClick={() => setUnitOpen(true)} className="rounded-md border border-foreground bg-foreground px-3 py-2 text-sm font-semibold text-background">
-            Add room
-          </button>
-        </div>
-        {units.length > 0 ? (
-          <div className="mt-4 overflow-x-auto rounded-lg border border-foreground/10">
-            <table className="min-w-full text-sm">
-              <thead className="bg-foreground/[0.03] text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="px-4 py-3">Room</th>
-                  <th className="px-4 py-3">Location</th>
-                  <th className="px-4 py-3">Nightly rate</th>
-                  <th className="px-4 py-3">Property</th>
-                </tr>
-              </thead>
-              <tbody>
-                {units.map((u) => (
-                  <tr key={u.id} className="border-t border-foreground/10">
-                    <td className="px-4 py-3 font-medium">{u.name}</td>
-                    <td className="px-4 py-3">{u.location || "—"}</td>
-                    <td className="px-4 py-3">{u.nightlyRateLabel}</td>
-                    <td className="px-4 py-3">{u.propertyLabel || "Unassigned"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-muted">No rooms yet. Click &quot;Add room&quot; to create your inventory.</p>
-        )}
-      </section>
-      </>
-      ) : null}
-
       {tab === "catalog" ? (
       <section className="rounded-lg border border-foreground/10 p-4">
         <h2 className="font-semibold">Service catalog</h2>
@@ -356,6 +209,10 @@ export function SettingsWorkspace({
                     currency: serviceForm.currency,
                   }),
                 "Service item added.",
+                () => {
+                  setServiceForm((f) => ({ ...f, name: "", price: "" }));
+                  router.refresh();
+                },
               )
             }
             className="self-end rounded-md border border-foreground bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50"
@@ -480,86 +337,6 @@ export function SettingsWorkspace({
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setEditService(null)} className="rounded-md border px-3 py-2 text-sm">Cancel</button>
                 <button type="submit" disabled={isPending} className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background">Save changes</button>
-              </div>
-            </form>
-        </ModalOverlay>
-      ) : null}
-
-      {unitOpen ? (
-        <ModalOverlay open={unitOpen} onClose={() => setUnitOpen(false)} panelClassName={MODAL_PANEL_LG}>
-            <h2 className="text-lg font-bold">Add room</h2>
-            <p className="mt-1 text-sm text-muted">Standalone short-let room — no project link required.</p>
-            <form
-              className="mt-4 space-y-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                run(
-                  () =>
-                    createShortletUnit(tenantSlug, {
-                      source: unitForm.source,
-                      projectUnitId: unitForm.source === "PROJECT_UNIT" ? unitForm.projectUnitId : undefined,
-                      propertyId: unitForm.propertyId || undefined,
-                      name: unitForm.name,
-                      location: unitForm.location || undefined,
-                      nightlyRate: Number(unitForm.nightlyRate),
-                      cleaningFee: unitForm.cleaningFee ? Number(unitForm.cleaningFee) : undefined,
-                      currency: unitForm.currency,
-                    }),
-                  "Room added.",
-                );
-                setUnitOpen(false);
-              }}
-            >
-              {projectUnitOptions.length > 0 ? (
-                <label className="block text-sm text-muted">
-                  Room type
-                  <UiSelect className="mt-1" value={unitForm.source} onChange={(e) => setUnitForm((f) => ({ ...f, source: e.target.value as "CUSTOM" | "PROJECT_UNIT" }))}>
-                    <option value="CUSTOM">Custom room (recommended)</option>
-                    <option value="PROJECT_UNIT">Link to sales project unit (optional)</option>
-                  </UiSelect>
-                </label>
-              ) : null}
-              {unitForm.source === "PROJECT_UNIT" && projectUnitOptions.length > 0 ? (
-                <label className="block text-sm text-muted">
-                  Project unit
-                  <UiSelect className="mt-1" value={unitForm.projectUnitId} onChange={(e) => setUnitForm((f) => ({ ...f, projectUnitId: e.target.value }))}>
-                    {projectUnitOptions.map((o) => (
-                      <option key={o.id} value={o.id}>{o.label}</option>
-                    ))}
-                  </UiSelect>
-                </label>
-              ) : (
-                <>
-                  <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Room name (e.g. Room 12, Suite A)" value={unitForm.name} onChange={(e) => setUnitForm((f) => ({ ...f, name: e.target.value }))} required />
-                  <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Location / building (optional)" value={unitForm.location} onChange={(e) => setUnitForm((f) => ({ ...f, location: e.target.value }))} />
-                </>
-              )}
-              {properties.length > 0 ? (
-                <label className="block text-sm text-muted">
-                  Property
-                  <UiSelect className="mt-1" value={unitForm.propertyId} onChange={(e) => setUnitForm((f) => ({ ...f, propertyId: e.target.value }))}>
-                    <option value="">Unassigned</option>
-                    {properties.filter((p) => p.isActive).map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </UiSelect>
-                </label>
-              ) : null}
-              <div className="grid grid-cols-2 gap-3">
-                <input type="number" className="rounded-md border px-3 py-2 text-sm" placeholder="Nightly rate" value={unitForm.nightlyRate} onChange={(e) => setUnitForm((f) => ({ ...f, nightlyRate: e.target.value }))} required />
-                <input type="number" className="rounded-md border px-3 py-2 text-sm" placeholder="Cleaning fee" value={unitForm.cleaningFee} onChange={(e) => setUnitForm((f) => ({ ...f, cleaningFee: e.target.value }))} />
-              </div>
-              <label className="block text-sm text-muted">
-                Currency
-                <UiSelect className="mt-1" value={unitForm.currency} onChange={(e) => setUnitForm((f) => ({ ...f, currency: e.target.value }))}>
-                  {currencies.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </UiSelect>
-              </label>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setUnitOpen(false)} className="rounded-md border px-3 py-2 text-sm">Cancel</button>
-                <button type="submit" disabled={isPending} className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background">Add</button>
               </div>
             </form>
         </ModalOverlay>

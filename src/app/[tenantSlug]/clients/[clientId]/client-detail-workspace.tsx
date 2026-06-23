@@ -25,8 +25,7 @@ type UnitOption = {
   id: string;
   label: string;
   projectName: string;
-  pricingPlanId: string | null;
-  pricingPlans: Array<{ id: string; name: string }>;
+  defaultPricingPlanName: string | null;
 };
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -274,54 +273,45 @@ export function ClientDetailWorkspace({
       <ModalOverlay open={isLinkOpen} onClose={() => setIsLinkOpen(false)} panelClassName={MODAL_PANEL_XL}>
           <h2 className="text-lg font-semibold">Link unit to client</h2>
           <p className="mt-1 text-sm text-muted">
-            Connect a project unit to this client&apos;s portfolio. Pricing plan is optional.
+            Connect a project unit to this client&apos;s portfolio. The unit&apos;s pricing plan from inventory is used automatically.
           </p>
           <form action={linkAction} className="mt-5 space-y-4">
             {linkState && !linkState.ok ? <FormAlert>{linkState.error}</FormAlert> : null}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm text-muted">Unit</label>
-                <UiSelect
-                  name="unitId"
-                  value={linkUnitId}
-                  onChange={(e) => setLinkUnitId(e.target.value)}
-                >
-                  {unitOptions.length === 0 ? (
-                    <option value="">No units available</option>
-                  ) : (
-                    unitOptions.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.projectName} — {u.label}
-                      </option>
-                    ))
-                  )}
-                </UiSelect>
-              </div>
-              {selectedUnit && selectedUnit.pricingPlans.length > 0 ? (
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Pricing plan</label>
-                  <UiSelect name="pricingPlanId" defaultValue={selectedUnit.pricingPlanId ?? ""}>
-                    <option value="">Use unit default</option>
-                    {selectedUnit.pricingPlans.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              ) : (
-                <input type="hidden" name="pricingPlanId" value="" />
-              )}
-              <div>
-                <label className="mb-1 block text-sm text-muted">Role</label>
-                <UiSelect name="role" defaultValue="OWNER">
-                  <option value="OWNER">Owner</option>
-                  <option value="CO_OWNER">Co-owner</option>
-                  <option value="INVESTOR">Investor</option>
-                  <option value="TENANT">Tenant</option>
-                  <option value="BENEFICIARY">Beneficiary</option>
-                </UiSelect>
-              </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Unit</label>
+              <UiSelect
+                name="unitId"
+                value={linkUnitId}
+                onChange={(e) => setLinkUnitId(e.target.value)}
+              >
+                {unitOptions.length === 0 ? (
+                  <option value="">No units available</option>
+                ) : (
+                  unitOptions.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.projectName} — {u.label}
+                    </option>
+                  ))
+                )}
+              </UiSelect>
+              {selectedUnit ? (
+                <p className="mt-2 text-xs text-muted">
+                  Pricing plan:{" "}
+                  <span className="font-medium text-foreground">
+                    {selectedUnit.defaultPricingPlanName ?? "No plan on unit"}
+                  </span>
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Role</label>
+              <UiSelect name="role" defaultValue="OWNER">
+                <option value="OWNER">Owner</option>
+                <option value="CO_OWNER">Co-owner</option>
+                <option value="INVESTOR">Investor</option>
+                <option value="TENANT">Tenant</option>
+                <option value="BENEFICIARY">Beneficiary</option>
+              </UiSelect>
             </div>
             <div className="flex justify-end gap-2 border-t border-foreground/10 pt-4">
               <button type="button" onClick={() => setIsLinkOpen(false)} className="rounded-md border px-4 py-2 text-sm">

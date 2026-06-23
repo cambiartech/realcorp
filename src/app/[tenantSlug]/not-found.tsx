@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function TenantNotFound() {
   return (
     <div className="flex w-full items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 text-center shadow-sm">
+      <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 text-center shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">404</p>
         <h1 className="mt-1 text-lg font-semibold text-foreground">Page not found</h1>
         <p className="mt-2 text-sm text-muted">

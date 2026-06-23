@@ -8,7 +8,8 @@ export function formatReservationFolioBundle(
     amountPaid: number | { toString(): string };
     balanceDue: number | { toString(): string };
     currency: string;
-    unit: { name: string };
+    unit: { name: string } | null;
+    property?: { name: string } | null;
     folioLines: Array<{
       id: string;
       department: string;
@@ -34,7 +35,7 @@ export function formatReservationFolioBundle(
   return {
     reservationId: reservation.id,
     guestName: reservation.guestName,
-    unitName: reservation.unit.name,
+    unitName: reservation.unit?.name || reservation.property?.name || "Apartment TBD",
     totalAmountLabel: `${currency} ${Number(reservation.totalAmount).toLocaleString()}`,
     paidAmountLabel: `${currency} ${Number(reservation.amountPaid).toLocaleString()}`,
     balanceLabel: `${currency} ${Number(reservation.balanceDue).toLocaleString()}`,
@@ -59,6 +60,7 @@ export function formatReservationFolioBundle(
 
 export const FOLIO_RESERVATION_INCLUDE = {
   unit: { select: { name: true } },
+  property: { select: { name: true } },
   folioLines: { orderBy: { postedAt: "desc" as const } },
   payments: { orderBy: { paidAt: "desc" as const } },
 } as const;

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   CircleDollarSign,
   ClipboardList,
+  ClipboardCheck,
   ConciergeBell,
   CreditCard,
   FileText,
@@ -23,6 +24,7 @@ import {
   Landmark,
   LayoutDashboard,
   ListTodo,
+  MapPin,
   Megaphone,
   MessageCircle,
   Radio,
@@ -374,6 +376,10 @@ export function TenantSidebar({
         { id: "front-desk", label: "Front desk", href: `${shortletsItem.href}/front-desk`, icon: ConciergeBell },
         { id: "rooms", label: "Room board", href: `${shortletsItem.href}/rooms`, icon: BedDouble },
         { id: "reservations", label: "Reservations", href: `${shortletsItem.href}/reservations`, icon: CalendarDays },
+        { id: "locations", label: "Locations", href: `${shortletsItem.href}/locations`, icon: MapPin },
+        { id: "apartments", label: "Apartments", href: `${shortletsItem.href}/apartments`, icon: Building2 },
+        { id: "guests", label: "Guests", href: `${shortletsItem.href}/guests`, icon: Users },
+        { id: "inspections", label: "Inspections", href: `${shortletsItem.href}/inspections`, icon: ClipboardCheck },
         { id: "channels", label: "Channels", href: `${shortletsItem.href}/channels`, icon: Radio },
         { id: "folio", label: "Guest bill", href: `${shortletsItem.href}/folio`, icon: Receipt },
         { id: "reports", label: "Reports", href: `${shortletsItem.href}/reports`, icon: BarChart2 },
@@ -428,6 +434,9 @@ export function TenantSidebar({
     if (!pathname.startsWith(base) && pathname !== shortletsItem.href) return false;
     if (id === "front-desk") {
       return pathname === shortletsItem.href || pathname === `${shortletsItem.href}/front-desk`;
+    }
+    if (id === "locations" || id === "apartments") {
+      return pathname === `${shortletsItem.href}/${id}` || pathname.startsWith(`${shortletsItem.href}/${id}/`);
     }
     return pathname === `${shortletsItem.href}/${id}`;
   }

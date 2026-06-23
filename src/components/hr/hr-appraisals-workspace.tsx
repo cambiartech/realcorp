@@ -456,7 +456,7 @@ export function HrAppraisalsWorkspace({
 
       {reviewAppraisal && selectedCycle ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-foreground/10 bg-background p-5 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 shadow-xl">
             <h2 className="text-lg font-semibold">Manager review — {reviewAppraisal.employeeName}</h2>
             <p className="text-xs text-muted">
               {selectedCycle.periodLabel} · {selectedCycle.cycleTypeLabel}

@@ -56,7 +56,7 @@ export function ReportsWorkspace(props: Props) {
     { metric: "Occupancy (now)", value: props.occupancyLabel },
     { metric: "ADR", value: props.adrLabel },
     { metric: "Active reservations", value: String(props.activeReservations) },
-    { metric: "Total units", value: String(props.totalUnits) },
+    { metric: "Total apartments", value: String(props.totalUnits) },
     { metric: `Revenue (${props.from} – ${props.to})`, value: props.periodRevenueLabel },
     { metric: "Revenue (all-time)", value: props.totalRevenueLabel },
     { metric: "Outstanding balance", value: props.outstandingLabel },
@@ -127,7 +127,7 @@ export function ReportsWorkspace(props: Props) {
             <Card label="Occupancy (now)" value={props.occupancyLabel} />
             <Card label="ADR" value={props.adrLabel} />
             <Card label="Active reservations" value={String(props.activeReservations)} />
-            <Card label="Total units" value={String(props.totalUnits)} />
+            <Card label="Total apartments" value={String(props.totalUnits)} />
           </section>
           <section className="grid gap-3 sm:grid-cols-3">
             <Card label={`Revenue (${props.from} – ${props.to})`} value={props.periodRevenueLabel} />

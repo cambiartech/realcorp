@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { Eye, EyeOff } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, Suspense } from "react";
 import { FormAlert, FormFieldError } from "@/components/form-message";
@@ -33,6 +34,7 @@ function LoginFormInner() {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<LoginFieldName, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [callbackPath, setCallbackPath] = useState("/auth/landing");
 
@@ -147,15 +149,25 @@ function LoginFormInner() {
         <label htmlFor="login-password" className="mb-1 block text-sm text-muted">
           Password
         </label>
-        <input
-          id="login-password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={Boolean(fieldErrors.password)}
-          aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
-          className={fieldClass(Boolean(fieldErrors.password))}
-        />
+        <div className="relative">
+          <input
+            id="login-password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            aria-invalid={Boolean(fieldErrors.password)}
+            aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
+            className={[fieldClass(Boolean(fieldErrors.password)), "pr-10"].join(" ")}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center text-muted hover:text-foreground"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+          </button>
+        </div>
         {fieldErrors.password ? (
           <FormFieldError id="login-password-error">{fieldErrors.password}</FormFieldError>
         ) : null}

@@ -1,4 +1,5 @@
 import { formatEnumLabel } from "@/lib/ui-format";
+import { isActiveFolioStatus, isPreArrivalStatus } from "@/lib/shortlets-reservation-status";
 import { computeAdr, computeOccupancyPercent, countByHousekeepingStatus } from "@/lib/shortlets-analytics";
 
 export type NightAuditInHouseGuest = {
@@ -56,7 +57,8 @@ type BuildNightAuditInput = {
     balanceDue: number | { toString(): string };
     nights: number;
     totalAmount: number | { toString(): string };
-    unit: { name: string };
+    unit: { name: string } | null;
+    property?: { name: string } | null;
   }>;
   dayPayments: Array<{ amount: number | { toString(): string } }>;
   dayFolioLines: Array<{ department: string; amount: number | { toString(): string } }>;
@@ -90,7 +92,7 @@ export function buildNightAuditSnapshot(input: BuildNightAuditInput): NightAudit
 
   const inHouse = reservations.filter((r) => r.status === "CHECKED_IN");
   const outstanding = reservations
-    .filter((r) => r.status === "CHECKED_IN" || r.status === "RESERVED")
+    .filter((r) => isActiveFolioStatus(r.status))
     .reduce((s, r) => s + Number(r.balanceDue), 0);
 
   const paymentsCollected = dayPayments.reduce((s, p) => s + Number(p.amount), 0);
@@ -103,7 +105,7 @@ export function buildNightAuditSnapshot(input: BuildNightAuditInput): NightAudit
   }
 
   const arrivalsTomorrow = reservations.filter(
-    (r) => (r.status === "RESERVED" || r.status === "CHECKED_IN") && r.checkIn >= dayEnd && r.checkIn < tomorrowEnd,
+    (r) => isPreArrivalStatus(r.status) && r.checkIn >= dayEnd && r.checkIn < tomorrowEnd,
   ).length;
   const departuresTomorrow = reservations.filter(
     (r) => r.status === "CHECKED_IN" && r.checkOut >= dayEnd && r.checkOut < tomorrowEnd,
@@ -137,7 +139,7 @@ export function buildNightAuditSnapshot(input: BuildNightAuditInput): NightAudit
     },
     inHouseGuests: inHouse.map((r) => ({
       guestName: r.guestName,
-      unitName: r.unit.name,
+      unitName: r.unit?.name || r.property?.name || "Apartment TBD",
       checkInLabel: fmtDate(r.checkIn),
       checkOutLabel: fmtDate(r.checkOut),
       balanceDue: Number(r.balanceDue),
@@ -163,7 +165,8 @@ export function loadInHouseGuests(
     checkOut: Date;
     balanceDue: number | { toString(): string };
     currency: string;
-    unit: { name: string };
+    unit: { name: string } | null;
+    property?: { name: string } | null;
   }>,
   currency: string,
 ): NightAuditInHouseGuest[] {
@@ -171,7 +174,7 @@ export function loadInHouseGuests(
     .filter((r) => r.status === "CHECKED_IN")
     .map((r) => ({
       guestName: r.guestName,
-      unitName: r.unit.name,
+      unitName: r.unit?.name || r.property?.name || "Apartment TBD",
       checkInLabel: fmtDate(r.checkIn),
       checkOutLabel: fmtDate(r.checkOut),
       balanceDue: Number(r.balanceDue),

@@ -1,4 +1,4 @@
-export type CloudinaryArea = "finance" | "hr" | "hr-forms" | "branding" | "clients" | "listings";
+export type CloudinaryArea = "finance" | "hr" | "hr-forms" | "branding" | "clients" | "listings" | "shortlets";
 
 function readEnv(...keys: string[]) {
   for (const key of keys) {

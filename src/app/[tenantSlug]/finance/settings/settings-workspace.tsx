@@ -242,7 +242,7 @@ export function FinanceSettingsWorkspace({
             </div>
           </div>
 
-          <div className="rounded-lg border border-foreground/10 bg-background p-4">
+          <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
             <p className="text-sm font-semibold text-foreground">Rules & approvals</p>
             <p className="mt-1 text-xs text-muted">
               Plain limits for your team. Large expenses are blocked until a manager handles them outside the app or you raise the limit.

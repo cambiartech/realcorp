@@ -25,6 +25,7 @@ model User {
   memberships          Membership[]
   dashboardPreferences DashboardPreference[]
   projectStakes        ProjectStakeholder[]
+  propertyClients      PropertyClient[]
 }
 
 model Account {
@@ -113,10 +114,13 @@ model Tenant {
   shortletFolioLines   ShortletFolioLine[]
   shortletServiceItems ShortletServiceItem[]
   shortletBusinessDays ShortletBusinessDay[]
+  shortletGuests       ShortletGuest[]
+  shortletCheckoutInspections ShortletCheckoutInspection[]
   activities           Activity[]
   whatsappMessages     WhatsAppMessage[]
   expenses             Expense[]
   financeVendors       FinanceVendor[]
+  financeExpenseCategories FinanceExpenseCategory[]
   vendorBills          VendorBill[]
   vendorBillPayments   VendorBillPayment[]
   bankStatementImports BankStatementImport[]
@@ -727,6 +731,19 @@ model FinanceVendor {
   @@index([tenantId, name])
 }
 
+model FinanceExpenseCategory {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, name])
+}
+
 enum VendorBillStatus {
   OPEN
   PARTIAL
@@ -919,10 +936,31 @@ enum ShortletHousekeepingStatus {
 }
 
 enum ShortletReservationStatus {
-  RESERVED
+  PENDING
+  CONFIRMED
   CHECKED_IN
   CHECKED_OUT
   CANCELLED
+  NO_SHOW
+  RESERVED
+}
+
+enum ShortletGuestType {
+  INDIVIDUAL
+  CORPORATE
+}
+
+enum ShortletInspectionStatus {
+  AWAITING_INSPECTION
+  PASSED
+  FAILED
+  WAIVED
+}
+
+enum ShortletInspectionCondition {
+  GOOD
+  DAMAGES_FOUND
+  MAINTENANCE_REQUIRED
 }
 
 enum ShortletReservationSource {
@@ -942,11 +980,23 @@ enum ShortletFolioDepartment {
   OTHER
 }
 
+enum ShortletListingStatus {
+  AVAILABLE
+  UNAVAILABLE
+  MAINTENANCE
+}
+
 model ShortletProperty {
   id        String   @id @default(cuid())
   tenantId  String
   name      String
+  locationCode String?
   address   String?
+  city      String?
+  state     String?
+  country   String?  @default("Nigeria")
+  phone     String?
+  email     String?
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
@@ -954,6 +1004,7 @@ model ShortletProperty {
 
   tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   units  ShortletUnit[]
+  reservations ShortletReservation[]
 
   @@index([tenantId, isActive])
   @@index([tenantId, sortOrder])
@@ -966,8 +1017,17 @@ model ShortletUnit {
   projectUnitId       String?                    @unique
   name                String
   location            String?
+  floor               String?
+  roomLayout          String?
+  sizeSqFt            Int?
+  maxOccupancy        Int?
+  description         String?                    @db.Text
+  amenities           Json?
+  listingStatus       ShortletListingStatus      @default(AVAILABLE)
+  isActive            Boolean                    @default(true)
   nightlyRate         Decimal                    @db.Decimal(18, 2)
   cleaningFee         Decimal?                   @db.Decimal(18, 2)
+  cautionFee          Decimal?                   @db.Decimal(18, 2)
   currency            String                     @default("NGN")
   housekeepingStatus  ShortletHousekeepingStatus @default(VACANT_CLEAN)
   activeReservationId String?                    @unique
@@ -981,18 +1041,52 @@ model ShortletUnit {
   projectUnit       Unit?                 @relation(fields: [projectUnitId], references: [id], onDelete: SetNull)
   activeReservation ShortletReservation?  @relation("ActiveShortletReservation", fields: [activeReservationId], references: [id], onDelete: SetNull)
   reservations      ShortletReservation[]
+  checkoutInspections ShortletCheckoutInspection[]
 
   @@index([tenantId, housekeepingStatus])
   @@index([tenantId, propertyId])
   @@index([tenantId, createdAt])
 }
 
+model ShortletGuest {
+  id               String           @id @default(cuid())
+  tenantId         String
+  firstName        String
+  lastName         String?
+  fullName         String
+  email            String?
+  phone            String?
+  guestType        ShortletGuestType @default(INDIVIDUAL)
+  idType           String?
+  idNumber         String?
+  idDocumentUrl    String?
+  addressLine      String?
+  city             String?
+  state            String?
+  country          String?          @default("Nigeria")
+  notes            String?          @db.Text
+  propertyClientId String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyClient PropertyClient?     @relation(fields: [propertyClientId], references: [id], onDelete: SetNull)
+  reservations   ShortletReservation[]
+
+  @@index([tenantId, fullName])
+  @@index([tenantId, email])
+  @@index([tenantId, phone])
+}
+
 model ShortletReservation {
   id              String                    @id @default(cuid())
   tenantId        String
-  unitId          String
+  unitId          String?
+  propertyId      String?
+  guestId         String?
   guestClientId   String?
   channelLeadId   String?
+  bookingNumber   String?
   guestName       String
   guestEmail      String?
   guestPhone      String?
@@ -1002,8 +1096,10 @@ model ShortletReservation {
   totalAmount     Decimal                   @db.Decimal(18, 2)
   amountPaid      Decimal                   @default(0) @db.Decimal(18, 2)
   balanceDue      Decimal                   @db.Decimal(18, 2)
+  cautionFee      Decimal?                  @db.Decimal(18, 2)
+  cautionFeePaid  Decimal                   @default(0) @db.Decimal(18, 2)
   currency        String                    @default("NGN")
-  status          ShortletReservationStatus @default(RESERVED)
+  status          ShortletReservationStatus @default(PENDING)
   source          ShortletReservationSource @default(DIRECT)
   isWalkIn        Boolean                   @default(false)
   notes           String?
@@ -1013,18 +1109,52 @@ model ShortletReservation {
   updatedAt       DateTime                  @updatedAt
 
   tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  unit         ShortletUnit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit         ShortletUnit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  property     ShortletProperty?   @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  guest        ShortletGuest?      @relation(fields: [guestId], references: [id], onDelete: SetNull)
   guestClient  PropertyClient?     @relation(fields: [guestClientId], references: [id], onDelete: SetNull)
   channelLead  Lead?               @relation(fields: [channelLeadId], references: [id], onDelete: SetNull)
   activeOnUnit ShortletUnit?       @relation("ActiveShortletReservation")
   payments     ShortletPayment[]
   folioLines   ShortletFolioLine[]
+  checkoutInspection ShortletCheckoutInspection?
 
   @@index([tenantId, status])
   @@index([tenantId, checkIn, checkOut])
+  @@index([tenantId, guestId])
+  @@index([tenantId, propertyId])
   @@index([tenantId, guestClientId])
   @@index([tenantId, channelLeadId])
+  @@index([tenantId, bookingNumber])
   @@index([unitId, status])
+}
+
+model ShortletCheckoutInspection {
+  id                           String                      @id @default(cuid())
+  tenantId                     String
+  reservationId                String                      @unique
+  unitId                       String
+  status                       ShortletInspectionStatus    @default(AWAITING_INSPECTION)
+  condition                    ShortletInspectionCondition?
+  damageNotes                  String?                     @db.Text
+  cautionFeeAmount             Decimal?                    @db.Decimal(18, 2)
+  cautionRefunded              Decimal?                    @db.Decimal(18, 2)
+  cautionDeduction             Decimal?                    @db.Decimal(18, 2)
+  inspectedAt                  DateTime?
+  inspectedByUserId            String?
+  inspectedByLabel             String?
+  housekeepingCompletedAt      DateTime?
+  housekeepingCompletedByLabel String?
+  photoUrls                    Json?
+  createdAt                    DateTime                    @default(now())
+  updatedAt                    DateTime                    @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reservation ShortletReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  unit        ShortletUnit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, unitId])
 }
 
 model ShortletPayment {
@@ -1650,18 +1780,23 @@ model PropertyClient {
   status         PropertyClientStatus @default(PROSPECT)
   notes          String?              @db.Text
   assignedUserId String?
+  userId         String?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
   tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lead      Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
   deal      Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  portalUser User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   unitLinks ClientUnitLink[]
   documents ClientDocument[]
   shortletReservations ShortletReservation[]
+  shortletGuests       ShortletGuest[]
 
   @@index([tenantId, status])
   @@index([tenantId, fullName])
+  @@index([tenantId, email])
+  @@index([userId])
 }
 
 model ClientUnitLink {

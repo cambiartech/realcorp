@@ -15,6 +15,7 @@ import {
   sendSalesReceiptRecord,
   createVendorBill,
   saveFinanceVendor,
+  saveFinanceExpenseCategory,
   recordVendorBillPayment,
   voidVendorBill,
   sendBulkOverdueReminders,
@@ -45,6 +46,7 @@ import {
   type ReportExportKind,
 } from "@/lib/finance-report-xlsx";
 import { vendorNamesMatch } from "@/lib/finance-vendor";
+import { expenseCategoryNamesMatch, normalizeFinanceExpenseCategory } from "@/lib/finance-expense-category";
 import { UiSelect } from "@/components/ui-select";
 import { recurrenceFrequencyLabel, type VendorBillRecurrenceFrequency } from "@/lib/vendor-bill-recurrence";
 
@@ -309,6 +311,20 @@ type ArView = {
   }>;
 };
 
+type FinanceOverviewStats = {
+  outstandingReceivables: string;
+  overdueReceivables: string;
+  overdueInvoiceCount: number;
+  openPayables: string;
+  payablesOverdueCount: number;
+  collectedThisMonth: string;
+  expensesThisMonth: string;
+  pendingFinanceChecks: number;
+  openInvoiceCount: number;
+  openPayableCount: number;
+  bankingUnmatched: number;
+};
+
 type ReportView = {
   currency: string;
   companyName: string;
@@ -448,6 +464,7 @@ function shiftMonthBoundary(date: Date, months: number) {
 export function FinanceWorkspace({
   tenantSlug,
   canManageFinance,
+  overviewStats,
   deals,
   recentDecisions,
   dealOptions,
@@ -467,10 +484,12 @@ export function FinanceWorkspace({
   financeControls,
   fiscalYear,
   financeVendors,
+  financeExpenseCategories,
   vendorBills,
 }: {
   tenantSlug: string;
   canManageFinance: boolean;
+  overviewStats: FinanceOverviewStats;
   deals: FinanceDeal[];
   recentDecisions: FinanceDecisionItem[];
   dealOptions: DealOption[];
@@ -495,15 +514,18 @@ export function FinanceWorkspace({
   financeControls: FinanceControls;
   fiscalYear: TenantFiscalYear | null;
   financeVendors: FinanceVendorOption[];
+  financeExpenseCategories: FinanceVendorOption[];
   vendorBills: VendorBillRow[];
 }) {
   const [items, setItems] = useState(deals);
   const [vendorOptions, setVendorOptions] = useState(financeVendors);
+  const [categoryOptions, setCategoryOptions] = useState(financeExpenseCategories);
   const [pendingDealId, setPendingDealId] = useState<string | null>(null);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [isCreateReceiptOpen, setIsCreateReceiptOpen] = useState(false);
   const [isCreateExpenseOpen, setIsCreateExpenseOpen] = useState(false);
   const [expenseVendorName, setExpenseVendorName] = useState("");
+  const [expenseCategoryName, setExpenseCategoryName] = useState("");
   const [editingInvoice, setEditingInvoice] = useState<InvoiceRecordItem | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRecordItem | null>(null);
   const [paymentAttachment, setPaymentAttachment] = useState<{
@@ -552,6 +574,10 @@ export function FinanceWorkspace({
   useEffect(() => {
     setVendorOptions(financeVendors);
   }, [financeVendors]);
+
+  useEffect(() => {
+    setCategoryOptions(financeExpenseCategories);
+  }, [financeExpenseCategories]);
   const [highlightFocusId, setHighlightFocusId] = useState<string | null>(null);
   const [autoMatching, setAutoMatching] = useState(false);
   const [finalizingImportId, setFinalizingImportId] = useState<string | null>(null);
@@ -680,7 +706,7 @@ export function FinanceWorkspace({
     ? {
         title: "Finance overview",
         subtitle:
-          "Pending finance checks from sales deals. Use the sidebar for invoices, payments, audit logs, and other records.",
+          "Key numbers at a glance, plus pending finance checks from sales deals.",
       }
     : dedicatedSlug
       ? dedicatedHeading[dedicatedSlug]
@@ -729,7 +755,9 @@ export function FinanceWorkspace({
     }
 
     showSnackbar(
-      decision === "APPROVE" ? "Finance approved and removed from queue." : "Finance rejected and removed from queue.",
+      decision === "APPROVE"
+        ? "Finance approved. Client record created if the deal had lead/unit data."
+        : "Finance rejected and removed from queue.",
       "success",
     );
     setPendingDealId(null);
@@ -877,6 +905,7 @@ export function FinanceWorkspace({
     showSnackbar("Expense created.", "success");
     setIsCreateExpenseOpen(false);
     setExpenseVendorName("");
+    setExpenseCategoryName("");
     setExpenseAttachment(null);
     setActionPending(false);
     router.refresh();
@@ -1044,6 +1073,20 @@ export function FinanceWorkspace({
       return [...prev, { id: result.vendorId, name: result.name }].sort((a, b) => a.name.localeCompare(b.name));
     });
     showSnackbar(`Vendor “${result.name}” saved.`, "success");
+    return true;
+  }
+
+  async function handleSaveExpenseCategory(name: string) {
+    const result = await saveFinanceExpenseCategory(tenantSlug, name);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return false;
+    }
+    setCategoryOptions((prev) => {
+      if (prev.some((c) => expenseCategoryNamesMatch(c.name, result.name))) return prev;
+      return [...prev, { id: result.categoryId, name: result.name }].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    showSnackbar(`Category “${result.name}” saved.`, "success");
     return true;
   }
 
@@ -1940,11 +1983,12 @@ export function FinanceWorkspace({
           <div className="mt-2 grid gap-2 text-sm text-muted">
             <p>
               Sales team creates/updates deals and flags finance checks as pending; those deals appear in{" "}
-              <span className="font-medium text-foreground">Pending Queue</span>.
+              <span className="font-medium text-foreground">Pending checks</span> below.
             </p>
             <p>
-              Finance Manager or Org Admin approves/rejects from queue; decision metadata is saved with reviewer and
-              timestamp.
+              Finance Manager or Org Admin approves/rejects from queue. On approve, a{" "}
+              <span className="font-medium text-foreground">client record</span> is created automatically from the deal
+              (lead contact + unit link). Send a portal invite from Clients when ready.
             </p>
             <p>
               Open <span className="font-medium text-foreground">Audit Logs</span> from the sidebar for the full searchable
@@ -1961,7 +2005,67 @@ export function FinanceWorkspace({
       ) : null}
 
       {isFinanceOverviewSurface ? (
-        <section className="mt-6 rounded-lg border border-foreground/10 bg-background">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Link
+            href={`/${tenantSlug}/finance/receivables`}
+            className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
+          >
+            <p className="text-xs uppercase tracking-wide text-muted">Outstanding receivables</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.outstandingReceivables}</p>
+            <p className="mt-1 text-xs text-muted">{overviewStats.openInvoiceCount} open invoice(s)</p>
+          </Link>
+          <Link
+            href={`/${tenantSlug}/finance/receivables`}
+            className="rounded-lg border border-rose-200/60 bg-rose-50/50 p-4 transition-colors hover:bg-rose-50 dark:border-rose-500/25 dark:bg-rose-500/10 dark:hover:bg-rose-500/15"
+          >
+            <p className="text-xs uppercase tracking-wide text-rose-700/80 dark:text-rose-300/90">Overdue receivables</p>
+            <p className="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">{overviewStats.overdueReceivables}</p>
+            <p className="mt-1 text-xs text-rose-700/70 dark:text-rose-300/80">
+              {overviewStats.overdueInvoiceCount} overdue invoice(s)
+            </p>
+          </Link>
+          <Link
+            href={`/${tenantSlug}/finance/payables`}
+            className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
+          >
+            <p className="text-xs uppercase tracking-wide text-muted">Open payables</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.openPayables}</p>
+            <p className="mt-1 text-xs text-muted">
+              {overviewStats.openPayableCount} bill(s)
+              {overviewStats.payablesOverdueCount > 0 ? ` · ${overviewStats.payablesOverdueCount} overdue` : ""}
+            </p>
+          </Link>
+          <Link
+            href={`/${tenantSlug}/finance/payments`}
+            className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 p-4 transition-colors hover:bg-emerald-50 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+          >
+            <p className="text-xs uppercase tracking-wide text-emerald-800/80 dark:text-emerald-300/90">Collected this month</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-200">{overviewStats.collectedThisMonth}</p>
+            <p className="mt-1 text-xs text-emerald-800/70 dark:text-emerald-300/80">Invoice & direct payments</p>
+          </Link>
+          <Link
+            href={`/${tenantSlug}/finance/expenses`}
+            className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
+          >
+            <p className="text-xs uppercase tracking-wide text-muted">Expenses this month</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.expensesThisMonth}</p>
+            <p className="mt-1 text-xs text-muted">Operational spend recorded</p>
+          </Link>
+          <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
+            <p className="text-xs uppercase tracking-wide text-amber-800/80 dark:text-amber-300/90">Pending finance checks</p>
+            <p className="mt-1 text-2xl font-bold text-amber-900 dark:text-amber-200">{overviewStats.pendingFinanceChecks}</p>
+            <p className="mt-1 text-xs text-amber-800/70 dark:text-amber-300/80">
+              {overviewStats.bankingUnmatched > 0
+                ? `${overviewStats.bankingUnmatched} unmatched bank row(s) · `
+                : ""}
+              Sales deals awaiting review
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {isFinanceOverviewSurface ? (
+        <section className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02]">
           <div className="flex gap-1 border-b border-foreground/10 px-4 pt-3">
             {(
               [
@@ -2075,7 +2179,7 @@ export function FinanceWorkspace({
           )}
         </section>
       ) : dedicatedSlug ? (
-          <section className="mt-6 rounded-lg border border-foreground/10 bg-background">
+          <section className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02]">
           <div className="p-4">
             <div className="mb-3 flex items-center justify-end">
               {canManageFinance ? (
@@ -2161,6 +2265,12 @@ export function FinanceWorkspace({
                         <td className="px-3 py-2">
                           <p className="font-medium text-foreground">{invoice.invoiceNumber}</p>
                           <p className="text-xs text-muted">{invoice.title}</p>
+                          <Link
+                            href={`/${tenantSlug}/finance/invoices/${invoice.id}`}
+                            className="mt-1 inline-block text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                          >
+                            View
+                          </Link>
                         </td>
                         <td className="px-3 py-2 text-muted">{invoice.status}</td>
                         <td className="px-3 py-2 text-foreground">{invoice.amountLabel}</td>
@@ -2699,7 +2809,7 @@ export function FinanceWorkspace({
               </div>
             ) : recordsTab === "reports" ? (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-foreground/10 bg-background p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                   <div className="flex items-center gap-3">
                     {reportView.companyLogoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -2741,7 +2851,7 @@ export function FinanceWorkspace({
                   </div>
                 </div>
 
-                <div className="grid gap-3 rounded-lg border border-foreground/10 bg-background p-3 md:grid-cols-3">
+                <div className="grid gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 md:grid-cols-3">
                   <UiSelect value={reportProjectFilter} onChange={(e) => setReportProjectFilter(e.target.value)}>
                     <option value="all">All projects</option>
                     {reportProjectOptions.map((opt) => (
@@ -2771,7 +2881,7 @@ export function FinanceWorkspace({
 
                 <div className="grid gap-3 md:grid-cols-4">
                   {reportComparisonCards.map((card) => (
-                    <div key={card.id} className="rounded-lg border border-foreground/10 bg-background p-3">
+                    <div key={card.id} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                       <p className="text-xs uppercase tracking-wide text-muted">{card.label}</p>
                       <p className="mt-1 text-lg font-semibold text-foreground">
                         {reportView.currency} {card.current.toLocaleString()}
@@ -2812,7 +2922,7 @@ export function FinanceWorkspace({
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-4">
-                  <div className="rounded-lg border border-foreground/10 bg-background p-3">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Receivables snapshot</p>
                     <p className="mt-1 text-lg font-semibold text-foreground">
                       {reportView.currency} {filteredBalanceSnapshot.receivables.toLocaleString()}
@@ -2821,19 +2931,19 @@ export function FinanceWorkspace({
                       Overdue: {reportView.currency} {filteredBalanceSnapshot.overdueReceivables.toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-foreground/10 bg-background p-3">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Cash in</p>
                     <p className="mt-1 text-lg font-semibold text-foreground">
                       {reportView.currency} {filteredBalanceSnapshot.cashIn.toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-foreground/10 bg-background p-3">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Cash out</p>
                     <p className="mt-1 text-lg font-semibold text-foreground">
                       {reportView.currency} {filteredBalanceSnapshot.cashOut.toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-foreground/10 bg-background p-3">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Net cashflow</p>
                     <p className={["mt-1 text-lg font-semibold", valueTone(filteredBalanceSnapshot.netCashflow)].join(" ")}>
                       {reportView.currency} {filteredBalanceSnapshot.netCashflow.toLocaleString()}
@@ -2842,7 +2952,7 @@ export function FinanceWorkspace({
                 </div>
 
                 {reportKind === "balance" ? (
-                  <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-sm font-semibold text-foreground">Balance sheet</p>
                       <button
@@ -2919,7 +3029,7 @@ export function FinanceWorkspace({
                 ) : null}
 
                 {reportKind === "pnl" ? (
-                  <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-foreground">Profit & loss by month (last {reportMonthWindow} months)</p>
                     <button
@@ -2969,7 +3079,7 @@ export function FinanceWorkspace({
 
                 <div className="grid gap-4 md:grid-cols-2">
                   {reportKind === "cashflow" ? (
-                    <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-semibold text-foreground">Cash flow by month</p>
                       <button
@@ -3015,7 +3125,7 @@ export function FinanceWorkspace({
                   </div>
                   ) : null}
 
-                  <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-semibold text-foreground">Expense by category</p>
                       <button
@@ -3050,7 +3160,7 @@ export function FinanceWorkspace({
                 </div>
 
                 {reportDrilldown ? (
-                  <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-foreground">Transactions for {reportDrilldown.month}</p>
                       <button
@@ -3159,7 +3269,7 @@ export function FinanceWorkspace({
                     <p className="mt-1 text-xs text-muted">Ready for account-level reconciliation.</p>
                   </div>
                 </div>
-                <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                   <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">Statement import</p>
@@ -3215,7 +3325,7 @@ export function FinanceWorkspace({
                   </p>
                 </div>
                 {bankingImports.length > 0 ? (
-                  <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-foreground">Import history</p>
                       <div className="flex items-center gap-2">
@@ -3284,7 +3394,7 @@ export function FinanceWorkspace({
                   </div>
                 ) : null}
                 {importedBankRows.length > 0 ? (
-                  <div className="rounded-lg border border-foreground/10 bg-background p-4">
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 grid gap-3 md:grid-cols-4">
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Match rate</p>
@@ -3962,6 +4072,7 @@ export function FinanceWorkspace({
                 onClick={() => {
                   setIsCreateExpenseOpen(false);
                   setExpenseVendorName("");
+                  setExpenseCategoryName("");
                 }}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
                 aria-label="Close modal"
@@ -3977,7 +4088,7 @@ export function FinanceWorkspace({
                   Expenses above {financeControls.expenseApprovalThreshold.toLocaleString()} need manager approval before you can record them here.
                 </p>
               ) : null}
-              <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
+              {/* <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
                 Currencies, bank/cash accounts, and payment modes are only edited in{" "}
                 <Link
                   href={`/${tenantSlug}/finance/settings`}
@@ -3986,13 +4097,21 @@ export function FinanceWorkspace({
                   Finance settings
                 </Link>
                 . Save there, then open this form again to see new options.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Category</label>
-                  <input name="category" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-              </div>
+              </p> */}
+              <VendorNamePicker
+                vendors={categoryOptions}
+                value={expenseCategoryName}
+                onChange={setExpenseCategoryName}
+                onAddVendor={handleSaveExpenseCategory}
+                inputName="category"
+                fieldLabel="Category"
+                savedItemsLabel="Saved categories"
+                newItemNoun="category"
+                saveNowLabel="Save category now"
+                normalizeName={normalizeFinanceExpenseCategory}
+                namesMatch={expenseCategoryNamesMatch}
+                required
+              />
               <VendorNamePicker
                 vendors={vendorOptions}
                 value={expenseVendorName}
@@ -4554,7 +4673,7 @@ export function FinanceWorkspace({
           open
           onClose={() => setTimelineTarget(null)}
           variant="drawer"
-          panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-background p-4 shadow-2xl"
+          panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-foreground/[0.02] p-4 shadow-2xl"
         >
             <div className="flex items-start justify-between gap-3">
               <div>

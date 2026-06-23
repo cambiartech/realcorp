@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { isActiveFolioStatus } from "@/lib/shortlets-reservation-status";
 import { loadShortletsContext } from "@/lib/shortlets-loaders";
 import { computeAdr, computeOccupancyPercent } from "@/lib/shortlets-analytics";
 import { loadInHouseGuests, parseNightAuditSnapshot } from "@/lib/shortlets-night-audit";
@@ -68,7 +69,7 @@ export default async function ReportsPage({
   const outstanding = reservations
     .filter((r) => r.status !== "CANCELLED" && r.status !== "CHECKED_OUT")
     .reduce((s, r) => s + Number(r.balanceDue), 0);
-  const activeReservations = reservations.filter((r) => r.status === "RESERVED" || r.status === "CHECKED_IN").length;
+  const activeReservations = reservations.filter((r) => isActiveFolioStatus(r.status)).length;
 
   const deptMap = new Map<string, number>();
   for (const line of folioLines) {

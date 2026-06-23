@@ -393,7 +393,7 @@ export function TasksWorkspace({
           return (
             <section
               key={col.id}
-              className="flex min-w-[240px] flex-col rounded-lg border border-foreground/10 bg-background"
+              className="flex min-w-[240px] flex-col rounded-lg border border-foreground/10 bg-foreground/[0.02]"
             >
               <header className={["flex items-center gap-2 rounded-t-lg px-3 py-2.5", col.headerBg].join(" ")}>
                 <span className={["h-2 w-2 rounded-full", col.dot].join(" ")} aria-hidden />
@@ -409,7 +409,7 @@ export function TasksWorkspace({
                   colTasks.map((task) => (
                     <li
                       key={task.id}
-                      className="rounded-md border border-foreground/10 bg-background p-3 shadow-sm transition-shadow hover:shadow-md"
+                      className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3 shadow-sm transition-shadow hover:shadow-md"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <button

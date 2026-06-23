@@ -310,7 +310,7 @@ function DiscoverCard({
       : "Price on request";
 
   return (
-    <article className="group overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+    <article className="group overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.02] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative h-44 overflow-hidden bg-foreground/[0.05]">
         {listing.coverImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

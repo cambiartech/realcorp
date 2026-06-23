@@ -16,6 +16,7 @@ export const createPropertyClientSchema = z.object({
   country: z.string().trim().max(80).optional(),
   status: z.nativeEnum(PropertyClientStatus).optional(),
   notes: z.string().trim().max(5000).optional(),
+  sendPortalInvite: z.boolean().optional(),
 });
 
 export const updatePropertyClientSchema = createPropertyClientSchema;
@@ -51,6 +52,7 @@ export function parseCreatePropertyClientForm(formData: FormData) {
     country: formData.get("country") || undefined,
     status: formData.get("status") || PropertyClientStatus.PROSPECT,
     notes: formData.get("notes") || undefined,
+    sendPortalInvite: formData.get("sendPortalInvite") === "on" || formData.get("sendPortalInvite") === "true",
   });
 }
 

@@ -203,7 +203,7 @@ export function CaptureFormBuilder({
 
       <div className="lg:sticky lg:top-4 lg:self-start">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Live preview</p>
-        <div className="rounded-xl border border-foreground/10 bg-background p-4 shadow-sm">
+        <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm">
           {title ? <p className="text-base font-bold text-foreground">{title}</p> : null}
           {description ? (
             <p className="mt-1 line-clamp-3 text-xs text-muted" dangerouslySetInnerHTML={{ __html: description }} />

@@ -707,7 +707,7 @@ export function SettingsWorkspace({
                   </div>
                 ) : null}
                 {logoUrl ? (
-                  <div className="mt-3 rounded-md border border-foreground/10 bg-background p-3">
+                  <div className="mt-3 rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={logoUrl} alt="Company logo preview" className="h-16 w-auto object-contain" />
                     {/* <p className="mt-2 text-[11px] text-muted break-all">{logoUrl}</p> */}
@@ -1037,7 +1037,7 @@ function RoleExtraAccessMatrix({
 
 function SettingCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-foreground/10 bg-background px-4 py-3">
+    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
     </div>

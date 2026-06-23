@@ -303,7 +303,7 @@ export function HrPayslipsWorkspace({
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-foreground/10 bg-background p-4">
+      <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">

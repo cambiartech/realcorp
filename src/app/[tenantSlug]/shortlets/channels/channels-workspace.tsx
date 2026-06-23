@@ -24,6 +24,7 @@ type Props = {
   defaultCheckOutTime: string;
   leads: LeadRow[];
   unitOptions: Array<{ id: string; label: string }>;
+  propertyOptions: Array<{ id: string; label: string }>;
 };
 
 export function ChannelsWorkspace({
@@ -32,12 +33,14 @@ export function ChannelsWorkspace({
   defaultCheckOutTime,
   leads,
   unitOptions,
+  propertyOptions,
 }: Props) {
   const { showSnackbar } = useSnackbar();
   const [isPending, startTransition] = useTransition();
   const [importLead, setImportLead] = useState<LeadRow | null>(null);
   const [form, setForm] = useState({
-    unitId: unitOptions[0]?.id || "",
+    unitId: "",
+    propertyId: propertyOptions[0]?.id || "",
     checkIn: "",
     checkInTime: defaultCheckInTime,
     checkOut: "",
@@ -95,12 +98,13 @@ export function ChannelsWorkspace({
                   <td className="px-4 py-3">
                     <button
                       type="button"
-                      disabled={isPending || unitOptions.length === 0}
+                      disabled={isPending}
                       onClick={() => {
                         setImportLead(lead);
                         setForm((f) => ({
                           ...f,
-                          unitId: unitOptions[0]?.id || "",
+                          unitId: "",
+                          propertyId: propertyOptions[0]?.id || "",
                           notes: lead.notes.slice(0, 500),
                         }));
                       }}
@@ -122,6 +126,9 @@ export function ChannelsWorkspace({
             <p className="mt-1 text-sm text-muted">
               {importLead.name} · {importLead.source}
             </p>
+            <p className="mt-1 text-sm text-muted">
+              Creates a pending reservation. Apartment can be assigned later at check-in.
+            </p>
             <form
               className="mt-4 space-y-3"
               onSubmit={(e) => {
@@ -130,7 +137,8 @@ export function ChannelsWorkspace({
                   () =>
                     importChannelLeadAsReservation(tenantSlug, {
                       leadId: importLead.id,
-                      unitId: form.unitId,
+                      unitId: form.unitId || undefined,
+                      propertyId: form.propertyId || undefined,
                       checkIn: form.checkIn,
                       checkInTime: form.checkInTime,
                       checkOut: form.checkOut,
@@ -141,9 +149,21 @@ export function ChannelsWorkspace({
                 );
               }}
             >
+              {propertyOptions.length > 0 ? (
+                <label className="block text-sm text-muted">
+                  Location
+                  <UiSelect className="mt-1" value={form.propertyId} onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))}>
+                    <option value="">Select location (optional if apartment chosen)</option>
+                    {propertyOptions.map((o) => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
+                    ))}
+                  </UiSelect>
+                </label>
+              ) : null}
               <label className="block text-sm text-muted">
-                Room
-                <UiSelect className="mt-1" value={form.unitId} onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))} required>
+                Apartment <span className="text-xs">(optional)</span>
+                <UiSelect className="mt-1" value={form.unitId} onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))}>
+                  <option value="">Assign later</option>
                   {unitOptions.map((o) => (
                     <option key={o.id} value={o.id}>{o.label}</option>
                   ))}

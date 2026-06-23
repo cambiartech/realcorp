@@ -58,7 +58,7 @@ export function PayrollWorkflowGuide({
       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">How payroll works</p>
       <div className="grid gap-3 sm:grid-cols-3">
         {steps.map((s) => (
-          <div key={s.title} className="rounded-lg border border-foreground/10 bg-background/80 p-3">
+          <div key={s.title} className="rounded-lg border border-foreground/10 bg-foreground/[0.02]/80 p-3">
             <div className="mb-1.5 flex items-center gap-2">
               <s.icon className="h-4 w-4 text-muted" />
               <span className="text-sm font-semibold text-foreground">{s.title}</span>

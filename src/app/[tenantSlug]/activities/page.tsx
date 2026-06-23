@@ -252,7 +252,7 @@ export default async function ActivitiesPage({
             const entityLabel = activity.entityType === "LEAD" ? "Lead" : "Deal";
 
             return (
-              <div key={activity.id} className="rounded-lg border border-foreground/10 bg-background px-4 py-3">
+              <div key={activity.id} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="flex items-start gap-2.5">
                     <span className="mt-0.5 shrink-0 text-base">{TYPE_ICONS[activity.type]}</span>

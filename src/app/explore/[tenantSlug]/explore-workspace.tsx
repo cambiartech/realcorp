@@ -173,7 +173,7 @@ function ListingCard({
 }) {
   const location = [listing.city, listing.state].filter(Boolean).join(", ");
   return (
-    <article className="group overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-sm transition-shadow hover:shadow-md">
+    <article className="group overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.02] shadow-sm transition-shadow hover:shadow-md">
       <div className="relative h-44 w-full overflow-hidden bg-foreground/[0.05]">
         {listing.coverImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -273,7 +273,7 @@ function InquiryModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Inquire about ${listing.name}`}
-        className="w-full max-w-md rounded-xl border border-foreground/10 bg-background p-5 shadow-xl"
+        className="w-full max-w-md rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 shadow-xl"
       >
         {submitted ? (
           <div className="py-6 text-center">

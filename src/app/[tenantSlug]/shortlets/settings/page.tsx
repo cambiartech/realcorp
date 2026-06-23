@@ -6,10 +6,11 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-type SettingsTab = "operations" | "inventory" | "catalog";
+type SettingsTab = "operations" | "catalog";
 
 function parseSettingsTab(value?: string): SettingsTab {
-  if (value === "inventory" || value === "catalog") return value;
+  if (value === "catalog") return "catalog";
+  if (value === "inventory") return "operations";
   return "operations";
 }
 
@@ -26,28 +27,10 @@ export default async function ShortletSettingsPage({
   const ctx = await loadShortletsContext(tenantSlug);
   if (!ctx.access.canSettings) notFound();
 
-  const [serviceItems, projectUnits, properties, units] = await Promise.all([
-    prisma.shortletServiceItem.findMany({
-      where: { tenantId: ctx.tenant.id },
-      orderBy: [{ department: "asc" }, { name: "asc" }],
-    }),
-    prisma.unit.findMany({
-      where: { tenantId: ctx.tenant.id, shortletUnit: null },
-      select: { id: true, label: true, unitType: true, status: true, project: { select: { name: true } } },
-      orderBy: [{ project: { name: "asc" } }, { label: "asc" }],
-      take: 500,
-    }),
-    prisma.shortletProperty.findMany({
-      where: { tenantId: ctx.tenant.id },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      include: { _count: { select: { units: true } } },
-    }),
-    prisma.shortletUnit.findMany({
-      where: { tenantId: ctx.tenant.id },
-      select: { id: true, name: true, location: true, nightlyRate: true, currency: true, propertyId: true, property: { select: { name: true } } },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const serviceItems = await prisma.shortletServiceItem.findMany({
+    where: { tenantId: ctx.tenant.id },
+    orderBy: [{ department: "asc" }, { name: "asc" }],
+  });
 
   return (
     <SettingsWorkspace
@@ -57,21 +40,6 @@ export default async function ShortletSettingsPage({
       currencies={ctx.currencies}
       pmsSettings={ctx.pmsSettings}
       moduleFinance={ctx.tenant.settings?.moduleFinance ?? false}
-      properties={properties.map((p) => ({
-        id: p.id,
-        name: p.name,
-        address: p.address || "",
-        isActive: p.isActive,
-        unitCount: p._count.units,
-      }))}
-      units={units.map((u) => ({
-        id: u.id,
-        name: u.name,
-        location: u.location || "",
-        nightlyRateLabel: `${u.currency} ${Number(u.nightlyRate).toLocaleString()}`,
-        propertyId: u.propertyId || "",
-        propertyLabel: u.property?.name || "",
-      }))}
       serviceItems={serviceItems.map((s) => ({
         id: s.id,
         department: formatEnumLabel(s.department),
@@ -81,10 +49,6 @@ export default async function ShortletSettingsPage({
         priceLabel: `${s.currency} ${Number(s.price).toLocaleString()}`,
         currency: s.currency,
         active: s.active,
-      }))}
-      projectUnitOptions={projectUnits.map((u) => ({
-        id: u.id,
-        label: `${u.project.name} · ${u.label}${u.unitType ? ` (${u.unitType})` : ""}`,
       }))}
     />
   );
