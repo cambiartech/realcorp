@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
 import { canManageTasks } from "@/lib/tasks-access";
+import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "@/lib/membership-departments";
 import { ensureDefaultTaskSpaces } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export default async function TasksPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
+    select: { role: true, status: true, department: true, isDepartmentLead: true },
   });
 
   assertTenantNavAccess(session, membership, tenant.settings, "tasks");
@@ -76,10 +77,21 @@ export default async function TasksPage({
     }),
   ]);
 
-  const memberOptions = memberships.map((m) => ({
+  const allMembers: TaskAssigneeMember[] = memberships.map((m) => ({
     id: m.user.id,
     label: m.user.name || m.user.email || "Member",
+    role: m.role,
+    department: m.department,
+    isDepartmentLead: m.isDepartmentLead,
   }));
+
+  const memberOptions = filterTaskAssigneeMembers(allMembers, {
+    isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+    actorRole: membership?.role,
+    actorUserId: session.user.id,
+    actorDepartment: membership?.department,
+    actorIsDepartmentLead: membership?.isDepartmentLead,
+  });
 
   const initialView = view === "my" ? "my" : view === "sprint" ? "sprint" : "company";
 

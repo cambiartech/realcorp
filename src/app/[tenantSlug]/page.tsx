@@ -6,7 +6,13 @@ import prisma from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import { DashboardWorkspace } from "./dashboard/dashboard-workspace";
 import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
+import {
+  dashboardRoleViewForMembership,
+  normalizeLegacyDashboardRoleView,
+  type DashboardRoleView,
+} from "@/lib/org-membership-profile";
 import { buildOrgSetupSteps, orgSetupProgress } from "@/lib/org-setup-checklist";
+import { loadHrDashboardMetrics } from "@/lib/hr-dashboard-metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +50,7 @@ export default async function TenantHomePage({
           whatsappPhoneNumberId: true,
           termiiApiKey: true,
           moduleTasks: true,
+          moduleHr: true,
           logoUrl: true,
           orgEmail: true,
           orgPhone: true,
@@ -66,7 +73,7 @@ export default async function TenantHomePage({
         userId: session.user.id,
       },
     },
-    select: { role: true, status: true, tenantId: true },
+    select: { role: true, status: true, tenantId: true, department: true, isDepartmentLead: true },
   });
   const isActive = membership?.status === MembershipStatus.ACTIVE;
   const canView = Boolean(session.user.isPlatformAdmin) || isActive;
@@ -78,23 +85,33 @@ export default async function TenantHomePage({
   assertTenantNavAccess(session, membership, tenant.settings, "dashboard");
 
   const role = (membership?.role || MembershipRole.SALES_EXECUTIVE) as MembershipRole;
-  const allowedRoleViews = [
-    MembershipRole.ORG_ADMIN,
-    MembershipRole.FINANCE_MANAGER,
-    MembershipRole.SALES_MANAGER,
-    MembershipRole.SALES_EXECUTIVE,
-  ] as const;
-  const normalizeRoleView = (value?: string | null) =>
-    value === MembershipRole.ORG_ADMIN ||
-    value === MembershipRole.FINANCE_MANAGER ||
-    value === MembershipRole.SALES_MANAGER ||
-    value === MembershipRole.SALES_EXECUTIVE
-      ? value
-      : MembershipRole.SALES_EXECUTIVE;
-  const roleOptions =
+  const userDashboardView = dashboardRoleViewForMembership(role, {
+    isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+    department: membership?.department,
+    isDepartmentLead: membership?.isDepartmentLead,
+  });
+
+  const allRoleViews: DashboardRoleView[] = [
+    "ORG_ADMIN",
+    "FINANCE",
+    "SALES_MANAGER",
+    "SALES",
+    "HR",
+    "MARKETING",
+    "COMMUNITY",
+    "OPERATIONS",
+  ];
+
+  const roleOptions: DashboardRoleView[] =
     session.user.isPlatformAdmin || role === MembershipRole.ORG_ADMIN
-      ? allowedRoleViews
-      : ([normalizeRoleView(role)] as const);
+      ? allRoleViews
+      : [userDashboardView];
+
+  const normalizeRoleView = (value?: string | null): DashboardRoleView => {
+    const legacy = normalizeLegacyDashboardRoleView(value);
+    if (legacy && allRoleViews.includes(legacy)) return legacy;
+    return userDashboardView;
+  };
 
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -103,6 +120,7 @@ export default async function TenantHomePage({
   monthEnd.setMonth(monthEnd.getMonth() + 1);
 
   const moduleTasksEnabled = tenant.settings?.moduleTasks ?? true;
+  const moduleHrEnabled = tenant.settings?.moduleHr ?? false;
   const canManageOrgSetup = Boolean(session.user.isPlatformAdmin) || role === MembershipRole.ORG_ADMIN;
 
   const [
@@ -272,6 +290,8 @@ export default async function TenantHomePage({
       where: { tenantId: tenant.id, acceptedAt: null, expiresAt: { gt: new Date() } },
     }),
   ]);
+
+  const hrMetrics = await loadHrDashboardMetrics(tenant.id, tenantSlug, moduleHrEnabled);
 
   const orgSetupSteps = buildOrgSetupSteps({
     tenantSlug: tenant.slug,
@@ -615,6 +635,18 @@ export default async function TenantHomePage({
         myWorkTasks,
         tasksModuleEnabled: moduleTasksEnabled,
         tasksPageUrl: `/${tenantSlug}/tasks?view=my`,
+        hrModuleEnabled: hrMetrics.enabled,
+        hrPageUrl: hrMetrics.hrPageUrl,
+        hrPeriodLabel: hrMetrics.periodLabel,
+        hrTeamSnapshot: {
+          activeMemberCount: hrMetrics.activeMemberCount,
+          pendingInviteCount: hrMetrics.pendingInviteCount,
+          employeeProfileCount: hrMetrics.employeeProfileCount,
+          activeEmployeeCount: hrMetrics.activeEmployeeCount,
+        },
+        hrTopPerformers: hrMetrics.topPerformers,
+        hrPendingFormCount: hrMetrics.pendingFormCount,
+        hrOpenAppraisalCount: hrMetrics.openAppraisalCount,
         leadFunnel,
         leaderboard,
         revenueMonthly,

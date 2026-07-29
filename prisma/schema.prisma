@@ -277,6 +277,10 @@ model Membership {
   userId    String
   role      MembershipRole
   status    MembershipStatus @default(ACTIVE)
+  /// sales | finance | marketing | community | hr | operations
+  department String?
+  /// Department lead / coordinator — controls team visibility and task assignment scope
+  isDepartmentLead Boolean @default(false)
   /// Per-user module overrides: { "finance": "read", "marketing": "full" } — see membership-module-permissions.ts
   modulePermissions Json?
   createdAt DateTime         @default(now())
@@ -295,6 +299,8 @@ model Invitation {
   tenantId   String
   email      String
   role       MembershipRole
+  department String?
+  isDepartmentLead Boolean @default(false)
   token      String         @unique
   expiresAt  DateTime
   acceptedAt DateTime?

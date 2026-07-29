@@ -34,6 +34,13 @@ export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<JoinFieldName, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const busy = pending || submitting;
+
+  useEffect(() => {
+    if (state != null) setSubmitting(false);
+  }, [state]);
 
   useEffect(() => {
     if (state?.ok) {
@@ -58,6 +65,7 @@ export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
     }
 
     setFieldErrors({});
+    setSubmitting(true);
     formAction(formData);
   }
 
@@ -113,12 +121,12 @@ export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
 
       <button
         type="submit"
-        disabled={pending}
-        aria-busy={pending}
-        className="mt-2 inline-flex items-center justify-center gap-2 border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        disabled={busy}
+        aria-busy={busy}
+        className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-70"
       >
-        {pending ? <InlineSpinner /> : null}
-        {pending ? "Accepting invite…" : "Join organization"}
+        {busy ? <InlineSpinner /> : null}
+        {busy ? "Joining organization…" : "Join organization"}
       </button>
     </form>
   );

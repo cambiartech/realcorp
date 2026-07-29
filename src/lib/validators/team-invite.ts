@@ -1,22 +1,69 @@
-import { MembershipRole } from "@/generated/prisma";
 import { z } from "zod";
+import {
+  ORG_DEPARTMENT_OPTIONS,
+  resolveMembershipRole,
+  type OrgDepartment,
+} from "@/lib/org-membership-profile";
 
-const validRoles = Object.values(MembershipRole);
+const departmentValues = ORG_DEPARTMENT_OPTIONS.map((d) => d.value) as [OrgDepartment, ...OrgDepartment[]];
 
-export const teamInviteSchema = z.object({
-  email: z.string().trim().toLowerCase().min(1, "Email is required.").email("Enter a valid email address."),
-  role: z.enum(validRoles as [string, ...string[]], {
-    message: "Select a valid role.",
-  }),
-});
+export const teamInviteSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().min(1, "Email is required.").email("Enter a valid email address."),
+    accessKind: z.enum(["org_admin", "department", "portal"]),
+    department: z.enum(departmentValues).optional(),
+    isDepartmentLead: z
+      .union([z.literal("on"), z.literal("true"), z.literal("1"), z.literal("")])
+      .optional()
+      .transform((v) => v === "on" || v === "true" || v === "1"),
+    portalRole: z.enum(["investor", "listing_owner"]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.accessKind === "department" && !data.department) {
+      ctx.addIssue({ code: "custom", message: "Select a department.", path: ["department"] });
+    }
+    if (data.accessKind === "portal" && !data.portalRole) {
+      ctx.addIssue({ code: "custom", message: "Select a portal access type.", path: ["portalRole"] });
+    }
+  });
 
-export type TeamInviteFieldName = keyof z.infer<typeof teamInviteSchema>;
+export type TeamInviteFieldName = "email" | "accessKind" | "department" | "isDepartmentLead" | "portalRole";
 
 export function parseTeamInviteForm(formData: FormData) {
   return teamInviteSchema.safeParse({
     email: formData.get("email"),
-    role: formData.get("role"),
+    accessKind: formData.get("accessKind") || "department",
+    department: formData.get("department") || undefined,
+    isDepartmentLead: formData.get("isDepartmentLead") ?? "",
+    portalRole: formData.get("portalRole") || undefined,
   });
+}
+
+export function resolveRoleFromTeamInviteForm(data: z.infer<typeof teamInviteSchema>) {
+  if (data.accessKind === "org_admin") {
+    return resolveMembershipRole({ kind: "org_admin" });
+  }
+  if (data.accessKind === "portal") {
+    return resolveMembershipRole({ kind: "portal", portalRole: data.portalRole! });
+  }
+  return resolveMembershipRole({
+    kind: "department",
+    department: data.department!,
+    isDepartmentLead: data.isDepartmentLead ?? false,
+  });
+}
+
+export function inviteProfileFromForm(data: z.infer<typeof teamInviteSchema>) {
+  if (data.accessKind === "org_admin") {
+    return { department: null as string | null, isDepartmentLead: true };
+  }
+  if (data.accessKind === "portal") {
+    return { department: null as string | null, isDepartmentLead: false };
+  }
+  return {
+    department: data.department!,
+    isDepartmentLead: data.isDepartmentLead ?? false,
+  };
 }
 
 export function zodTeamInviteIssuesToFieldRecord(
@@ -25,7 +72,14 @@ export function zodTeamInviteIssuesToFieldRecord(
   const out: Partial<Record<TeamInviteFieldName, string>> = {};
   for (const issue of issues) {
     const key = issue.path[0];
-    if ((key === "email" || key === "role") && !out[key]) {
+    if (
+      (key === "email" ||
+        key === "accessKind" ||
+        key === "department" ||
+        key === "isDepartmentLead" ||
+        key === "portalRole") &&
+      !out[key]
+    ) {
       out[key] = issue.message;
     }
   }

@@ -7,7 +7,8 @@ import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
 import { sendInviteEmail } from "@/lib/email";
 import { buildInviteUrl, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
-import { parseTeamInviteForm } from "@/lib/validators/team-invite";
+import { parseTeamInviteForm, inviteProfileFromForm, resolveRoleFromTeamInviteForm } from "@/lib/validators/team-invite";
+import { membershipRoleLabel, profileFromMembershipRole } from "@/lib/org-membership-profile";
 import { Prisma } from "@/generated/prisma";
 import {
   membershipModulePermissionsToJson,
@@ -62,7 +63,51 @@ export async function inviteTenantMember(
   }
 
   const email = parsed.data.email.toLowerCase();
-  const role = parsed.data.role as MembershipRole;
+  const role = resolveRoleFromTeamInviteForm(parsed.data);
+  const profile = inviteProfileFromForm(parsed.data);
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (existingUser) {
+    const activeMember = await prisma.membership.findFirst({
+      where: {
+        tenantId: tenant.id,
+        userId: existingUser.id,
+        status: MembershipStatus.ACTIVE,
+      },
+      select: { role: true },
+    });
+    if (activeMember) {
+      return {
+        ok: false,
+        error: `${email} is already an active team member (${activeMember.role.replace(/_/g, " ").toLowerCase()}). Update their role on the Members tab instead of sending a new invite.`,
+      };
+    }
+  }
+
+  const pendingInvite = await prisma.invitation.findFirst({
+    where: {
+      tenantId: tenant.id,
+      email,
+      acceptedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { role: true, expiresAt: true },
+  });
+  if (pendingInvite) {
+    const roleLabel = pendingInvite.role.replace(/_/g, " ").toLowerCase();
+    const expiresLabel = new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
+      pendingInvite.expiresAt,
+    );
+    return {
+      ok: false,
+      error: `An invite for ${email} is already pending (${roleLabel}, expires ${expiresLabel}). Go to Pending invites and use Resend — do not create a duplicate.`,
+    };
+  }
+
   const token = newInviteToken();
   const expiresAt = inviteExpiresAt();
 
@@ -72,6 +117,8 @@ export async function inviteTenantMember(
         tenantId: tenant.id,
         email,
         role,
+        department: profile.department,
+        isDepartmentLead: profile.isDepartmentLead,
         token,
         expiresAt,
       },
@@ -98,7 +145,7 @@ export async function inviteTenantMember(
     tenantName: tenant.name,
     inviterLabel,
     inviteUrl,
-    roleLabel: role,
+    roleLabel: membershipRoleLabel(role, profile.department, profile.isDepartmentLead),
   });
 
   await writeAuditLog({
@@ -184,9 +231,15 @@ export async function updateMembershipRole(
     }
   }
 
+  const profile = profileFromMembershipRole(parsed.data.role);
+
   await prisma.membership.update({
     where: { id: target.id },
-    data: { role: parsed.data.role },
+    data: {
+      role: parsed.data.role,
+      department: profile.department,
+      isDepartmentLead: profile.isDepartmentLead,
+    },
   });
 
   await writeAuditLog({

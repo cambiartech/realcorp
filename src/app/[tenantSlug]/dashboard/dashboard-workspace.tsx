@@ -34,9 +34,16 @@ import { TenantPageShell } from "@/components/tenant-page-shell";
 import type { OrgSetupStep } from "@/lib/org-setup-checklist";
 import { UiSelect } from "@/components/ui-select";
 import { formatEnumLabel } from "@/lib/ui-format";
+import {
+  dashboardShowsFinanceKpis,
+  dashboardShowsSalesKpis,
+  DASHBOARD_ROLE_VIEW_LABELS,
+  normalizeLegacyDashboardRoleView,
+  type DashboardRoleView,
+} from "@/lib/org-membership-profile";
 import { saveDashboardPreference, upsertTenantGoal } from "./actions";
 
-type RoleView = "ORG_ADMIN" | "FINANCE_MANAGER" | "SALES_MANAGER" | "SALES_EXECUTIVE";
+type RoleView = DashboardRoleView;
 
 type WidgetValue = {
   revenueMtd: number;
@@ -68,6 +75,26 @@ type WidgetValue = {
   }>;
   tasksModuleEnabled: boolean;
   tasksPageUrl: string;
+  hrModuleEnabled: boolean;
+  hrPageUrl: string;
+  hrPeriodLabel: string;
+  hrTeamSnapshot: {
+    activeMemberCount: number;
+    pendingInviteCount: number;
+    employeeProfileCount: number;
+    activeEmployeeCount: number;
+  };
+  hrTopPerformers: Array<{
+    name: string;
+    department: string;
+    rank: number;
+    compositeScore: number;
+    tasksCompleted: number;
+    tasksAssigned: number;
+    tasksScore: number;
+  }>;
+  hrPendingFormCount: number;
+  hrOpenAppraisalCount: number;
   leadFunnel: Array<{ stage: string; count: number }>;
   leaderboard: Array<{ label: string; value: number }>;
   stageVelocity: Array<{ stage: string; avgDays: number; dropOffPct: number }>;
@@ -226,6 +253,10 @@ const WIDGET_LABELS: Record<string, string> = {
   my_pipeline: "My pipeline",
   my_new_leads: "My new leads (7d)",
   my_open_tasks: "My open tasks",
+  hr_team_snapshot: "Team headcount",
+  hr_top_performers: "Top performers (tasks)",
+  hr_pending_forms: "Pending HR forms",
+  hr_open_appraisals: "Open appraisals",
 };
 
 const ROLE_WIDGETS: Record<RoleView, string[]> = {
@@ -244,7 +275,7 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
     "rep_leaderboard_trend",
     "my_open_tasks",
   ],
-  FINANCE_MANAGER: [
+  FINANCE: [
     "expected_month",
     "overdue_installments",
     "pending_verification",
@@ -263,7 +294,11 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
     "rep_leaderboard_trend",
     "my_open_tasks",
   ],
-  SALES_EXECUTIVE: ["my_pipeline", "my_new_leads", "lead_funnel", "my_open_tasks"],
+  SALES: ["my_pipeline", "my_new_leads", "lead_funnel", "my_open_tasks"],
+  HR: ["hr_team_snapshot", "hr_top_performers", "hr_pending_forms", "hr_open_appraisals", "my_open_tasks"],
+  MARKETING: ["lead_source_quality", "my_open_tasks"],
+  COMMUNITY: ["my_open_tasks"],
+  OPERATIONS: ["my_open_tasks"],
 };
 
 const ALL_WIDGET_IDS = new Set(Object.values(ROLE_WIDGETS).flat());
@@ -298,12 +333,23 @@ function readDashboardDraft(tenantSlug: string): DashboardUiDraftV1 | null {
     if (!raw) return null;
     const d = JSON.parse(raw) as Partial<DashboardUiDraftV1>;
     if (d.v !== DASHBOARD_UI_DRAFT_VERSION || !d.roleView) return null;
-    const allowedRole: RoleView[] = ["ORG_ADMIN", "FINANCE_MANAGER", "SALES_MANAGER", "SALES_EXECUTIVE"];
-    if (!allowedRole.includes(d.roleView)) return null;
+    const normalizedView = normalizeLegacyDashboardRoleView(d.roleView);
+    if (!normalizedView) return null;
+    const allowedRole: RoleView[] = [
+      "ORG_ADMIN",
+      "FINANCE",
+      "SALES_MANAGER",
+      "SALES",
+      "HR",
+      "MARKETING",
+      "COMMUNITY",
+      "OPERATIONS",
+    ];
+    if (!allowedRole.includes(normalizedView)) return null;
     const widgetIds = sanitizeWidgetIds(d.widgetIds);
     return {
       v: DASHBOARD_UI_DRAFT_VERSION,
-      roleView: d.roleView,
+      roleView: normalizedView,
       widgetIds,
       chartRange:
         d.chartRange === "WEEK" ||
@@ -360,17 +406,15 @@ function getServerAlignedDashboardUi(
   initialRoleView: RoleView,
   initialWidgetIds: string[],
 ): DashboardBootstrapUi {
-  const defaultForRole = ROLE_WIDGETS[initialRoleView];
-  const mergedInitial = Array.from(
-    new Set<string>([
-      ...(initialWidgetIds.length ? initialWidgetIds : defaultForRole),
-      "revenue_monthly_bar",
-      "pipeline_target_trend",
-    ]),
-  );
+  const pool = ROLE_WIDGETS[initialRoleView];
+  const mergedInitial =
+    initialWidgetIds.length > 0
+      ? initialWidgetIds.filter((id) => pool.includes(id))
+      : [...pool];
+  const selectedWidgets = mergedInitial.length > 0 ? mergedInitial : [...pool];
   return {
     roleView: initialRoleView,
-    selectedWidgets: mergedInitial,
+    selectedWidgets,
     chartRange: "1M",
     globalRange: "1M",
     module: "ALL",
@@ -1334,7 +1378,7 @@ export function DashboardWorkspace({
                   >
                     {roleViewOptions.map((view) => (
                       <option key={view} value={view}>
-                        {view.replaceAll("_", " ")}
+                        {DASHBOARD_ROLE_VIEW_LABELS[view]}
                       </option>
                     ))}
                   </UiSelect>
@@ -1628,62 +1672,64 @@ export function DashboardWorkspace({
         </div>
       ) : null}
 
-      {/* One surface, one accent. Colour is reserved for status, not decoration. */}
-      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <button
-          type="button"
-          onClick={() => setOpenKpiDetail("LEADS_TODAY")}
-          className="rc-card-interactive p-4"
-        >
-          <p className="rc-metric-label">Leads today</p>
-          <p className="rc-metric-value" data-zero={leadsTodayCount === 0}>
-            {leadsTodayCount}
-          </p>
-          <MiniBars values={leadsMiniSeries} tone="accent" />
-          <p className="rc-metric-hint">Lead-level breakdown</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpenKpiDetail("DEALS_TODAY")}
-          className="rc-card-interactive p-4"
-        >
-          <p className="rc-metric-label">Deals today</p>
-          <p className="rc-metric-value" data-zero={dealsTodayCount === 0}>
-            {dealsTodayCount}
-          </p>
-          <MiniBars values={dealsMiniSeries} tone="info" />
-          <p className="rc-metric-hint">Deal-level breakdown</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpenKpiDetail("PROJECTS")}
-          className="rc-card-interactive p-4"
-        >
-          <p className="rc-metric-label">Projects</p>
-          <p className="rc-metric-value" data-zero={filteredProjects.length === 0}>
-            {filteredProjects.length}
-          </p>
-          <p className="rc-metric-hint">Project activity</p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpenKpiDetail("TOP_PROJECTS")}
-          className="rc-card-interactive p-4"
-        >
-          <p className="rc-metric-label">Top project</p>
-          <p className="mt-2 text-lg font-semibold leading-snug text-foreground">
-            {topProjects[0]?.projectName || (
-              <span className="text-[var(--faint)] font-medium">Nothing ranked yet</span>
-            )}
-          </p>
-          <p className="rc-metric-hint">
-            {topProjects[0]
-              ? `${topProjects[0].dealCount} deals · ${formatMoney(topProjects[0].totalValue)}`
-              : "Rankings appear once deals are logged"}
-          </p>
-        </button>
-      </section>
+      {dashboardShowsSalesKpis(roleView) ? (
+        <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <button
+            type="button"
+            onClick={() => setOpenKpiDetail("LEADS_TODAY")}
+            className="rc-card-interactive p-4"
+          >
+            <p className="rc-metric-label">Leads today</p>
+            <p className="rc-metric-value" data-zero={leadsTodayCount === 0}>
+              {leadsTodayCount}
+            </p>
+            <MiniBars values={leadsMiniSeries} tone="accent" />
+            <p className="rc-metric-hint">Lead-level breakdown</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpenKpiDetail("DEALS_TODAY")}
+            className="rc-card-interactive p-4"
+          >
+            <p className="rc-metric-label">Deals today</p>
+            <p className="rc-metric-value" data-zero={dealsTodayCount === 0}>
+              {dealsTodayCount}
+            </p>
+            <MiniBars values={dealsMiniSeries} tone="info" />
+            <p className="rc-metric-hint">Deal-level breakdown</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpenKpiDetail("PROJECTS")}
+            className="rc-card-interactive p-4"
+          >
+            <p className="rc-metric-label">Projects</p>
+            <p className="rc-metric-value" data-zero={filteredProjects.length === 0}>
+              {filteredProjects.length}
+            </p>
+            <p className="rc-metric-hint">Project activity</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpenKpiDetail("TOP_PROJECTS")}
+            className="rc-card-interactive p-4"
+          >
+            <p className="rc-metric-label">Top project</p>
+            <p className="mt-2 text-lg font-semibold leading-snug text-foreground">
+              {topProjects[0]?.projectName || (
+                <span className="text-[var(--faint)] font-medium">Nothing ranked yet</span>
+              )}
+            </p>
+            <p className="rc-metric-hint">
+              {topProjects[0]
+                ? `${topProjects[0].dealCount} deals · ${formatMoney(topProjects[0].totalValue)}`
+                : "Rankings appear once deals are logged"}
+            </p>
+          </button>
+        </section>
+      ) : null}
 
+      {dashboardShowsFinanceKpis(roleView) ? (
       <section className="mt-6">
         <div className="mb-2 flex items-center justify-between gap-3">
           <h2 className="rc-section-title">Finance analytics</h2>
@@ -1731,6 +1777,7 @@ export function DashboardWorkspace({
           </button>
         </div>
       </section>
+      ) : null}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {widgetOrder.map((id) => (
@@ -2300,7 +2347,7 @@ export function DashboardWorkspace({
             >
               {roleViewOptions.map((role) => (
                 <option key={role} value={role}>
-                  {role.replaceAll("_", " ")}
+                  {DASHBOARD_ROLE_VIEW_LABELS[role]}
                 </option>
               ))}
             </UiSelect>
@@ -2810,6 +2857,107 @@ function WidgetCard({
       </>
     ) : (
       <p className="mt-3 text-xs text-muted">Tasks module is disabled.</p>
+    );
+  } else if (id === "hr_team_snapshot") {
+    title = "Team Headcount";
+    body = values.hrModuleEnabled ? (
+      <>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <StatPill label="Active members" value={values.hrTeamSnapshot.activeMemberCount} tone="emerald" />
+          <StatPill label="HR profiles" value={values.hrTeamSnapshot.employeeProfileCount} tone="emerald" />
+          <StatPill label="Active employees" value={values.hrTeamSnapshot.activeEmployeeCount} tone="emerald" />
+          <StatPill label="Pending invites" value={values.hrTeamSnapshot.pendingInviteCount} tone="amber" />
+        </div>
+        <Link
+          href={`${values.hrPageUrl}?tab=people`}
+          className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+        >
+          Open people directory →
+        </Link>
+      </>
+    ) : (
+      <p className="mt-3 text-xs text-muted">HR module is not enabled for this organization.</p>
+    );
+  } else if (id === "hr_top_performers") {
+    title = "Top Performers";
+    const maxScore = Math.max(1, ...values.hrTopPerformers.map((x) => x.compositeScore));
+    body = values.hrModuleEnabled ? (
+      values.hrTopPerformers.length ? (
+        <>
+          <p className="mt-1 text-[11px] text-muted">{values.hrPeriodLabel} · task completion weighted</p>
+          <div className="mt-3 space-y-2">
+            {values.hrTopPerformers.map((person) => (
+              <div key={`${person.rank}-${person.name}`}>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-foreground">
+                    <span className="mr-1 font-semibold text-muted">#{person.rank}</span>
+                    {person.name}
+                  </span>
+                  <span className="shrink-0 text-muted">{person.compositeScore}%</span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-foreground/10">
+                  <div
+                    className="h-full rounded-full bg-[var(--info)]"
+                    style={{ width: `${Math.max(8, (person.compositeScore / maxScore) * 100)}%` }}
+                  />
+                </div>
+                <p className="mt-0.5 text-[10px] text-muted">
+                  {person.department} · {person.tasksCompleted}/{person.tasksAssigned} tasks · score{" "}
+                  {person.tasksScore}
+                </p>
+              </div>
+            ))}
+          </div>
+          <Link
+          href={`${values.hrPageUrl}?tab=insights`}
+          className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+        >
+          Full performance board →
+          </Link>
+        </>
+      ) : (
+        <p className="mt-3 text-sm text-muted">No active employee profiles yet — add people in HR.</p>
+      )
+    ) : (
+      <p className="mt-3 text-xs text-muted">HR module is not enabled for this organization.</p>
+    );
+  } else if (id === "hr_pending_forms") {
+    title = "Pending HR Forms";
+    body = values.hrModuleEnabled ? (
+      <>
+        <div className="mt-3 rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] p-3">
+          <p className="text-xl font-bold text-foreground">{values.hrPendingFormCount}</p>
+          <p className="text-[11px] text-muted">
+            onboarding / HR form{values.hrPendingFormCount === 1 ? "" : "s"} awaiting submission
+          </p>
+        </div>
+        <Link
+          href={`${values.hrPageUrl}?tab=people`}
+          className="mt-2 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+        >
+          Manage form queue →
+        </Link>
+      </>
+    ) : (
+      <p className="mt-3 text-xs text-muted">HR module is not enabled for this organization.</p>
+    );
+  } else if (id === "hr_open_appraisals") {
+    title = "Open Appraisals";
+    body = values.hrModuleEnabled ? (
+      <>
+        <div className="mt-3 rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
+          <p className="text-xl font-bold text-foreground">{values.hrOpenAppraisalCount}</p>
+          <p className="text-[11px] text-muted">appraisal{values.hrOpenAppraisalCount === 1 ? "" : "s"} in progress</p>
+        </div>
+        <Link
+          href={`${values.hrPageUrl}?tab=appraisals`}
+          className="mt-2 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+        >
+          Review appraisals →
+        </Link>
+      </>
+    ) : (
+      <p className="mt-3 text-xs text-muted">HR module is not enabled for this organization.</p>
     );
   } else if (id === "inventory_snapshot") {
     title = "Inventory Snapshot";

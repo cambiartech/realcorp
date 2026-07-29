@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/db";
 import { MembershipStatus } from "@/generated/prisma";
 import { classifyInvite } from "@/lib/invitation-utils";
+import { profileFromMembershipRole } from "@/lib/org-membership-profile";
 import { parseJoinForm } from "@/lib/validators/join";
 
 export type AcceptInviteResult = { ok: true; redirectTo: string } | { ok: false; error: string };
@@ -45,6 +46,10 @@ export async function acceptInvite(
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   const inviteEmail = invitation.email.toLowerCase();
   const fullName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim();
+  const profile =
+    invitation.department != null
+      ? { department: invitation.department, isDepartmentLead: invitation.isDepartmentLead }
+      : profileFromMembershipRole(invitation.role);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -74,10 +79,14 @@ export async function acceptInvite(
           tenantId: invitation.tenantId,
           userId: user.id,
           role: invitation.role,
+          department: profile.department,
+          isDepartmentLead: profile.isDepartmentLead,
           status: MembershipStatus.ACTIVE,
         },
         update: {
           role: invitation.role,
+          department: profile.department,
+          isDepartmentLead: profile.isDepartmentLead,
           status: MembershipStatus.ACTIVE,
         },
       });

@@ -7,6 +7,7 @@ import { buildInviteUrl, classifyInvite, inviteStatusLabel } from "@/lib/invitat
 import { normalizeTenantModuleFlags, tenantModuleSummary } from "@/lib/tenant-module-definitions";
 import { PlatformModulesForm } from "../../modules-form";
 import { TenantInvitesWorkspace, type PlatformInviteRow } from "./tenant-invites-workspace";
+import { TenantMembersWorkspace, type PlatformMemberRow } from "./tenant-members-workspace";
 import { InviteTokenLookup } from "../../invite-token-lookup";
 
 export const dynamic = "force-dynamic";
@@ -38,12 +39,31 @@ export default async function PlatformTenantInvitesPage({
         take: 50,
       },
       memberships: {
-        where: { role: MembershipRole.ORG_ADMIN, status: MembershipStatus.ACTIVE },
-        select: { id: true },
+        where: { status: MembershipStatus.ACTIVE },
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, isPlatformAdmin: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
       },
     },
   });
   if (!tenant) notFound();
+
+  const hasActiveOrgAdmin = tenant.memberships.some((m) => m.role === MembershipRole.ORG_ADMIN);
+
+  const members: PlatformMemberRow[] = tenant.memberships.map((m) => ({
+    membershipId: m.id,
+    userId: m.user.id,
+    name: m.user.name || m.user.email || "User",
+    email: m.user.email || "",
+    role: m.role.replaceAll("_", " "),
+    department: m.department,
+    isDepartmentLead: m.isDepartmentLead,
+    joinedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(m.createdAt),
+    isPlatformAdmin: m.user.isPlatformAdmin,
+  }));
 
   const invites: PlatformInviteRow[] = tenant.invitations.map((invite) => {
     const status = classifyInvite(invite);
@@ -101,11 +121,12 @@ export default async function PlatformTenantInvitesPage({
 
       <div className="mt-8 space-y-8">
         <InviteTokenLookup />
+        <TenantMembersWorkspace tenantSlug={tenant.slug} tenantName={tenant.name} members={members} />
         <TenantInvitesWorkspace
           tenantSlug={tenant.slug}
           tenantName={tenant.name}
           invites={invites}
-          hasActiveOrgAdmin={tenant.memberships.length > 0}
+          hasActiveOrgAdmin={hasActiveOrgAdmin}
         />
       </div>
     </div>

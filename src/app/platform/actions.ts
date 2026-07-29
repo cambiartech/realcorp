@@ -6,6 +6,10 @@ import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { sendInviteEmail } from "@/lib/email";
 import { buildInviteUrl, classifyInvite, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
 import { pickBestErrorEvent } from "@/lib/platform-error-details";
+import {
+  deleteTenantInvitation,
+  removeTenantMember,
+} from "@/lib/platform-tenant-member-cleanup";
 import { readTenantModuleFlagsFromForm } from "@/lib/tenant-module-definitions";
 import { tenantModuleRevalidatePaths } from "@/lib/tenant-module-revalidate";
 import { revalidatePath } from "next/cache";
@@ -137,6 +141,70 @@ export async function platformRefreshInvitationToken(
 }
 
 const createAdminInviteSchema = z.string().trim().email("Enter a valid email address.");
+
+export async function platformRemoveTenantMember(
+  tenantSlug: string,
+  userId: string,
+): Promise<{ ok: true; email: string | null } | { ok: false; error: string }> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(tenantSlug);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const result = await removeTenantMember({
+    tenantId: tenant.id,
+    userId,
+    purgeUserAccount: false,
+  });
+  if (!result.ok) return result;
+
+  revalidatePath(`/platform/tenants/${tenantSlug}`);
+  revalidatePath("/platform");
+  revalidatePath(`/${tenantSlug}/team`);
+  return { ok: true, email: result.email };
+}
+
+export async function platformPurgeTenantMember(
+  tenantSlug: string,
+  userId: string,
+): Promise<{ ok: true; email: string | null } | { ok: false; error: string }> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(tenantSlug);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const result = await removeTenantMember({
+    tenantId: tenant.id,
+    userId,
+    purgeUserAccount: true,
+  });
+  if (!result.ok) return result;
+
+  revalidatePath(`/platform/tenants/${tenantSlug}`);
+  revalidatePath("/platform");
+  revalidatePath(`/${tenantSlug}/team`);
+  return { ok: true, email: result.email };
+}
+
+export async function platformDeleteInvitation(
+  tenantSlug: string,
+  invitationId: string,
+): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(tenantSlug);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const result = await deleteTenantInvitation({ tenantId: tenant.id, invitationId });
+  if (!result.ok) return result;
+
+  revalidatePath(`/platform/tenants/${tenantSlug}`);
+  revalidatePath("/platform");
+  return { ok: true, email: result.email };
+}
 
 export async function platformCreateAdminInvite(
   tenantSlug: string,

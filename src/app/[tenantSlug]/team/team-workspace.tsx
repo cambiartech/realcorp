@@ -9,7 +9,12 @@ import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_MD } from "@/lib/modal-panel";
-import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
+import {
+  INVITE_ACCESS_KIND_OPTIONS,
+  INVITE_DEPARTMENT_OPTIONS,
+  INVITE_PORTAL_ROLE_OPTIONS,
+  TEAM_MEMBERSHIP_ROLE_OPTIONS,
+} from "@/lib/team-membership-roles";
 import type {
   AssignableMemberModule,
   MembershipModulePermissions,
@@ -429,6 +434,7 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
 function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () => void }) {
   const [state, formAction, pending] = useActionState(inviteTenantMember.bind(null, tenantSlug), initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<TeamInviteFieldName, string>>>({});
+  const [accessKind, setAccessKind] = useState<"department" | "org_admin" | "portal">("department");
   const { showSnackbar } = useSnackbar();
   const seenStateRef = useRef<string>("");
 
@@ -469,7 +475,7 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Invite team member</h2>
-          <p className="mt-1 text-sm text-muted">Send a role-based invitation link.</p>
+          <p className="mt-1 text-sm text-muted">Pick a department and whether they lead the team.</p>
         </div>
         <button
           type="button"
@@ -533,27 +539,76 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
           </div>
 
           <div>
-            <label htmlFor="team-modal-role" className="mb-1 block text-sm text-muted">
-              Role
+            <label htmlFor="team-modal-access" className="mb-1 block text-sm text-muted">
+              Access type
             </label>
             <UiSelect
-              id="team-modal-role"
-              name="role"
-              defaultValue={MembershipRole.SALES_EXECUTIVE}
-              aria-invalid={Boolean(fieldErrors.role)}
-              aria-describedby={fieldErrors.role ? "team-modal-role-error" : undefined}
-              invalid={Boolean(fieldErrors.role)}
+              id="team-modal-access"
+              name="accessKind"
+              value={accessKind}
+              onChange={(e) => setAccessKind(e.target.value as typeof accessKind)}
             >
-              {TEAM_MEMBERSHIP_ROLE_OPTIONS.map((opt) => (
+              {INVITE_ACCESS_KIND_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
             </UiSelect>
-            {fieldErrors.role ? (
-              <FormFieldError id="team-modal-role-error">{fieldErrors.role}</FormFieldError>
-            ) : null}
           </div>
+
+          {accessKind === "department" ? (
+            <>
+              <div>
+                <label htmlFor="team-modal-department" className="mb-1 block text-sm text-muted">
+                  Department
+                </label>
+                <UiSelect
+                  id="team-modal-department"
+                  name="department"
+                  defaultValue="sales"
+                  invalid={Boolean(fieldErrors.department)}
+                >
+                  {INVITE_DEPARTMENT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </UiSelect>
+                {fieldErrors.department ? (
+                  <FormFieldError>{fieldErrors.department}</FormFieldError>
+                ) : null}
+              </div>
+              <label className="flex items-start gap-3 rounded-md border border-foreground/10 bg-field px-3 py-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="isDepartmentLead"
+                  value="on"
+                  className="mt-0.5 h-4 w-4"
+                />
+                <span>
+                  <span className="font-medium text-foreground">Department lead / coordinator</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Can assign tasks within this department and see team-scoped dashboards.
+                  </span>
+                </span>
+              </label>
+            </>
+          ) : null}
+
+          {accessKind === "portal" ? (
+            <div>
+              <label htmlFor="team-modal-portal" className="mb-1 block text-sm text-muted">
+                Portal access
+              </label>
+              <UiSelect id="team-modal-portal" name="portalRole" defaultValue="investor">
+                {INVITE_PORTAL_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          ) : null}
 
           <div className="flex justify-end gap-2">
             <button

@@ -1,11 +1,14 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { MembershipRole } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { UiSelect } from "@/components/ui-select";
-import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
+import {
+  INVITE_ACCESS_KIND_OPTIONS,
+  INVITE_DEPARTMENT_OPTIONS,
+  INVITE_PORTAL_ROLE_OPTIONS,
+} from "@/lib/team-membership-roles";
 import {
   parseTeamInviteForm,
   zodTeamInviteIssuesToFieldRecord,
@@ -31,6 +34,7 @@ function fieldClass(invalid: boolean) {
 export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
   const [state, formAction, pending] = useActionState(inviteTenantMember.bind(null, tenantSlug), initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<TeamInviteFieldName, string>>>({});
+  const [accessKind, setAccessKind] = useState<"department" | "org_admin" | "portal">("department");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -79,8 +83,6 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
           autoComplete="email"
           placeholder="user@company.com"
           className={fieldClass(Boolean(fieldErrors.email))}
-          aria-invalid={Boolean(fieldErrors.email)}
-          aria-describedby={fieldErrors.email ? "team-invite-email-error" : undefined}
         />
         {fieldErrors.email ? (
           <FormFieldError id="team-invite-email-error">{fieldErrors.email}</FormFieldError>
@@ -88,27 +90,53 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
       </div>
 
       <div>
-        <label htmlFor="team-invite-role" className="mb-1 block text-sm text-muted">
-          Role
+        <label htmlFor="team-invite-access" className="mb-1 block text-sm text-muted">
+          Access type
         </label>
         <UiSelect
-          id="team-invite-role"
-          name="role"
-          defaultValue={MembershipRole.SALES_EXECUTIVE}
-          aria-invalid={Boolean(fieldErrors.role)}
-          aria-describedby={fieldErrors.role ? "team-invite-role-error" : undefined}
-          invalid={Boolean(fieldErrors.role)}
+          id="team-invite-access"
+          name="accessKind"
+          value={accessKind}
+          onChange={(e) => setAccessKind(e.target.value as typeof accessKind)}
         >
-          {TEAM_MEMBERSHIP_ROLE_OPTIONS.map((opt) => (
+          {INVITE_ACCESS_KIND_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
           ))}
         </UiSelect>
-        {fieldErrors.role ? (
-          <FormFieldError id="team-invite-role-error">{fieldErrors.role}</FormFieldError>
-        ) : null}
       </div>
+
+      {accessKind === "department" ? (
+        <>
+          <div>
+            <label htmlFor="team-invite-department" className="mb-1 block text-sm text-muted">
+              Department
+            </label>
+            <UiSelect id="team-invite-department" name="department" defaultValue="sales">
+              {INVITE_DEPARTMENT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="isDepartmentLead" value="on" />
+            Department lead / coordinator
+          </label>
+        </>
+      ) : null}
+
+      {accessKind === "portal" ? (
+        <UiSelect name="portalRole" defaultValue="investor">
+          {INVITE_PORTAL_ROLE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </UiSelect>
+      ) : null}
 
       <button
         type="submit"

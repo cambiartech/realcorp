@@ -5,6 +5,10 @@ import { WorkTaskStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { canManageTasks, canViewTasksModule } from "@/lib/tasks-access";
 import {
+  isTaskAssigneeAllowed,
+  type TaskAssigneeMember,
+} from "@/lib/membership-departments";
+import {
   createWorkTaskInputSchema,
   createTaskSpaceInputSchema,
   updateWorkTaskInputSchema,
@@ -26,7 +30,7 @@ async function getTenantContext(tenantSlug: string) {
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
+    select: { status: true, role: true, department: true, isDepartmentLead: true },
   });
 
   const moduleTasks = tenant.settings?.moduleTasks ?? true;
@@ -35,6 +39,43 @@ async function getTenantContext(tenantSlug: string) {
   }
 
   return { tenant, session, membership };
+}
+
+async function loadAssigneeMembers(tenantId: string): Promise<TaskAssigneeMember[]> {
+  const memberships = await prisma.membership.findMany({
+    where: { tenantId, status: "ACTIVE" },
+    include: { user: { select: { id: true, name: true, email: true } } },
+    take: 200,
+  });
+  return memberships.map((m) => ({
+    id: m.user.id,
+    label: m.user.name || m.user.email || "Member",
+    role: m.role,
+    department: m.department,
+    isDepartmentLead: m.isDepartmentLead,
+  }));
+}
+
+async function assertAssigneeAllowed(
+  ctx: NonNullable<Awaited<ReturnType<typeof getTenantContext>>>,
+  assigneeUserId: string | null | undefined,
+): Promise<ActionResult | null> {
+  if (!assigneeUserId) return null;
+  const members = await loadAssigneeMembers(ctx.tenant.id);
+  const allowed = isTaskAssigneeAllowed(assigneeUserId, members, {
+    isPlatformAdmin: Boolean(ctx.session.user.isPlatformAdmin),
+    actorRole: ctx.membership?.role,
+    actorUserId: ctx.session.user.id,
+    actorDepartment: ctx.membership?.department ?? undefined,
+    actorIsDepartmentLead: ctx.membership?.isDepartmentLead,
+  });
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "You can only assign tasks to people in your department. Org admin and HR can assign across teams.",
+    };
+  }
+  return null;
 }
 
 export async function createWorkTask(
@@ -56,6 +97,9 @@ export async function createWorkTask(
 
   const parsed = createWorkTaskInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const assigneeError = await assertAssigneeAllowed(ctx, parsed.data.assigneeUserId);
+  if (assigneeError) return assigneeError;
 
   const status = parsed.data.status ?? WorkTaskStatus.TODO;
   const completedAt = status === WorkTaskStatus.DONE ? new Date() : null;
@@ -130,6 +174,9 @@ export async function updateWorkTask(
 
   const parsed = updateWorkTaskInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const assigneeError = await assertAssigneeAllowed(ctx, parsed.data.assigneeUserId);
+  if (assigneeError) return assigneeError;
 
   const existing = await prisma.workTask.findFirst({
     where: { id: parsed.data.taskId, tenantId: ctx.tenant.id },

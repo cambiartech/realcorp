@@ -6,6 +6,7 @@ import { useSnackbar } from "@/components/snackbar";
 import { ButtonSpinner } from "@/components/button-spinner";
 import {
   platformCreateAdminInvite,
+  platformDeleteInvitation,
   platformRefreshInvitationToken,
   platformResendInvitation,
 } from "../../actions";
@@ -81,6 +82,25 @@ export function TenantInvitesWorkspace({
       result.emailSent ? "success" : "info",
     );
     if (result.inviteUrl) void copyLink(result.inviteUrl);
+    router.refresh();
+  }
+
+  async function handleDelete(invite: PlatformInviteRow) {
+    if (
+      !window.confirm(
+        `Delete pending invite for ${invite.email}?\n\nUse this to clear duplicate invites before re-inviting.`,
+      )
+    ) {
+      return;
+    }
+    setPendingId(invite.id);
+    const result = await platformDeleteInvitation(tenantSlug, invite.id);
+    setPendingId(null);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar(`Invite for ${result.email} deleted.`, "success");
     router.refresh();
   }
 
@@ -197,6 +217,16 @@ export function TenantInvitesWorkspace({
                           className="text-xs font-semibold text-foreground underline underline-offset-2 disabled:opacity-40"
                         >
                           {pendingId === invite.id ? "Working…" : "Refresh token"}
+                        </button>
+                      ) : null}
+                      {invite.status !== "accepted" ? (
+                        <button
+                          type="button"
+                          disabled={pendingId === invite.id}
+                          onClick={() => void handleDelete(invite)}
+                          className="text-xs text-[var(--danger)] underline underline-offset-2 disabled:opacity-40"
+                        >
+                          Delete
                         </button>
                       ) : null}
                     </div>
