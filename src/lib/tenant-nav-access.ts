@@ -113,7 +113,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.ORG_ADMIN:
       return withoutInvestorPortalNav(NAV_ORDER);
     case MembershipRole.FINANCE_MANAGER:
-      return ["dashboard", "clients", "shortlets", "tasks", "finance", "settings"];
+      return ["dashboard", "clients", "tasks", "finance", "settings"];
     case MembershipRole.HR_MANAGER:
       return ["dashboard", "tasks", "hr", "team", "settings"];
     case MembershipRole.MARKETING_MANAGER:
@@ -125,10 +125,10 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.FNB_STAFF:
       return ["dashboard", "shortlets", "settings"];
     case MembershipRole.SALES_MANAGER:
-      return [...SALES_STACK, "clients", "shortlets", "tasks", "listings", "stakeholders", "settings"];
+      return [...SALES_STACK, "clients", "tasks", "listings", "stakeholders", "settings"];
     case MembershipRole.SALES_EXECUTIVE:
     default:
-      return [...SALES_STACK, "clients", "shortlets", "tasks", "settings"];
+      return [...SALES_STACK, "clients", "tasks", "settings"];
   }
 }
 

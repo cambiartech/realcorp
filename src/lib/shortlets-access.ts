@@ -15,6 +15,13 @@ export type ShortletsAccessContext = {
   } | null;
 };
 
+/** Roles that get Short lets by default (ops + org admin). Sales/finance need explicit module assignment. */
+const SHORTLETS_DEFAULT_ROLES = new Set<MembershipRole>([
+  MembershipRole.ORG_ADMIN,
+  MembershipRole.HOUSEKEEPING_MANAGER,
+  MembershipRole.FNB_STAFF,
+]);
+
 function isActiveMember(membership: ShortletsAccessContext["membership"]) {
   return membership?.status === MembershipStatus.ACTIVE;
 }
@@ -30,23 +37,21 @@ function shortletsPermissionLevel(ctx: ShortletsAccessContext): MembershipModule
   );
 }
 
-function hasShortletsModuleOverride(ctx: ShortletsAccessContext): boolean {
-  const level = shortletsPermissionLevel(ctx);
-  return level != null && level !== "none";
+function hasExplicitShortletsGrant(ctx: ShortletsAccessContext): boolean {
+  return memberCanAccessModuleNav(shortletsPermissionLevel(ctx));
+}
+
+function hasDefaultShortletsRole(ctx: ShortletsAccessContext): boolean {
+  const r = role(ctx.membership);
+  return r != null && SHORTLETS_DEFAULT_ROLES.has(r);
 }
 
 export function canAccessShortLets(ctx: ShortletsAccessContext): boolean {
   if (ctx.isPlatformAdmin) return true;
   if (!isActiveMember(ctx.membership)) return false;
-  if (memberCanAccessModuleNav(shortletsPermissionLevel(ctx))) return true;
-  const r = role(ctx.membership)!;
-  return (
-    r === MembershipRole.ORG_ADMIN ||
-    r === MembershipRole.SALES_MANAGER ||
-    r === MembershipRole.FINANCE_MANAGER ||
-    r === MembershipRole.HOUSEKEEPING_MANAGER ||
-    r === MembershipRole.FNB_STAFF
-  );
+  if (shortletsPermissionLevel(ctx) === "none") return false;
+  if (hasExplicitShortletsGrant(ctx)) return true;
+  return hasDefaultShortletsRole(ctx);
 }
 
 export function canManageShortLets(ctx: ShortletsAccessContext): boolean {
@@ -56,12 +61,7 @@ export function canManageShortLets(ctx: ShortletsAccessContext): boolean {
   if (level === "full" || level === "edit") return true;
   if (level === "none" || level === "read") return false;
   const r = role(ctx.membership)!;
-  return (
-    r === MembershipRole.ORG_ADMIN ||
-    r === MembershipRole.SALES_MANAGER ||
-    r === MembershipRole.FINANCE_MANAGER ||
-    r === MembershipRole.HOUSEKEEPING_MANAGER
-  );
+  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
 }
 
 export function canManageHousekeeping(ctx: ShortletsAccessContext): boolean {
@@ -69,11 +69,7 @@ export function canManageHousekeeping(ctx: ShortletsAccessContext): boolean {
   if (!isActiveMember(ctx.membership)) return false;
   if (shortletsPermissionLevel(ctx) === "full") return true;
   const r = role(ctx.membership)!;
-  return (
-    r === MembershipRole.ORG_ADMIN ||
-    r === MembershipRole.HOUSEKEEPING_MANAGER ||
-    r === MembershipRole.SALES_MANAGER
-  );
+  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
 }
 
 export function canPostFolio(ctx: ShortletsAccessContext): boolean {
@@ -85,8 +81,6 @@ export function canPostFolio(ctx: ShortletsAccessContext): boolean {
   const r = role(ctx.membership)!;
   return (
     r === MembershipRole.ORG_ADMIN ||
-    r === MembershipRole.SALES_MANAGER ||
-    r === MembershipRole.FINANCE_MANAGER ||
     r === MembershipRole.FNB_STAFF ||
     r === MembershipRole.HOUSEKEEPING_MANAGER
   );
@@ -95,10 +89,9 @@ export function canPostFolio(ctx: ShortletsAccessContext): boolean {
 export function canViewShortletReports(ctx: ShortletsAccessContext): boolean {
   if (ctx.isPlatformAdmin) return true;
   if (!isActiveMember(ctx.membership)) return false;
-  if (hasShortletsModuleOverride(ctx) && memberCanAccessModuleNav(shortletsPermissionLevel(ctx))) {
-    return shortletsPermissionLevel(ctx) !== "none";
-  }
-  return role(ctx.membership) !== MembershipRole.FNB_STAFF;
+  if (hasExplicitShortletsGrant(ctx)) return shortletsPermissionLevel(ctx) !== "none";
+  const r = role(ctx.membership)!;
+  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
 }
 
 export function canManageShortletSettings(ctx: ShortletsAccessContext): boolean {
