@@ -5,11 +5,7 @@ import { resolveTenantCurrencies } from "@/lib/finance-catalog";
 import { parseShortletPmsSettings } from "@/lib/shortlets-settings";
 import {
   canAccessShortLets,
-  canManageHousekeeping,
-  canManageShortLets,
-  canManageShortletSettings,
-  canPostFolio,
-  canViewShortletReports,
+  resolveShortletsAccess,
   type ShortletsAccessContext,
 } from "@/lib/shortlets-access";
 import { notFound } from "next/navigation";
@@ -51,7 +47,7 @@ export async function loadShortletsContext(tenantSlug: string) {
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
+    select: { status: true, role: true, modulePermissions: true },
   });
 
   assertTenantNavAccess(session, membership, tenant.settings, "shortlets");
@@ -70,13 +66,7 @@ export async function loadShortletsContext(tenantSlug: string) {
     tenant,
     membership,
     moduleClients: tenant.settings?.moduleClients ?? false,
-    access: {
-      canManage: canManageShortLets(accessCtx),
-      canHousekeeping: canManageHousekeeping(accessCtx),
-      canPostFolio: canPostFolio(accessCtx),
-      canSettings: canManageShortletSettings(accessCtx),
-      canReports: canViewShortletReports(accessCtx),
-    },
+    access: resolveShortletsAccess(accessCtx),
     pmsSettings,
     currencies,
   };

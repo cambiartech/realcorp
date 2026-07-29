@@ -7,6 +7,7 @@ import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { getVisibleNavKeys, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
+import { resolveShortletsAccess } from "@/lib/shortlets-access";
 import { loadOrgSetupForUser } from "@/lib/load-org-setup";
 import { OrgSetupCoachBoundary } from "@/components/org-setup-coach-boundary";
 
@@ -93,6 +94,19 @@ export default async function TenantLayout({
     Boolean(session.user.isPlatformAdmin),
   );
 
+  const shortletsAccess = visibleNavKeys.includes("shortlets")
+    ? resolveShortletsAccess({
+        isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+        membership: membership
+          ? {
+              status: membership.status,
+              role: membership.role,
+              modulePermissions: membership.modulePermissions,
+            }
+          : null,
+      })
+    : null;
+
   const navProps = {
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
@@ -104,6 +118,7 @@ export default async function TenantLayout({
     moduleWhatsApp: tenant.settings?.moduleWhatsApp !== false,
     userName: session.user.name ?? null,
     userEmail: session.user.email ?? null,
+    shortletsAccess,
   };
 
   return (

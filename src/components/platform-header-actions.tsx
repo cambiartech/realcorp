@@ -3,6 +3,13 @@
 import { signOut } from "next-auth/react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+function loginCallbackUrl() {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/login`;
+  }
+  return "/login";
+}
+
 export function PlatformHeaderActions({ userLabel }: { userLabel: string }) {
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
@@ -11,7 +18,7 @@ export function PlatformHeaderActions({ userLabel }: { userLabel: string }) {
       </span>
       <button
         type="button"
-        onClick={() => signOut({ callbackUrl: "/login" })}
+        onClick={() => signOut({ callbackUrl: loginCallbackUrl() })}
         className="rc-btn rc-btn-secondary rc-btn-sm"
       >
         Sign out

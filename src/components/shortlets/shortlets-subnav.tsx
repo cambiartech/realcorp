@@ -2,19 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Building2,
-  ClipboardCheck,
-  BarChart2,
-  BedDouble,
-  CalendarDays,
-  ConciergeBell,
-  MapPin,
-  Radio,
-  Receipt,
-  Settings,
-  Users,
-} from "lucide-react";
+import { buildShortletsNavItems, type ShortletsNavAccess } from "@/lib/shortlets-nav-items";
 
 type Props = {
   tenantSlug: string;
@@ -23,13 +11,6 @@ type Props = {
   canPostFolio: boolean;
   canSettings: boolean;
   canReports: boolean;
-};
-
-type SubItem = {
-  id: string;
-  label: string;
-  icon: typeof ConciergeBell;
-  show: boolean;
 };
 
 export function ShortletsSubnav({
@@ -42,26 +23,20 @@ export function ShortletsSubnav({
 }: Props) {
   const pathname = usePathname();
   const base = `/${tenantSlug}/shortlets`;
-
-  const items: SubItem[] = [
-    { id: "front-desk", label: "Front desk", icon: ConciergeBell, show: canManage },
-    { id: "rooms", label: "Room board", icon: BedDouble, show: canManage || canHousekeeping },
-    { id: "reservations", label: "Reservations", icon: CalendarDays, show: canManage },
-    { id: "locations", label: "Locations", icon: MapPin, show: canManage },
-    { id: "apartments", label: "Apartments", icon: Building2, show: canManage },
-    { id: "guests", label: "Guests", icon: Users, show: canManage },
-    { id: "inspections", label: "Inspections", icon: ClipboardCheck, show: canManage || canHousekeeping },
-    { id: "channels", label: "Channels", icon: Radio, show: canManage },
-    { id: "folio", label: "Guest bill", icon: Receipt, show: canPostFolio },
-    { id: "reports", label: "Reports", icon: BarChart2, show: canReports },
-    { id: "settings", label: "Settings", icon: Settings, show: canSettings },
-  ].filter((i) => i.show);
+  const access: ShortletsNavAccess = {
+    canManage,
+    canHousekeeping,
+    canPostFolio,
+    canSettings,
+    canReports,
+  };
+  const items = buildShortletsNavItems(base, access);
 
   return (
     <nav className="border-b border-foreground/10" aria-label="Short lets navigation">
       <div className="flex gap-1 overflow-x-auto pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
-          const href = `${base}/${item.id}`;
+          const href = item.href;
           const active =
             pathname === href ||
             (item.id === "front-desk" && pathname === base) ||

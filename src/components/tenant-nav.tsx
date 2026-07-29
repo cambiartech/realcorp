@@ -42,6 +42,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { TenantNavKey } from "@/lib/tenant-nav-access";
+import type { ShortletsNavAccess } from "@/lib/shortlets-nav-items";
+import { buildShortletsNavItems } from "@/lib/shortlets-nav-items";
 
 export type TenantNavProps = {
   tenantName: string;
@@ -56,6 +58,7 @@ export type TenantNavProps = {
   moduleWhatsApp?: boolean;
   userName: string | null;
   userEmail: string | null;
+  shortletsAccess?: ShortletsNavAccess | null;
 };
 
 type NavItem = { key: TenantNavKey; label: string; href: string; mobileLabel: string };
@@ -199,6 +202,7 @@ export function TenantSidebar({
   moduleWhatsApp = true,
   userName,
   userEmail,
+  shortletsAccess = null,
 }: TenantNavProps) {
   const pathname = usePathname();
   const coreItems = useCoreNavItems(tenantSlug, visibleNavKeys);
@@ -404,34 +408,18 @@ export function TenantSidebar({
   const hasHrItems = hrSubItems.length > 0;
   const shortletsItem = coreItems.find((i) => i.key === "shortlets");
   const shortletsSubItems: FinanceSubItem[] = shortletsItem
-    ? [
-        {
-          id: "front-desk",
-          label: "Front desk",
-          href: `${shortletsItem.href}/front-desk`,
-          icon: ConciergeBell,
-        },
-        { id: "rooms", label: "Room board", href: `${shortletsItem.href}/rooms`, icon: BedDouble },
-        {
-          id: "reservations",
-          label: "Reservations",
-          href: `${shortletsItem.href}/reservations`,
-          icon: CalendarDays,
-        },
-        { id: "locations", label: "Locations", href: `${shortletsItem.href}/locations`, icon: MapPin },
-        { id: "apartments", label: "Apartments", href: `${shortletsItem.href}/apartments`, icon: Building2 },
-        { id: "guests", label: "Guests", href: `${shortletsItem.href}/guests`, icon: Users },
-        {
-          id: "inspections",
-          label: "Inspections",
-          href: `${shortletsItem.href}/inspections`,
-          icon: ClipboardCheck,
-        },
-        { id: "channels", label: "Channels", href: `${shortletsItem.href}/channels`, icon: Radio },
-        { id: "folio", label: "Guest bill", href: `${shortletsItem.href}/folio`, icon: Receipt },
-        { id: "reports", label: "Reports", href: `${shortletsItem.href}/reports`, icon: BarChart2 },
-        { id: "settings", label: "Settings", href: `${shortletsItem.href}/settings`, icon: Settings },
-      ]
+    ? buildShortletsNavItems(shortletsItem.href, shortletsAccess ?? {
+        canManage: false,
+        canHousekeeping: false,
+        canPostFolio: false,
+        canSettings: false,
+        canReports: false,
+      }).map((item) => ({
+        id: item.id,
+        label: item.label,
+        href: item.href,
+        icon: item.icon,
+      }))
     : [];
   const hasShortletsItems = shortletsSubItems.length > 0;
 

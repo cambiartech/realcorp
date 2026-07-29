@@ -75,7 +75,7 @@ async function getTenantAndMembership(tenantSlug: string, userId: string) {
   if (!tenant) return { tenant: null, membership: null };
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId } },
-    select: { status: true, role: true },
+    select: { status: true, role: true, modulePermissions: true },
   });
   return { tenant, membership };
 }
@@ -88,7 +88,7 @@ function financeSyncEnabled(tenant: {
 
 function accessCtx(
   isPlatformAdmin: boolean,
-  membership: { status: MembershipStatus; role: MembershipRole } | null,
+  membership: { status: MembershipStatus; role: MembershipRole; modulePermissions?: unknown } | null,
 ): ShortletsAccessContext {
   return { isPlatformAdmin, membership };
 }
