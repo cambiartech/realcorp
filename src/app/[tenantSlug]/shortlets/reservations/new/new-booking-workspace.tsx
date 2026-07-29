@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { createShortletBookings, createShortletReservation, listAvailableShortletApartments } from "../../actions";
+import {
+  createShortletBookings,
+  createShortletReservation,
+  listAvailableShortletApartments,
+} from "../../actions";
 
 type GuestOption = {
   id: string;
@@ -52,7 +56,13 @@ type Props = {
 
 const PAYMENT_METHODS = ["Cash", "Transfer", "Card", "POS", "Online"];
 
-function newStayBlock(defaults: { checkInTime: string; checkOutTime: string; checkIn?: string; checkOut?: string; propertyId?: string }): StayBlock {
+function newStayBlock(defaults: {
+  checkInTime: string;
+  checkOutTime: string;
+  checkIn?: string;
+  checkOut?: string;
+  propertyId?: string;
+}): StayBlock {
   return {
     key: Math.random().toString(36).slice(2),
     checkIn: defaults.checkIn || "",
@@ -118,7 +128,9 @@ export function NewBookingWorkspace({
   const filteredGuests = useMemo(() => {
     const q = guestSearch.trim().toLowerCase();
     if (!q) return guests;
-    return guests.filter((g) => g.label.toLowerCase().includes(q) || g.email?.toLowerCase().includes(q) || g.phone?.includes(q));
+    return guests.filter(
+      (g) => g.label.toLowerCase().includes(q) || g.email?.toLowerCase().includes(q) || g.phone?.includes(q),
+    );
   }, [guests, guestSearch]);
 
   const selectedGuest = guests.find((g) => g.id === guestId);
@@ -131,7 +143,14 @@ export function NewBookingWorkspace({
     setStays((prev) => {
       const next = prev.map((s, i) => (i === index ? { ...s, ...patch } : s));
       const updated = next[index];
-      if (updated && (patch.checkIn || patch.checkOut || patch.checkInTime || patch.checkOutTime || patch.propertyId !== undefined)) {
+      if (
+        updated &&
+        (patch.checkIn ||
+          patch.checkOut ||
+          patch.checkInTime ||
+          patch.checkOutTime ||
+          patch.propertyId !== undefined)
+      ) {
         void loadAvailability(index, updated);
       }
       return next;
@@ -153,7 +172,8 @@ export function NewBookingWorkspace({
       prev.map((s, i) => {
         if (i !== index) return s;
         if (!res.ok) return { ...s, loading: false, available: [] };
-        const unitId = s.unitId && res.apartments.some((a: ApartmentOption) => a.id === s.unitId) ? s.unitId : "";
+        const unitId =
+          s.unitId && res.apartments.some((a: ApartmentOption) => a.id === s.unitId) ? s.unitId : "";
         return { ...s, loading: false, available: res.apartments, unitId };
       }),
     );
@@ -270,9 +290,17 @@ export function NewBookingWorkspace({
   return (
     <div className="space-y-6">
       <div>
-        <Link href={`/${tenantSlug}/shortlets/reservations`} className="text-sm text-muted hover:text-foreground">← Back to reservations</Link>
+        <Link
+          href={`/${tenantSlug}/shortlets/reservations`}
+          className="text-sm text-muted hover:text-foreground"
+        >
+          ← Back to reservations
+        </Link>
         <h2 className="mt-2 text-xl font-bold">New booking</h2>
-        <p className="mt-1 text-sm text-muted">Create an advance reservation or walk-in check-in. Pick a guest profile — apartment optional until check-in.</p>
+        <p className="mt-1 text-sm text-muted">
+          Create an advance reservation or walk-in check-in. Pick a guest profile — apartment optional until
+          check-in.
+        </p>
       </div>
 
       <form className="grid gap-6 xl:grid-cols-3 xl:items-start" onSubmit={submit}>
@@ -294,8 +322,9 @@ export function NewBookingWorkspace({
               />
             </div>
             {bookingType === "WALK_IN" ? (
-              <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm text-amber-800">
-                Walk-in policy: guest must pay the full booking amount before check-in. A clean vacant apartment is required.
+              <p className="mt-3 rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-sm text-[var(--warn)]">
+                Walk-in policy: guest must pay the full booking amount before check-in. A clean vacant
+                apartment is required.
               </p>
             ) : null}
           </section>
@@ -320,10 +349,18 @@ export function NewBookingWorkspace({
               />
               <label className="block text-sm text-muted">
                 Select guest *
-                <UiSelect className="mt-1" value={guestId} onChange={(e) => setGuestId(e.target.value)} required>
+                <UiSelect
+                  className="mt-1"
+                  value={guestId}
+                  onChange={(e) => setGuestId(e.target.value)}
+                  required
+                >
                   <option value="">Choose a guest…</option>
                   {filteredGuests.map((g) => (
-                    <option key={g.id} value={g.id}>{g.label}{g.email ? ` · ${g.email}` : ""}</option>
+                    <option key={g.id} value={g.id}>
+                      {g.label}
+                      {g.email ? ` · ${g.email}` : ""}
+                    </option>
                   ))}
                 </UiSelect>
               </label>
@@ -335,7 +372,14 @@ export function NewBookingWorkspace({
               ) : null}
               <label className="block text-sm text-muted sm:max-w-xs">
                 Number of guests
-                <input type="number" min={1} max={50} className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={guestCount} onChange={(e) => setGuestCount(e.target.value)} />
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={guestCount}
+                  onChange={(e) => setGuestCount(e.target.value)}
+                />
               </label>
             </div>
           </section>
@@ -343,10 +387,29 @@ export function NewBookingWorkspace({
           <section className="rounded-lg border border-foreground/10 p-4">
             <h3 className="font-semibold">Apartment selection</h3>
             <div className="mt-3 flex gap-1 rounded-md border border-foreground/10 p-1">
-              <button type="button" onClick={() => { setApartmentMode("SINGLE"); setStays((s) => s.slice(0, 1)); }} className={apartmentMode === "SINGLE" ? "flex-1 rounded bg-foreground px-3 py-1.5 text-sm text-background" : "flex-1 rounded px-3 py-1.5 text-sm text-muted"}>
+              <button
+                type="button"
+                onClick={() => {
+                  setApartmentMode("SINGLE");
+                  setStays((s) => s.slice(0, 1));
+                }}
+                className={
+                  apartmentMode === "SINGLE"
+                    ? "flex-1 rounded bg-foreground px-3 py-1.5 text-sm text-background"
+                    : "flex-1 rounded px-3 py-1.5 text-sm text-muted"
+                }
+              >
                 Single apartment
               </button>
-              <button type="button" onClick={() => setApartmentMode("MULTIPLE")} className={apartmentMode === "MULTIPLE" ? "flex-1 rounded bg-foreground px-3 py-1.5 text-sm text-background" : "flex-1 rounded px-3 py-1.5 text-sm text-muted"}>
+              <button
+                type="button"
+                onClick={() => setApartmentMode("MULTIPLE")}
+                className={
+                  apartmentMode === "MULTIPLE"
+                    ? "flex-1 rounded bg-foreground px-3 py-1.5 text-sm text-background"
+                    : "flex-1 rounded px-3 py-1.5 text-sm text-muted"
+                }
+              >
                 Multiple apartments
               </button>
             </div>
@@ -357,34 +420,76 @@ export function NewBookingWorkspace({
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">Apartment {index + 1}</p>
                     {apartmentMode === "MULTIPLE" && stays.length > 1 ? (
-                      <button type="button" onClick={() => removeStay(index)} className="text-xs text-red-600">Remove</button>
+                      <button
+                        type="button"
+                        onClick={() => removeStay(index)}
+                        className="text-xs text-[var(--danger)]"
+                      >
+                        Remove
+                      </button>
                     ) : null}
                   </div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <input type="date" className="rounded-md border px-3 py-2 text-sm" value={stay.checkIn} onChange={(e) => updateStay(index, { checkIn: e.target.value })} required />
-                    <input type="time" className="rounded-md border px-3 py-2 text-sm" value={stay.checkInTime} onChange={(e) => updateStay(index, { checkInTime: e.target.value })} required />
-                    <input type="date" className="rounded-md border px-3 py-2 text-sm" value={stay.checkOut} onChange={(e) => updateStay(index, { checkOut: e.target.value })} required />
-                    <input type="time" className="rounded-md border px-3 py-2 text-sm" value={stay.checkOutTime} onChange={(e) => updateStay(index, { checkOutTime: e.target.value })} required />
+                    <input
+                      type="date"
+                      className="rounded-md border px-3 py-2 text-sm"
+                      value={stay.checkIn}
+                      onChange={(e) => updateStay(index, { checkIn: e.target.value })}
+                      required
+                    />
+                    <input
+                      type="time"
+                      className="rounded-md border px-3 py-2 text-sm"
+                      value={stay.checkInTime}
+                      onChange={(e) => updateStay(index, { checkInTime: e.target.value })}
+                      required
+                    />
+                    <input
+                      type="date"
+                      className="rounded-md border px-3 py-2 text-sm"
+                      value={stay.checkOut}
+                      onChange={(e) => updateStay(index, { checkOut: e.target.value })}
+                      required
+                    />
+                    <input
+                      type="time"
+                      className="rounded-md border px-3 py-2 text-sm"
+                      value={stay.checkOutTime}
+                      onChange={(e) => updateStay(index, { checkOutTime: e.target.value })}
+                      required
+                    />
                   </div>
                   {locationOptions.length > 0 ? (
                     <label className="mt-3 block text-sm text-muted">
                       Location
-                      <UiSelect className="mt-1" value={stay.propertyId} onChange={(e) => updateStay(index, { propertyId: e.target.value, unitId: "" })}>
+                      <UiSelect
+                        className="mt-1"
+                        value={stay.propertyId}
+                        onChange={(e) => updateStay(index, { propertyId: e.target.value, unitId: "" })}
+                      >
                         <option value="">All locations</option>
                         {locationOptions.map((l) => (
-                          <option key={l.id} value={l.id}>{l.label}</option>
+                          <option key={l.id} value={l.id}>
+                            {l.label}
+                          </option>
                         ))}
                       </UiSelect>
                     </label>
                   ) : null}
                   {!stay.checkIn || !stay.checkOut ? (
-                    <p className="mt-3 text-sm text-muted">Select check-in and check-out dates to see available apartments.</p>
+                    <p className="mt-3 text-sm text-muted">
+                      Select check-in and check-out dates to see available apartments.
+                    </p>
                   ) : stay.loading ? (
                     <p className="mt-3 text-sm text-muted">Loading available apartments…</p>
                   ) : (
                     <label className="mt-3 block text-sm text-muted">
                       Apartment <span className="text-xs">(optional — assign at check-in)</span>
-                      <UiSelect className="mt-1" value={stay.unitId} onChange={(e) => updateStay(index, { unitId: e.target.value })}>
+                      <UiSelect
+                        className="mt-1"
+                        value={stay.unitId}
+                        onChange={(e) => updateStay(index, { unitId: e.target.value })}
+                      >
                         <option value="">Assign later</option>
                         {stay.available.map((a) => (
                           <option key={a.id} value={a.id}>
@@ -394,13 +499,23 @@ export function NewBookingWorkspace({
                       </UiSelect>
                     </label>
                   )}
-                  {stay.checkIn && stay.checkOut && !stay.loading && stay.available.length === 0 && isWalkIn ? (
-                    <p className="mt-2 text-sm text-amber-700">No clean vacant apartments for these dates.</p>
+                  {stay.checkIn &&
+                  stay.checkOut &&
+                  !stay.loading &&
+                  stay.available.length === 0 &&
+                  isWalkIn ? (
+                    <p className="mt-2 text-sm text-[var(--warn)]">
+                      No clean vacant apartments for these dates.
+                    </p>
                   ) : null}
                 </div>
               ))}
               {apartmentMode === "MULTIPLE" ? (
-                <button type="button" onClick={addStay} className="w-full rounded-md border border-dashed border-foreground/20 px-3 py-2 text-sm text-muted hover:border-foreground/40">
+                <button
+                  type="button"
+                  onClick={addStay}
+                  className="w-full rounded-md border border-dashed border-foreground/20 px-3 py-2 text-sm text-muted hover:border-foreground/40"
+                >
                   + Add another apartment
                 </button>
               ) : null}
@@ -409,7 +524,13 @@ export function NewBookingWorkspace({
 
           <section className="rounded-lg border border-foreground/10 p-4">
             <h3 className="font-semibold">Notes</h3>
-            <textarea className="mt-3 w-full rounded-md border px-3 py-2 text-sm" rows={3} placeholder="Special requests or internal notes…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <textarea
+              className="mt-3 w-full rounded-md border px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Special requests or internal notes…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </section>
         </div>
 
@@ -419,54 +540,107 @@ export function NewBookingWorkspace({
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted">Room charges</dt>
-                <dd>{pricing.currency} {pricing.subtotal.toLocaleString()}</dd>
+                <dd>
+                  {pricing.currency} {pricing.subtotal.toLocaleString()}
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted">Caution fee</dt>
-                <dd>{pricing.currency} {pricing.cautionTotal.toLocaleString()}</dd>
+                <dd>
+                  {pricing.currency} {pricing.cautionTotal.toLocaleString()}
+                </dd>
               </div>
               <div className="flex justify-between border-t border-foreground/10 pt-2 font-semibold">
                 <dt>Total</dt>
-                <dd>{pricing.currency} {pricing.total.toLocaleString()}</dd>
+                <dd>
+                  {pricing.currency} {pricing.total.toLocaleString()}
+                </dd>
               </div>
             </dl>
           </section>
 
           <section className="rounded-lg border border-foreground/10 p-4">
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={collectPayment} onChange={(e) => setCollectPayment(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={collectPayment}
+                onChange={(e) => setCollectPayment(e.target.checked)}
+              />
               Record payment now
             </label>
             {collectPayment ? (
               <div className="mt-3 space-y-3">
-                <input type="number" min={0} className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Booking amount paid" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
-                <input type="number" min={0} className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Caution fee paid" value={cautionFeePaid} onChange={(e) => setCautionFeePaid(e.target.value)} />
-                <input type="date" className="w-full rounded-md border px-3 py-2 text-sm" value={paymentPaidAt} onChange={(e) => setPaymentPaidAt(e.target.value)} />
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Booking amount paid"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Caution fee paid"
+                  value={cautionFeePaid}
+                  onChange={(e) => setCautionFeePaid(e.target.value)}
+                />
+                <input
+                  type="date"
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  value={paymentPaidAt}
+                  onChange={(e) => setPaymentPaidAt(e.target.value)}
+                />
                 <label className="block text-sm text-muted">
                   Payment method
-                  <UiSelect className="mt-1" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                  <UiSelect
+                    className="mt-1"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  >
                     {PAYMENT_METHODS.map((m) => (
-                      <option key={m} value={m}>{m}</option>
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
                     ))}
                   </UiSelect>
                 </label>
-                <input className="w-full rounded-md border px-3 py-2 text-sm" placeholder="Reference (optional)" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} />
+                <input
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Reference (optional)"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                />
               </div>
             ) : null}
           </section>
 
           {bookingType === "PRIOR" ? (
             <label className="flex items-center gap-2 rounded-lg border border-foreground/10 p-4 text-sm">
-              <input type="checkbox" checked={checkInImmediately} onChange={(e) => setCheckInImmediately(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={checkInImmediately}
+                onChange={(e) => setCheckInImmediately(e.target.checked)}
+              />
               Check in immediately after booking
             </label>
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <button type="submit" disabled={isPending || !guestId} className="rounded-md bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-50">
+            <button
+              type="submit"
+              disabled={isPending || !guestId}
+              className="rounded-md bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-50"
+            >
               {bookingType === "WALK_IN" ? "Check in guest" : "Create booking"}
             </button>
-            <Link href={`/${tenantSlug}/shortlets/reservations`} className="text-center text-sm text-muted hover:text-foreground">Cancel</Link>
+            <Link
+              href={`/${tenantSlug}/shortlets/reservations`}
+              className="text-center text-sm text-muted hover:text-foreground"
+            >
+              Cancel
+            </Link>
           </div>
         </aside>
       </form>
@@ -474,7 +648,17 @@ export function NewBookingWorkspace({
   );
 }
 
-function TypeCard({ active, title, subtitle, onClick }: { active: boolean; title: string; subtitle: string; onClick: () => void }) {
+function TypeCard({
+  active,
+  title,
+  subtitle,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"

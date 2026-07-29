@@ -62,7 +62,7 @@ export function FileDropZone({
       className={[
         "relative cursor-pointer rounded-xl border-2 border-dashed px-6 py-10 text-center transition-all",
         dragOver
-          ? "border-violet-500 bg-violet-500/10 scale-[1.01]"
+          ? "border-[var(--accent-line)] bg-[var(--accent-wash)] scale-[1.01]"
           : "border-foreground/20 bg-foreground/[0.02] hover:border-foreground/35 hover:bg-foreground/[0.04]",
         disabled || uploading ? "pointer-events-none opacity-50" : "",
       ].join(" ")}

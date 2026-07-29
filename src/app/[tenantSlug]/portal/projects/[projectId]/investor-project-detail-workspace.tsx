@@ -6,7 +6,9 @@ import type { InvestorProjectDetail } from "@/lib/portal";
 
 function formatMoney(value: number, currency: string) {
   try {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(
+      value,
+    );
   } catch {
     return `${currency} ${value.toLocaleString()}`;
   }
@@ -61,7 +63,9 @@ export function InvestorProjectDetailWorkspace({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">{tenantName}</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">{project.projectName}</h1>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                {project.projectName}
+              </h1>
               {locationLine || project.locationAddress ? (
                 <p className="mt-1 flex items-center gap-1 text-sm text-muted">
                   <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -75,7 +79,9 @@ export function InvestorProjectDetailWorkspace({
               </span>
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                  project.isPublished ? "bg-emerald-500/10 text-emerald-600" : "bg-foreground/[0.06] text-muted"
+                  project.isPublished
+                    ? "bg-[var(--success-wash)] text-[var(--success)]"
+                    : "bg-foreground/[0.06] text-muted"
                 }`}
               >
                 {project.isPublished ? "Live listing" : "Private"}
@@ -87,7 +93,10 @@ export function InvestorProjectDetailWorkspace({
 
       {/* Your stake */}
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Your allocation" value={project.allocationAmount > 0 ? formatMoney(project.allocationAmount, project.currency) : "—"} />
+        <Stat
+          label="Your allocation"
+          value={project.allocationAmount > 0 ? formatMoney(project.allocationAmount, project.currency) : "—"}
+        />
         <Stat
           label="Share of pool"
           value={allocationShare > 0 ? `${allocationShare}%` : "—"}
@@ -111,12 +120,19 @@ export function InvestorProjectDetailWorkspace({
           <span className="font-medium text-foreground">{soldPct}% sold</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-foreground/[0.08]">
-          <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${soldPct}%` }} />
+          <div
+            className="h-full rounded-full bg-[var(--success)] transition-all"
+            style={{ width: `${soldPct}%` }}
+          />
         </div>
         <dl className="mt-4 grid grid-cols-3 gap-3">
           <MetricBox label="Invoiced" value={formatMoney(project.totalInvoiced, project.currency)} />
           <MetricBox label="Collected" value={formatMoney(project.totalCollected, project.currency)} />
-          <MetricBox label="Your earnings" value={formatMoney(project.yourEarnings, project.currency)} highlight />
+          <MetricBox
+            label="Your earnings"
+            value={formatMoney(project.yourEarnings, project.currency)}
+            highlight
+          />
         </dl>
       </section>
 
@@ -124,11 +140,16 @@ export function InvestorProjectDetailWorkspace({
       {project.description || project.amenities.length > 0 ? (
         <section className="mt-6 rounded-xl border border-foreground/10 p-5">
           <h2 className="text-sm font-semibold text-foreground">About this project</h2>
-          {project.description ? <p className="mt-2 text-sm leading-relaxed text-muted">{project.description}</p> : null}
+          {project.description ? (
+            <p className="mt-2 text-sm leading-relaxed text-muted">{project.description}</p>
+          ) : null}
           {project.amenities.length > 0 ? (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {project.amenities.map((a) => (
-                <span key={a} className="rounded-full border border-foreground/10 px-2.5 py-0.5 text-xs text-foreground">
+                <span
+                  key={a}
+                  className="rounded-full border border-foreground/10 px-2.5 py-0.5 text-xs text-foreground"
+                >
                   {a}
                 </span>
               ))}
@@ -174,7 +195,9 @@ export function InvestorProjectDetailWorkspace({
                   <tr key={payment.id} className="hover:bg-foreground/[0.02]">
                     <td className="px-4 py-2.5 whitespace-nowrap text-muted">{formatDate(payment.paidAt)}</td>
                     <td className="px-4 py-2.5 text-foreground">{payment.label}</td>
-                    <td className="px-4 py-2.5 text-right font-medium">{formatMoney(payment.amount, payment.currency)}</td>
+                    <td className="px-4 py-2.5 text-right font-medium">
+                      {formatMoney(payment.amount, payment.currency)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -211,11 +234,15 @@ function Stat({
   return (
     <div
       className={`rounded-xl border px-4 py-3.5 ${
-        highlight ? "border-emerald-500/25 bg-emerald-500/[0.06]" : "border-foreground/10 bg-foreground/[0.02]"
+        highlight
+          ? "border-[var(--success-line)] bg-[var(--success)]/[0.06]"
+          : "border-foreground/10 bg-foreground/[0.02]"
       }`}
     >
       <p className="text-xs text-muted">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${highlight ? "text-emerald-600" : "text-foreground"}`}>{value}</p>
+      <p className={`mt-1 text-lg font-semibold ${highlight ? "text-[var(--success)]" : "text-foreground"}`}>
+        {value}
+      </p>
       {hint ? <p className="mt-0.5 text-[11px] text-muted">{hint}</p> : null}
     </div>
   );
@@ -223,9 +250,15 @@ function Stat({
 
 function MetricBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-lg px-3 py-2.5 text-center ${highlight ? "bg-emerald-500/[0.06]" : "bg-foreground/[0.03]"}`}>
+    <div
+      className={`rounded-lg px-3 py-2.5 text-center ${highlight ? "bg-[var(--success)]/[0.06]" : "bg-foreground/[0.03]"}`}
+    >
       <dt className="text-[11px] text-muted">{label}</dt>
-      <dd className={`mt-0.5 text-sm font-semibold ${highlight ? "text-emerald-600" : "text-foreground"}`}>{value}</dd>
+      <dd
+        className={`mt-0.5 text-sm font-semibold ${highlight ? "text-[var(--success)]" : "text-foreground"}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

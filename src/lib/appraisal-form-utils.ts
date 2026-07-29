@@ -85,11 +85,11 @@ export function parseManagerAppraisalFormData(
     }
   }
   const overallRaw = fd.get("overallRating");
-  const overallRating =
-    overallRaw != null && String(overallRaw) !== "" ? Number(overallRaw) : undefined;
+  const overallRating = overallRaw != null && String(overallRaw) !== "" ? Number(overallRaw) : undefined;
   return {
     managerNotes: String(fd.get("managerNotes") || ""),
-    overallRating: overallRating != null && overallRating >= 0 && overallRating <= 5 ? overallRating : undefined,
+    overallRating:
+      overallRating != null && overallRating >= 0 && overallRating <= 5 ? overallRating : undefined,
     actionResponses,
   };
 }

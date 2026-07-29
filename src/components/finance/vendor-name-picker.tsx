@@ -118,8 +118,8 @@ export function VendorNamePicker({
 
       {isNewName ? (
         <p className="mt-1 text-xs text-muted">
-          <span className="font-medium text-foreground">{normalizedQuery}</span> is new — it will be saved when you record
-          the {newItemNoun === "category" ? "expense" : "bill"}.
+          <span className="font-medium text-foreground">{normalizedQuery}</span> is new — it will be saved
+          when you record the {newItemNoun === "category" ? "expense" : "bill"}.
           {onAddVendor ? (
             <>
               {" "}
@@ -194,7 +194,9 @@ export function VendorNamePicker({
 
       {showAll && vendors.length > 0 ? (
         <div className="mt-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-2">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">All saved {newItemNoun}s</p>
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+            All saved {newItemNoun}s
+          </p>
           <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
             {vendors.map((vendor) => (
               <button

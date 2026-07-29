@@ -32,11 +32,7 @@ function inviteErrorMessage(
   return "This invite link is invalid. Ask for a new invite.";
 }
 
-export default async function JoinPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}) {
+export default async function JoinPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token } = await searchParams;
   const invite = token
     ? await prisma.invitation.findUnique({

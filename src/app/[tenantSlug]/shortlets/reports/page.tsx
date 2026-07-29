@@ -33,10 +33,20 @@ export default async function ReportsPage({
   });
 
   const [units, reservations, payments, folioLines, businessDays, inHouseReservations] = await Promise.all([
-    prisma.shortletUnit.findMany({ where: { tenantId: ctx.tenant.id }, select: { housekeepingStatus: true } }),
+    prisma.shortletUnit.findMany({
+      where: { tenantId: ctx.tenant.id },
+      select: { housekeepingStatus: true },
+    }),
     prisma.shortletReservation.findMany({
       where: { tenantId: ctx.tenant.id },
-      select: { status: true, nights: true, totalAmount: true, checkIn: true, checkOut: true, balanceDue: true },
+      select: {
+        status: true,
+        nights: true,
+        totalAmount: true,
+        checkIn: true,
+        checkOut: true,
+        balanceDue: true,
+      },
     }),
     prisma.shortletPayment.findMany({
       where: { tenantId: ctx.tenant.id, paidAt: { gte: fromDate, lte: toDate } },
@@ -105,7 +115,9 @@ export default async function ReportsPage({
         return {
           id: d.id,
           dateLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(d.businessDate),
-          closedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(d.closedAt),
+          closedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+            d.closedAt,
+          ),
           occupancy: snap ? `${snap.summary.occupancyPercent}%` : "—",
           adr: snap ? snap.summary.adrLabel : "—",
           inHouse: snap ? String(snap.summary.inHouseCount) : "—",

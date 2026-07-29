@@ -19,11 +19,7 @@ function canManageFinance(
   return membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.FINANCE_MANAGER;
 }
 
-export default async function FinanceSettingsPage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function FinanceSettingsPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) notFound();
@@ -63,8 +59,13 @@ export default async function FinanceSettingsPage({
   const savedBanks = normalizeFinanceOptionList(tenant.settings?.financeBankAccounts);
   const savedModes = normalizeFinanceOptionList(tenant.settings?.financePaymentModes);
   const mergedModes =
-    savedModes.length > 0 ? Array.from(new Set([...DEFAULT_PAYMENT_MODES, ...savedModes])) : DEFAULT_PAYMENT_MODES;
-  const currenciesMerged = mergeCurrencyOptions(tenant.settings?.financeCurrencies, tenant.defaultCurrency || "NGN");
+    savedModes.length > 0
+      ? Array.from(new Set([...DEFAULT_PAYMENT_MODES, ...savedModes]))
+      : DEFAULT_PAYMENT_MODES;
+  const currenciesMerged = mergeCurrencyOptions(
+    tenant.settings?.financeCurrencies,
+    tenant.defaultCurrency || "NGN",
+  );
 
   const defaults = {
     financeBankAccounts: savedBanks,

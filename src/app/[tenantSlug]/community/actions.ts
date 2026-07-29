@@ -11,8 +11,7 @@ import { revalidatePath } from "next/cache";
 type ActionResult = { ok: true } | { ok: false; error: string };
 
 export type RotatePortalResult =
-  | { ok: true; rawToken: string; relativePath: string }
-  | { ok: false; error: string };
+  { ok: true; rawToken: string; relativePath: string } | { ok: false; error: string };
 
 function canManageCommunity(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
   return (
@@ -84,7 +83,10 @@ export async function createRealtorPartner(
   return { ok: true };
 }
 
-export async function rotateRealtorPortalToken(tenantSlug: string, partnerId: string): Promise<RotatePortalResult> {
+export async function rotateRealtorPortalToken(
+  tenantSlug: string,
+  partnerId: string,
+): Promise<RotatePortalResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 

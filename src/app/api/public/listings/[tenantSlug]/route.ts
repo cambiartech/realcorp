@@ -47,16 +47,11 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
 
   const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown";
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
   if (rateLimited(ip)) {
     return NextResponse.json(
       { ok: false, error: "Rate limit exceeded. Try again in a minute." },

@@ -36,8 +36,8 @@ type AnalyticsRow = {
 };
 
 function statusClass(status: LeadCaptureFormStatus) {
-  if (status === LeadCaptureFormStatus.ACTIVE) return "bg-emerald-500/10 text-emerald-700";
-  if (status === LeadCaptureFormStatus.PAUSED) return "bg-amber-500/10 text-amber-800";
+  if (status === LeadCaptureFormStatus.ACTIVE) return "bg-[var(--success-wash)] text-[var(--success)]";
+  if (status === LeadCaptureFormStatus.PAUSED) return "bg-[var(--warn-wash)] text-[var(--warn)]";
   return "bg-foreground/10 text-muted";
 }
 
@@ -80,7 +80,9 @@ export function CaptureFormsPanel({
 
   async function toggleStatus(form: CaptureFormRow) {
     const next =
-      form.status === LeadCaptureFormStatus.ACTIVE ? LeadCaptureFormStatus.PAUSED : LeadCaptureFormStatus.ACTIVE;
+      form.status === LeadCaptureFormStatus.ACTIVE
+        ? LeadCaptureFormStatus.PAUSED
+        : LeadCaptureFormStatus.ACTIVE;
     const result = await updateLeadCaptureFormStatus(tenantSlug, form.id, next);
     if (result.ok) {
       showSnackbar(`Form ${next === LeadCaptureFormStatus.ACTIVE ? "activated" : "paused"}.`, "success");
@@ -94,8 +96,8 @@ export function CaptureFormsPanel({
         <div>
           <h2 className="text-lg font-semibold">Capture forms</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Lead magnets for social bios, WhatsApp status, and community partners. Track views, partial fills, and
-            submissions with UTM attribution, location, device, and time-of-day.
+            Lead magnets for social bios, WhatsApp status, and community partners. Track views, partial fills,
+            and submissions with UTM attribution, location, device, and time-of-day.
           </p>
         </div>
         {canEdit ? (
@@ -110,7 +112,10 @@ export function CaptureFormsPanel({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Active forms", value: forms.filter((f) => f.status === LeadCaptureFormStatus.ACTIVE).length },
+          {
+            label: "Active forms",
+            value: forms.filter((f) => f.status === LeadCaptureFormStatus.ACTIVE).length,
+          },
           { label: "Total views", value: forms.reduce((s, f) => s + f.viewCount, 0) },
           { label: "Started", value: forms.reduce((s, f) => s + f.startCount, 0) },
           { label: "Submissions", value: forms.reduce((s, f) => s + f.submitCount, 0) },
@@ -140,7 +145,10 @@ export function CaptureFormsPanel({
                 <td colSpan={6} className="px-4 py-10 text-center text-muted">
                   No capture forms yet.{" "}
                   {canEdit ? (
-                    <Link href={`/${tenantSlug}/marketing/forms/new`} className="font-semibold text-foreground underline">
+                    <Link
+                      href={`/${tenantSlug}/marketing/forms/new`}
+                      className="font-semibold text-foreground underline"
+                    >
                       Create your first form
                     </Link>
                   ) : (
@@ -158,7 +166,9 @@ export function CaptureFormsPanel({
                     <td className="px-4 py-3">
                       <p className="font-medium">{form.name}</p>
                       <p className="text-xs text-muted">{form.title}</p>
-                      <code className="mt-1 block text-[11px] text-muted">{captureFormPublicPath(tenantSlug, form.slug)}</code>
+                      <code className="mt-1 block text-[11px] text-muted">
+                        {captureFormPublicPath(tenantSlug, form.slug)}
+                      </code>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted">
                       <p>
@@ -175,11 +185,17 @@ export function CaptureFormsPanel({
                       {stats?.topSource ? <p>Top source: {stats.topSource}</p> : null}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(form.status)}`}>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(form.status)}`}
+                      >
                         {formatEnumLabel(form.status)}
                       </span>
                       {canEdit ? (
-                        <button type="button" onClick={() => void toggleStatus(form)} className="ml-2 text-xs underline">
+                        <button
+                          type="button"
+                          onClick={() => void toggleStatus(form)}
+                          className="ml-2 text-xs underline"
+                        >
                           {form.status === LeadCaptureFormStatus.ACTIVE ? "Pause" : "Activate"}
                         </button>
                       ) : null}

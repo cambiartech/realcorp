@@ -7,8 +7,21 @@ import { UiSelect } from "@/components/ui-select";
 import { TenantPageShell } from "@/components/tenant-page-shell";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
-import { createWorkTask, createTaskSpace, deleteWorkTask, updateWorkTask, updateWorkTaskStatus } from "@/app/[tenantSlug]/tasks/actions";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
+import {
+  createWorkTask,
+  createTaskSpace,
+  deleteWorkTask,
+  updateWorkTask,
+  updateWorkTaskStatus,
+} from "@/app/[tenantSlug]/tasks/actions";
 
 export type TaskSpaceRow = {
   id: string;
@@ -56,17 +69,41 @@ const STATUS_COLUMNS: Array<{
   headerBg: string;
   headerText: string;
 }> = [
-  { id: "TODO", label: "To-do", dot: "bg-violet-500", headerBg: "bg-violet-50 dark:bg-violet-950/30", headerText: "text-violet-700 dark:text-violet-300" },
-  { id: "IN_PROGRESS", label: "In progress", dot: "bg-amber-500", headerBg: "bg-amber-50 dark:bg-amber-950/30", headerText: "text-amber-800 dark:text-amber-300" },
-  { id: "IN_REVIEW", label: "In review", dot: "bg-sky-500", headerBg: "bg-sky-50 dark:bg-sky-950/30", headerText: "text-sky-800 dark:text-sky-300" },
-  { id: "DONE", label: "Complete", dot: "bg-emerald-500", headerBg: "bg-emerald-50 dark:bg-emerald-950/30", headerText: "text-emerald-800 dark:text-emerald-300" },
+  {
+    id: "TODO",
+    label: "To-do",
+    dot: "bg-[var(--accent)]",
+    headerBg: "bg-[var(--accent-wash)] ",
+    headerText: "text-[var(--accent)] ",
+  },
+  {
+    id: "IN_PROGRESS",
+    label: "In progress",
+    dot: "bg-[var(--warn)]",
+    headerBg: "bg-[var(--warn-wash)] ",
+    headerText: "text-[var(--warn)] ",
+  },
+  {
+    id: "IN_REVIEW",
+    label: "In review",
+    dot: "bg-[var(--info)]",
+    headerBg: "bg-[var(--info-wash)] ",
+    headerText: "text-[var(--info)] ",
+  },
+  {
+    id: "DONE",
+    label: "Complete",
+    dot: "bg-[var(--success)]",
+    headerBg: "bg-[var(--success-wash)] ",
+    headerText: "text-[var(--success)] ",
+  },
 ];
 
 const PRIORITY_STYLE: Record<WorkTaskRow["priority"], string> = {
   LOW: "border-foreground/15 text-muted",
-  MEDIUM: "border-sky-300/50 text-sky-700 dark:text-sky-300",
-  HIGH: "border-amber-400/50 text-amber-800 dark:text-amber-300",
-  URGENT: "border-red-400/50 text-red-700 dark:text-red-300",
+  MEDIUM: "border-[var(--info-line)] text-[var(--info)] ",
+  HIGH: "border-[var(--warn-line)] text-[var(--warn)] ",
+  URGENT: "border-[var(--danger-line)] text-[var(--danger)] ",
 };
 
 function initials(label: string) {
@@ -123,7 +160,16 @@ export function TasksWorkspace({
     if (priorityFilter !== "all") rows = rows.filter((t) => t.priority === priorityFilter);
     if (projectFilter !== "all") rows = rows.filter((t) => t.projectId === projectFilter);
     return rows;
-  }, [tasks, viewTab, spaceFilter, assigneeFilter, statusFilter, priorityFilter, projectFilter, currentUserId]);
+  }, [
+    tasks,
+    viewTab,
+    spaceFilter,
+    assigneeFilter,
+    statusFilter,
+    priorityFilter,
+    projectFilter,
+    currentUserId,
+  ]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -271,7 +317,8 @@ export function TasksWorkspace({
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
           <p className="mt-1 max-w-xl text-sm text-muted">
-            Company work across teams — boards, sprints, and assignments. CRM follow-ups stay under Sales → Activities.
+            Company work across teams — boards, sprints, and assignments. CRM follow-ups stay under Sales →
+            Activities.
           </p>
         </div>
         <button
@@ -309,8 +356,14 @@ export function TasksWorkspace({
 
       <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
         <div className="min-w-[140px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">Assignee</label>
-          <UiSelect value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="text-sm">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Assignee
+          </label>
+          <UiSelect
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value)}
+            className="text-sm"
+          >
             <option value="all">All assignees</option>
             <option value="me">Assigned to me</option>
             <option value="unassigned">Unassigned</option>
@@ -322,8 +375,14 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[120px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">Status</label>
-          <UiSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-sm">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Status
+          </label>
+          <UiSelect
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-sm"
+          >
             <option value="all">All statuses</option>
             {STATUS_COLUMNS.map((s) => (
               <option key={s.id} value={s.id}>
@@ -333,8 +392,14 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[120px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">Priority</label>
-          <UiSelect value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="text-sm">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Priority
+          </label>
+          <UiSelect
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="text-sm"
+          >
             <option value="all">All priorities</option>
             <option value="LOW">Low</option>
             <option value="MEDIUM">Medium</option>
@@ -343,7 +408,9 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[140px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">Teamspace</label>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Teamspace
+          </label>
           <UiSelect value={spaceFilter} onChange={(e) => setSpaceFilter(e.target.value)} className="text-sm">
             <option value="all">All teamspaces</option>
             {spaces.map((s) => (
@@ -354,8 +421,14 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[140px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">Project</label>
-          <UiSelect value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="text-sm">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+            Project
+          </label>
+          <UiSelect
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="text-sm"
+          >
             <option value="all">All projects</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -383,11 +456,14 @@ export function TasksWorkspace({
 
       {viewTab === "sprint" ? (
         <p className="mt-3 text-xs text-muted">
-          Showing tasks tagged with a sprint label — demo sprint: <span className="font-medium text-foreground">{activeSprintLabel}</span>
+          Showing tasks tagged with a sprint label — demo sprint:{" "}
+          <span className="font-medium text-foreground">{activeSprintLabel}</span>
         </p>
       ) : null}
 
-      <div className={`mt-4 grid gap-3 overflow-x-auto pb-4 ${visibleColumns.length === 1 ? "max-w-sm" : visibleColumns.length === 2 ? "lg:grid-cols-2" : visibleColumns.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
+      <div
+        className={`mt-4 grid gap-3 overflow-x-auto pb-4 ${visibleColumns.length === 1 ? "max-w-sm" : visibleColumns.length === 2 ? "lg:grid-cols-2" : visibleColumns.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}
+      >
         {visibleColumns.map((col) => {
           const colTasks = tasksByStatus.get(col.id) || [];
           return (
@@ -395,10 +471,14 @@ export function TasksWorkspace({
               key={col.id}
               className="flex min-w-[240px] flex-col rounded-lg border border-foreground/10 bg-foreground/[0.02]"
             >
-              <header className={["flex items-center gap-2 rounded-t-lg px-3 py-2.5", col.headerBg].join(" ")}>
+              <header
+                className={["flex items-center gap-2 rounded-t-lg px-3 py-2.5", col.headerBg].join(" ")}
+              >
                 <span className={["h-2 w-2 rounded-full", col.dot].join(" ")} aria-hidden />
                 <h2 className={["text-sm font-semibold", col.headerText].join(" ")}>{col.label}</h2>
-                <span className={["ml-auto text-xs font-medium", col.headerText].join(" ")}>{colTasks.length}</span>
+                <span className={["ml-auto text-xs font-medium", col.headerText].join(" ")}>
+                  {colTasks.length}
+                </span>
               </header>
               <ul className="flex flex-1 flex-col gap-2 p-2">
                 {colTasks.length === 0 ? (
@@ -459,7 +539,7 @@ export function TasksWorkspace({
                           </span>
                         ) : null}
                         {task.sprintLabel ? (
-                          <span className="rounded-full border border-indigo-300/40 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                          <span className="rounded-full border border-[var(--info-line)] bg-[var(--info-wash)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--info)]">
                             {task.sprintLabel}
                           </span>
                         ) : null}
@@ -485,7 +565,9 @@ export function TasksWorkspace({
                           >
                             {initials(task.assigneeLabel)}
                           </span>
-                          <span className="max-w-[90px] truncate text-[11px] text-muted">{task.assigneeLabel}</span>
+                          <span className="max-w-[90px] truncate text-[11px] text-muted">
+                            {task.assigneeLabel}
+                          </span>
                         </div>
                         {task.dueDateLabel ? (
                           <span className="text-[10px] text-muted">{task.dueDateLabel}</span>
@@ -495,7 +577,9 @@ export function TasksWorkspace({
                         <UiSelect
                           value={task.status}
                           disabled={pending}
-                          onChange={(e) => handleStatusChange(task.id, e.target.value as WorkTaskRow["status"])}
+                          onChange={(e) =>
+                            handleStatusChange(task.id, e.target.value as WorkTaskRow["status"])
+                          }
                           className="text-xs"
                         >
                           {STATUS_COLUMNS.map((s) => (
@@ -530,7 +614,8 @@ export function TasksWorkspace({
           <div>
             <h3 className="text-sm font-semibold text-foreground">Teamspaces</h3>
             <p className="mt-1 text-xs text-muted">
-              Namespaces for departments or teams — Marketing, Finance, People, etc. Tasks can be tagged to a teamspace.
+              Namespaces for departments or teams — Marketing, Finance, People, etc. Tasks can be tagged to a
+              teamspace.
             </p>
           </div>
           {canManageSpaces ? (
@@ -564,335 +649,344 @@ export function TasksWorkspace({
 
       {taskToDelete ? (
         <ModalOverlay open onClose={() => setTaskToDelete(null)} panelClassName={MODAL_PANEL_XS}>
-            <h2 className="text-lg font-semibold text-foreground">Delete task?</h2>
-            <p className="mt-2 text-sm text-muted">
-              <span className="font-medium text-foreground">&ldquo;{taskToDelete.title}&rdquo;</span> will be removed permanently. This cannot be undone.
-            </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => setTaskToDelete(null)}
-                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={handleDeleteConfirm}
-                aria-busy={pending}
-                className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {pending ? <ButtonSpinner /> : null}
-                {pending ? "Deleting…" : "Delete task"}
-              </button>
-            </div>
+          <h2 className="text-lg font-semibold text-foreground">Delete task?</h2>
+          <p className="mt-2 text-sm text-muted">
+            <span className="font-medium text-foreground">&ldquo;{taskToDelete.title}&rdquo;</span> will be
+            removed permanently. This cannot be undone.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setTaskToDelete(null)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={handleDeleteConfirm}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Deleting…" : "Delete task"}
+            </button>
+          </div>
         </ModalOverlay>
       ) : null}
 
       {editingTask ? (
         <ModalOverlay open onClose={() => setEditingTask(null)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Edit task</h2>
-              <button
-                type="button"
-                onClick={() => setEditingTask(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
-                aria-label="Close"
-              >
-                ×
-              </button>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Edit task</h2>
+            <button
+              type="button"
+              onClick={() => setEditingTask(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+          <form action={handleEdit} className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Title</label>
+              <input
+                name="title"
+                required
+                defaultValue={editingTask.title}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
             </div>
-            <form action={handleEdit} className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Description (optional)</label>
+              <textarea
+                name="description"
+                rows={3}
+                defaultValue={editingTask.description || ""}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm text-muted">Title</label>
-                <input
-                  name="title"
-                  required
-                  defaultValue={editingTask.title}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Description (optional)</label>
-                <textarea
-                  name="description"
-                  rows={3}
-                  defaultValue={editingTask.description || ""}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Status</label>
-                  <UiSelect name="status" defaultValue={editingTask.status}>
-                    {STATUS_COLUMNS.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                    <option value="CANCELLED">Cancelled</option>
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Priority</label>
-                  <UiSelect name="priority" defaultValue={editingTask.priority}>
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Teamspace</label>
-                  <UiSelect
-                    name="spaceId"
-                    value={editSpaceId}
-                    onChange={(e) => setEditSpaceId(e.target.value)}
-                  >
-                    {spaces.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Project (optional)</label>
-                  <UiSelect name="projectId" defaultValue={editingTask.projectId || ""}>
-                    <option value="">None</option>
-                    {projectsForEditSpace.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.iconEmoji ? `${p.iconEmoji} ` : ""}
-                        {p.name}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
+                <label className="mb-1 block text-sm text-muted">Status</label>
+                <UiSelect name="status" defaultValue={editingTask.status}>
+                  {STATUS_COLUMNS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                  <option value="CANCELLED">Cancelled</option>
+                </UiSelect>
               </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Assignee</label>
-                <UiSelect name="assigneeUserId" defaultValue={editingTask.assigneeUserId || ""}>
-                  <option value="">Unassigned</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
+                <label className="mb-1 block text-sm text-muted">Priority</label>
+                <UiSelect name="priority" defaultValue={editingTask.priority}>
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </UiSelect>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Teamspace</label>
+                <UiSelect name="spaceId" value={editSpaceId} onChange={(e) => setEditSpaceId(e.target.value)}>
+                  {spaces.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
                     </option>
                   ))}
                 </UiSelect>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Due date</label>
-                  <input
-                    name="dueDate"
-                    type="date"
-                    defaultValue={editingTask.dueDateValue || ""}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Sprint label</label>
-                  <input
-                    name="sprintLabel"
-                    placeholder="Sprint 12"
-                    defaultValue={editingTask.sprintLabel || ""}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
-                  />
-                </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Project (optional)</label>
+                <UiSelect name="projectId" defaultValue={editingTask.projectId || ""}>
+                  <option value="">None</option>
+                  {projectsForEditSpace.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.iconEmoji ? `${p.iconEmoji} ` : ""}
+                      {p.name}
+                    </option>
+                  ))}
+                </UiSelect>
               </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setEditingTask(null)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-                >
-                  {pending ? <ButtonSpinner /> : null}
-                  {pending ? "Saving…" : "Save changes"}
-                </button>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Assignee</label>
+              <UiSelect name="assigneeUserId" defaultValue={editingTask.assigneeUserId || ""}>
+                <option value="">Unassigned</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Due date</label>
+                <input
+                  name="dueDate"
+                  type="date"
+                  defaultValue={editingTask.dueDateValue || ""}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
               </div>
-            </form>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Sprint label</label>
+                <input
+                  name="sprintLabel"
+                  placeholder="Sprint 12"
+                  defaultValue={editingTask.sprintLabel || ""}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditingTask(null)}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={pending}
+                aria-busy={pending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+              >
+                {pending ? <ButtonSpinner /> : null}
+                {pending ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </form>
         </ModalOverlay>
       ) : null}
 
-      <ModalOverlay open={isCreateOpen} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">New task</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
-                aria-label="Close"
+      <ModalOverlay
+        open={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        panelClassName={MODAL_PANEL_SM}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">New task</h2>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <form action={handleCreate} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-sm text-muted">Title</label>
+            <input
+              name="title"
+              required
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Description (optional)</label>
+            <textarea
+              name="description"
+              rows={3}
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Teamspace</label>
+              <UiSelect
+                name="spaceId"
+                value={createSpaceId}
+                onChange={(e) => setCreateSpaceId(e.target.value)}
               >
-                ×
-              </button>
+                {spaces.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </UiSelect>
             </div>
-            <form action={handleCreate} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-muted">Title</label>
-                <input
-                  name="title"
-                  required
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Description (optional)</label>
-                <textarea
-                  name="description"
-                  rows={3}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Teamspace</label>
-                  <UiSelect
-                    name="spaceId"
-                    value={createSpaceId}
-                    onChange={(e) => setCreateSpaceId(e.target.value)}
-                  >
-                    {spaces.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Project (optional)</label>
-                  <UiSelect name="projectId" defaultValue="">
-                    <option value="">None</option>
-                    {projectsForSpace.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.iconEmoji ? `${p.iconEmoji} ` : ""}
-                        {p.name}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Assignee</label>
-                  <UiSelect name="assigneeUserId" defaultValue={currentUserId}>
-                    <option value="">Unassigned</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Priority</label>
-                  <UiSelect name="priority" defaultValue="MEDIUM">
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Due date</label>
-                  <input name="dueDate" type="date" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Sprint label</label>
-                  <input
-                    name="sprintLabel"
-                    placeholder="Sprint 12"
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-                >
-                  {pending ? <ButtonSpinner /> : null}
-                  {pending ? "Saving…" : "Create task"}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Project (optional)</label>
+              <UiSelect name="projectId" defaultValue="">
+                <option value="">None</option>
+                {projectsForSpace.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.iconEmoji ? `${p.iconEmoji} ` : ""}
+                    {p.name}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Assignee</label>
+              <UiSelect name="assigneeUserId" defaultValue={currentUserId}>
+                <option value="">Unassigned</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Priority</label>
+              <UiSelect name="priority" defaultValue="MEDIUM">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </UiSelect>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Due date</label>
+              <input
+                name="dueDate"
+                type="date"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Sprint label</label>
+              <input
+                name="sprintLabel"
+                placeholder="Sprint 12"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Saving…" : "Create task"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
-      <ModalOverlay open={isCreateSpaceOpen} onClose={() => setIsCreateSpaceOpen(false)} panelClassName={MODAL_PANEL_XS}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Add teamspace</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateSpaceOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-muted">
-              e.g. Marketing, Finance, Legal — use this like a department or Notion teamspace.
-            </p>
-            <form action={handleCreateSpace} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-muted">Name</label>
-                <input
-                  name="name"
-                  required
-                  placeholder="Marketing"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Color</label>
-                <input
-                  name="color"
-                  type="color"
-                  defaultValue="#6366f1"
-                  className="h-10 w-full cursor-pointer rounded-md border border-foreground/15 bg-field"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateSpaceOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-                >
-                  {pending ? <ButtonSpinner /> : null}
-                  {pending ? "Saving…" : "Add teamspace"}
-                </button>
-              </div>
-            </form>
+      <ModalOverlay
+        open={isCreateSpaceOpen}
+        onClose={() => setIsCreateSpaceOpen(false)}
+        panelClassName={MODAL_PANEL_XS}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Add teamspace</h2>
+          <button
+            type="button"
+            onClick={() => setIsCreateSpaceOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          e.g. Marketing, Finance, Legal — use this like a department or Notion teamspace.
+        </p>
+        <form action={handleCreateSpace} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-sm text-muted">Name</label>
+            <input
+              name="name"
+              required
+              placeholder="Marketing"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Color</label>
+            <input
+              name="color"
+              type="color"
+              defaultValue="#6366f1"
+              className="h-10 w-full cursor-pointer rounded-md border border-foreground/15 bg-field"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateSpaceOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Saving…" : "Add teamspace"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
     </TenantPageShell>
   );

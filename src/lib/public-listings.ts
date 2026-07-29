@@ -119,7 +119,9 @@ export async function loadPublicListings(
   ]);
 
   let listings: PublicListing[] = projects.map((p) => {
-    const planPrices = p.pricingPlans.map((plan) => Number(plan.price)).filter((n) => Number.isFinite(n) && n > 0);
+    const planPrices = p.pricingPlans
+      .map((plan) => Number(plan.price))
+      .filter((n) => Number.isFinite(n) && n > 0);
     const base = p.basePrice != null ? Number(p.basePrice) : null;
     const allPrices = [...planPrices, ...(base != null && base > 0 ? [base] : [])];
     const unitsAvailable = p.units.filter((u) => u.status === "AVAILABLE").length;

@@ -2,8 +2,16 @@ import { z } from "zod";
 
 export const joinInviteSchema = z
   .object({
-    firstName: z.string().trim().min(2, "First name must be at least 2 characters.").max(40, "First name is too long."),
-    lastName: z.string().trim().min(2, "Last name must be at least 2 characters.").max(40, "Last name is too long."),
+    firstName: z
+      .string()
+      .trim()
+      .min(2, "First name must be at least 2 characters.")
+      .max(40, "First name is too long."),
+    lastName: z
+      .string()
+      .trim()
+      .min(2, "Last name must be at least 2 characters.")
+      .max(40, "Last name is too long."),
     password: z.string().min(8, "Password must be at least 8 characters."),
     confirmPassword: z.string().min(1, "Please confirm your password."),
   })
@@ -23,9 +31,7 @@ export function parseJoinForm(formData: FormData) {
   });
 }
 
-export function zodJoinIssuesToFieldRecord(
-  issues: z.ZodIssue[],
-): Partial<Record<JoinFieldName, string>> {
+export function zodJoinIssuesToFieldRecord(issues: z.ZodIssue[]): Partial<Record<JoinFieldName, string>> {
   const out: Partial<Record<JoinFieldName, string>> = {};
   for (const issue of issues) {
     const key = issue.path[0];

@@ -65,11 +65,15 @@ const NAV_ORDER: TenantNavKey[] = [
 
 const SALES_STACK: TenantNavKey[] = ["dashboard", "projects", "leads", "deals", "activities"];
 
+/** Investor portal menu — never shown to tenant staff / platform admins. */
+const INVESTOR_PORTAL_NAV: TenantNavKey[] = ["portal", "portalShortlets", "portalDocuments"];
+
+function withoutInvestorPortalNav(keys: TenantNavKey[]): TenantNavKey[] {
+  return keys.filter((k) => !INVESTOR_PORTAL_NAV.includes(k));
+}
+
 /** Roles that only ever see the stakeholder portal (investors / listing owners). */
-export const PORTAL_ONLY_ROLES: MembershipRole[] = [
-  MembershipRole.INVESTOR,
-  MembershipRole.LISTING_OWNER,
-];
+export const PORTAL_ONLY_ROLES: MembershipRole[] = [MembershipRole.INVESTOR, MembershipRole.LISTING_OWNER];
 
 export function isPortalOnlyRole(role: MembershipRole | null | undefined): boolean {
   return role != null && PORTAL_ONLY_ROLES.includes(role);
@@ -100,14 +104,14 @@ const GRANT_TO_NAV: Record<string, TenantNavKey> = {
 
 function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): TenantNavKey[] {
   if (isPlatformAdmin) {
-    return NAV_ORDER.filter((k) => k !== "portal");
+    return withoutInvestorPortalNav(NAV_ORDER);
   }
   switch (role) {
     case MembershipRole.INVESTOR:
     case MembershipRole.LISTING_OWNER:
       return ["portal", "portalShortlets", "portalDocuments", "settings"];
     case MembershipRole.ORG_ADMIN:
-      return NAV_ORDER.filter((k) => k !== "portal");
+      return withoutInvestorPortalNav(NAV_ORDER);
     case MembershipRole.FINANCE_MANAGER:
       return [...SALES_STACK, "clients", "shortlets", "tasks", "finance", "settings"];
     case MembershipRole.HR_MANAGER:
@@ -221,7 +225,11 @@ export function getVisibleNavKeys(opts: {
     keys = NAV_ORDER.filter((k) => set.has(k));
   }
   if (!isPlatformAdmin && r !== MembershipRole.ORG_ADMIN && !portalOnly) {
-    keys = applyUserModulePermissionsToNavKeys(keys, userModulePermissions, settings as Partial<TenantModuleFlags>);
+    keys = applyUserModulePermissionsToNavKeys(
+      keys,
+      userModulePermissions,
+      settings as Partial<TenantModuleFlags>,
+    );
   }
   if (portalOnly && settings.moduleShortLets) {
     const set = new Set(keys);
@@ -236,9 +244,6 @@ export function getVisibleNavKeys(opts: {
   return NAV_ORDER.filter((k) => keys.includes(k));
 }
 
-export function canAccessNavKey(
-  key: TenantNavKey,
-  opts: Parameters<typeof getVisibleNavKeys>[0],
-): boolean {
+export function canAccessNavKey(key: TenantNavKey, opts: Parameters<typeof getVisibleNavKeys>[0]): boolean {
   return getVisibleNavKeys(opts).includes(key);
 }

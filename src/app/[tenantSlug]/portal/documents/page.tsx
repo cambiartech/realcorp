@@ -7,11 +7,7 @@ import { InvestorDocumentsWorkspace } from "./investor-documents-workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function InvestorDocumentsPage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function InvestorDocumentsPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) notFound();
@@ -44,11 +40,19 @@ export default async function InvestorDocumentsPage({
     select: { role: true, status: true, modulePermissions: true },
   });
 
-  assertTenantNavAccess(session, membership, tenant.settings, "portalDocuments");
+  const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";
+  if (!isAdminViewer) {
+    assertTenantNavAccess(session, membership, tenant.settings, "portalDocuments");
+  }
 
   const documents = await loadInvestorClientDocuments(tenant.id, session.user.id);
 
   return (
-    <InvestorDocumentsWorkspace tenantSlug={tenantSlug} tenantName={tenant.name} documents={documents} />
+    <InvestorDocumentsWorkspace
+      tenantSlug={tenantSlug}
+      tenantName={tenant.name}
+      documents={documents}
+      isAdminViewer={isAdminViewer}
+    />
   );
 }

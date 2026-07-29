@@ -163,7 +163,9 @@ export default async function LeadDetailPage({
         unitLabel: d.unit?.label ?? "No unit",
         projectName: d.unit?.project?.name ?? "—",
         projectId: d.unit?.project?.id ?? null,
-        ownerLabel: d.assignedUserId ? (userMap.get(d.assignedUserId)?.name ?? userMap.get(d.assignedUserId)?.email ?? "Unknown") : "Unassigned",
+        ownerLabel: d.assignedUserId
+          ? (userMap.get(d.assignedUserId)?.name ?? userMap.get(d.assignedUserId)?.email ?? "Unknown")
+          : "Unassigned",
         createdAt: d.createdAt.toISOString().slice(0, 10),
       }))}
       users={userOptions}
@@ -172,23 +174,25 @@ export default async function LeadDetailPage({
       sourceOptions={sourceOptions}
       activities={activities}
       currentUserId={session.user.id}
-      whatsappMessages={whatsappMessages.map((m: {
-        id: string;
-        direction: string;
-        body: string;
-        timestamp: Date;
-        fromPhone: string | null;
-        toPhone: string | null;
-        status: string | null;
-      }) => ({
-        id: m.id,
-        direction: m.direction,
-        body: m.body,
-        timestamp: m.timestamp.toISOString(),
-        fromPhone: m.fromPhone,
-        toPhone: m.toPhone,
-        status: m.status,
-      }))}
+      whatsappMessages={whatsappMessages.map(
+        (m: {
+          id: string;
+          direction: string;
+          body: string;
+          timestamp: Date;
+          fromPhone: string | null;
+          toPhone: string | null;
+          status: string | null;
+        }) => ({
+          id: m.id,
+          direction: m.direction,
+          body: m.body,
+          timestamp: m.timestamp.toISOString(),
+          fromPhone: m.fromPhone,
+          toPhone: m.toPhone,
+          status: m.status,
+        }),
+      )}
     />
   );
 }

@@ -5,7 +5,9 @@ import type { InvestorShortletPortfolio } from "@/lib/portal";
 
 function formatMoney(value: number, currency: string) {
   try {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(
+      value,
+    );
   } catch {
     return `${currency} ${value.toLocaleString()}`;
   }
@@ -73,7 +75,7 @@ export function InvestorShortletsWorkspace({
                   <td className="px-4 py-3 text-right tabular-nums">
                     {formatMoney(unit.totalCollected, unit.currency)}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-emerald-600">
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--success)]">
                     {formatMoney(unit.yourEarnings, unit.currency)}
                   </td>
                 </tr>
@@ -86,24 +88,23 @@ export function InvestorShortletsWorkspace({
   );
 }
 
-function StatCard({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
+function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div
       className={[
         "rounded-xl border px-4 py-3",
-        highlight ? "border-emerald-500/20 bg-emerald-500/[0.06]" : "border-foreground/10 bg-foreground/[0.02]",
+        highlight
+          ? "border-[var(--success-line)] bg-[var(--success)]/[0.06]"
+          : "border-foreground/10 bg-foreground/[0.02]",
       ].join(" ")}
     >
       <p className="text-xs text-muted">{label}</p>
-      <p className={["mt-1 text-xl font-semibold", highlight ? "text-emerald-600" : "text-foreground"].join(" ")}>
+      <p
+        className={[
+          "mt-1 text-xl font-semibold",
+          highlight ? "text-[var(--success)]" : "text-foreground",
+        ].join(" ")}
+      >
         {value}
       </p>
     </div>

@@ -85,7 +85,9 @@ export function TagInput({
         />
       </div>
       <input type="hidden" name={name} value={JSON.stringify(tags)} />
-      <p className="mt-1 text-[11px] text-muted">Press Enter to add each amenity. Backspace removes the last tag.</p>
+      <p className="mt-1 text-[11px] text-muted">
+        Press Enter to add each amenity. Backspace removes the last tag.
+      </p>
     </div>
   );
 }

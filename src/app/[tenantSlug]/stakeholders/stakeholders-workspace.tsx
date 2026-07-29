@@ -218,9 +218,7 @@ export function StakeholdersWorkspace({
                   className="rounded-full border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground transition-colors hover:border-foreground/30 hover:bg-foreground/[0.04]"
                 >
                   {project.name}
-                  {count > 0 ? (
-                    <span className="ml-1.5 text-xs text-muted">({count})</span>
-                  ) : null}
+                  {count > 0 ? <span className="ml-1.5 text-xs text-muted">({count})</span> : null}
                 </button>
               );
             })}
@@ -241,15 +239,7 @@ export function StakeholdersWorkspace({
   );
 }
 
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: string;
-}) {
+function StatTile({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string }) {
   return (
     <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] px-4 py-3.5">
       <div className="flex items-center gap-2 text-muted">
@@ -317,7 +307,9 @@ function StakeholdersManageModal({
                 <p className="text-sm font-medium text-foreground">{stake.label}</p>
                 <p className="text-xs text-muted">
                   {STAKE_TYPE_LABEL[stake.type]}
-                  {stake.investmentAmount != null ? ` · ₦${formatMoney(stake.investmentAmount)} allocation` : ""}
+                  {stake.investmentAmount != null
+                    ? ` · ₦${formatMoney(stake.investmentAmount)} allocation`
+                    : ""}
                 </p>
               </div>
               <button

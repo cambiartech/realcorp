@@ -1,7 +1,14 @@
 "use client";
 
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { DataExportMenu } from "@/components/shortlets/data-export-menu";
@@ -13,12 +20,7 @@ import { getEntityTimelineLogs } from "../finance/actions";
 import { ListingEditorModal } from "@/components/listing-editor-modal";
 import { ListingImageUpload } from "@/components/listing-image-upload";
 import { AddStakeholderForm } from "@/components/stakeholders/add-stakeholder-form";
-import {
-  createProject,
-  deleteProject,
-  removeProjectStakeholder,
-  updateProject,
-} from "./actions";
+import { createProject, deleteProject, removeProjectStakeholder, updateProject } from "./actions";
 
 type ProjectRow = {
   id: string;
@@ -173,10 +175,7 @@ export function ProjectsWorkspace({
   );
 
   const inventoryBreakdown = useMemo(
-    () =>
-      projects
-        .map((p) => ({ label: p.name, value: p.unitsCount }))
-        .sort((a, b) => b.value - a.value),
+    () => projects.map((p) => ({ label: p.name, value: p.unitsCount })).sort((a, b) => b.value - a.value),
     [projects],
   );
 
@@ -244,7 +243,7 @@ export function ProjectsWorkspace({
               ))}
               <Link
                 href={`/${tenantSlug}/projects`}
-                className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2"
+                className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
               >
                 Clear filters
               </Link>
@@ -289,57 +288,65 @@ export function ProjectsWorkspace({
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+      <div className="rc-card mt-5 overflow-hidden">
+        <table className="rc-table">
+          <thead>
             <tr>
-              <th className="px-4 py-3">Project</th>
-              <th className="px-4 py-3">Base price</th>
-              <th className="px-4 py-3">Units</th>
-              <th className="px-4 py-3">Listing</th>
-              <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3">Actions</th>
+              <th>Project</th>
+              <th>Base price</th>
+              <th>Units</th>
+              <th>Listing</th>
+              <th>Created</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-foreground/10">
+          <tbody>
             {projects.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-sm text-muted">
-                  No projects yet.
+                <td colSpan={6}>
+                  <div className="rc-empty my-2 border-0 bg-transparent">
+                    <p className="rc-empty-title">No projects yet</p>
+                    <p className="rc-empty-body">Create your first project to start tracking units, pricing and availability.</p>
+                  </div>
                 </td>
               </tr>
             ) : (
               projects.map((project) => (
                 <tr key={project.id}>
-                  <td className="px-4 py-3 font-medium text-foreground">{project.name}</td>
-                  <td className="px-4 py-3 text-muted">
-                    {project.basePrice != null ? `${project.currency} ${project.basePrice.toLocaleString()}` : "—"}
+                  <td className="font-medium">{project.name}</td>
+                  <td className={project.basePrice == null ? "nil" : undefined}>
+                    {project.basePrice != null
+                      ? `${project.currency} ${project.basePrice.toLocaleString()}`
+                      : "Not set"}
                   </td>
-                  <td className="px-4 py-3 text-muted">{project.unitsCount}</td>
-                  <td className="px-4 py-3">
+                  <td className="num">{project.unitsCount}</td>
+                  <td>
                     {project.isPublished ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                      <span className="rc-pill rc-pill-success">
                         Published
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.06] px-2.5 py-0.5 text-xs font-semibold text-muted">
+                      <span className="rc-pill rc-pill-neutral">
                         Hidden
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-muted">{project.createdAt}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-3">
+                  <td className="text-[var(--muted)]">{project.createdAt}</td>
+                  {/* One clear primary action; the rest stay quiet until you're
+                      on the row, so the table reads as data rather than a wall
+                      of links. */}
+                  <td>
+                    <div className="rc-row-actions flex-wrap justify-end">
                       <Link
                         href={`/${tenantSlug}/projects/${project.id}`}
-                        className="text-sm font-medium text-foreground underline decoration-foreground/20 underline-offset-2"
+                        className="rc-btn rc-btn-secondary rc-btn-sm !opacity-100"
                       >
                         Open units
                       </Link>
                       <button
                         type="button"
                         onClick={() => openTimeline(project)}
-                        className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                        className="rc-btn rc-btn-ghost rc-btn-sm"
                       >
                         Timeline
                       </button>
@@ -349,7 +356,7 @@ export function ProjectsWorkspace({
                             <button
                               type="button"
                               onClick={() => setListingProject(project)}
-                              className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                              className="rc-btn rc-btn-ghost rc-btn-sm"
                             >
                               Listing
                             </button>
@@ -358,7 +365,7 @@ export function ProjectsWorkspace({
                             <button
                               type="button"
                               onClick={() => setStakeholderProject(project)}
-                              className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                              className="rc-btn rc-btn-ghost rc-btn-sm"
                             >
                               Stakeholders
                               {stakeholders.some((s) => s.projectId === project.id)
@@ -369,14 +376,15 @@ export function ProjectsWorkspace({
                           <button
                             type="button"
                             onClick={() => setEditingProject(project)}
-                            className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                            className="rc-btn rc-btn-ghost rc-btn-sm"
                           >
                             Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => setDeletingProject(project)}
-                            className="text-xs text-error underline decoration-error/40 underline-offset-2"
+                            className="rc-btn rc-btn-ghost rc-btn-sm text-[var(--danger)] hover:bg-[var(--danger-wash)]"
+                            aria-label={`Delete ${project.name}`}
                           >
                             Delete
                           </button>
@@ -391,193 +399,197 @@ export function ProjectsWorkspace({
         </table>
       </div>
 
-      <ModalOverlay open={Boolean(isCreateOpen)} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Create project</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+      <ModalOverlay
+        open={Boolean(isCreateOpen)}
+        onClose={() => setIsCreateOpen(false)}
+        panelClassName={MODAL_PANEL_SM}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Create project</h2>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <form ref={formRef} noValidate onSubmit={submitCreateProject} className="mt-4 space-y-4">
+          {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
+          <div>
+            <label htmlFor="project-name" className="mb-1 block text-sm text-muted">
+              Project name
+            </label>
+            <input
+              id="project-name"
+              name="name"
+              placeholder="e.g. BO Gardens Phase 1"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+            {nameError ? <FormFieldError>{nameError}</FormFieldError> : null}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="project-base-price" className="mb-1 block text-sm text-muted">
+                Base price (optional)
+              </label>
+              <input
+                id="project-base-price"
+                name="basePrice"
+                inputMode="decimal"
+                placeholder="e.g. 70000000"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
             </div>
+            <div>
+              <label htmlFor="project-currency" className="mb-1 block text-sm text-muted">
+                Currency
+              </label>
+              <CurrencySelect
+                id="project-currency"
+                currencies={currencies}
+                defaultCurrency={defaultCurrency}
+              />
+            </div>
+          </div>
 
-            <form ref={formRef} noValidate onSubmit={submitCreateProject} className="mt-4 space-y-4">
-              {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
-              <div>
-                <label htmlFor="project-name" className="mb-1 block text-sm text-muted">
-                  Project name
-                </label>
-                <input
-                  id="project-name"
-                  name="name"
-                  placeholder="e.g. BO Gardens Phase 1"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-                {nameError ? <FormFieldError>{nameError}</FormFieldError> : null}
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="project-base-price" className="mb-1 block text-sm text-muted">
-                    Base price (optional)
-                  </label>
-                  <input
-                    id="project-base-price"
-                    name="basePrice"
-                    inputMode="decimal"
-                    placeholder="e.g. 70000000"
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="project-currency" className="mb-1 block text-sm text-muted">
-                    Currency
-                  </label>
-                  <CurrencySelect
-                    id="project-currency"
-                    currencies={currencies}
-                    defaultCurrency={defaultCurrency}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {pending ? <ButtonSpinner /> : null}
-                  {pending ? "Creating project..." : "Create project"}
-                </button>
-              </div>
-            </form>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Creating project..." : "Create project"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
       {editingProject ? (
         <ModalOverlay open onClose={() => setEditingProject(null)} panelClassName={MODAL_PANEL_LG}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Edit project</h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Edit project</h2>
+            <button
+              type="button"
+              onClick={() => setEditingProject(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              aria-label="Close modal"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+          <form ref={editFormRef} noValidate onSubmit={submitEditProject} className="mt-4 space-y-4">
+            {editState && !editState.ok ? <FormAlert>{editState.error}</FormAlert> : null}
+            <div>
+              <label htmlFor="project-edit-name" className="mb-1 block text-sm text-muted">
+                Project name
+              </label>
+              <input
+                id="project-edit-name"
+                name="name"
+                defaultValue={editingProject.name}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+              {editNameError ? <FormFieldError>{editNameError}</FormFieldError> : null}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="project-edit-base-price" className="mb-1 block text-sm text-muted">
+                  Base price (optional)
+                </label>
+                <input
+                  id="project-edit-base-price"
+                  name="basePrice"
+                  inputMode="decimal"
+                  defaultValue={editingProject.basePrice != null ? String(editingProject.basePrice) : ""}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div>
+                <label htmlFor="project-edit-currency" className="mb-1 block text-sm text-muted">
+                  Currency
+                </label>
+                <CurrencySelect
+                  id="project-edit-currency"
+                  currencies={currencies}
+                  defaultCurrency={defaultCurrency}
+                  defaultValue={editingProject.currency}
+                />
+              </div>
+            </div>
+
+            <ListingImageUpload
+              tenantSlug={tenantSlug}
+              projectId={editingProject.id}
+              coverUrl={editCoverUrl}
+              galleryUrls={editGalleryUrls}
+              onCoverChange={setEditCoverUrl}
+              onGalleryChange={setEditGalleryUrls}
+            />
+
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setEditingProject(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-            <form ref={editFormRef} noValidate onSubmit={submitEditProject} className="mt-4 space-y-4">
-              {editState && !editState.ok ? <FormAlert>{editState.error}</FormAlert> : null}
-              <div>
-                <label htmlFor="project-edit-name" className="mb-1 block text-sm text-muted">
-                  Project name
-                </label>
-                <input
-                  id="project-edit-name"
-                  name="name"
-                  defaultValue={editingProject.name}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-                {editNameError ? <FormFieldError>{editNameError}</FormFieldError> : null}
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="project-edit-base-price" className="mb-1 block text-sm text-muted">
-                    Base price (optional)
-                  </label>
-                  <input
-                    id="project-edit-base-price"
-                    name="basePrice"
-                    inputMode="decimal"
-                    defaultValue={editingProject.basePrice != null ? String(editingProject.basePrice) : ""}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="project-edit-currency" className="mb-1 block text-sm text-muted">
-                    Currency
-                  </label>
-                  <CurrencySelect
-                    id="project-edit-currency"
-                    currencies={currencies}
-                    defaultCurrency={defaultCurrency}
-                    defaultValue={editingProject.currency}
-                  />
-                </div>
-              </div>
-
-              <ListingImageUpload
-                tenantSlug={tenantSlug}
-                projectId={editingProject.id}
-                coverUrl={editCoverUrl}
-                galleryUrls={editGalleryUrls}
-                onCoverChange={setEditCoverUrl}
-                onGalleryChange={setEditGalleryUrls}
-              />
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingProject(null)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editPending}
-                  aria-busy={editPending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {editPending ? <ButtonSpinner /> : null}
-                  {editPending ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-            </form>
-        </ModalOverlay>
-      ) : null}
-
-      {deletingProject ? (
-        <ModalOverlay open onClose={() => setDeletingProject(null)} panelClassName={MODAL_PANEL_SM}>
-            <h2 className="text-lg font-semibold text-foreground">Delete project?</h2>
-            <p className="mt-2 text-sm text-muted">
-              This will remove <strong className="text-foreground">{deletingProject.name}</strong> only if it has no
-              units.
-            </p>
-            {deleteState && !deleteState.ok ? <FormAlert>{deleteState.error}</FormAlert> : null}
-            <form action={deleteAction} className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeletingProject(null)}
                 className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={deletePending}
-                aria-busy={deletePending}
-                className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                disabled={editPending}
+                aria-busy={editPending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {deletePending ? <ButtonSpinner /> : null}
-                {deletePending ? "Deleting..." : "Delete"}
+                {editPending ? <ButtonSpinner /> : null}
+                {editPending ? "Saving..." : "Save changes"}
               </button>
-            </form>
+            </div>
+          </form>
+        </ModalOverlay>
+      ) : null}
+
+      {deletingProject ? (
+        <ModalOverlay open onClose={() => setDeletingProject(null)} panelClassName={MODAL_PANEL_SM}>
+          <h2 className="text-lg font-semibold text-foreground">Delete project?</h2>
+          <p className="mt-2 text-sm text-muted">
+            This will remove <strong className="text-foreground">{deletingProject.name}</strong> only if it
+            has no units.
+          </p>
+          {deleteState && !deleteState.ok ? <FormAlert>{deleteState.error}</FormAlert> : null}
+          <form action={deleteAction} className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDeletingProject(null)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={deletePending}
+              aria-busy={deletePending}
+              className="inline-flex items-center gap-2 rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {deletePending ? <ButtonSpinner /> : null}
+              {deletePending ? "Deleting..." : "Delete"}
+            </button>
+          </form>
         </ModalOverlay>
       ) : null}
 
@@ -610,38 +622,38 @@ export function ProjectsWorkspace({
           variant="drawer"
           panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-foreground/[0.02] p-4 shadow-2xl"
         >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Project Timeline</h2>
-                <p className="text-xs text-muted">{timelineProject.name}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTimelineProject(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close timeline"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Project Timeline</h2>
+              <p className="text-xs text-muted">{timelineProject.name}</p>
             </div>
-            {timelineLoading ? (
-              <p className="mt-4 text-sm text-muted">Loading timeline...</p>
-            ) : timelineLogs.length === 0 ? (
-              <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
-            ) : (
-              <ul className="mt-4 space-y-2">
-                {timelineLogs.map((log) => (
-                  <li key={log.id} className="rounded-md border border-foreground/10 p-3">
-                    <p className="text-xs text-muted">{log.timestamp}</p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
-                    <p className="text-xs text-muted">By: {log.actor}</p>
-                    <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <button
+              type="button"
+              onClick={() => setTimelineProject(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              aria-label="Close timeline"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+          {timelineLoading ? (
+            <p className="mt-4 text-sm text-muted">Loading timeline...</p>
+          ) : timelineLogs.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {timelineLogs.map((log) => (
+                <li key={log.id} className="rounded-md border border-foreground/10 p-3">
+                  <p className="text-xs text-muted">{log.timestamp}</p>
+                  <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
+                  <p className="text-xs text-muted">By: {log.actor}</p>
+                  <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </ModalOverlay>
       ) : null}
     </div>
@@ -689,7 +701,8 @@ function StakeholdersModal({
         <div>
           <h2 className="text-lg font-semibold text-foreground">Stakeholders</h2>
           <p className="text-xs text-muted">
-            {project.name} — investors and listing owners see this project (and their earnings share) in their portal.
+            {project.name} — investors and listing owners see this project (and their earnings share) in their
+            portal.
           </p>
         </div>
         <button
@@ -772,8 +785,8 @@ function ShareExploreModal({ tenantSlug, onClose }: { tenantSlug: string; onClos
         <div>
           <h2 className="text-lg font-semibold text-foreground">Explore page &amp; embed</h2>
           <p className="text-xs text-muted">
-            Share your public listings page, embed it on any website or blog, or pull listings into ads via the API.
-            Only projects marked <strong className="text-foreground">Published</strong> appear.
+            Share your public listings page, embed it on any website or blog, or pull listings into ads via
+            the API. Only projects marked <strong className="text-foreground">Published</strong> appear.
           </p>
         </div>
         <button
@@ -789,9 +802,24 @@ function ShareExploreModal({ tenantSlug, onClose }: { tenantSlug: string; onClos
       </div>
 
       <div className="mt-4 space-y-4">
-        <ShareRow label="Public Explore page" value={exploreUrl} onCopy={() => copy(exploreUrl, "Link")} openHref={exploreUrl} />
-        <ShareRow label="Embed code (iframe)" value={iframeSnippet} onCopy={() => copy(iframeSnippet, "Embed code")} mono />
-        <ShareRow label="JSON API (for ads / custom sites)" value={apiUrl} onCopy={() => copy(apiUrl, "API URL")} mono />
+        <ShareRow
+          label="Public Explore page"
+          value={exploreUrl}
+          onCopy={() => copy(exploreUrl, "Link")}
+          openHref={exploreUrl}
+        />
+        <ShareRow
+          label="Embed code (iframe)"
+          value={iframeSnippet}
+          onCopy={() => copy(iframeSnippet, "Embed code")}
+          mono
+        />
+        <ShareRow
+          label="JSON API (for ads / custom sites)"
+          value={apiUrl}
+          onCopy={() => copy(apiUrl, "API URL")}
+          mono
+        />
         <p className="text-[11px] text-muted">
           API supports <code className="font-mono">?q=</code>, <code className="font-mono">?city=</code>,{" "}
           <code className="font-mono">?purpose=SALE|SHORT_LET|RENTAL</code>,{" "}

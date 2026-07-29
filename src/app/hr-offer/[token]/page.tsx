@@ -33,7 +33,11 @@ export default async function HrOfferSignPage({ params }: { params: Promise<{ to
     },
   });
   if (!offer) notFound();
-  if (offer.tokenExpiresAt && offer.tokenExpiresAt < new Date() && offer.status !== HrOfferLetterStatus.SIGNED) {
+  if (
+    offer.tokenExpiresAt &&
+    offer.tokenExpiresAt < new Date() &&
+    offer.status !== HrOfferLetterStatus.SIGNED
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-center text-sm text-slate-600">
         This offer link has expired. Contact HR for a new link.
@@ -43,7 +47,9 @@ export default async function HrOfferSignPage({ params }: { params: Promise<{ to
 
   const brand = brandingFromSettings(offer.tenant.name, offer.tenant.settings);
   const signedAtLabel = offer.candidateSignedAt
-    ? new Intl.DateTimeFormat("en-NG", { dateStyle: "long", timeStyle: "short" }).format(offer.candidateSignedAt)
+    ? new Intl.DateTimeFormat("en-NG", { dateStyle: "long", timeStyle: "short" }).format(
+        offer.candidateSignedAt,
+      )
     : undefined;
 
   return (

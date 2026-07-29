@@ -25,8 +25,8 @@ export function HrMonthlyScoresPanel({
           Composite score per employee for the selected month — combines{" "}
           <strong className="font-medium text-foreground">manager-confirmed appraisal</strong>,{" "}
           <strong className="font-medium text-foreground">task delivery</strong>, and{" "}
-          <strong className="font-medium text-foreground">department KPIs</strong> (e.g. sales leads &
-          closed deals, marketing outreach, goal progress for ops/HR).
+          <strong className="font-medium text-foreground">department KPIs</strong> (e.g. sales leads & closed
+          deals, marketing outreach, goal progress for ops/HR).
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <label className="text-xs font-medium text-muted">
@@ -115,8 +115,9 @@ export function HrMonthlyScoresPanel({
       )}
 
       <p className="text-[10px] text-muted">
-        Weights vary by department — Sales leans on leads &amp; deals; Marketing on leads &amp; activities; other
-        teams on goals &amp; task delivery. Yearly appraisals are archived separately under Yearly archive.
+        Weights vary by department — Sales leans on leads &amp; deals; Marketing on leads &amp; activities;
+        other teams on goals &amp; task delivery. Yearly appraisals are archived separately under Yearly
+        archive.
       </p>
     </div>
   );

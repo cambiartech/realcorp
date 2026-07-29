@@ -124,7 +124,8 @@ function GuarantorPrint() {
         <PrintFieldRow label="Known employee for (years)" />
       </FormSection>
       <p className="text-xs leading-relaxed text-slate-600">
-        I confirm that I act as guarantor for the employee named above and accept responsibility as outlined in company policy.
+        I confirm that I act as guarantor for the employee named above and accept responsibility as outlined
+        in company policy.
       </p>
     </>
   );

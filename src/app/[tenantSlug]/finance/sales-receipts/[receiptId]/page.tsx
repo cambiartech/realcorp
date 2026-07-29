@@ -62,10 +62,7 @@ export default async function SalesReceiptDetailPage({
 
   const brand = brandingFromSettings(tenant.name, tenant.settings);
   const customerName =
-    receipt.customerName ||
-    receipt.deal?.propertyClient?.fullName ||
-    receipt.deal?.lead?.name ||
-    "—";
+    receipt.customerName || receipt.deal?.propertyClient?.fullName || receipt.deal?.lead?.name || "—";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8">
@@ -103,7 +100,9 @@ export default async function SalesReceiptDetailPage({
         sentToEmail={receipt.sentToEmail}
         sentAtLabel={
           receipt.sentAt
-            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(receipt.sentAt)
+            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+                receipt.sentAt,
+              )
             : null
         }
       />

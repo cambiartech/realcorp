@@ -36,7 +36,10 @@ export function averageSelfRatings(scores: AppraisalActionScores, actionIds: str
   return Math.round(avg * 10) / 10;
 }
 
-export function averageConfirmedRatings(scores: AppraisalActionScores, actionIds: string[]): number | undefined {
+export function averageConfirmedRatings(
+  scores: AppraisalActionScores,
+  actionIds: string[],
+): number | undefined {
   const values = actionIds
     .map((id) => getManagerRating(scores[id]))
     .filter((v): v is number => v != null && v >= 0);

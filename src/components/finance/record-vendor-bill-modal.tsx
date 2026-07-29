@@ -63,7 +63,12 @@ export function RecordVendorBillModal({
   const titleTouched = useRef(false);
 
   const autoTitle = useMemo(
-    () => buildVendorBillTitle(vendorName, dueDate ? new Date(`${dueDate}T12:00:00`) : null, isRecurring ? frequency : null),
+    () =>
+      buildVendorBillTitle(
+        vendorName,
+        dueDate ? new Date(`${dueDate}T12:00:00`) : null,
+        isRecurring ? frequency : null,
+      ),
     [vendorName, dueDate, isRecurring, frequency],
   );
 
@@ -82,7 +87,10 @@ export function RecordVendorBillModal({
     const periods = recurrencePeriodsInRange(vendorName, anchor, frequency, range);
     return {
       count: periods.length,
-      description: periods.length > 0 ? describeRecurrenceRange(range, frequency, periods.length) : "No bills in this range — adjust dates or count.",
+      description:
+        periods.length > 0
+          ? describeRecurrenceRange(range, frequency, periods.length)
+          : "No bills in this range — adjust dates or count.",
     };
   }, [isRecurring, dueDate, rangeMode, rangeEndDate, periodCount, fiscalYear, vendorName, frequency]);
 
@@ -117,7 +125,9 @@ export function RecordVendorBillModal({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Record vendor bill</h2>
-            <p className="mt-0.5 text-xs text-muted">Recurring schedules are calculated from your date range — nothing is fixed.</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Recurring schedules are calculated from your date range — nothing is fixed.
+            </p>
           </div>
           <button
             type="button"
@@ -167,7 +177,9 @@ export function RecordVendorBillModal({
             />
             <span>
               <span className="block text-sm font-medium text-foreground">Recurring bill</span>
-              <span className="text-xs text-muted">Daily, weekly, or monthly — for as long as you define below.</span>
+              <span className="text-xs text-muted">
+                Daily, weekly, or monthly — for as long as you define below.
+              </span>
             </span>
           </label>
 
@@ -178,7 +190,9 @@ export function RecordVendorBillModal({
                 <UiSelect
                   name="recurrenceFrequency"
                   value={frequency}
-                  onChange={(e) => setFrequency((e.target.value as VendorBillRecurrenceFrequency) || "MONTHLY")}
+                  onChange={(e) =>
+                    setFrequency((e.target.value as VendorBillRecurrenceFrequency) || "MONTHLY")
+                  }
                 >
                   <option value="DAILY">Daily</option>
                   <option value="WEEKLY">Weekly</option>
@@ -193,7 +207,8 @@ export function RecordVendorBillModal({
                   onChange={(e) => setRangeMode((e.target.value as RecurrenceRangeMode) || "PERIOD_COUNT")}
                 >
                   <option value="FISCAL_YEAR_END" disabled={!fiscalYear}>
-                    Rest of fiscal year{fiscalEndLabel ? ` (through ${fiscalEndLabel})` : " — set on dashboard"}
+                    Rest of fiscal year
+                    {fiscalEndLabel ? ` (through ${fiscalEndLabel})` : " — set on dashboard"}
                   </option>
                   <option value="END_DATE">Until a specific date</option>
                   <option value="PERIOD_COUNT">Fixed number of bills</option>
@@ -235,13 +250,16 @@ export function RecordVendorBillModal({
 
               {rangeMode === "FISCAL_YEAR_END" && fiscalYear ? (
                 <p className="text-xs text-muted">
-                  Uses fiscal year{fiscalYear.label ? ` “${fiscalYear.label}”` : ""} ending {fiscalEndLabel}. Bills are
-                  added on each {recurrenceFrequencyLabel(frequency).toLowerCase()} due date until that end date.
+                  Uses fiscal year{fiscalYear.label ? ` “${fiscalYear.label}”` : ""} ending {fiscalEndLabel}.
+                  Bills are added on each {recurrenceFrequencyLabel(frequency).toLowerCase()} due date until
+                  that end date.
                 </p>
               ) : null}
 
               <p className="text-xs font-medium text-foreground">
-                {dueDate ? schedulePreview.description : "Set the first due date to preview how many bills will be created."}
+                {dueDate
+                  ? schedulePreview.description
+                  : "Set the first due date to preview how many bills will be created."}
               </p>
             </div>
           ) : null}
@@ -280,7 +298,12 @@ export function RecordVendorBillModal({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Amount</label>
-              <input name="amount" inputMode="decimal" required className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+              <input
+                name="amount"
+                inputMode="decimal"
+                required
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Currency</label>
@@ -313,7 +336,10 @@ export function RecordVendorBillModal({
 
           <div>
             <label className="mb-1 block text-sm text-muted">Note (optional)</label>
-            <input name="note" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
+            <input
+              name="note"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+            />
           </div>
 
           <div className="flex justify-end gap-2">

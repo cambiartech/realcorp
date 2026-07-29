@@ -2,7 +2,10 @@ import { PropertyClientStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 /** Create (or return existing) PropertyClient linked to a closed / finance-approved deal. */
-export async function ensureClientFromDeal(tenantId: string, dealId: string): Promise<{ clientId: string } | null> {
+export async function ensureClientFromDeal(
+  tenantId: string,
+  dealId: string,
+): Promise<{ clientId: string } | null> {
   const deal = await prisma.deal.findFirst({
     where: { id: dealId, tenantId },
     include: {

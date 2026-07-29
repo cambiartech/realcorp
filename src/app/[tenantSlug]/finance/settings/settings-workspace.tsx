@@ -118,7 +118,9 @@ export function FinanceSettingsWorkspace({
     <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:py-5">
       <div className="border-b border-foreground/10 pb-4">
         <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">Finance Settings</h1>
-        <p className="mt-0.5 text-sm text-muted">Dropdown catalogs for expenses, receipts, payments, and invoices.</p>
+        <p className="mt-0.5 text-sm text-muted">
+          Dropdown catalogs for expenses, receipts, payments, and invoices.
+        </p>
       </div>
 
       <div className="mt-4 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
@@ -126,12 +128,13 @@ export function FinanceSettingsWorkspace({
           {isDraft ? (
             <div
               role="status"
-              className="rounded-lg border border-amber-500/45 bg-amber-500/[0.12] px-3 py-2.5 text-sm text-foreground shadow-sm"
+              className="rounded-lg border border-[var(--warn-line)] bg-[var(--warn)]/[0.12] px-3 py-2.5 text-sm text-foreground shadow-sm"
             >
               <span className="font-semibold">Draft</span>
               {" — "}
-              These catalogs are not saved yet. Click <span className="font-semibold">Save finance settings</span>{" "}
-              or your changes will be lost if you leave or refresh the page.
+              These catalogs are not saved yet. Click{" "}
+              <span className="font-semibold">Save finance settings</span> or your changes will be lost if you
+              leave or refresh the page.
             </div>
           ) : null}
           {/* Single JSON fields avoid FormData quirks with repeated name="...[]" fields in Server Actions */}
@@ -173,9 +176,16 @@ export function FinanceSettingsWorkspace({
               <div className="mt-2 max-h-48 overflow-auto rounded-md border border-foreground/10 bg-background p-2">
                 {bankAccounts.length === 0 ? <p className="text-xs text-muted">No accounts yet.</p> : null}
                 {bankAccounts.map((item) => (
-                  <div key={item} className="mb-1 flex items-center justify-between gap-2 rounded border border-foreground/10 px-2 py-1 text-xs">
+                  <div
+                    key={item}
+                    className="mb-1 flex items-center justify-between gap-2 rounded border border-foreground/10 px-2 py-1 text-xs"
+                  >
                     <span>{item}</span>
-                    <button type="button" onClick={() => removeItem(item, bankAccounts, setBankAccounts)} className="text-muted hover:text-error">
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item, bankAccounts, setBankAccounts)}
+                      className="text-muted hover:text-error"
+                    >
                       Remove
                     </button>
                   </div>
@@ -202,9 +212,16 @@ export function FinanceSettingsWorkspace({
               <div className="mt-2 max-h-48 overflow-auto rounded-md border border-foreground/10 bg-background p-2">
                 {paymentModes.length === 0 ? <p className="text-xs text-muted">No modes yet.</p> : null}
                 {paymentModes.map((item) => (
-                  <div key={item} className="mb-1 flex items-center justify-between gap-2 rounded border border-foreground/10 px-2 py-1 text-xs">
+                  <div
+                    key={item}
+                    className="mb-1 flex items-center justify-between gap-2 rounded border border-foreground/10 px-2 py-1 text-xs"
+                  >
                     <span>{item}</span>
-                    <button type="button" onClick={() => removeItem(item, paymentModes, setPaymentModes)} className="text-muted hover:text-error">
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item, paymentModes, setPaymentModes)}
+                      className="text-muted hover:text-error"
+                    >
                       Remove
                     </button>
                   </div>
@@ -231,9 +248,16 @@ export function FinanceSettingsWorkspace({
               <div className="mt-2 max-h-48 overflow-auto rounded-md border border-foreground/10 bg-background p-2">
                 {currencies.length === 0 ? <p className="text-xs text-muted">No currencies yet.</p> : null}
                 {currencies.map((item) => (
-                  <div key={item} className="mb-1 flex items-center justify-between gap-2 rounded border border-foreground/10 px-2 py-1 text-xs">
+                  <div
+                    key={item}
+                    className="mb-1 flex items-center justify-between gap-2 rounded border border-foreground/10 px-2 py-1 text-xs"
+                  >
                     <span>{item}</span>
-                    <button type="button" onClick={() => removeItem(item, currencies, setCurrencies)} className="text-muted hover:text-error">
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item, currencies, setCurrencies)}
+                      className="text-muted hover:text-error"
+                    >
                       Remove
                     </button>
                   </div>
@@ -245,11 +269,14 @@ export function FinanceSettingsWorkspace({
           <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
             <p className="text-sm font-semibold text-foreground">Rules & approvals</p>
             <p className="mt-1 text-xs text-muted">
-              Plain limits for your team. Large expenses are blocked until a manager handles them outside the app or you raise the limit.
+              Plain limits for your team. Large expenses are blocked until a manager handles them outside the
+              app or you raise the limit.
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-foreground">Expense needs approval above</label>
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  Expense needs approval above
+                </label>
                 <input
                   name="expenseApprovalThreshold"
                   type="number"
@@ -261,7 +288,9 @@ export function FinanceSettingsWorkspace({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-foreground">First payment reminder (days overdue)</label>
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  First payment reminder (days overdue)
+                </label>
                 <input
                   name="firstReminderAfterDays"
                   type="number"
@@ -272,7 +301,9 @@ export function FinanceSettingsWorkspace({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-foreground">Second reminder wave (days overdue)</label>
+                <label className="mb-1 block text-xs font-medium text-foreground">
+                  Second reminder wave (days overdue)
+                </label>
                 <input
                   name="secondReminderAfterDays"
                   type="number"
@@ -286,17 +317,21 @@ export function FinanceSettingsWorkspace({
           </div>
 
           {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
-          {state?.ok ? <p className="text-xs font-medium text-emerald-600">Finance settings saved.</p> : null}
+          {state?.ok ? (
+            <p className="text-xs font-medium text-[var(--success)]">Finance settings saved.</p>
+          ) : null}
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted">Add or remove items, then click Save — drafts are not persisted until you save.</p>
+            <p className="text-xs text-muted">
+              Add or remove items, then click Save — drafts are not persisted until you save.
+            </p>
             <button
               type="submit"
               disabled={pending}
               aria-busy={pending}
               className={
                 isDraft
-                  ? "inline-flex items-center gap-2 rounded-md border-2 border-amber-600/80 bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-md ring-2 ring-amber-500/40 transition-opacity hover:opacity-90 disabled:opacity-60"
+                  ? "inline-flex items-center gap-2 rounded-md border-2 border-[var(--warn-line)] bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-md ring-2 ring-[var(--warn-line)] transition-opacity hover:opacity-90 disabled:opacity-60"
                   : "inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-60"
               }
             >

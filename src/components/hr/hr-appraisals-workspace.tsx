@@ -67,8 +67,8 @@ export type AppraisalCycleView = {
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-slate-100 text-slate-700",
-  SELF_SUBMITTED: "bg-violet-100 text-violet-800",
-  REVIEWED: "bg-emerald-100 text-emerald-800",
+  SELF_SUBMITTED: "bg-[var(--accent-wash)] text-[var(--accent)]",
+  REVIEWED: "bg-[var(--success-wash)] text-[var(--success)]",
 };
 
 export function HrAppraisalsWorkspace({
@@ -146,7 +146,8 @@ export function HrAppraisalsWorkspace({
     [monthlyCycles, selectedCycleId],
   );
 
-  const reviewAppraisal = reviewId && selectedCycle ? selectedCycle.appraisals.find((a) => a.id === reviewId) : null;
+  const reviewAppraisal =
+    reviewId && selectedCycle ? selectedCycle.appraisals.find((a) => a.id === reviewId) : null;
 
   const cycleActions = useMemo(() => {
     if (!selectedCycle) return [];
@@ -187,9 +188,9 @@ export function HrAppraisalsWorkspace({
           <p className="text-xs text-muted">Open monthly periods</p>
           <p className="text-2xl font-bold">{queueCounts.openCycles}</p>
         </div>
-        <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-4">
+        <div className="rounded-lg border border-[var(--accent-line)] bg-[var(--accent-wash)] p-4">
           <p className="text-xs text-muted">Awaiting manager review (this month)</p>
-          <p className="text-2xl font-bold text-violet-800">{queueCounts.pendingReview}</p>
+          <p className="text-2xl font-bold text-[var(--accent)]">{queueCounts.pendingReview}</p>
         </div>
       </div>
 
@@ -340,7 +341,11 @@ export function HrAppraisalsWorkspace({
             </div>
             <div>
               <label className="mb-1 block text-[10px] font-medium uppercase text-muted">Due date</label>
-              <input name="dueDate" type="date" className="rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm" />
+              <input
+                name="dueDate"
+                type="date"
+                className="rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+              />
             </div>
             <button
               type="submit"
@@ -368,8 +373,10 @@ export function HrAppraisalsWorkspace({
                   <button
                     type="button"
                     disabled={pending}
-                    onClick={() => void runAction(() => closeAppraisalCycle(tenantSlug, cycle.id), "Period closed.")}
-                    className="text-xs font-semibold text-red-700 underline"
+                    onClick={() =>
+                      void runAction(() => closeAppraisalCycle(tenantSlug, cycle.id), "Period closed.")
+                    }
+                    className="text-xs font-semibold text-[var(--danger)] underline"
                   >
                     Close period
                   </button>
@@ -395,7 +402,9 @@ export function HrAppraisalsWorkspace({
                     }}
                     className={[
                       "w-full rounded-md border px-3 py-2 text-left text-sm",
-                      selectedCycleId === c.id ? "border-foreground/25 bg-foreground/[0.06] font-semibold" : "border-foreground/10",
+                      selectedCycleId === c.id
+                        ? "border-foreground/25 bg-foreground/[0.06] font-semibold"
+                        : "border-foreground/10",
                     ].join(" ")}
                   >
                     {c.periodLabel}
@@ -433,7 +442,9 @@ export function HrAppraisalsWorkspace({
                           {a.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-muted">{a.overallRating != null ? `${a.overallRating}/5` : "—"}</td>
+                      <td className="px-4 py-3 text-muted">
+                        {a.overallRating != null ? `${a.overallRating}/5` : "—"}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
@@ -462,7 +473,8 @@ export function HrAppraisalsWorkspace({
               {selectedCycle.periodLabel} · {selectedCycle.cycleTypeLabel}
             </p>
             <p className="mt-2 text-xs text-muted">
-              Review the employee&apos;s self-ratings (0–5), confirm or adjust each score, and add development notes.
+              Review the employee&apos;s self-ratings (0–5), confirm or adjust each score, and add development
+              notes.
               {selectedCycle.cycleType === "MONTHLY"
                 ? " Confirmed scores feed the monthly performance ranking."
                 : " Confirmed scores are recorded for this yearly review."}
@@ -517,7 +529,7 @@ export function HrAppraisalsWorkspace({
                               Employee: {appraisalRatingLabel(selfRating)}
                             </span>
                             {isReadOnly ? (
-                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-800">
+                              <span className="rounded-full bg-[var(--success-wash)] px-2 py-0.5 font-medium text-[var(--success)]">
                                 Final: {appraisalRatingLabel(managerRating)}
                               </span>
                             ) : (
@@ -574,7 +586,9 @@ export function HrAppraisalsWorkspace({
               ) : (
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="block text-sm">
-                    <span className="mb-1 block text-xs font-medium text-muted">Overall (optional override)</span>
+                    <span className="mb-1 block text-xs font-medium text-muted">
+                      Overall (optional override)
+                    </span>
                     <AppraisalRatingSelect
                       name="overallRating"
                       defaultValue={

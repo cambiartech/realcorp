@@ -1,7 +1,10 @@
 "use client";
 
 import { MODAL_PANEL_SM, MODAL_PANEL_XL } from "@/lib/modal-panel";
-import { SendFinanceEmailModal, type FinanceEmailModalMode } from "@/components/finance/send-finance-email-modal";
+import {
+  SendFinanceEmailModal,
+  type FinanceEmailModalMode,
+} from "@/components/finance/send-finance-email-modal";
 import { ModalOverlay } from "@/components/modal-overlay";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -448,13 +451,13 @@ function csvCell(row: string[], idxMap: Record<string, number>, keys: string[]):
 }
 
 function valueTone(value: number) {
-  if (value > 0) return "text-emerald-600";
-  if (value < 0) return "text-red-600";
+  if (value > 0) return "text-[var(--success)]";
+  if (value < 0) return "text-[var(--danger)]";
   return "text-muted";
 }
 
 function rowFocusClass(highlightId: string | null, rowId: string) {
-  return highlightId === rowId ? "bg-amber-500/10 ring-1 ring-inset ring-amber-500/35" : "";
+  return highlightId === rowId ? "bg-[var(--warn-wash)] ring-1 ring-inset ring-[var(--warn-line)]" : "";
 }
 
 function shiftMonthBoundary(date: Date, months: number) {
@@ -539,7 +542,11 @@ export function FinanceWorkspace({
     name: string;
     publicId: string;
   } | null>(null);
-  const [timelineTarget, setTimelineTarget] = useState<{ entityType: string; entityId: string; title: string } | null>(null);
+  const [timelineTarget, setTimelineTarget] = useState<{
+    entityType: string;
+    entityId: string;
+    title: string;
+  } | null>(null);
   const [timelineLogs, setTimelineLogs] = useState<TimelineLogRow[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [actionPending, setActionPending] = useState(false);
@@ -569,7 +576,10 @@ export function FinanceWorkspace({
   const [paymentsViewTab, setPaymentsViewTab] = useState<"all" | "invoiced" | "direct">("all");
   const [isCreateDirectPaymentOpen, setIsCreateDirectPaymentOpen] = useState(false);
   const [sendReceipt, setSendReceipt] = useState<SalesReceiptRow | null>(null);
-  const [emailInvoice, setEmailInvoice] = useState<{ invoice: InvoiceRecordItem; mode: FinanceEmailModalMode } | null>(null);
+  const [emailInvoice, setEmailInvoice] = useState<{
+    invoice: InvoiceRecordItem;
+    mode: FinanceEmailModalMode;
+  } | null>(null);
 
   useEffect(() => {
     setVendorOptions(financeVendors);
@@ -611,15 +621,7 @@ export function FinanceWorkspace({
     normalizedPath === financeBasePath || normalizedPath === `${financeBasePath}/overview`;
 
   type DedicatedFinanceSlug =
-    | "invoices"
-    | "payments"
-    | "expenses"
-    | "receipts"
-    | "ar"
-    | "payables"
-    | "banking"
-    | "reports"
-    | "logs";
+    "invoices" | "payments" | "expenses" | "receipts" | "ar" | "payables" | "banking" | "reports" | "logs";
 
   function dedicatedFinanceSlugFromPath(path: string): DedicatedFinanceSlug | null {
     if (path.endsWith("/finance/invoices")) return "invoices";
@@ -692,7 +694,10 @@ export function FinanceWorkspace({
 
   const dedicatedHeading: Record<DedicatedFinanceSlug, { title: string; subtitle: string }> = {
     invoices: { title: "Invoices", subtitle: "Issue, send, and collect on customer invoices." },
-    payments: { title: "Payments", subtitle: "Invoice payments and direct collections — no invoice required for walk-ins or misc. cash." },
+    payments: {
+      title: "Payments",
+      subtitle: "Invoice payments and direct collections — no invoice required for walk-ins or misc. cash.",
+    },
     expenses: { title: "Expenses", subtitle: "Operational spend and reimbursements." },
     receipts: { title: "Sales receipts", subtitle: "Direct collections not tied to an invoice." },
     ar: { title: "Receivables", subtitle: "Money customers owe you — aging and follow-ups." },
@@ -705,8 +710,7 @@ export function FinanceWorkspace({
   const pageHeading = isFinanceOverviewSurface
     ? {
         title: "Finance overview",
-        subtitle:
-          "Key numbers at a glance, plus pending finance checks from sales deals.",
+        subtitle: "Key numbers at a glance, plus pending finance checks from sales deals.",
       }
     : dedicatedSlug
       ? dedicatedHeading[dedicatedSlug]
@@ -838,7 +842,11 @@ export function FinanceWorkspace({
         setUploadPending(false);
         return;
       }
-      const payload = (await response.json()) as { secure_url?: string; original_filename?: string; public_id?: string };
+      const payload = (await response.json()) as {
+        secure_url?: string;
+        original_filename?: string;
+        public_id?: string;
+      };
       if (!payload.secure_url || !payload.public_id) {
         showSnackbar("Upload response invalid. Continue without attachment.", "error");
         setUploadPending(false);
@@ -940,7 +948,10 @@ export function FinanceWorkspace({
     if (!emailInvoice || actionPending) return;
     setActionPending(true);
     const { invoice, mode } = emailInvoice;
-    const payload = { toEmail: input.email, customPaymentInstructions: input.customPaymentInstructions || undefined };
+    const payload = {
+      toEmail: input.email,
+      customPaymentInstructions: input.customPaymentInstructions || undefined,
+    };
     const result =
       mode === "remind"
         ? await sendInvoiceReminder(tenantSlug, invoice.id, payload)
@@ -952,8 +963,7 @@ export function FinanceWorkspace({
       showSnackbar(result.error, "error");
       return;
     }
-    const label =
-      mode === "remind" ? "Reminder sent" : mode === "resend" ? "Invoice resent" : "Invoice sent";
+    const label = mode === "remind" ? "Reminder sent" : mode === "resend" ? "Invoice resent" : "Invoice sent";
     showSnackbar(`${label} to ${input.email}. Copy filed in Finance documents.`, "success");
     setEmailInvoice(null);
     router.refresh();
@@ -1000,7 +1010,11 @@ export function FinanceWorkspace({
         setUploadPending(false);
         return;
       }
-      const payload = (await response.json()) as { secure_url?: string; original_filename?: string; public_id?: string };
+      const payload = (await response.json()) as {
+        secure_url?: string;
+        original_filename?: string;
+        public_id?: string;
+      };
       if (!payload.secure_url || !payload.public_id) {
         showSnackbar("Upload response invalid. Continue without attachment.", "error");
         setUploadPending(false);
@@ -1070,7 +1084,9 @@ export function FinanceWorkspace({
     }
     setVendorOptions((prev) => {
       if (prev.some((v) => vendorNamesMatch(v.name, result.name))) return prev;
-      return [...prev, { id: result.vendorId, name: result.name }].sort((a, b) => a.name.localeCompare(b.name));
+      return [...prev, { id: result.vendorId, name: result.name }].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
     });
     showSnackbar(`Vendor “${result.name}” saved.`, "success");
     return true;
@@ -1084,7 +1100,9 @@ export function FinanceWorkspace({
     }
     setCategoryOptions((prev) => {
       if (prev.some((c) => expenseCategoryNamesMatch(c.name, result.name))) return prev;
-      return [...prev, { id: result.categoryId, name: result.name }].sort((a, b) => a.name.localeCompare(b.name));
+      return [...prev, { id: result.categoryId, name: result.name }].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
     });
     showSnackbar(`Category “${result.name}” saved.`, "success");
     return true;
@@ -1132,7 +1150,9 @@ export function FinanceWorkspace({
         : undefined;
     const rangeRaw = String(formData.get("recurrenceRangeMode") || "");
     const recurrenceRangeMode =
-      rangeRaw === "FISCAL_YEAR_END" || rangeRaw === "END_DATE" || rangeRaw === "PERIOD_COUNT" ? rangeRaw : undefined;
+      rangeRaw === "FISCAL_YEAR_END" || rangeRaw === "END_DATE" || rangeRaw === "PERIOD_COUNT"
+        ? rangeRaw
+        : undefined;
     const result = await createVendorBill(tenantSlug, {
       vendorName: String(formData.get("vendorName") || ""),
       title: String(formData.get("title") || "") || undefined,
@@ -1303,8 +1323,7 @@ export function FinanceWorkspace({
               Number.isFinite(dateMs) && Number.isFinite(paymentDateMs)
                 ? Math.abs(dateMs - paymentDateMs) / (1000 * 60 * 60 * 24)
                 : 99;
-            const referenceHit =
-              p.referenceRaw && refNeedle.includes(p.referenceRaw.toLowerCase()) ? 1 : 0;
+            const referenceHit = p.referenceRaw && refNeedle.includes(p.referenceRaw.toLowerCase()) ? 1 : 0;
             const score = amountDiff + dateDiffDays * 0.2 - referenceHit * 3;
             return {
               kind: "payment" as const,
@@ -1322,8 +1341,7 @@ export function FinanceWorkspace({
               Number.isFinite(dateMs) && Number.isFinite(expenseDateMs)
                 ? Math.abs(dateMs - expenseDateMs) / (1000 * 60 * 60 * 24)
                 : 99;
-            const referenceHit =
-              e.referenceRaw && refNeedle.includes(e.referenceRaw.toLowerCase()) ? 1 : 0;
+            const referenceHit = e.referenceRaw && refNeedle.includes(e.referenceRaw.toLowerCase()) ? 1 : 0;
             const score = amountDiff + dateDiffDays * 0.2 - referenceHit * 3;
             return {
               kind: "expense" as const,
@@ -1402,7 +1420,7 @@ export function FinanceWorkspace({
   function csvEscape(value: string | number | null | undefined) {
     const raw = value == null ? "" : String(value);
     if (!/[",\n]/.test(raw)) return raw;
-    return `"${raw.replace(/"/g, "\"\"")}"`;
+    return `"${raw.replace(/"/g, '""')}"`;
   }
 
   function reportExportMeta() {
@@ -1421,9 +1439,17 @@ export function FinanceWorkspace({
       if (kind === "pnl") {
         await downloadFinanceReportXlsx("pnl", meta, { ...payload, pnl: visiblePnlBreakdown });
       } else if (kind === "cashflow") {
-        await downloadFinanceReportXlsx("cashflow", meta, { ...payload, cashflow: visibleCashflowBreakdown, pnl: visiblePnlBreakdown });
+        await downloadFinanceReportXlsx("cashflow", meta, {
+          ...payload,
+          cashflow: visibleCashflowBreakdown,
+          pnl: visiblePnlBreakdown,
+        });
       } else if (kind === "expenses") {
-        await downloadFinanceReportXlsx("expenses", meta, { ...payload, expenses: visibleExpenseBreakdown, pnl: visiblePnlBreakdown });
+        await downloadFinanceReportXlsx("expenses", meta, {
+          ...payload,
+          expenses: visibleExpenseBreakdown,
+          pnl: visiblePnlBreakdown,
+        });
       } else {
         await downloadFinanceReportXlsx("balance", meta, {
           balance: buildBalanceExportLines(balanceSheetSections),
@@ -1462,7 +1488,10 @@ export function FinanceWorkspace({
       expenseTransactions: filteredExpenses.map((e) => ({
         date: e.expenseDateLabel,
         amount: e.amountValue,
-        description: e.vendorName !== "—" ? `${e.vendorName}${e.reference ? ` · ${e.reference}` : ""}` : e.reference || e.category,
+        description:
+          e.vendorName !== "—"
+            ? `${e.vendorName}${e.reference ? ` · ${e.reference}` : ""}`
+            : e.reference || e.category,
         category: e.category,
       })),
     };
@@ -1493,10 +1522,13 @@ export function FinanceWorkspace({
     let rows = scopedBankRows;
     if (showUnmatchedOnly) rows = rows.filter((r) => r.matchStatus !== "MATCHED");
     if (bankStatusFilter === "matched") rows = rows.filter((r) => r.matchStatus === "MATCHED");
-    if (bankStatusFilter === "unmatched") rows = rows.filter((r) => r.matchStatus === "UNMATCHED" || !r.matchStatus);
+    if (bankStatusFilter === "unmatched")
+      rows = rows.filter((r) => r.matchStatus === "UNMATCHED" || !r.matchStatus);
     if (bankStatusFilter === "exception") rows = rows.filter((r) => r.matchStatus === "EXCEPTION");
     if (exceptionReasonFilter !== "all") {
-      rows = rows.filter((r) => r.matchStatus === "EXCEPTION" && (r.exceptionReason || "OTHER") === exceptionReasonFilter);
+      rows = rows.filter(
+        (r) => r.matchStatus === "EXCEPTION" && (r.exceptionReason || "OTHER") === exceptionReasonFilter,
+      );
     }
     return rows;
   }, [scopedBankRows, showUnmatchedOnly, bankStatusFilter, exceptionReasonFilter]);
@@ -1506,26 +1538,31 @@ export function FinanceWorkspace({
     for (const x of invoices) if (x.projectId) map.set(x.projectId, x.projectLabel);
     for (const x of payments) if (x.projectId) map.set(x.projectId, x.projectLabel);
     for (const x of expenses) if (x.projectId) map.set(x.projectId, x.projectLabel);
-    return Array.from(map.entries()).map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(map.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [invoices, payments, expenses]);
   const reportUnitOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const x of invoices) if (x.unitId) map.set(x.unitId, x.unitLabel);
     for (const x of payments) if (x.unitId) map.set(x.unitId, x.unitLabel);
     for (const x of expenses) if (x.unitId) map.set(x.unitId, x.unitLabel);
-    return Array.from(map.entries()).map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(map.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [invoices, payments, expenses]);
   const reportDepartmentOptions = useMemo(
     () =>
       Array.from(
-        new Set([
-          ...financeOptions.departments,
-          ...invoices.map((x) => x.department),
-          ...payments.map((x) => x.department),
-          ...expenses.map((x) => x.department),
-        ].filter(Boolean)),
-      )
-        .sort((a, b) => a.localeCompare(b)),
+        new Set(
+          [
+            ...financeOptions.departments,
+            ...invoices.map((x) => x.department),
+            ...payments.map((x) => x.department),
+            ...expenses.map((x) => x.department),
+          ].filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
     [financeOptions.departments, invoices, payments, expenses],
   );
 
@@ -1583,7 +1620,13 @@ export function FinanceWorkspace({
     return rows.map((r) => ({ ...r, net: r.collected - r.expenses }));
   }, [reportView.pnlBreakdown, reportMonthWindow, filteredInvoices, filteredPayments, filteredExpenses]);
   const visibleCashflowBreakdown = useMemo(
-    () => visiblePnlBreakdown.map((x) => ({ month: x.month, inflow: x.collected, outflow: x.expenses, net: x.collected - x.expenses })),
+    () =>
+      visiblePnlBreakdown.map((x) => ({
+        month: x.month,
+        inflow: x.collected,
+        outflow: x.expenses,
+        net: x.collected - x.expenses,
+      })),
     [visiblePnlBreakdown],
   );
   const visibleExpenseBreakdown = useMemo(
@@ -1601,12 +1644,21 @@ export function FinanceWorkspace({
         .sort((a, b) => b.total - a.total),
     [filteredExpenses],
   );
-  const reportMonthLabel = useMemo(() => new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }), []);
+  const reportMonthLabel = useMemo(
+    () => new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }),
+    [],
+  );
   const reportDrilldown = useMemo(() => {
     if (!reportDrilldownMonth) return null;
-    const invoicesForMonth = filteredInvoices.filter((x) => reportMonthLabel.format(new Date(`${x.issuedAtValue}T00:00:00`)) === reportDrilldownMonth);
-    const paymentsForMonth = filteredPayments.filter((x) => reportMonthLabel.format(new Date(`${x.paidAtValue}T00:00:00`)) === reportDrilldownMonth);
-    const expensesForMonth = filteredExpenses.filter((x) => reportMonthLabel.format(new Date(`${x.expenseDateValue}T00:00:00`)) === reportDrilldownMonth);
+    const invoicesForMonth = filteredInvoices.filter(
+      (x) => reportMonthLabel.format(new Date(`${x.issuedAtValue}T00:00:00`)) === reportDrilldownMonth,
+    );
+    const paymentsForMonth = filteredPayments.filter(
+      (x) => reportMonthLabel.format(new Date(`${x.paidAtValue}T00:00:00`)) === reportDrilldownMonth,
+    );
+    const expensesForMonth = filteredExpenses.filter(
+      (x) => reportMonthLabel.format(new Date(`${x.expenseDateValue}T00:00:00`)) === reportDrilldownMonth,
+    );
     const totals = {
       invoices: invoicesForMonth.reduce((sum, x) => sum + x.amountValue, 0),
       payments: paymentsForMonth.reduce((sum, x) => sum + x.amountValue, 0),
@@ -1650,15 +1702,23 @@ export function FinanceWorkspace({
       invoiced: filteredInvoices
         .filter((x) => x.statusValue !== "VOID" && inRange(x.issuedAtValue, currentStart, currentEnd))
         .reduce((sum, x) => sum + x.amountValue, 0),
-      collected: filteredPayments.filter((x) => inRange(x.paidAtValue, currentStart, currentEnd)).reduce((sum, x) => sum + x.amountValue, 0),
-      expenses: filteredExpenses.filter((x) => inRange(x.expenseDateValue, currentStart, currentEnd)).reduce((sum, x) => sum + x.amountValue, 0),
+      collected: filteredPayments
+        .filter((x) => inRange(x.paidAtValue, currentStart, currentEnd))
+        .reduce((sum, x) => sum + x.amountValue, 0),
+      expenses: filteredExpenses
+        .filter((x) => inRange(x.expenseDateValue, currentStart, currentEnd))
+        .reduce((sum, x) => sum + x.amountValue, 0),
     };
     const previous = {
       invoiced: filteredInvoices
         .filter((x) => x.statusValue !== "VOID" && inRange(x.issuedAtValue, comparisonStart, comparisonEnd))
         .reduce((sum, x) => sum + x.amountValue, 0),
-      collected: filteredPayments.filter((x) => inRange(x.paidAtValue, comparisonStart, comparisonEnd)).reduce((sum, x) => sum + x.amountValue, 0),
-      expenses: filteredExpenses.filter((x) => inRange(x.expenseDateValue, comparisonStart, comparisonEnd)).reduce((sum, x) => sum + x.amountValue, 0),
+      collected: filteredPayments
+        .filter((x) => inRange(x.paidAtValue, comparisonStart, comparisonEnd))
+        .reduce((sum, x) => sum + x.amountValue, 0),
+      expenses: filteredExpenses
+        .filter((x) => inRange(x.expenseDateValue, comparisonStart, comparisonEnd))
+        .reduce((sum, x) => sum + x.amountValue, 0),
     };
     return {
       current: { ...current, net: current.collected - current.expenses },
@@ -1667,10 +1727,30 @@ export function FinanceWorkspace({
   }, [filteredInvoices, filteredPayments, filteredExpenses, reportMonthWindow, reportCompareMode]);
   const reportComparisonCards = useMemo(() => {
     const rows = [
-      { id: "invoiced", label: "Invoiced", current: reportComparison.current.invoiced, previous: reportComparison.previous.invoiced },
-      { id: "collected", label: "Collected", current: reportComparison.current.collected, previous: reportComparison.previous.collected },
-      { id: "expenses", label: "Expenses", current: reportComparison.current.expenses, previous: reportComparison.previous.expenses },
-      { id: "net", label: "Money left", current: reportComparison.current.net, previous: reportComparison.previous.net },
+      {
+        id: "invoiced",
+        label: "Invoiced",
+        current: reportComparison.current.invoiced,
+        previous: reportComparison.previous.invoiced,
+      },
+      {
+        id: "collected",
+        label: "Collected",
+        current: reportComparison.current.collected,
+        previous: reportComparison.previous.collected,
+      },
+      {
+        id: "expenses",
+        label: "Expenses",
+        current: reportComparison.current.expenses,
+        previous: reportComparison.previous.expenses,
+      },
+      {
+        id: "net",
+        label: "Money left",
+        current: reportComparison.current.net,
+        previous: reportComparison.previous.net,
+      },
     ];
     return rows.map((row) => {
       const change = row.current - row.previous;
@@ -1688,8 +1768,7 @@ export function FinanceWorkspace({
   );
 
   const balanceSheetSections = useMemo(() => {
-    const assetsTotal =
-      filteredBalanceSnapshot.receivables + filteredBalanceSnapshot.cashIn;
+    const assetsTotal = filteredBalanceSnapshot.receivables + filteredBalanceSnapshot.cashIn;
     const liabilitiesTotal = openPayablesTotal;
     const equityTotal = assetsTotal - liabilitiesTotal;
     return {
@@ -1732,7 +1811,10 @@ export function FinanceWorkspace({
     const matched = scopedBankRows.filter((r) => r.matchStatus === "MATCHED").length;
     const unmatchedRows = scopedBankRows.filter((r) => r.matchStatus !== "MATCHED");
     const unmatched = unmatchedRows.length;
-    const unmatchedAmount = unmatchedRows.reduce((sum, r) => sum + (Number.isFinite(r.amountAbs) ? r.amountAbs : 0), 0);
+    const unmatchedAmount = unmatchedRows.reduce(
+      (sum, r) => sum + (Number.isFinite(r.amountAbs) ? r.amountAbs : 0),
+      0,
+    );
     let oldestUnmatchedDays = 0;
     const nowMs = Date.now();
     for (const row of unmatchedRows) {
@@ -1796,7 +1878,13 @@ export function FinanceWorkspace({
     setImportedBankRows((curr) =>
       curr.map((r) =>
         r.id === row.id
-          ? { ...r, matchStatus: "UNMATCHED", matchedEntityType: null, matchedEntityId: null, exceptionReason: null }
+          ? {
+              ...r,
+              matchStatus: "UNMATCHED",
+              matchedEntityType: null,
+              matchedEntityId: null,
+              exceptionReason: null,
+            }
           : r,
       ),
     );
@@ -1836,7 +1924,12 @@ export function FinanceWorkspace({
       setImportedBankRows((curr) =>
         curr.map((r) =>
           matchedIds.has(r.id)
-            ? { ...r, matchStatus: "MATCHED", matchedEntityType: r.direction === "credit" ? "PAYMENT" : "EXPENSE", exceptionReason: null }
+            ? {
+                ...r,
+                matchStatus: "MATCHED",
+                matchedEntityType: r.direction === "credit" ? "PAYMENT" : "EXPENSE",
+                exceptionReason: null,
+              }
             : r,
         ),
       );
@@ -1902,7 +1995,9 @@ export function FinanceWorkspace({
       return;
     }
     showSnackbar("Reconciliation note saved.", "success");
-    setImportedBankRows((curr) => curr.map((r) => (r.id === row.id ? { ...r, reconciliationNote: note } : r)));
+    setImportedBankRows((curr) =>
+      curr.map((r) => (r.id === row.id ? { ...r, reconciliationNote: note } : r)),
+    );
     setNoteDrafts((curr) => ({ ...curr, [row.id]: note }));
     router.refresh();
   }
@@ -2023,12 +2118,12 @@ export function FinanceWorkspace({
             </p>
             <p>
               Finance Manager or Org Admin approves/rejects from queue. On approve, a{" "}
-              <span className="font-medium text-foreground">client record</span> is created automatically from the deal
-              (lead contact + unit link). Send a portal invite from Clients when ready.
+              <span className="font-medium text-foreground">client record</span> is created automatically from
+              the deal (lead contact + unit link). Send a portal invite from Clients when ready.
             </p>
             <p>
-              Open <span className="font-medium text-foreground">Audit Logs</span> from the sidebar for the full searchable
-              trail. Invoices, payments, and expenses each have their own pages.
+              Open <span className="font-medium text-foreground">Audit Logs</span> from the sidebar for the
+              full searchable trail. Invoices, payments, and expenses each have their own pages.
             </p>
           </div>
         </section>
@@ -2052,11 +2147,11 @@ export function FinanceWorkspace({
           </Link>
           <Link
             href={`/${tenantSlug}/finance/receivables`}
-            className="rounded-lg border border-rose-200/60 bg-rose-50/50 p-4 transition-colors hover:bg-rose-50 dark:border-rose-500/25 dark:bg-rose-500/10 dark:hover:bg-rose-500/15"
+            className="rounded-lg border border-[var(--danger-line)] bg-[var(--danger-wash)] p-4 transition-colors hover:bg-[var(--danger-wash)] dark:hover:bg-[var(--danger-wash)]"
           >
-            <p className="text-xs uppercase tracking-wide text-rose-700/80 dark:text-rose-300/90">Overdue receivables</p>
-            <p className="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">{overviewStats.overdueReceivables}</p>
-            <p className="mt-1 text-xs text-rose-700/70 dark:text-rose-300/80">
+            <p className="text-xs uppercase tracking-wide text-[var(--danger)]">Overdue receivables</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--danger)]">{overviewStats.overdueReceivables}</p>
+            <p className="mt-1 text-xs text-[var(--danger)]">
               {overviewStats.overdueInvoiceCount} overdue invoice(s)
             </p>
           </Link>
@@ -2068,16 +2163,20 @@ export function FinanceWorkspace({
             <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.openPayables}</p>
             <p className="mt-1 text-xs text-muted">
               {overviewStats.openPayableCount} bill(s)
-              {overviewStats.payablesOverdueCount > 0 ? ` · ${overviewStats.payablesOverdueCount} overdue` : ""}
+              {overviewStats.payablesOverdueCount > 0
+                ? ` · ${overviewStats.payablesOverdueCount} overdue`
+                : ""}
             </p>
           </Link>
           <Link
             href={`/${tenantSlug}/finance/payments`}
-            className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 p-4 transition-colors hover:bg-emerald-50 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+            className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4 transition-colors hover:bg-[var(--success-wash)] dark:hover:bg-[var(--success-wash)]"
           >
-            <p className="text-xs uppercase tracking-wide text-emerald-800/80 dark:text-emerald-300/90">Collected this month</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-200">{overviewStats.collectedThisMonth}</p>
-            <p className="mt-1 text-xs text-emerald-800/70 dark:text-emerald-300/80">Invoice & direct payments</p>
+            <p className="text-xs uppercase tracking-wide text-[var(--success)]">Collected this month</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--success)]">
+              {overviewStats.collectedThisMonth}
+            </p>
+            <p className="mt-1 text-xs text-[var(--success)]">Invoice & direct payments</p>
           </Link>
           <Link
             href={`/${tenantSlug}/finance/expenses`}
@@ -2087,10 +2186,10 @@ export function FinanceWorkspace({
             <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.expensesThisMonth}</p>
             <p className="mt-1 text-xs text-muted">Operational spend recorded</p>
           </Link>
-          <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
-            <p className="text-xs uppercase tracking-wide text-amber-800/80 dark:text-amber-300/90">Pending finance checks</p>
-            <p className="mt-1 text-2xl font-bold text-amber-900 dark:text-amber-200">{overviewStats.pendingFinanceChecks}</p>
-            <p className="mt-1 text-xs text-amber-800/70 dark:text-amber-300/80">
+          <div className="rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] p-4">
+            <p className="text-xs uppercase tracking-wide text-[var(--warn)]">Pending finance checks</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--warn)]">{overviewStats.pendingFinanceChecks}</p>
+            <p className="mt-1 text-xs text-[var(--warn)]">
               {overviewStats.bankingUnmatched > 0
                 ? `${overviewStats.bankingUnmatched} unmatched bank row(s) · `
                 : ""}
@@ -2133,89 +2232,95 @@ export function FinanceWorkspace({
                 <p>Value</p>
                 <p>Action</p>
               </div>
-            {items.length === 0 ? (
-              <div className="p-5 text-sm text-muted">No pending finance items right now.</div>
-            ) : (
-              <ul className="divide-y divide-foreground/10">
-                {items.map((deal) => {
-                  const isPending = pendingDealId === deal.id;
-                  return (
-                    <li key={deal.id} className="grid gap-3 px-4 py-4 md:grid-cols-[2.2fr_1fr_1fr_1fr_1.2fr] md:items-center">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{deal.title}</p>
-                        <p className="mt-0.5 text-xs text-muted">Submitted {deal.createdAtLabel}</p>
-                      </div>
-                      <p className="text-sm text-muted">{deal.owner}</p>
-                      <p className="text-sm text-muted">{deal.stage}</p>
-                      <p className="text-sm text-foreground">{deal.value}</p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={!canManageFinance || isPending || Boolean(pendingDealId)}
-                          onClick={() => handleDecision(deal.id, "APPROVE")}
-                          className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                        >
-                          {isPending ? "Saving..." : "Approve"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canManageFinance || isPending || Boolean(pendingDealId)}
-                          onClick={() => handleDecision(deal.id, "REJECT")}
-                          className="rounded-md border border-error/35 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/10 disabled:opacity-50"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+              {items.length === 0 ? (
+                <div className="p-5 text-sm text-muted">No pending finance items right now.</div>
+              ) : (
+                <ul className="divide-y divide-foreground/10">
+                  {items.map((deal) => {
+                    const isPending = pendingDealId === deal.id;
+                    return (
+                      <li
+                        key={deal.id}
+                        className="grid gap-3 px-4 py-4 md:grid-cols-[2.2fr_1fr_1fr_1fr_1.2fr] md:items-center"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{deal.title}</p>
+                          <p className="mt-0.5 text-xs text-muted">Submitted {deal.createdAtLabel}</p>
+                        </div>
+                        <p className="text-sm text-muted">{deal.owner}</p>
+                        <p className="text-sm text-muted">{deal.stage}</p>
+                        <p className="text-sm text-foreground">{deal.value}</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={!canManageFinance || isPending || Boolean(pendingDealId)}
+                            onClick={() => handleDecision(deal.id, "APPROVE")}
+                            className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+                          >
+                            {isPending ? "Saving..." : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canManageFinance || isPending || Boolean(pendingDealId)}
+                            onClick={() => handleDecision(deal.id, "REJECT")}
+                            className="rounded-md border border-error/35 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/10 disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </>
           ) : (
             <>
               <p className="border-b border-foreground/10 px-4 py-2 text-xs text-muted">
                 Latest approvals and rejections. Full history lives under Audit Logs.
               </p>
-            {recentDecisions.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-muted">No decisions recorded yet.</p>
-            ) : (
-              <ul className="divide-y divide-foreground/10">
-                {recentDecisions.map((item) => (
-                  <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-                    <div>
-                      <p className="font-medium text-foreground">{item.title}</p>
-                      <p className="text-xs text-muted">
-                        {item.reviewedBy} - {item.reviewedAtLabel}
-                      </p>
-                    </div>
-                    <span
-                      className={[
-                        "rounded-full border px-2 py-0.5 text-xs font-semibold",
-                        item.decision === "Approved"
-                          ? "border-emerald-300/40 text-emerald-400"
-                          : "border-red-300/40 text-red-400",
-                      ].join(" ")}
+              {recentDecisions.length === 0 ? (
+                <p className="px-4 py-4 text-sm text-muted">No decisions recorded yet.</p>
+              ) : (
+                <ul className="divide-y divide-foreground/10">
+                  {recentDecisions.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
                     >
-                      {item.decision}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="border-t border-foreground/10 px-4 py-3">
-              <Link
-                href={`/${tenantSlug}/finance/audit-logs`}
-                className="text-sm font-semibold text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/50"
-              >
-                View full audit log →
-              </Link>
-            </div>
+                      <div>
+                        <p className="font-medium text-foreground">{item.title}</p>
+                        <p className="text-xs text-muted">
+                          {item.reviewedBy} - {item.reviewedAtLabel}
+                        </p>
+                      </div>
+                      <span
+                        className={[
+                          "rounded-full border px-2 py-0.5 text-xs font-semibold",
+                          item.decision === "Approved"
+                            ? "border-[var(--success-line)] text-[var(--success)]"
+                            : "border-[var(--danger-line)] text-[var(--danger)]",
+                        ].join(" ")}
+                      >
+                        {item.decision}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="border-t border-foreground/10 px-4 py-3">
+                <Link
+                  href={`/${tenantSlug}/finance/audit-logs`}
+                  className="text-sm font-semibold text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/50"
+                >
+                  View full audit log →
+                </Link>
+              </div>
             </>
           )}
         </section>
       ) : dedicatedSlug ? (
-          <section className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02]">
+        <section className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02]">
           <div className="p-4">
             <div className="mb-3 flex items-center justify-end">
               {canManageFinance ? (
@@ -2278,116 +2383,124 @@ export function FinanceWorkspace({
 
             {recordsTab === "invoices" ? (
               invoices.length === 0 ? (
-              <p className="text-sm text-muted">No invoice records yet.</p>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-foreground/10">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
-                    <tr>
-                      <th className="px-3 py-2">Invoice</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Amount</th>
-                      <th className="px-3 py-2">Balance</th>
-                      <th className="px-3 py-2">Due</th>
-                      <th className="px-3 py-2">Aging</th>
-                      <th className="px-3 py-2">Payments</th>
-                      <th className="px-3 py-2">Reminders</th>
-                      <th className="px-3 py-2">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-foreground/10">
-                    {invoices.map((invoice) => (
-                      <tr key={invoice.id} data-focus-id={invoice.id} className={rowFocusClass(highlightFocusId, invoice.id)}>
-                        <td className="px-3 py-2">
-                          <p className="font-medium text-foreground">{invoice.invoiceNumber}</p>
-                          <p className="text-xs text-muted">{invoice.title}</p>
-                          <Link
-                            href={`/${tenantSlug}/finance/invoices/${invoice.id}`}
-                            className="mt-1 inline-block text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
-                          >
-                            View
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2 text-muted">{invoice.status}</td>
-                        <td className="px-3 py-2 text-foreground">{invoice.amountLabel}</td>
-                        <td className="px-3 py-2 text-foreground">{invoice.balanceLabel}</td>
-                        <td className="px-3 py-2 text-muted">{invoice.dueDateLabel}</td>
-                        <td className="px-3 py-2 text-muted">{invoice.isOverdue ? `${invoice.overdueDays} day(s) overdue` : "Current"}</td>
-                        <td className="px-3 py-2 text-muted">
-                          {invoice.paymentsCount} - {invoice.lastPaymentLabel}
-                        </td>
-                        <td className="px-3 py-2 text-muted">
-                          {invoice.reminderCount} - {invoice.lastReminderLabel}
-                        </td>
-                        <td className="px-3 py-2">
-                          {canManageFinance ? (
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setEditingInvoice(invoice)}
-                                className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openTimeline("INVOICE", invoice.id, `${invoice.invoiceNumber} timeline`)}
-                                className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
-                              >
-                                Timeline
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!invoice.canRecordPayment}
-                                onClick={() => {
-                                  setPaymentAttachment(null);
-                                  setPaymentInvoice(invoice);
-                                }}
-                                className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
-                              >
-                                Record payment
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!invoice.canSend || actionPending}
-                                onClick={() => handleSendInvoice(invoice)}
-                                className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
-                              >
-                                Send
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!invoice.canResend || actionPending}
-                                onClick={() => handleResendInvoice(invoice)}
-                                className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
-                              >
-                                Resend
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!invoice.canSendReminder || actionPending}
-                                onClick={() => handleSendReminder(invoice)}
-                                className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
-                              >
-                                Remind
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!invoice.canVoid || actionPending}
-                                onClick={() => handleVoidInvoice(invoice)}
-                                className="text-xs text-error underline decoration-error/40 underline-offset-2 disabled:opacity-40"
-                              >
-                                Void
-                              </button>
-                            </div>
-                          ) : null}
-                        </td>
+                <p className="text-sm text-muted">No invoice records yet.</p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Invoice</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Balance</th>
+                        <th className="px-3 py-2">Due</th>
+                        <th className="px-3 py-2">Aging</th>
+                        <th className="px-3 py-2">Payments</th>
+                        <th className="px-3 py-2">Reminders</th>
+                        <th className="px-3 py-2">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
+                    </thead>
+                    <tbody className="divide-y divide-foreground/10">
+                      {invoices.map((invoice) => (
+                        <tr
+                          key={invoice.id}
+                          data-focus-id={invoice.id}
+                          className={rowFocusClass(highlightFocusId, invoice.id)}
+                        >
+                          <td className="px-3 py-2">
+                            <p className="font-medium text-foreground">{invoice.invoiceNumber}</p>
+                            <p className="text-xs text-muted">{invoice.title}</p>
+                            <Link
+                              href={`/${tenantSlug}/finance/invoices/${invoice.id}`}
+                              className="mt-1 inline-block text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                            >
+                              View
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 text-muted">{invoice.status}</td>
+                          <td className="px-3 py-2 text-foreground">{invoice.amountLabel}</td>
+                          <td className="px-3 py-2 text-foreground">{invoice.balanceLabel}</td>
+                          <td className="px-3 py-2 text-muted">{invoice.dueDateLabel}</td>
+                          <td className="px-3 py-2 text-muted">
+                            {invoice.isOverdue ? `${invoice.overdueDays} day(s) overdue` : "Current"}
+                          </td>
+                          <td className="px-3 py-2 text-muted">
+                            {invoice.paymentsCount} - {invoice.lastPaymentLabel}
+                          </td>
+                          <td className="px-3 py-2 text-muted">
+                            {invoice.reminderCount} - {invoice.lastReminderLabel}
+                          </td>
+                          <td className="px-3 py-2">
+                            {canManageFinance ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingInvoice(invoice)}
+                                  className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openTimeline("INVOICE", invoice.id, `${invoice.invoiceNumber} timeline`)
+                                  }
+                                  className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
+                                >
+                                  Timeline
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!invoice.canRecordPayment}
+                                  onClick={() => {
+                                    setPaymentAttachment(null);
+                                    setPaymentInvoice(invoice);
+                                  }}
+                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
+                                >
+                                  Record payment
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!invoice.canSend || actionPending}
+                                  onClick={() => handleSendInvoice(invoice)}
+                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
+                                >
+                                  Send
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!invoice.canResend || actionPending}
+                                  onClick={() => handleResendInvoice(invoice)}
+                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
+                                >
+                                  Resend
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!invoice.canSendReminder || actionPending}
+                                  onClick={() => handleSendReminder(invoice)}
+                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
+                                >
+                                  Remind
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!invoice.canVoid || actionPending}
+                                  onClick={() => handleVoidInvoice(invoice)}
+                                  className="text-xs text-error underline decoration-error/40 underline-offset-2 disabled:opacity-40"
+                                >
+                                  Void
+                                </button>
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             ) : recordsTab === "receipts" ? (
               salesReceipts.length === 0 ? (
                 <p className="text-sm text-muted">No sales receipts yet.</p>
@@ -2515,11 +2628,15 @@ export function FinanceWorkspace({
                       </thead>
                       <tbody className="divide-y divide-foreground/10">
                         {paymentsListFiltered.map((payment) => (
-                          <tr key={payment.id} data-focus-id={payment.id} className={rowFocusClass(highlightFocusId, payment.id)}>
+                          <tr
+                            key={payment.id}
+                            data-focus-id={payment.id}
+                            className={rowFocusClass(highlightFocusId, payment.id)}
+                          >
                             <td className="px-3 py-2">
                               <p>{payment.invoiceLabel}</p>
                               {payment.isDirect ? (
-                                <span className="mt-0.5 inline-block rounded-full border border-sky-300/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600">
+                                <span className="mt-0.5 inline-block rounded-full border border-[var(--info-line)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--info)]">
                                   Direct
                                 </span>
                               ) : null}
@@ -2536,7 +2653,9 @@ export function FinanceWorkspace({
                               >
                                 Open
                               </Link>
-                              {payment.hasAttachment ? <span className="ml-2 text-[11px] text-emerald-600">Attachment</span> : null}
+                              {payment.hasAttachment ? (
+                                <span className="ml-2 text-[11px] text-[var(--success)]">Attachment</span>
+                              ) : null}
                             </td>
                           </tr>
                         ))}
@@ -2564,7 +2683,11 @@ export function FinanceWorkspace({
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
                       {expenses.map((expense) => (
-                        <tr key={expense.id} data-focus-id={expense.id} className={rowFocusClass(highlightFocusId, expense.id)}>
+                        <tr
+                          key={expense.id}
+                          data-focus-id={expense.id}
+                          className={rowFocusClass(highlightFocusId, expense.id)}
+                        >
                           <td className="px-3 py-2">{expense.category}</td>
                           <td className="px-3 py-2">{expense.vendorName}</td>
                           <td className="px-3 py-2">{expense.amountLabel}</td>
@@ -2584,8 +2707,9 @@ export function FinanceWorkspace({
                   <div>
                     <p className="text-sm font-semibold text-foreground">Payment reminders</p>
                     <p className="text-xs text-muted">
-                      First reminder after {financeControls.firstReminderAfterDays} day(s) overdue. Second wave after{" "}
-                      {financeControls.secondReminderAfterDays} day(s). One reminder per invoice per 24 hours.
+                      First reminder after {financeControls.firstReminderAfterDays} day(s) overdue. Second
+                      wave after {financeControls.secondReminderAfterDays} day(s). One reminder per invoice
+                      per 24 hours.
                     </p>
                   </div>
                   {canManageFinance ? (
@@ -2782,7 +2906,9 @@ export function FinanceWorkspace({
                     </table>
                   </div>
                 ) : vendorBills.length === 0 ? (
-                  <p className="text-sm text-muted">No vendor bills yet. Record a bill when a supplier invoices you.</p>
+                  <p className="text-sm text-muted">
+                    No vendor bills yet. Record a bill when a supplier invoices you.
+                  </p>
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
                     <table className="w-full text-left text-sm">
@@ -2798,7 +2924,11 @@ export function FinanceWorkspace({
                       </thead>
                       <tbody className="divide-y divide-foreground/10">
                         {vendorBills.map((bill) => (
-                          <tr key={bill.id} data-focus-id={bill.id} className={rowFocusClass(highlightFocusId, bill.id)}>
+                          <tr
+                            key={bill.id}
+                            data-focus-id={bill.id}
+                            className={rowFocusClass(highlightFocusId, bill.id)}
+                          >
                             <td className="px-3 py-2">
                               <p className="font-medium text-foreground">{bill.billNumber}</p>
                               <p className="text-xs text-muted">{bill.title}</p>
@@ -2849,7 +2979,11 @@ export function FinanceWorkspace({
                   <div className="flex items-center gap-3">
                     {reportView.companyLogoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={reportView.companyLogoUrl} alt={`${reportView.companyName} logo`} className="h-10 w-auto object-contain" />
+                      <img
+                        src={reportView.companyLogoUrl}
+                        alt={`${reportView.companyName} logo`}
+                        className="h-10 w-auto object-contain"
+                      />
                     ) : null}
                     <p className="text-sm font-semibold text-foreground">Financial reports</p>
                     <p className="text-xs text-muted">
@@ -2857,14 +2991,19 @@ export function FinanceWorkspace({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <UiSelect value={reportKind} onChange={(e) => setReportKind((e.target.value as ReportKind) || "pnl")}>
+                    <UiSelect
+                      value={reportKind}
+                      onChange={(e) => setReportKind((e.target.value as ReportKind) || "pnl")}
+                    >
                       <option value="pnl">Profit & Loss</option>
                       <option value="cashflow">Cash Flow</option>
                       <option value="balance">Balance Sheet</option>
                     </UiSelect>
                     <UiSelect
                       value={String(reportMonthWindow)}
-                      onChange={(e) => setReportMonthWindow((Number(e.target.value) as ReportMonthWindow) || 6)}
+                      onChange={(e) =>
+                        setReportMonthWindow((Number(e.target.value) as ReportMonthWindow) || 6)
+                      }
                     >
                       <option value="3">Last 3 months</option>
                       <option value="6">Last 6 months</option>
@@ -2872,7 +3011,9 @@ export function FinanceWorkspace({
                     </UiSelect>
                     <UiSelect
                       value={reportCompareMode}
-                      onChange={(e) => setReportCompareMode((e.target.value as ReportCompareMode) || "previous_period")}
+                      onChange={(e) =>
+                        setReportCompareMode((e.target.value as ReportCompareMode) || "previous_period")
+                      }
                     >
                       <option value="previous_period">Compared to last period</option>
                       <option value="same_period_last_year">Compared to same months last year</option>
@@ -2887,11 +3028,15 @@ export function FinanceWorkspace({
                   </div>
                 </div>
                 <p className="text-xs text-muted">
-                  Excel exports include a Summary dashboard with KPIs and charts, plus detail sheets. Use CSV only when you need raw import data.
+                  Excel exports include a Summary dashboard with KPIs and charts, plus detail sheets. Use CSV
+                  only when you need raw import data.
                 </p>
 
                 <div className="grid gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 md:grid-cols-3">
-                  <UiSelect value={reportProjectFilter} onChange={(e) => setReportProjectFilter(e.target.value)}>
+                  <UiSelect
+                    value={reportProjectFilter}
+                    onChange={(e) => setReportProjectFilter(e.target.value)}
+                  >
                     <option value="all">All projects</option>
                     {reportProjectOptions.map((opt) => (
                       <option key={opt.id} value={opt.id}>
@@ -2907,7 +3052,10 @@ export function FinanceWorkspace({
                       </option>
                     ))}
                   </UiSelect>
-                  <UiSelect value={reportDepartmentFilter} onChange={(e) => setReportDepartmentFilter(e.target.value)}>
+                  <UiSelect
+                    value={reportDepartmentFilter}
+                    onChange={(e) => setReportDepartmentFilter(e.target.value)}
+                  >
                     <option value="all">All departments</option>
                     {reportDepartmentOptions.map((opt) => (
                       <option key={opt} value={opt}>
@@ -2916,11 +3064,16 @@ export function FinanceWorkspace({
                     ))}
                   </UiSelect>
                 </div>
-                <p className="text-xs text-muted">Department filter applies across invoices, payments, and expenses.</p>
+                <p className="text-xs text-muted">
+                  Department filter applies across invoices, payments, and expenses.
+                </p>
 
                 <div className="grid gap-3 md:grid-cols-4">
                   {reportComparisonCards.map((card) => (
-                    <div key={card.id} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
+                    <div
+                      key={card.id}
+                      className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3"
+                    >
                       <p className="text-xs uppercase tracking-wide text-muted">{card.label}</p>
                       <p className="mt-1 text-lg font-semibold text-foreground">
                         {reportView.currency} {card.current.toLocaleString()}
@@ -2941,22 +3094,38 @@ export function FinanceWorkspace({
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Invoiced (all time)</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{reportView.pnlLite.invoicedLabel}</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {reportView.pnlLite.invoicedLabel}
+                    </p>
                     <p className="mt-1 text-xs text-muted">Collected: {reportView.pnlLite.collectedLabel}</p>
                     <p className="text-xs text-muted">Outstanding: {reportView.pnlLite.outstandingLabel}</p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Monthly cash</p>
-                    <p className="mt-1 text-xs text-muted">This month: {reportView.cashflowLite.currentMonthLabel}</p>
-                    <p className="text-xs text-muted">Last month: {reportView.cashflowLite.previousMonthLabel}</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">Change: {reportView.cashflowLite.changeLabel}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      This month: {reportView.cashflowLite.currentMonthLabel}
+                    </p>
+                    <p className="text-xs text-muted">
+                      Last month: {reportView.cashflowLite.previousMonthLabel}
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      Change: {reportView.cashflowLite.changeLabel}
+                    </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Collections performance</p>
-                    <p className="mt-1 text-lg font-semibold text-emerald-600">{reportView.collections.collectionRateLabel}</p>
-                    <p className="mt-1 text-xs text-muted">Overdue amount: {reportView.collections.overdueOutstandingLabel}</p>
-                    <p className="text-xs text-muted">Overdue invoices: {reportView.collections.overdueCount}</p>
-                    <p className="text-xs text-muted">Reminders sent: {reportView.collections.remindersSent}</p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--success)]">
+                      {reportView.collections.collectionRateLabel}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Overdue amount: {reportView.collections.overdueOutstandingLabel}
+                    </p>
+                    <p className="text-xs text-muted">
+                      Overdue invoices: {reportView.collections.overdueCount}
+                    </p>
+                    <p className="text-xs text-muted">
+                      Reminders sent: {reportView.collections.remindersSent}
+                    </p>
                   </div>
                 </div>
 
@@ -2967,7 +3136,8 @@ export function FinanceWorkspace({
                       {reportView.currency} {filteredBalanceSnapshot.receivables.toLocaleString()}
                     </p>
                     <p className="text-xs text-muted">
-                      Overdue: {reportView.currency} {filteredBalanceSnapshot.overdueReceivables.toLocaleString()}
+                      Overdue: {reportView.currency}{" "}
+                      {filteredBalanceSnapshot.overdueReceivables.toLocaleString()}
                     </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
@@ -2984,7 +3154,12 @@ export function FinanceWorkspace({
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Net cashflow</p>
-                    <p className={["mt-1 text-lg font-semibold", valueTone(filteredBalanceSnapshot.netCashflow)].join(" ")}>
+                    <p
+                      className={[
+                        "mt-1 text-lg font-semibold",
+                        valueTone(filteredBalanceSnapshot.netCashflow),
+                      ].join(" ")}
+                    >
                       {reportView.currency} {filteredBalanceSnapshot.netCashflow.toLocaleString()}
                     </p>
                   </div>
@@ -3003,60 +3178,78 @@ export function FinanceWorkspace({
                       </button>
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-lg border border-emerald-200/60 bg-emerald-50/40 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">What you own</p>
+                      <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--success)]">
+                          What you own
+                        </p>
                         <ul className="mt-2 space-y-2 text-sm">
                           {balanceSheetSections.assets.map((line) => (
                             <li
                               key={line.label}
-                              className={line.sub ? "pl-3 text-red-600 dark:text-red-400" : "text-foreground"}
+                              className={line.sub ? "pl-3 text-[var(--danger)] " : "text-foreground"}
                             >
                               <span>{line.label}</span>
-                              <span className={["float-right font-semibold", line.sub ? "text-red-600 dark:text-red-400" : ""].join(" ")}>
+                              <span
+                                className={[
+                                  "float-right font-semibold",
+                                  line.sub ? "text-[var(--danger)] " : "",
+                                ].join(" ")}
+                              >
                                 {reportView.currency} {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
                         </ul>
-                        <p className="mt-3 border-t border-emerald-200/60 pt-2 text-sm font-semibold text-emerald-800 dark:border-emerald-900/40 dark:text-emerald-300">
+                        <p className="mt-3 border-t border-[var(--success-line)] pt-2 text-sm font-semibold text-[var(--success)]">
                           Total{" "}
                           <span className="float-right">
                             {reportView.currency} {balanceSheetSections.assetsTotal.toLocaleString()}
                           </span>
                         </p>
                       </div>
-                      <div className="rounded-lg border border-red-200/60 bg-red-50/40 p-3 dark:border-red-900/40 dark:bg-red-950/20">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">What you owe</p>
+                      <div className="rounded-lg border border-[var(--danger-line)] bg-[var(--danger-wash)] p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--danger)]">
+                          What you owe
+                        </p>
                         <ul className="mt-2 space-y-2 text-sm">
                           {balanceSheetSections.liabilities.map((line) => (
                             <li key={line.label} className="text-foreground">
                               <span>{line.label}</span>
-                              <span className="float-right font-semibold text-red-700 dark:text-red-400">
+                              <span className="float-right font-semibold text-[var(--danger)]">
                                 {reportView.currency} {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
                         </ul>
-                        <p className="mt-3 border-t border-red-200/60 pt-2 text-sm font-semibold text-red-800 dark:border-red-900/40 dark:text-red-300">
+                        <p className="mt-3 border-t border-[var(--danger-line)] pt-2 text-sm font-semibold text-[var(--danger)]">
                           Total{" "}
                           <span className="float-right">
                             {reportView.currency} {balanceSheetSections.liabilitiesTotal.toLocaleString()}
                           </span>
                         </p>
                       </div>
-                      <div className="rounded-lg border border-blue-200/60 bg-blue-50/40 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">Owner position</p>
+                      <div className="rounded-lg border border-[var(--info-line)] bg-[var(--info-wash)] p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--info)]">
+                          Owner position
+                        </p>
                         <ul className="mt-2 space-y-2 text-sm">
                           {balanceSheetSections.equity.map((line) => (
                             <li key={line.label} className="text-foreground">
                               <span>{line.label}</span>
-                              <span className={["float-right font-semibold", valueTone(line.amount)].join(" ")}>
+                              <span
+                                className={["float-right font-semibold", valueTone(line.amount)].join(" ")}
+                              >
                                 {reportView.currency} {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
                         </ul>
-                        <p className={["mt-3 border-t border-blue-200/60 pt-2 text-sm font-semibold dark:border-blue-900/40", valueTone(balanceSheetSections.equityTotal)].join(" ")}>
+                        <p
+                          className={[
+                            "mt-3 border-t border-[var(--info-line)] pt-2 text-sm font-semibold ",
+                            valueTone(balanceSheetSections.equityTotal),
+                          ].join(" ")}
+                        >
                           Total{" "}
                           <span className="float-right">
                             {reportView.currency} {balanceSheetSections.equityTotal.toLocaleString()}
@@ -3069,61 +3262,13 @@ export function FinanceWorkspace({
 
                 {reportKind === "pnl" ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">Profit & loss by month (last {reportMonthWindow} months)</p>
-                    <button
-                      type="button"
-                      onClick={() => void exportReportExcel("pnl")}
-                      className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
-                    >
-                      Export Excel
-                    </button>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Month</th>
-                          <th className="px-3 py-2">Invoiced</th>
-                          <th className="px-3 py-2">Collected</th>
-                          <th className="px-3 py-2">Expenses</th>
-                          <th className="px-3 py-2">Net</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-foreground/10">
-                        {visiblePnlBreakdown.map((row) => (
-                          <tr key={row.month}>
-                            <td className="px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => setReportDrilldownMonth(row.month)}
-                                className="text-left font-medium text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
-                              >
-                                {row.month}
-                              </button>
-                            </td>
-                            <td className="px-3 py-2">{reportView.currency} {row.invoiced.toLocaleString()}</td>
-                            <td className="px-3 py-2">{reportView.currency} {row.collected.toLocaleString()}</td>
-                            <td className="px-3 py-2">{reportView.currency} {row.expenses.toLocaleString()}</td>
-                            <td className={["px-3 py-2 font-semibold", valueTone(row.net)].join(" ")}>
-                              {reportView.currency} {row.net.toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                ) : null}
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  {reportKind === "cashflow" ? (
-                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">Cash flow by month</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        Profit & loss by month (last {reportMonthWindow} months)
+                      </p>
                       <button
                         type="button"
-                        onClick={() => void exportReportExcel("cashflow")}
+                        onClick={() => void exportReportExcel("pnl")}
                         className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
                       >
                         Export Excel
@@ -3134,13 +3279,14 @@ export function FinanceWorkspace({
                         <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
                           <tr>
                             <th className="px-3 py-2">Month</th>
-                            <th className="px-3 py-2">Inflow</th>
-                            <th className="px-3 py-2">Outflow</th>
+                            <th className="px-3 py-2">Invoiced</th>
+                            <th className="px-3 py-2">Collected</th>
+                            <th className="px-3 py-2">Expenses</th>
                             <th className="px-3 py-2">Net</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-foreground/10">
-                          {visibleCashflowBreakdown.map((row) => (
+                          {visiblePnlBreakdown.map((row) => (
                             <tr key={row.month}>
                               <td className="px-3 py-2">
                                 <button
@@ -3151,8 +3297,15 @@ export function FinanceWorkspace({
                                   {row.month}
                                 </button>
                               </td>
-                              <td className="px-3 py-2">{reportView.currency} {row.inflow.toLocaleString()}</td>
-                              <td className="px-3 py-2">{reportView.currency} {row.outflow.toLocaleString()}</td>
+                              <td className="px-3 py-2">
+                                {reportView.currency} {row.invoiced.toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2">
+                                {reportView.currency} {row.collected.toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2">
+                                {reportView.currency} {row.expenses.toLocaleString()}
+                              </td>
                               <td className={["px-3 py-2 font-semibold", valueTone(row.net)].join(" ")}>
                                 {reportView.currency} {row.net.toLocaleString()}
                               </td>
@@ -3162,6 +3315,58 @@ export function FinanceWorkspace({
                       </table>
                     </div>
                   </div>
+                ) : null}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  {reportKind === "cashflow" ? (
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-semibold text-foreground">Cash flow by month</p>
+                        <button
+                          type="button"
+                          onClick={() => void exportReportExcel("cashflow")}
+                          className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
+                        >
+                          Export Excel
+                        </button>
+                      </div>
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">Month</th>
+                              <th className="px-3 py-2">Inflow</th>
+                              <th className="px-3 py-2">Outflow</th>
+                              <th className="px-3 py-2">Net</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {visibleCashflowBreakdown.map((row) => (
+                              <tr key={row.month}>
+                                <td className="px-3 py-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setReportDrilldownMonth(row.month)}
+                                    className="text-left font-medium text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
+                                  >
+                                    {row.month}
+                                  </button>
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency} {row.inflow.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency} {row.outflow.toLocaleString()}
+                                </td>
+                                <td className={["px-3 py-2 font-semibold", valueTone(row.net)].join(" ")}>
+                                  {reportView.currency} {row.net.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   ) : null}
 
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
@@ -3189,7 +3394,9 @@ export function FinanceWorkspace({
                             <tr key={row.category}>
                               <td className="px-3 py-2">{row.category}</td>
                               <td className="px-3 py-2">{row.count}</td>
-                              <td className="px-3 py-2 font-semibold">{reportView.currency} {row.total.toLocaleString()}</td>
+                              <td className="px-3 py-2 font-semibold">
+                                {reportView.currency} {row.total.toLocaleString()}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -3201,7 +3408,9 @@ export function FinanceWorkspace({
                 {reportDrilldown ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-foreground">Transactions for {reportDrilldown.month}</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        Transactions for {reportDrilldown.month}
+                      </p>
                       <button
                         type="button"
                         onClick={() => setReportDrilldownMonth(null)}
@@ -3213,23 +3422,37 @@ export function FinanceWorkspace({
                     <div className="grid gap-3 md:grid-cols-3">
                       <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Invoices</p>
-                        <p className="mt-1 text-base font-semibold text-foreground">{reportDrilldown.invoices.length}</p>
-                        <p className="text-xs text-muted">{reportView.currency} {reportDrilldown.totals.invoices.toLocaleString()}</p>
+                        <p className="mt-1 text-base font-semibold text-foreground">
+                          {reportDrilldown.invoices.length}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {reportView.currency} {reportDrilldown.totals.invoices.toLocaleString()}
+                        </p>
                       </div>
                       <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Payments</p>
-                        <p className="mt-1 text-base font-semibold text-foreground">{reportDrilldown.payments.length}</p>
-                        <p className="text-xs text-muted">{reportView.currency} {reportDrilldown.totals.payments.toLocaleString()}</p>
+                        <p className="mt-1 text-base font-semibold text-foreground">
+                          {reportDrilldown.payments.length}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {reportView.currency} {reportDrilldown.totals.payments.toLocaleString()}
+                        </p>
                       </div>
                       <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Expenses</p>
-                        <p className="mt-1 text-base font-semibold text-foreground">{reportDrilldown.expenses.length}</p>
-                        <p className="text-xs text-muted">{reportView.currency} {reportDrilldown.totals.expenses.toLocaleString()}</p>
+                        <p className="mt-1 text-base font-semibold text-foreground">
+                          {reportDrilldown.expenses.length}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {reportView.currency} {reportDrilldown.totals.expenses.toLocaleString()}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-3 grid gap-4 md:grid-cols-3">
                       <div className="rounded-md border border-foreground/10">
-                        <p className="border-b border-foreground/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">Invoices</p>
+                        <p className="border-b border-foreground/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                          Invoices
+                        </p>
                         <div className="max-h-56 overflow-y-auto px-3 py-2 text-xs">
                           {reportDrilldown.invoices.length === 0 ? (
                             <p className="text-muted">No invoices for this month.</p>
@@ -3248,7 +3471,9 @@ export function FinanceWorkspace({
                         </div>
                       </div>
                       <div className="rounded-md border border-foreground/10">
-                        <p className="border-b border-foreground/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">Payments</p>
+                        <p className="border-b border-foreground/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                          Payments
+                        </p>
                         <div className="max-h-56 overflow-y-auto px-3 py-2 text-xs">
                           {reportDrilldown.payments.length === 0 ? (
                             <p className="text-muted">No payments for this month.</p>
@@ -3267,7 +3492,9 @@ export function FinanceWorkspace({
                         </div>
                       </div>
                       <div className="rounded-md border border-foreground/10">
-                        <p className="border-b border-foreground/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">Expenses</p>
+                        <p className="border-b border-foreground/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                          Expenses
+                        </p>
                         <div className="max-h-56 overflow-y-auto px-3 py-2 text-xs">
                           {reportDrilldown.expenses.length === 0 ? (
                             <p className="text-muted">No expenses for this month.</p>
@@ -3293,13 +3520,19 @@ export function FinanceWorkspace({
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Configured bank/cash accounts</p>
-                    <p className="mt-1 text-xl font-semibold text-foreground">{financeOptions.bankAccounts.length}</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Configured bank/cash accounts
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-foreground">
+                      {financeOptions.bankAccounts.length}
+                    </p>
                     <p className="mt-1 text-xs text-muted">Managed from Finance Settings.</p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                     <p className="text-xs uppercase tracking-wide text-muted">Captured payment modes</p>
-                    <p className="mt-1 text-xl font-semibold text-foreground">{financeOptions.paymentModes.length}</p>
+                    <p className="mt-1 text-xl font-semibold text-foreground">
+                      {financeOptions.paymentModes.length}
+                    </p>
                     <p className="mt-1 text-xs text-muted">Available in payment and receipt forms.</p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
@@ -3342,8 +3575,9 @@ export function FinanceWorkspace({
                   </div>
                   {importedBankRows.length > 0 ? (
                     <div className="mb-4 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
-                      Imported file: <span className="font-medium text-foreground">{bankImportName}</span> with{" "}
-                      <span className="font-medium text-foreground">{importedBankRows.length}</span> transaction row(s).
+                      Imported file: <span className="font-medium text-foreground">{bankImportName}</span>{" "}
+                      with <span className="font-medium text-foreground">{importedBankRows.length}</span>{" "}
+                      transaction row(s).
                     </div>
                   ) : null}
                   <p className="text-sm font-semibold text-foreground">Next in banking rollout</p>
@@ -3368,7 +3602,10 @@ export function FinanceWorkspace({
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-foreground">Import history</p>
                       <div className="flex items-center gap-2">
-                        <UiSelect value={selectedImportId} onChange={(e) => setSelectedImportId(e.target.value)}>
+                        <UiSelect
+                          value={selectedImportId}
+                          onChange={(e) => setSelectedImportId(e.target.value)}
+                        >
                           <option value="all">All imports</option>
                           {bankingImports.map((imp) => (
                             <option key={imp.id} value={imp.id}>
@@ -3378,7 +3615,11 @@ export function FinanceWorkspace({
                         </UiSelect>
                         <button
                           type="button"
-                          disabled={!selectedImport || selectedImport.finalized || finalizingImportId === selectedImport?.id}
+                          disabled={
+                            !selectedImport ||
+                            selectedImport.finalized ||
+                            finalizingImportId === selectedImport?.id
+                          }
                           onClick={() => void handleFinalizeSelectedImport()}
                           className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
                         >
@@ -3405,15 +3646,17 @@ export function FinanceWorkspace({
                               <td className="px-3 py-2">{imp.sourceName}</td>
                               <td className="px-3 py-2 text-muted">{imp.importedAtLabel}</td>
                               <td className="px-3 py-2">{imp.totalRows}</td>
-                              <td className="px-3 py-2 text-emerald-600">{imp.matchedRows}</td>
-                              <td className="px-3 py-2 text-amber-600">{imp.unmatchedRows}</td>
+                              <td className="px-3 py-2 text-[var(--success)]">{imp.matchedRows}</td>
+                              <td className="px-3 py-2 text-[var(--warn)]">{imp.unmatchedRows}</td>
                               <td className="px-3 py-2">
                                 {imp.finalized ? (
-                                  <span className="rounded-full border border-emerald-300/40 px-2 py-0.5 text-xs text-emerald-500">
+                                  <span className="rounded-full border border-[var(--success-line)] px-2 py-0.5 text-xs text-[var(--success)]">
                                     Finalized
                                   </span>
                                 ) : (
-                                  <span className="rounded-full border border-foreground/20 px-2 py-0.5 text-xs text-muted">Open</span>
+                                  <span className="rounded-full border border-foreground/20 px-2 py-0.5 text-xs text-muted">
+                                    Open
+                                  </span>
                                 )}
                               </td>
                               <td className="px-3 py-2">
@@ -3437,25 +3680,35 @@ export function FinanceWorkspace({
                     <div className="mb-3 grid gap-3 md:grid-cols-4">
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Match rate</p>
-                        <p className="mt-1 text-lg font-semibold text-foreground">{bankingMetrics.matchRate.toFixed(1)}%</p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">
+                          {bankingMetrics.matchRate.toFixed(1)}%
+                        </p>
                       </div>
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Rows in scope</p>
                         <p className="mt-1 text-lg font-semibold text-foreground">{bankingMetrics.total}</p>
-                        <p className="text-xs text-muted">Matched {bankingMetrics.matched} / Unmatched {bankingMetrics.unmatched}</p>
+                        <p className="text-xs text-muted">
+                          Matched {bankingMetrics.matched} / Unmatched {bankingMetrics.unmatched}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Unmatched amount</p>
-                        <p className="mt-1 text-lg font-semibold text-foreground">{bankingMetrics.unmatchedAmount.toLocaleString()}</p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">
+                          {bankingMetrics.unmatchedAmount.toLocaleString()}
+                        </p>
                       </div>
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                         <p className="text-xs uppercase tracking-wide text-muted">Oldest unmatched</p>
-                        <p className="mt-1 text-lg font-semibold text-foreground">{bankingMetrics.oldestUnmatchedDays} day(s)</p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">
+                          {bankingMetrics.oldestUnmatchedDays} day(s)
+                        </p>
                       </div>
                     </div>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-foreground">Reconciliation queue (manual review)</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          Reconciliation queue (manual review)
+                        </p>
                         <p className="mt-1 text-xs text-muted">
                           Suggested matches are based on exact amount + nearest date + reference hint.
                         </p>
@@ -3511,13 +3764,19 @@ export function FinanceWorkspace({
                       ))}
                     </div>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <UiSelect value={bankStatusFilter} onChange={(e) => setBankStatusFilter(e.target.value as BankingStatusFilter)}>
+                      <UiSelect
+                        value={bankStatusFilter}
+                        onChange={(e) => setBankStatusFilter(e.target.value as BankingStatusFilter)}
+                      >
                         <option value="all">All statuses</option>
                         <option value="unmatched">Unmatched</option>
                         <option value="matched">Matched</option>
                         <option value="exception">Exception</option>
                       </UiSelect>
-                      <UiSelect value={exceptionReasonFilter} onChange={(e) => setExceptionReasonFilter(e.target.value)}>
+                      <UiSelect
+                        value={exceptionReasonFilter}
+                        onChange={(e) => setExceptionReasonFilter(e.target.value)}
+                      >
                         <option value="all">All exception reasons</option>
                         {BANK_EXCEPTION_REASON_OPTIONS.map((reason) => (
                           <option key={reason} value={reason}>
@@ -3559,30 +3818,37 @@ export function FinanceWorkspace({
                                     {row.reference ? ` | Ref: ${row.reference}` : ""}
                                   </p>
                                   {row.importIsFinalized ? (
-                                    <p className="mt-1 text-[11px] text-emerald-600">Batch finalized (locked)</p>
+                                    <p className="mt-1 text-[11px] text-[var(--success)]">
+                                      Batch finalized (locked)
+                                    </p>
                                   ) : null}
                                 </td>
                                 <td className="px-3 py-2">
                                   <span
                                     className={
                                       row.direction === "credit"
-                                        ? "rounded-full border border-emerald-300/40 px-2 py-0.5 text-xs text-emerald-500"
-                                        : "rounded-full border border-amber-300/40 px-2 py-0.5 text-xs text-amber-500"
+                                        ? "rounded-full border border-[var(--success-line)] px-2 py-0.5 text-xs text-[var(--success)]"
+                                        : "rounded-full border border-[var(--warn-line)] px-2 py-0.5 text-xs text-[var(--warn)]"
                                     }
                                   >
                                     {row.direction}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2 text-foreground">{row.amountAbs.toLocaleString()}</td>
+                                <td className="px-3 py-2 text-foreground">
+                                  {row.amountAbs.toLocaleString()}
+                                </td>
                                 <td className="px-3 py-2 text-muted">
                                   {row.matchStatus === "MATCHED" ? (
                                     <p className="text-foreground">
-                                      Matched to {row.matchedEntityType || "record"} {row.matchedEntityId ? `(${row.matchedEntityId.slice(0, 8)})` : ""}
+                                      Matched to {row.matchedEntityType || "record"}{" "}
+                                      {row.matchedEntityId ? `(${row.matchedEntityId.slice(0, 8)})` : ""}
                                     </p>
                                   ) : row.matchStatus === "EXCEPTION" ? (
                                     <>
                                       <p className="text-foreground">Exception bucket</p>
-                                      <p className="text-xs text-muted">Reason: {row.exceptionReason || "OTHER"}</p>
+                                      <p className="text-xs text-muted">
+                                        Reason: {row.exceptionReason || "OTHER"}
+                                      </p>
                                     </>
                                   ) : match ? (
                                     <>
@@ -3599,15 +3865,15 @@ export function FinanceWorkspace({
                                 </td>
                                 <td className="px-3 py-2">
                                   {row.matchStatus === "MATCHED" ? (
-                                    <span className="rounded-full border border-emerald-300/40 px-2 py-0.5 text-xs text-emerald-500">
+                                    <span className="rounded-full border border-[var(--success-line)] px-2 py-0.5 text-xs text-[var(--success)]">
                                       Matched
                                     </span>
                                   ) : row.matchStatus === "EXCEPTION" ? (
-                                    <span className="rounded-full border border-amber-300/40 px-2 py-0.5 text-xs text-amber-600">
+                                    <span className="rounded-full border border-[var(--warn-line)] px-2 py-0.5 text-xs text-[var(--warn)]">
                                       Exception
                                     </span>
                                   ) : match ? (
-                                    <span className="rounded-full border border-emerald-300/40 px-2 py-0.5 text-xs text-emerald-500">
+                                    <span className="rounded-full border border-[var(--success-line)] px-2 py-0.5 text-xs text-[var(--success)]">
                                       Ready to match
                                     </span>
                                   ) : (
@@ -3641,13 +3907,17 @@ export function FinanceWorkspace({
                                         <UiSelect
                                           value={selected}
                                           onChange={(e) =>
-                                            setManualMatchSelection((curr) => ({ ...curr, [row.id]: e.target.value }))
+                                            setManualMatchSelection((curr) => ({
+                                              ...curr,
+                                              [row.id]: e.target.value,
+                                            }))
                                           }
                                         >
                                           <option value="">Pick record</option>
                                           {candidates.map((c) => (
                                             <option key={`${c.kind}:${c.id}`} value={`${c.kind}:${c.id}`}>
-                                              {c.kind === "payment" ? "Payment" : "Expense"} | {c.amount.toLocaleString()} | {c.label}
+                                              {c.kind === "payment" ? "Payment" : "Expense"} |{" "}
+                                              {c.amount.toLocaleString()} | {c.label}
                                             </option>
                                           ))}
                                         </UiSelect>
@@ -3659,7 +3929,9 @@ export function FinanceWorkspace({
                                             if (!selected) return;
                                             const [kind, id] = selected.split(":");
                                             if (!id || (kind !== "payment" && kind !== "expense")) return;
-                                            const candidate = candidates.find((c) => c.id === id && c.kind === kind);
+                                            const candidate = candidates.find(
+                                              (c) => c.id === id && c.kind === kind,
+                                            );
                                             if (!candidate) return;
                                             void handleMarkMatched(row, candidate);
                                           }}
@@ -3670,9 +3942,14 @@ export function FinanceWorkspace({
                                     )}
                                     <div className="flex items-center gap-2">
                                       <UiSelect
-                                        value={exceptionReasonDrafts[row.id] ?? row.exceptionReason ?? "OTHER"}
+                                        value={
+                                          exceptionReasonDrafts[row.id] ?? row.exceptionReason ?? "OTHER"
+                                        }
                                         onChange={(e) =>
-                                          setExceptionReasonDrafts((curr) => ({ ...curr, [row.id]: e.target.value }))
+                                          setExceptionReasonDrafts((curr) => ({
+                                            ...curr,
+                                            [row.id]: e.target.value,
+                                          }))
                                         }
                                       >
                                         {BANK_EXCEPTION_REASON_OPTIONS.map((reason) => (
@@ -3683,7 +3960,9 @@ export function FinanceWorkspace({
                                       </UiSelect>
                                       <input
                                         value={noteDrafts[row.id] ?? row.reconciliationNote ?? ""}
-                                        onChange={(e) => setNoteDrafts((curr) => ({ ...curr, [row.id]: e.target.value }))}
+                                        onChange={(e) =>
+                                          setNoteDrafts((curr) => ({ ...curr, [row.id]: e.target.value }))
+                                        }
                                         placeholder="Exception note"
                                         className="w-40 rounded-md border border-foreground/20 bg-background px-2 py-1 text-xs"
                                         disabled={row.importIsFinalized}
@@ -3699,7 +3978,7 @@ export function FinanceWorkspace({
                                       <button
                                         type="button"
                                         disabled={row.importIsFinalized}
-                                        className="rounded-md border border-amber-300/40 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                                        className="rounded-md border border-[var(--warn-line)] px-2 py-1 text-xs text-[var(--warn)] hover:bg-[var(--warn-wash)] disabled:opacity-50"
                                         onClick={() => void handleMarkException(row)}
                                       >
                                         Mark exception
@@ -3720,9 +3999,17 @@ export function FinanceWorkspace({
               <p className="text-sm text-muted">No master logs yet.</p>
             ) : (
               <div className="space-y-3">
-                <form action={`/${tenantSlug}/finance/audit-logs`} method="get" className="grid gap-2 md:grid-cols-6">
-                  {logFilters.logsEntityType ? <input type="hidden" name="logsEntityType" value={logFilters.logsEntityType} /> : null}
-                  {logFilters.logsEntityId ? <input type="hidden" name="logsEntityId" value={logFilters.logsEntityId} /> : null}
+                <form
+                  action={`/${tenantSlug}/finance/audit-logs`}
+                  method="get"
+                  className="grid gap-2 md:grid-cols-6"
+                >
+                  {logFilters.logsEntityType ? (
+                    <input type="hidden" name="logsEntityType" value={logFilters.logsEntityType} />
+                  ) : null}
+                  {logFilters.logsEntityId ? (
+                    <input type="hidden" name="logsEntityId" value={logFilters.logsEntityId} />
+                  ) : null}
                   <input
                     name="logsQ"
                     defaultValue={logFilters.logsQ}
@@ -3769,13 +4056,21 @@ export function FinanceWorkspace({
                     </button>
                   </div>
                 </form>
-                <form action={`/${tenantSlug}/finance/audit-logs`} method="get" className="grid gap-2 md:grid-cols-6">
+                <form
+                  action={`/${tenantSlug}/finance/audit-logs`}
+                  method="get"
+                  className="grid gap-2 md:grid-cols-6"
+                >
                   <input type="hidden" name="logsQ" value={logFilters.logsQ} />
                   <input type="hidden" name="logsModule" value={logFilters.logsModule} />
                   <input type="hidden" name="logsAction" value={logFilters.logsAction} />
                   <input type="hidden" name="logsActor" value={logFilters.logsActor} />
-                  {logFilters.logsEntityType ? <input type="hidden" name="logsEntityType" value={logFilters.logsEntityType} /> : null}
-                  {logFilters.logsEntityId ? <input type="hidden" name="logsEntityId" value={logFilters.logsEntityId} /> : null}
+                  {logFilters.logsEntityType ? (
+                    <input type="hidden" name="logsEntityType" value={logFilters.logsEntityType} />
+                  ) : null}
+                  {logFilters.logsEntityId ? (
+                    <input type="hidden" name="logsEntityId" value={logFilters.logsEntityId} />
+                  ) : null}
                   <input
                     type="date"
                     name="logsFrom"
@@ -3803,460 +4098,506 @@ export function FinanceWorkspace({
                       Clear filters
                     </button>
                     <p className="text-xs text-muted">
-                      {logPagination.total} total log(s), page {logFilters.logsPage} of {logPagination.totalPages}
+                      {logPagination.total} total log(s), page {logFilters.logsPage} of{" "}
+                      {logPagination.totalPages}
                     </p>
                   </div>
                 </form>
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
-                    <tr>
-                      <th className="px-3 py-2">When</th>
-                      <th className="px-3 py-2">Actor</th>
-                      <th className="px-3 py-2">Module</th>
-                      <th className="px-3 py-2">Action</th>
-                      <th className="px-3 py-2">Entity</th>
-                      <th className="px-3 py-2">Summary</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-foreground/10">
-                    {masterLogs.map((log) => (
-                      <tr key={log.id}>
-                        <td className="px-3 py-2">{log.timestamp}</td>
-                        <td className="px-3 py-2">{log.actor}</td>
-                        <td className="px-3 py-2">{log.module}</td>
-                        <td className="px-3 py-2">{log.action}</td>
-                        <td className="px-3 py-2">{log.entityType}</td>
-                        <td className="px-3 py-2">{log.summary}</td>
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                      <tr>
+                        <th className="px-3 py-2">When</th>
+                        <th className="px-3 py-2">Actor</th>
+                        <th className="px-3 py-2">Module</th>
+                        <th className="px-3 py-2">Action</th>
+                        <th className="px-3 py-2">Entity</th>
+                        <th className="px-3 py-2">Summary</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex items-center justify-between">
-                <Link
-                  href={financeAuditLogsUrl(tenantSlug, logFilters, Math.max(1, logFilters.logsPage - 1))}
-                  className={[
-                    "rounded-md border px-3 py-1.5 text-xs font-semibold",
-                    logFilters.logsPage <= 1
-                      ? "pointer-events-none border-foreground/10 text-muted/60"
-                      : "border-foreground/15 text-foreground hover:bg-foreground/[0.06]",
-                  ].join(" ")}
-                >
-                  Previous
-                </Link>
-                <Link
-                  href={financeAuditLogsUrl(tenantSlug, logFilters, Math.min(logPagination.totalPages, logFilters.logsPage + 1))}
-                  className={[
-                    "rounded-md border px-3 py-1.5 text-xs font-semibold",
-                    logFilters.logsPage >= logPagination.totalPages
-                      ? "pointer-events-none border-foreground/10 text-muted/60"
-                      : "border-foreground/15 text-foreground hover:bg-foreground/[0.06]",
-                  ].join(" ")}
-                >
-                  Next
-                </Link>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-foreground/10">
+                      {masterLogs.map((log) => (
+                        <tr key={log.id}>
+                          <td className="px-3 py-2">{log.timestamp}</td>
+                          <td className="px-3 py-2">{log.actor}</td>
+                          <td className="px-3 py-2">{log.module}</td>
+                          <td className="px-3 py-2">{log.action}</td>
+                          <td className="px-3 py-2">{log.entityType}</td>
+                          <td className="px-3 py-2">{log.summary}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Link
+                    href={financeAuditLogsUrl(tenantSlug, logFilters, Math.max(1, logFilters.logsPage - 1))}
+                    className={[
+                      "rounded-md border px-3 py-1.5 text-xs font-semibold",
+                      logFilters.logsPage <= 1
+                        ? "pointer-events-none border-foreground/10 text-muted/60"
+                        : "border-foreground/15 text-foreground hover:bg-foreground/[0.06]",
+                    ].join(" ")}
+                  >
+                    Previous
+                  </Link>
+                  <Link
+                    href={financeAuditLogsUrl(
+                      tenantSlug,
+                      logFilters,
+                      Math.min(logPagination.totalPages, logFilters.logsPage + 1),
+                    )}
+                    className={[
+                      "rounded-md border px-3 py-1.5 text-xs font-semibold",
+                      logFilters.logsPage >= logPagination.totalPages
+                        ? "pointer-events-none border-foreground/10 text-muted/60"
+                        : "border-foreground/15 text-foreground hover:bg-foreground/[0.06]",
+                    ].join(" ")}
+                  >
+                    Next
+                  </Link>
+                </div>
               </div>
             )}
           </div>
-          </section>
+        </section>
       ) : null}
 
-
-      <ModalOverlay open={Boolean(isCreateInvoiceOpen)} onClose={() => setIsCreateInvoiceOpen(false)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Create invoice</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateInvoiceOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+      <ModalOverlay
+        open={Boolean(isCreateInvoiceOpen)}
+        onClose={() => setIsCreateInvoiceOpen(false)}
+        panelClassName={MODAL_PANEL_SM}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Create invoice</h2>
+          <button
+            type="button"
+            onClick={() => setIsCreateInvoiceOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <form action={handleCreateInvoice} className="mt-4 space-y-3">
+          <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
+            Currency options come from{" "}
+            <Link
+              href={`/${tenantSlug}/finance/settings`}
+              className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
+            >
+              Finance settings
+            </Link>
+            .
+          </p>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Linked deal (optional)</label>
+            <UiSelect name="dealId" defaultValue="">
+              <option value="">None</option>
+              {dealOptions.map((deal) => (
+                <option key={deal.id} value={deal.id}>
+                  {deal.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Invoice title</label>
+            <input
+              name="title"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                inputMode="decimal"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
             </div>
-            <form action={handleCreateInvoice} className="mt-4 space-y-3">
-              <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
-                Currency options come from{" "}
-                <Link
-                  href={`/${tenantSlug}/finance/settings`}
-                  className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
-                >
-                  Finance settings
-                </Link>
-                .
-              </p>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Linked deal (optional)</label>
-                <UiSelect name="dealId" defaultValue="">
-                  <option value="">None</option>
-                  {dealOptions.map((deal) => (
-                    <option key={deal.id} value={deal.id}>
-                      {deal.label}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Invoice title</label>
-                <input
-                  name="title"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Amount</label>
-                  <input
-                    name="amount"
-                    inputMode="decimal"
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Currency</label>
-                  <UiSelect
-                    key={`inv-curr-${financeOptions.currencies.join("|")}`}
-                    name="currency"
-                    defaultValue={financeOptions.currencies[0] || "NGN"}
-                  >
-                    {financeOptions.currencies.map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currency}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Due date (optional)</label>
-                <input
-                  name="dueDate"
-                  type="date"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-                <UiSelect
-                  name="department"
-                  defaultValue={financeOptions.departments[0] || "Finance"}
-                >
-                  <option value="">Select department</option>
-                  {financeOptions.departments.map((department) => (
-                    <option key={department} value={department}>
-                      {department}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateInvoiceOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {actionPending ? "Saving..." : "Create"}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Currency</label>
+              <UiSelect
+                key={`inv-curr-${financeOptions.currencies.join("|")}`}
+                name="currency"
+                defaultValue={financeOptions.currencies[0] || "NGN"}
+              >
+                {financeOptions.currencies.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Due date (optional)</label>
+            <input
+              name="dueDate"
+              type="date"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+            <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
+              <option value="">Select department</option>
+              {financeOptions.departments.map((department) => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateInvoiceOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={actionPending}
+              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {actionPending ? "Saving..." : "Create"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
-      <ModalOverlay open={Boolean(isCreateReceiptOpen)} onClose={() => setIsCreateReceiptOpen(false)} panelClassName={MODAL_PANEL_XL}>
-        
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Create sales receipt</h2>
-                <p className="mt-1 text-xs text-muted">Capture customer payment instantly with account and mode details.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateReceiptOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+      <ModalOverlay
+        open={Boolean(isCreateReceiptOpen)}
+        onClose={() => setIsCreateReceiptOpen(false)}
+        panelClassName={MODAL_PANEL_XL}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Create sales receipt</h2>
+            <p className="mt-1 text-xs text-muted">
+              Capture customer payment instantly with account and mode details.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateReceiptOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <form action={handleCreateSalesReceipt} className="mt-4 space-y-3">
+          <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
+            Currency, accounts, and payment modes come from{" "}
+            <Link
+              href={`/${tenantSlug}/finance/settings`}
+              className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
+            >
+              Finance settings
+            </Link>
+            .
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Title</label>
+              <input
+                name="title"
+                placeholder="Initial allocation payment"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
             </div>
-            <form action={handleCreateSalesReceipt} className="mt-4 space-y-3">
-              <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
-                Currency, accounts, and payment modes come from{" "}
-                <Link
-                  href={`/${tenantSlug}/finance/settings`}
-                  className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
-                >
-                  Finance settings
-                </Link>
-                .
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Title</label>
-                  <input name="title" placeholder="Initial allocation payment" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Customer (optional)</label>
-                  <input name="customerName" placeholder="Customer name" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Amount</label>
-                  <input name="amount" inputMode="decimal" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Currency</label>
-                  <UiSelect
-                    key={`sr-curr-${financeOptions.currencies.join("|")}`}
-                    name="currency"
-                    defaultValue={financeOptions.currencies[0] || "NGN"}
-                  >
-                    {financeOptions.currencies.map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currency}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Linked deal (optional)</label>
-                  <UiSelect name="dealId" defaultValue="">
-                    <option value="">None</option>
-                    {dealOptions.map((deal) => (
-                      <option key={deal.id} value={deal.id}>
-                        {deal.label}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Payment mode (optional)</label>
-                  <UiSelect
-                    key={`sr-mode-${financeOptions.paymentModes.join("|")}`}
-                    name="paymentMode"
-                    defaultValue={financeOptions.paymentModes[0] || ""}
-                  >
-                    <option value="">Select mode</option>
-                    {financeOptions.paymentModes.map((mode) => (
-                      <option key={mode} value={mode}>
-                        {mode}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Deposit account (optional)</label>
-                  <UiSelect
-                    key={`sr-bank-${financeOptions.bankAccounts.join("|")}`}
-                    name="depositAccount"
-                    defaultValue={financeOptions.bankAccounts[0] || ""}
-                  >
-                    <option value="">Select account</option>
-                    {financeOptions.bankAccounts.map((account) => (
-                      <option key={account} value={account}>
-                        {account}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
-                  <input name="reference" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Notes (optional)</label>
-                  <input name="note" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateReceiptOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {actionPending ? "Saving..." : "Create receipt"}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Customer (optional)</label>
+              <input
+                name="customerName"
+                placeholder="Customer name"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                inputMode="decimal"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Currency</label>
+              <UiSelect
+                key={`sr-curr-${financeOptions.currencies.join("|")}`}
+                name="currency"
+                defaultValue={financeOptions.currencies[0] || "NGN"}
+              >
+                {financeOptions.currencies.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Linked deal (optional)</label>
+              <UiSelect name="dealId" defaultValue="">
+                <option value="">None</option>
+                {dealOptions.map((deal) => (
+                  <option key={deal.id} value={deal.id}>
+                    {deal.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Payment mode (optional)</label>
+              <UiSelect
+                key={`sr-mode-${financeOptions.paymentModes.join("|")}`}
+                name="paymentMode"
+                defaultValue={financeOptions.paymentModes[0] || ""}
+              >
+                <option value="">Select mode</option>
+                {financeOptions.paymentModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Deposit account (optional)</label>
+              <UiSelect
+                key={`sr-bank-${financeOptions.bankAccounts.join("|")}`}
+                name="depositAccount"
+                defaultValue={financeOptions.bankAccounts[0] || ""}
+              >
+                <option value="">Select account</option>
+                {financeOptions.bankAccounts.map((account) => (
+                  <option key={account} value={account}>
+                    {account}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <input
+                name="reference"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Notes (optional)</label>
+              <input
+                name="note"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsCreateReceiptOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={actionPending}
+              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {actionPending ? "Saving..." : "Create receipt"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
-      <ModalOverlay open={Boolean(isCreateExpenseOpen)} onClose={() => setIsCreateExpenseOpen(false)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Create expense</h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCreateExpenseOpen(false);
-                  setExpenseVendorName("");
-                  setExpenseCategoryName("");
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+      <ModalOverlay
+        open={Boolean(isCreateExpenseOpen)}
+        onClose={() => setIsCreateExpenseOpen(false)}
+        panelClassName={MODAL_PANEL_SM}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Create expense</h2>
+          <button
+            type="button"
+            onClick={() => {
+              setIsCreateExpenseOpen(false);
+              setExpenseVendorName("");
+              setExpenseCategoryName("");
+            }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <form action={handleCreateExpense} className="mt-4 space-y-3">
+          {financeControls.expenseApprovalThreshold ? (
+            <p className="rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-[11px] text-foreground">
+              Expenses above {financeControls.expenseApprovalThreshold.toLocaleString()} need manager approval
+              before you can record them here.
+            </p>
+          ) : null}
+          {/* <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
+ Currencies, bank/cash accounts, and payment modes are only edited in{" "}
+ <Link
+ href={`/${tenantSlug}/finance/settings`}
+ className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
+ >
+ Finance settings
+ </Link>
+ . Save there, then open this form again to see new options.
+ </p> */}
+          <VendorNamePicker
+            vendors={categoryOptions}
+            value={expenseCategoryName}
+            onChange={setExpenseCategoryName}
+            onAddVendor={handleSaveExpenseCategory}
+            inputName="category"
+            fieldLabel="Category"
+            savedItemsLabel="Saved categories"
+            newItemNoun="category"
+            saveNowLabel="Save category now"
+            normalizeName={normalizeFinanceExpenseCategory}
+            namesMatch={expenseCategoryNamesMatch}
+            required
+          />
+          <VendorNamePicker
+            vendors={vendorOptions}
+            value={expenseVendorName}
+            onChange={setExpenseVendorName}
+            onAddVendor={handleSaveVendor}
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                inputMode="decimal"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
             </div>
-            <form action={handleCreateExpense} className="mt-4 space-y-3">
-              {financeControls.expenseApprovalThreshold ? (
-                <p className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-foreground">
-                  Expenses above {financeControls.expenseApprovalThreshold.toLocaleString()} need manager approval before you can record them here.
-                </p>
-              ) : null}
-              {/* <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
-                Currencies, bank/cash accounts, and payment modes are only edited in{" "}
-                <Link
-                  href={`/${tenantSlug}/finance/settings`}
-                  className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
-                >
-                  Finance settings
-                </Link>
-                . Save there, then open this form again to see new options.
-              </p> */}
-              <VendorNamePicker
-                vendors={categoryOptions}
-                value={expenseCategoryName}
-                onChange={setExpenseCategoryName}
-                onAddVendor={handleSaveExpenseCategory}
-                inputName="category"
-                fieldLabel="Category"
-                savedItemsLabel="Saved categories"
-                newItemNoun="category"
-                saveNowLabel="Save category now"
-                normalizeName={normalizeFinanceExpenseCategory}
-                namesMatch={expenseCategoryNamesMatch}
-                required
+            <div>
+              <label className="mb-1 block text-sm text-muted">Currency</label>
+              <UiSelect
+                key={`exp-curr-${financeOptions.currencies.join("|")}`}
+                name="currency"
+                defaultValue={financeOptions.currencies[0] || "NGN"}
+              >
+                {financeOptions.currencies.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Expense date</label>
+              <input
+                name="expenseDate"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
-              <VendorNamePicker
-                vendors={vendorOptions}
-                value={expenseVendorName}
-                onChange={setExpenseVendorName}
-                onAddVendor={handleSaveVendor}
-              />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Amount</label>
-                  <input name="amount" inputMode="decimal" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Currency</label>
-                  <UiSelect
-                    key={`exp-curr-${financeOptions.currencies.join("|")}`}
-                    name="currency"
-                    defaultValue={financeOptions.currencies[0] || "NGN"}
-                  >
-                    {financeOptions.currencies.map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currency}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Expense date</label>
-                  <input name="expenseDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Paid through (optional)</label>
-                  <UiSelect
-                    key={`exp-bank-${financeOptions.bankAccounts.join("|")}`}
-                    name="paidThroughAccount"
-                    defaultValue={financeOptions.bankAccounts[0] || ""}
-                  >
-                    <option value="">Select account</option>
-                    {financeOptions.bankAccounts.map((account) => (
-                      <option key={account} value={account}>
-                        {account}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
-                <input name="reference" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Note (optional)</label>
-                <textarea name="note" rows={3} className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-                <UiSelect
-                  name="department"
-                  defaultValue={financeOptions.departments[0] || "Finance"}
-                >
-                  <option value="">Select department</option>
-                  {financeOptions.departments.map((department) => (
-                    <option key={department} value={department}>
-                      {department}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Attachment (optional)</label>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  disabled={uploadPending}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void uploadExpenseAttachment(file);
-                  }}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground file:mr-3 file:rounded file:border-0 file:bg-foreground file:px-2 file:py-1 file:text-xs file:font-semibold file:text-background"
-                />
-                <p className="mt-1 text-xs text-muted">
-                  {expenseAttachment
-                    ? `Attached: ${expenseAttachment.name}`
-                    : uploadPending
-                      ? "Uploading..."
-                      : "If file storage is not configured yet, continue without attachment."}
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateExpenseOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {actionPending ? "Saving..." : "Create"}
-                </button>
-              </div>
-            </form>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Paid through (optional)</label>
+              <UiSelect
+                key={`exp-bank-${financeOptions.bankAccounts.join("|")}`}
+                name="paidThroughAccount"
+                defaultValue={financeOptions.bankAccounts[0] || ""}
+              >
+                <option value="">Select account</option>
+                {financeOptions.bankAccounts.map((account) => (
+                  <option key={account} value={account}>
+                    {account}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+            <input
+              name="reference"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Note (optional)</label>
+            <textarea
+              name="note"
+              rows={3}
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+            <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
+              <option value="">Select department</option>
+              {financeOptions.departments.map((department) => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Attachment (optional)</label>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              disabled={uploadPending}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void uploadExpenseAttachment(file);
+              }}
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground file:mr-3 file:rounded file:border-0 file:bg-foreground file:px-2 file:py-1 file:text-xs file:font-semibold file:text-background"
+            />
+            <p className="mt-1 text-xs text-muted">
+              {expenseAttachment
+                ? `Attached: ${expenseAttachment.name}`
+                : uploadPending
+                  ? "Uploading..."
+                  : "If file storage is not configured yet, continue without attachment."}
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateExpenseOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={actionPending}
+              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {actionPending ? "Saving..." : "Create"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
       <RecordVendorBillModal
@@ -4274,436 +4615,465 @@ export function FinanceWorkspace({
 
       {paymentBill ? (
         <ModalOverlay open onClose={() => setPaymentBill(null)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Pay vendor bill</h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Pay vendor bill</h2>
+            <button
+              type="button"
+              onClick={() => setPaymentBill(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              aria-label="Close modal"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            {paymentBill.billNumber} — Balance: {paymentBill.balanceLabel}
+          </p>
+          <form action={handleRecordBillPayment} className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                inputMode="decimal"
+                required
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Paid date</label>
+              <input
+                name="paidAt"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                required
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Payment method</label>
+                <UiSelect name="method" defaultValue={financeOptions.paymentModes[0] || ""}>
+                  <option value="">Select method</option>
+                  {financeOptions.paymentModes.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Paid from account</label>
+                <UiSelect name="paidThroughAccount" defaultValue="">
+                  <option value="">Select account</option>
+                  {financeOptions.bankAccounts.map((account) => (
+                    <option key={account} value={account}>
+                      {account}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <input
+                name="reference"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setPaymentBill(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={actionPending}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+              >
+                {actionPending ? "Saving..." : "Record payment"}
               </button>
             </div>
-            <p className="mt-1 text-xs text-muted">
-              {paymentBill.billNumber} — Balance: {paymentBill.balanceLabel}
-            </p>
-            <form action={handleRecordBillPayment} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-muted">Amount</label>
-                <input name="amount" inputMode="decimal" required className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Paid date</label>
-                <input name="paidAt" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Payment method</label>
-                  <UiSelect name="method" defaultValue={financeOptions.paymentModes[0] || ""}>
-                    <option value="">Select method</option>
-                    {financeOptions.paymentModes.map((mode) => (
-                      <option key={mode} value={mode}>
-                        {mode}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Paid from account</label>
-                  <UiSelect name="paidThroughAccount" defaultValue="">
-                    <option value="">Select account</option>
-                    {financeOptions.bankAccounts.map((account) => (
-                      <option key={account} value={account}>
-                        {account}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
-                <input name="reference" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setPaymentBill(null)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]">
-                  Cancel
-                </button>
-                <button type="submit" disabled={actionPending} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-                  {actionPending ? "Saving..." : "Record payment"}
-                </button>
-              </div>
-            </form>
+          </form>
         </ModalOverlay>
       ) : null}
 
       {paymentInvoice ? (
         <ModalOverlay open onClose={() => setPaymentInvoice(null)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Record payment</h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Record payment</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setPaymentAttachment(null);
+                setPaymentInvoice(null);
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              aria-label="Close modal"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            {paymentInvoice.invoiceNumber} - Balance: {paymentInvoice.balanceLabel}
+          </p>
+          <form action={handleRecordPayment} className="mt-4 space-y-3">
+            <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
+              Payment method options come from{" "}
+              <Link
+                href={`/${tenantSlug}/finance/settings`}
+                className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
+              >
+                Finance settings
+              </Link>
+              .
+            </p>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                inputMode="decimal"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Paid date</label>
+              <input
+                name="paidAt"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Method (optional)</label>
+                <UiSelect
+                  key={`pay-mode-${financeOptions.paymentModes.join("|")}`}
+                  name="method"
+                  defaultValue={financeOptions.paymentModes[0] || ""}
+                >
+                  <option value="">Select mode</option>
+                  {financeOptions.paymentModes.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+                <input
+                  name="reference"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+              <UiSelect
+                name="department"
+                defaultValue={paymentInvoice.department || financeOptions.departments[0] || "Finance"}
+              >
+                <option value="">Select department</option>
+                {financeOptions.departments.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Note (optional)</label>
+              <textarea
+                name="note"
+                rows={3}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Receipt attachment (optional)</label>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                disabled={uploadPending}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void uploadPaymentAttachment(file);
+                }}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground file:mr-3 file:rounded file:border-0 file:bg-foreground file:px-2 file:py-1 file:text-xs file:font-semibold file:text-background"
+              />
+              <p className="mt-1 text-xs text-muted">
+                {paymentAttachment
+                  ? `Attached: ${paymentAttachment.name}`
+                  : uploadPending
+                    ? "Uploading..."
+                    : "If file storage is not set yet, continue and add later."}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setPaymentAttachment(null);
                   setPaymentInvoice(null);
                 }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={actionPending}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {actionPending ? "Saving..." : "Record"}
               </button>
             </div>
-            <p className="mt-1 text-xs text-muted">
-              {paymentInvoice.invoiceNumber} - Balance: {paymentInvoice.balanceLabel}
-            </p>
-            <form action={handleRecordPayment} className="mt-4 space-y-3">
-              <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
-                Payment method options come from{" "}
-                <Link
-                  href={`/${tenantSlug}/finance/settings`}
-                  className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2"
-                >
-                  Finance settings
-                </Link>
-                .
-              </p>
+          </form>
+        </ModalOverlay>
+      ) : null}
+
+      <ModalOverlay
+        open={Boolean(isCreateDirectPaymentOpen)}
+        onClose={() => setIsCreateDirectPaymentOpen(false)}
+        panelClassName={MODAL_PANEL_SM}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Record direct payment</h2>
+          <button
+            type="button"
+            onClick={() => setIsCreateDirectPaymentOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          For walk-ins, reservation deposits, or other cash received without an invoice.
+        </p>
+        <form action={handleRecordDirectPayment} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-sm text-muted">Title / description</label>
+            <input
+              name="title"
+              required
+              placeholder="e.g. Walk-in deposit — Azure B-04"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Payer name (optional)</label>
+            <input
+              name="payerName"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                inputMode="decimal"
+                required
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Currency</label>
+              <UiSelect name="currency" defaultValue={reportView.currency}>
+                {financeOptions.currencies.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Paid date</label>
+            <input
+              name="paidAt"
+              type="date"
+              required
+              defaultValue={new Date().toISOString().slice(0, 10)}
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Method (optional)</label>
+              <UiSelect name="method" defaultValue={financeOptions.paymentModes[0] || ""}>
+                <option value="">Select method</option>
+                {financeOptions.paymentModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <input
+                name="reference"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+            <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
+              <option value="">None</option>
+              {financeOptions.departments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Note (optional)</label>
+            <textarea
+              name="note"
+              rows={2}
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateDirectPaymentOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={actionPending}
+              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {actionPending ? "Saving..." : "Record payment"}
+            </button>
+          </div>
+        </form>
+      </ModalOverlay>
+
+      {editingInvoice ? (
+        <ModalOverlay open onClose={() => setEditingInvoice(null)} panelClassName={MODAL_PANEL_SM}>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Edit invoice</h2>
+            <button
+              type="button"
+              onClick={() => setEditingInvoice(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              aria-label="Close modal"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+          <form action={handleEditInvoice} className="mt-4 space-y-3">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Title</label>
+              <input
+                name="title"
+                defaultValue={editingInvoice.title}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm text-muted">Amount</label>
                 <input
                   name="amount"
                   inputMode="decimal"
+                  defaultValue={editingInvoice.amountValue}
                   className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Paid date</label>
-                <input
-                  name="paidAt"
-                  type="date"
-                  defaultValue={new Date().toISOString().slice(0, 10)}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Method (optional)</label>
-                  <UiSelect
-                    key={`pay-mode-${financeOptions.paymentModes.join("|")}`}
-                    name="method"
-                    defaultValue={financeOptions.paymentModes[0] || ""}
-                  >
-                    <option value="">Select mode</option>
-                    {financeOptions.paymentModes.map((mode) => (
-                      <option key={mode} value={mode}>
-                        {mode}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
-                  <input
-                    name="reference"
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+                <label className="mb-1 block text-sm text-muted">Currency</label>
                 <UiSelect
-                  name="department"
-                  defaultValue={paymentInvoice.department || financeOptions.departments[0] || "Finance"}
+                  name="currency"
+                  defaultValue={editingInvoice.currency || financeOptions.currencies[0] || "NGN"}
                 >
-                  <option value="">Select department</option>
-                  {financeOptions.departments.map((department) => (
-                    <option key={department} value={department}>
-                      {department}
+                  {financeOptions.currencies.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
                     </option>
                   ))}
                 </UiSelect>
               </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Note (optional)</label>
-                <textarea
-                  name="note"
-                  rows={3}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Receipt attachment (optional)</label>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  disabled={uploadPending}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void uploadPaymentAttachment(file);
-                  }}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground file:mr-3 file:rounded file:border-0 file:bg-foreground file:px-2 file:py-1 file:text-xs file:font-semibold file:text-background"
-                />
-                <p className="mt-1 text-xs text-muted">
-                  {paymentAttachment
-                    ? `Attached: ${paymentAttachment.name}`
-                    : uploadPending
-                      ? "Uploading..."
-                      : "If file storage is not set yet, continue and add later."}
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPaymentAttachment(null);
-                    setPaymentInvoice(null);
-                  }}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {actionPending ? "Saving..." : "Record"}
-                </button>
-              </div>
-            </form>
-        </ModalOverlay>
-      ) : null}
-
-      <ModalOverlay open={Boolean(isCreateDirectPaymentOpen)} onClose={() => setIsCreateDirectPaymentOpen(false)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Record direct payment</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateDirectPaymentOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
             </div>
-            <p className="mt-1 text-xs text-muted">
-              For walk-ins, reservation deposits, or other cash received without an invoice.
-            </p>
-            <form action={handleRecordDirectPayment} className="mt-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm text-muted">Title / description</label>
+                <label className="mb-1 block text-sm text-muted">Due date</label>
                 <input
-                  name="title"
-                  required
-                  placeholder="e.g. Walk-in deposit — Azure B-04"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Payer name (optional)</label>
-                <input
-                  name="payerName"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Amount</label>
-                  <input
-                    name="amount"
-                    inputMode="decimal"
-                    required
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Currency</label>
-                  <UiSelect name="currency" defaultValue={reportView.currency}>
-                    {financeOptions.currencies.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Paid date</label>
-                <input
-                  name="paidAt"
+                  name="dueDate"
                   type="date"
-                  required
-                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  defaultValue={editingInvoice.dueDateValue}
                   className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 />
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Method (optional)</label>
-                  <UiSelect name="method" defaultValue={financeOptions.paymentModes[0] || ""}>
-                    <option value="">Select method</option>
-                    {financeOptions.paymentModes.map((mode) => (
-                      <option key={mode} value={mode}>
-                        {mode}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
-                  <input
-                    name="reference"
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-              </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-                <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
-                  <option value="">None</option>
-                  {financeOptions.departments.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
-                    </option>
-                  ))}
+                <label className="mb-1 block text-sm text-muted">Status</label>
+                <UiSelect
+                  name="status"
+                  defaultValue={
+                    editingInvoice.statusValue === "VOID"
+                      ? "VOID"
+                      : editingInvoice.statusValue === "DRAFT"
+                        ? "DRAFT"
+                        : "SENT"
+                  }
+                >
+                  <option value="DRAFT">Draft</option>
+                  <option value="SENT">Sent</option>
+                  <option value="VOID">Void</option>
                 </UiSelect>
               </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Note (optional)</label>
-                <textarea
-                  name="note"
-                  rows={2}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateDirectPaymentOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {actionPending ? "Saving..." : "Record payment"}
-                </button>
-              </div>
-            </form>
-      </ModalOverlay>
-
-      {editingInvoice ? (
-        <ModalOverlay open onClose={() => setEditingInvoice(null)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Edit invoice</h2>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+              <UiSelect
+                name="department"
+                defaultValue={editingInvoice.department || financeOptions.departments[0] || "Finance"}
+              >
+                <option value="">Select department</option>
+                {financeOptions.departments.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setEditingInvoice(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={actionPending}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {actionPending ? "Saving..." : "Save changes"}
               </button>
             </div>
-            <form action={handleEditInvoice} className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-muted">Title</label>
-                <input
-                  name="title"
-                  defaultValue={editingInvoice.title}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Amount</label>
-                  <input
-                    name="amount"
-                    inputMode="decimal"
-                    defaultValue={editingInvoice.amountValue}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Currency</label>
-                  <UiSelect name="currency" defaultValue={editingInvoice.currency || financeOptions.currencies[0] || "NGN"}>
-                    {financeOptions.currencies.map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currency}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Due date</label>
-                  <input
-                    name="dueDate"
-                    type="date"
-                    defaultValue={editingInvoice.dueDateValue}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm text-muted">Status</label>
-                  <UiSelect
-                    name="status"
-                    defaultValue={
-                      editingInvoice.statusValue === "VOID"
-                        ? "VOID"
-                        : editingInvoice.statusValue === "DRAFT"
-                          ? "DRAFT"
-                          : "SENT"
-                    }
-                  >
-                    <option value="DRAFT">Draft</option>
-                    <option value="SENT">Sent</option>
-                    <option value="VOID">Void</option>
-                  </UiSelect>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-                <UiSelect
-                  name="department"
-                  defaultValue={editingInvoice.department || financeOptions.departments[0] || "Finance"}
-                >
-                  <option value="">Select department</option>
-                  {financeOptions.departments.map((department) => (
-                    <option key={department} value={department}>
-                      {department}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingInvoice(null)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionPending}
-                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {actionPending ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-            </form>
+          </form>
         </ModalOverlay>
       ) : null}
 
@@ -4714,39 +5084,39 @@ export function FinanceWorkspace({
           variant="drawer"
           panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-foreground/[0.02] p-4 shadow-2xl"
         >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Entity Timeline</h2>
-                <p className="text-xs text-muted">{timelineTarget.title}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTimelineTarget(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close timeline"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Entity Timeline</h2>
+              <p className="text-xs text-muted">{timelineTarget.title}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setTimelineTarget(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              aria-label="Close timeline"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
 
-            {timelineLoading ? (
-              <p className="mt-4 text-sm text-muted">Loading timeline...</p>
-            ) : timelineLogs.length === 0 ? (
-              <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
-            ) : (
-              <ul className="mt-4 space-y-2">
-                {timelineLogs.map((log) => (
-                  <li key={log.id} className="rounded-md border border-foreground/10 p-3">
-                    <p className="text-xs text-muted">{log.timestamp}</p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
-                    <p className="text-xs text-muted">By: {log.actor}</p>
-                    <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
+          {timelineLoading ? (
+            <p className="mt-4 text-sm text-muted">Loading timeline...</p>
+          ) : timelineLogs.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {timelineLogs.map((log) => (
+                <li key={log.id} className="rounded-md border border-foreground/10 p-3">
+                  <p className="text-xs text-muted">{log.timestamp}</p>
+                  <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
+                  <p className="text-xs text-muted">By: {log.actor}</p>
+                  <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </ModalOverlay>
       ) : null}
 

@@ -16,11 +16,5 @@ export default async function NewGuestPage({
   const ctx = await loadShortletsContext(tenantSlug);
   if (!ctx.access.canManage) notFound();
 
-  return (
-    <GuestFormWorkspace
-      tenantSlug={ctx.tenant.slug}
-      mode="create"
-      returnTo={sp.returnTo}
-    />
-  );
+  return <GuestFormWorkspace tenantSlug={ctx.tenant.slug} mode="create" returnTo={sp.returnTo} />;
 }

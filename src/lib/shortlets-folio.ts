@@ -1,33 +1,31 @@
 import { formatEnumLabel } from "@/lib/ui-format";
 
-export function formatReservationFolioBundle(
-  reservation: {
+export function formatReservationFolioBundle(reservation: {
+  id: string;
+  guestName: string;
+  totalAmount: number | { toString(): string };
+  amountPaid: number | { toString(): string };
+  balanceDue: number | { toString(): string };
+  currency: string;
+  unit: { name: string } | null;
+  property?: { name: string } | null;
+  folioLines: Array<{
     id: string;
-    guestName: string;
-    totalAmount: number | { toString(): string };
-    amountPaid: number | { toString(): string };
-    balanceDue: number | { toString(): string };
+    department: string;
+    description: string;
+    quantity: number;
+    amount: number | { toString(): string };
     currency: string;
-    unit: { name: string } | null;
-    property?: { name: string } | null;
-    folioLines: Array<{
-      id: string;
-      department: string;
-      description: string;
-      quantity: number;
-      amount: number | { toString(): string };
-      currency: string;
-      postedAt: Date;
-    }>;
-    payments: Array<{
-      id: string;
-      amount: number | { toString(): string };
-      currency: string;
-      paidAt: Date;
-      method: string | null;
-    }>;
-  },
-) {
+    postedAt: Date;
+  }>;
+  payments: Array<{
+    id: string;
+    amount: number | { toString(): string };
+    currency: string;
+    paidAt: Date;
+    method: string | null;
+  }>;
+}) {
   const currency = reservation.currency;
   const fmt = (d: Date) =>
     new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(d);

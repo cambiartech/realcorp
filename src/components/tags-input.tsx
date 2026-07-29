@@ -58,9 +58,9 @@ export function TagsInput({
             </li>
           ))}
         </ul>
-      ) : (
-        !disabled ? <p className="mb-2 text-xs text-muted">No options yet — add one below.</p> : null
-      )}
+      ) : !disabled ? (
+        <p className="mb-2 text-xs text-muted">No options yet — add one below.</p>
+      ) : null}
       {!disabled ? (
         <>
           <div className="flex gap-2">

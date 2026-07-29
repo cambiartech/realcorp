@@ -4,16 +4,28 @@ import Link from "next/link";
 import { Download, Users } from "lucide-react";
 import type { HrAnalyticsSnapshot } from "@/lib/hr-analytics";
 
-function StatCard({ label, value, hint, accent }: { label: string; value: string | number; hint?: string; accent?: boolean }) {
+function StatCard({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  accent?: boolean;
+}) {
   return (
     <div
       className={[
         "rounded-lg border p-4",
-        accent ? "border-violet-500/25 bg-violet-500/5" : "border-foreground/10",
+        accent ? "border-[var(--accent-line)] bg-[var(--accent-wash)]" : "border-foreground/10",
       ].join(" ")}
     >
       <p className="text-xs text-muted">{label}</p>
-      <p className={["text-2xl font-bold", accent ? "text-violet-800" : "text-foreground"].join(" ")}>{value}</p>
+      <p className={["text-2xl font-bold", accent ? "text-[var(--accent)]" : "text-foreground"].join(" ")}>
+        {value}
+      </p>
       {hint ? <p className="mt-1 text-[10px] text-muted">{hint}</p> : null}
     </div>
   );
@@ -53,9 +65,22 @@ export function HrInsightsWorkspace({
         <h2 className="mb-3 text-sm font-semibold text-foreground">Headcount & movement</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Team logins" value={analytics.teamSize} hint="Active memberships" />
-          <StatCard label="Active employees" value={analytics.activeHeadcount} hint="Profiles marked ACTIVE" accent />
-          <StatCard label="Joiners (YTD)" value={analytics.joinersYtd} hint="ACTIVE with joining date this year" />
-          <StatCard label="Leavers (YTD)" value={analytics.leaversYtd} hint="EXITED status updated this year" />
+          <StatCard
+            label="Active employees"
+            value={analytics.activeHeadcount}
+            hint="Profiles marked ACTIVE"
+            accent
+          />
+          <StatCard
+            label="Joiners (YTD)"
+            value={analytics.joinersYtd}
+            hint="ACTIVE with joining date this year"
+          />
+          <StatCard
+            label="Leavers (YTD)"
+            value={analytics.leaversYtd}
+            hint="EXITED status updated this year"
+          />
         </div>
       </div>
 
@@ -78,7 +103,11 @@ export function HrInsightsWorkspace({
         <h2 className="mb-3 text-sm font-semibold text-foreground">Appraisals & goals</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Open review periods" value={analytics.openAppraisalCycles} />
-          <StatCard label="Overdue reviews" value={analytics.overdueAppraisalCount} accent={analytics.overdueAppraisalCount > 0} />
+          <StatCard
+            label="Overdue reviews"
+            value={analytics.overdueAppraisalCount}
+            accent={analytics.overdueAppraisalCount > 0}
+          />
           <StatCard label="Awaiting self-review" value={analytics.pendingSelfAppraisalCount} />
           <StatCard label="Awaiting manager sign-off" value={analytics.pendingManagerReviewCount} accent />
           <StatCard label="Goals in progress" value={analytics.goalsInProgress} />

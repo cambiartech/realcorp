@@ -1,7 +1,14 @@
 "use server";
 
 import { auth } from "@/auth";
-import { BankMatchStatus, InvoiceStatus, MembershipRole, MembershipStatus, Prisma, VendorBillStatus } from "@/generated/prisma";
+import {
+  BankMatchStatus,
+  InvoiceStatus,
+  MembershipRole,
+  MembershipStatus,
+  Prisma,
+  VendorBillStatus,
+} from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
 import { sendSalesReceiptEmail } from "@/lib/email";
@@ -415,7 +422,8 @@ export async function recordInvoicePayment(
     select: { id: true, currency: true, amount: true, balanceDue: true, status: true },
   });
   if (!invoice) return { ok: false, error: "Invoice not found." };
-  if (invoice.status === InvoiceStatus.VOID) return { ok: false, error: "Cannot record payment on void invoice." };
+  if (invoice.status === InvoiceStatus.VOID)
+    return { ok: false, error: "Cannot record payment on void invoice." };
   if (Number(invoice.balanceDue) <= 0) return { ok: false, error: "Invoice is already fully paid." };
   if (parsed.data.amount > Number(invoice.balanceDue)) {
     return { ok: false, error: "Payment cannot exceed invoice balance." };
@@ -593,7 +601,7 @@ export async function updateInvoiceRecord(
         ? InvoiceStatus.PAID
         : paidAmount > 0
           ? InvoiceStatus.PARTIALLY_PAID
-          : ((parsed.data.status as InvoiceStatus | undefined) || InvoiceStatus.SENT);
+          : (parsed.data.status as InvoiceStatus | undefined) || InvoiceStatus.SENT;
 
   try {
     await prisma.invoice.update({
@@ -642,7 +650,8 @@ export async function sendInvoiceRecord(
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
   const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
-  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+  if (!emailParsed.success)
+    return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
@@ -684,7 +693,8 @@ export async function resendInvoiceRecord(
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
   const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
-  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+  if (!emailParsed.success)
+    return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
@@ -771,7 +781,8 @@ export async function sendInvoiceReminder(
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
   const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
-  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+  if (!emailParsed.success)
+    return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
@@ -792,7 +803,8 @@ export async function sendInvoiceReminder(
     select: { id: true, invoiceNumber: true, status: true, balanceDue: true, dueDate: true },
   });
   if (!invoice) return { ok: false, error: "Invoice not found." };
-  if (invoice.status === InvoiceStatus.DRAFT) return { ok: false, error: "Send the invoice before reminders." };
+  if (invoice.status === InvoiceStatus.DRAFT)
+    return { ok: false, error: "Send the invoice before reminders." };
   if (invoice.status === InvoiceStatus.VOID || invoice.status === InvoiceStatus.PAID) {
     return { ok: false, error: "Reminders are only available for open invoices." };
   }
@@ -951,7 +963,11 @@ export async function getEntityTimelineLogs(
     Boolean(membership && membership.status === MembershipStatus.ACTIVE);
   if (!canView) return { ok: false, error: "You do not have permission to view logs." };
 
-  const canViewSensitive = await canViewAuditDetails(tenantSlug, session.user.id, Boolean(session.user.isPlatformAdmin));
+  const canViewSensitive = await canViewAuditDetails(
+    tenantSlug,
+    session.user.id,
+    Boolean(session.user.isPlatformAdmin),
+  );
 
   const rows = await prisma.auditLog.findMany({
     where: { tenantId: tenant.id, entityType, entityId },
@@ -961,7 +977,9 @@ export async function getEntityTimelineLogs(
 
   const logs: EntityLogItem[] = rows.map((row) => ({
     id: row.id,
-    timestamp: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(row.createdAt),
+    timestamp: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+      row.createdAt,
+    ),
     actor: canViewSensitive ? row.actorLabel || "System" : "Restricted",
     action: row.action,
     summary: canViewSensitive ? row.summary || `${row.module} ${row.action}` : `${row.module} ${row.action}`,
@@ -1004,10 +1022,7 @@ export async function createExpenseRecord(
     select: { financeControls: true },
   });
   const controls = parseFinanceControls(settings?.financeControls);
-  if (
-    controls.expenseApprovalThreshold &&
-    parsed.data.amount > controls.expenseApprovalThreshold
-  ) {
+  if (controls.expenseApprovalThreshold && parsed.data.amount > controls.expenseApprovalThreshold) {
     return {
       ok: false,
       error: `Expenses above ${controls.expenseApprovalThreshold.toLocaleString()} ${parsed.data.currency} need manager approval before recording.`,
@@ -1355,8 +1370,7 @@ export async function recordVendorBillPayment(
   }
 
   const nextBalance = Number(bill.balanceDue) - parsed.data.amount;
-  const nextStatus =
-    nextBalance <= 0 ? VendorBillStatus.PAID : VendorBillStatus.PARTIAL;
+  const nextStatus = nextBalance <= 0 ? VendorBillStatus.PAID : VendorBillStatus.PARTIAL;
 
   try {
     await prisma.$transaction([
@@ -1560,7 +1574,8 @@ export async function sendSalesReceiptRecord(
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
   const emailParsed = z.string().trim().email("Enter a valid email address.").safeParse(input.toEmail);
-  if (!emailParsed.success) return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
+  if (!emailParsed.success)
+    return { ok: false, error: emailParsed.error.issues[0]?.message || "Invalid email." };
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
@@ -1934,10 +1949,7 @@ export async function markBankStatementRowMatched(
   return { ok: true };
 }
 
-export async function unmatchBankStatementRow(
-  tenantSlug: string,
-  rowId: string,
-): Promise<ActionResult> {
+export async function unmatchBankStatementRow(tenantSlug: string, rowId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
@@ -1949,13 +1961,22 @@ export async function unmatchBankStatementRow(
 
   const row = await prisma.bankStatementRow.findFirst({
     where: { id: rowId, tenantId: tenant.id },
-    select: { id: true, importId: true, matchStatus: true, matchedEntityType: true, matchedEntityId: true, amountAbs: true, direction: true },
+    select: {
+      id: true,
+      importId: true,
+      matchStatus: true,
+      matchedEntityType: true,
+      matchedEntityId: true,
+      amountAbs: true,
+      direction: true,
+    },
   });
   if (!row) return { ok: false, error: "Statement row not found." };
   if (await isImportFinalized(tenant.id, row.importId)) {
     return { ok: false, error: "This statement batch is finalized and locked." };
   }
-  if (row.matchStatus !== BankMatchStatus.MATCHED) return { ok: false, error: "Row is not currently matched." };
+  if (row.matchStatus !== BankMatchStatus.MATCHED)
+    return { ok: false, error: "Row is not currently matched." };
 
   try {
     await prisma.bankStatementRow.update({
@@ -2145,7 +2166,8 @@ export async function markBankStatementRowException(
     select: { id: true, importId: true },
   });
   if (!row) return { ok: false, error: "Statement row not found." };
-  if (await isImportFinalized(tenant.id, row.importId)) return { ok: false, error: "This statement batch is finalized and locked." };
+  if (await isImportFinalized(tenant.id, row.importId))
+    return { ok: false, error: "This statement batch is finalized and locked." };
 
   await prisma.bankStatementRow.update({
     where: { id: row.id },
@@ -2192,7 +2214,8 @@ export async function saveBankStatementRowNote(
     select: { id: true, importId: true },
   });
   if (!row) return { ok: false, error: "Statement row not found." };
-  if (await isImportFinalized(tenant.id, row.importId)) return { ok: false, error: "This statement batch is finalized and locked." };
+  if (await isImportFinalized(tenant.id, row.importId))
+    return { ok: false, error: "This statement batch is finalized and locked." };
 
   await prisma.bankStatementRow.update({
     where: { id: row.id },

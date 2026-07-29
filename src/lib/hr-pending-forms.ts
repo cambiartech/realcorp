@@ -123,7 +123,9 @@ export async function loadHrOnboardingStatusForUser(
     select: { id: true },
   });
 
-  const or: Array<{ employeeProfileId: string } | { recipientEmail: { equals: string; mode: "insensitive" } }> = [];
+  const or: Array<
+    { employeeProfileId: string } | { recipientEmail: { equals: string; mode: "insensitive" } }
+  > = [];
   if (profile) or.push({ employeeProfileId: profile.id });
   const normalizedEmail = email?.trim();
   if (normalizedEmail) {
@@ -176,9 +178,7 @@ export async function loadHrOnboardingStatusForUser(
     },
   });
 
-  const submittedTypes = new Set(
-    allRequests.filter((r) => isDoneStatus(r.status)).map((r) => r.formType),
-  );
+  const submittedTypes = new Set(allRequests.filter((r) => isDoneStatus(r.status)).map((r) => r.formType));
 
   const pendingRaw = allRequests.filter(
     (r) => r.status === HrFormRequestStatus.PENDING && r.expiresAt > now && !submittedTypes.has(r.formType),
@@ -204,9 +204,7 @@ export async function loadHrOnboardingStatusForUser(
   const bundle = pendingItems.find((p) => p.kind === "bundle");
   const masterOnboardingUrl = bundle?.fillUrl ?? pendingItems[0]?.fillUrl ?? null;
 
-  const submittedRows = dedupeByFormType(
-    allRequests.filter((r) => isDoneStatus(r.status) && r.submittedAt),
-  );
+  const submittedRows = dedupeByFormType(allRequests.filter((r) => isDoneStatus(r.status) && r.submittedAt));
 
   if (pendingItems.length === 0 && submittedRows.length > 0) {
     const latestSubmit = submittedRows.reduce<Date | null>((max, r) => {
@@ -215,9 +213,7 @@ export async function loadHrOnboardingStatusForUser(
     }, null);
     const bundleToken = submittedRows.find((r) => r.bundleToken)?.bundleToken;
     const masterUrl = bundleToken
-      ? absoluteAppUrl(
-          hrOnboardingBundlePath(bundleToken, tenantSlug ? { tenant: tenantSlug } : undefined),
-        )
+      ? absoluteAppUrl(hrOnboardingBundlePath(bundleToken, tenantSlug ? { tenant: tenantSlug } : undefined))
       : null;
 
     return {

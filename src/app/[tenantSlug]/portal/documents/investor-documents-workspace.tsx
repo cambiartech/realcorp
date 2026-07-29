@@ -22,10 +22,12 @@ export function InvestorDocumentsWorkspace({
   tenantSlug,
   tenantName,
   documents,
+  isAdminViewer,
 }: {
   tenantSlug: string;
   tenantName: string;
   documents: InvestorClientDocument[];
+  isAdminViewer?: boolean;
 }) {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
@@ -33,7 +35,8 @@ export function InvestorDocumentsWorkspace({
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Documents</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">My documents</h1>
         <p className="mt-2 text-sm text-muted">
-          Files shared with you by {tenantName}. Only documents your property manager has approved appear here.
+          Files shared with you by {tenantName}. Only documents your property manager has approved appear
+          here.
         </p>
         <Link
           href={`/${tenantSlug}/portal`}
@@ -42,6 +45,13 @@ export function InvestorDocumentsWorkspace({
           ← Back to portfolio
         </Link>
       </div>
+
+      {isAdminViewer ? (
+        <div className="mb-4 rounded-xl border border-foreground/10 bg-foreground/[0.03] px-4 py-3 text-sm text-muted">
+          Admin preview — upload documents from <strong className="text-foreground">Clients</strong> and
+          toggle <strong className="text-foreground">Share in portal</strong> so investors see them here.
+        </div>
+      ) : null}
 
       {documents.length === 0 ? (
         <div className="rounded-xl border border-dashed border-foreground/15 px-6 py-14 text-center">
@@ -53,7 +63,10 @@ export function InvestorDocumentsWorkspace({
       ) : (
         <ul className="divide-y divide-foreground/10 overflow-hidden rounded-xl border border-foreground/10">
           {documents.map((doc) => (
-            <li key={doc.id} className="flex items-center gap-3 bg-background px-4 py-3 hover:bg-foreground/[0.02]">
+            <li
+              key={doc.id}
+              className="flex items-center gap-3 bg-background px-4 py-3 hover:bg-foreground/[0.02]"
+            >
               <FileIcon fileName={doc.fileName} className="h-8 w-8 text-muted" />
               <div className="min-w-0 flex-1">
                 <a

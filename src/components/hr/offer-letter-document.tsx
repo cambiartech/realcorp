@@ -48,7 +48,9 @@ export function OfferLetterDocument({
           <p className="mt-2 text-xs text-slate-600">Signature & date</p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">For {brand.companyName}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            For {brand.companyName}
+          </p>
           <div className="mt-8 border-b border-slate-400" />
           <p className="mt-2 text-xs text-slate-600">Authorized signatory</p>
         </div>

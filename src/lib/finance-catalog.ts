@@ -30,7 +30,12 @@ export function normalizeFinanceOptionList(value: unknown): string[] {
       if (t) out.push(t);
       continue;
     }
-    if (item && typeof item === "object" && "label" in item && typeof (item as { label: unknown }).label === "string") {
+    if (
+      item &&
+      typeof item === "object" &&
+      "label" in item &&
+      typeof (item as { label: unknown }).label === "string"
+    ) {
       const t = String((item as { label: string }).label).trim();
       if (t) out.push(t);
     }

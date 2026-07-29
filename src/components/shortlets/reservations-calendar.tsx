@@ -27,7 +27,13 @@ type Props = {
   onSelectDay?: (date: string) => void;
 };
 
-export function ReservationsCalendar({ month, events, onMonthChange, onSelectReservation, onSelectDay }: Props) {
+export function ReservationsCalendar({
+  month,
+  events,
+  onMonthChange,
+  onSelectReservation,
+  onSelectDay,
+}: Props) {
   const [y, m] = month.split("-").map(Number);
   const firstDay = new Date(y, (m || 1) - 1, 1);
   const totalDays = daysInMonth(y, (m || 1) - 1);
@@ -67,7 +73,9 @@ export function ReservationsCalendar({ month, events, onMonthChange, onSelectRes
       </div>
       <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-muted">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className="py-1 font-medium">{d}</div>
+          <div key={d} className="py-1 font-medium">
+            {d}
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1">
@@ -87,7 +95,9 @@ export function ReservationsCalendar({ month, events, onMonthChange, onSelectRes
             className={[
               "min-h-[80px] rounded border p-1 text-left text-[10px]",
               cell.day ? "border-foreground/10 bg-background" : "border-transparent",
-              cell.dateStr && onSelectDay ? "cursor-pointer hover:border-foreground/25 hover:bg-foreground/[0.03]" : "",
+              cell.dateStr && onSelectDay
+                ? "cursor-pointer hover:border-foreground/25 hover:bg-foreground/[0.03]"
+                : "",
             ].join(" ")}
           >
             {cell.day ? <div className="font-semibold text-foreground">{cell.day}</div> : null}
@@ -120,7 +130,9 @@ export function ReservationsCalendar({ month, events, onMonthChange, onSelectRes
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-muted">Click a booking to open the guest bill. Click an empty day to start a new reservation.</p>
+      <p className="mt-3 text-xs text-muted">
+        Click a booking to open the guest bill. Click an empty day to start a new reservation.
+      </p>
     </div>
   );
 }

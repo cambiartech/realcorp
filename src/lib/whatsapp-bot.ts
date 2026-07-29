@@ -1,12 +1,7 @@
 import prisma from "@/lib/db";
 import { phoneVariants } from "@/lib/phone";
 import { loadPublicListings, type PublicListing } from "@/lib/public-listings";
-import {
-  sendWhatsAppButtons,
-  sendWhatsAppImage,
-  sendWhatsAppList,
-  sendWhatsAppText,
-} from "@/lib/whatsapp";
+import { sendWhatsAppButtons, sendWhatsAppImage, sendWhatsAppList, sendWhatsAppText } from "@/lib/whatsapp";
 
 /**
  * Realcorp Bot — menu-driven WhatsApp assistant.
@@ -59,7 +54,8 @@ const ID = {
 };
 
 const GREETING_RE = /^(hi|hello|hey|hallo|good\s*(morning|afternoon|evening)|menu|start|yo)\b/i;
-const LISTINGS_RE = /(listing|propert|project|house|home|apartment|land|buy|rent|short\s*let|price|available)/i;
+const LISTINGS_RE =
+  /(listing|propert|project|house|home|apartment|land|buy|rent|short\s*let|price|available)/i;
 const AGENT_RE = /(agent|human|person|speak|talk|call\s*me|help)/i;
 
 function formatPrice(value: number, currency: string) {
@@ -144,12 +140,7 @@ async function ensureLead(
   return { id: created.id, created: true };
 }
 
-async function createBotTask(
-  tenant: BotTenantContext,
-  leadId: string,
-  title: string,
-  body: string,
-) {
+async function createBotTask(tenant: BotTenantContext, leadId: string, title: string, body: string) {
   try {
     // Activities require a creator; attribute bot tasks to an org admin (or any member).
     const owner =
@@ -305,11 +296,7 @@ async function sendListingDetail(
   await recordBotReply(tenant, to, followUp, buttonsResult.ok ? buttonsResult.messageId : null, leadId);
 }
 
-async function handleBookViewing(
-  tenant: BotTenantContext,
-  message: BotInboundMessage,
-  projectId: string,
-) {
+async function handleBookViewing(tenant: BotTenantContext, message: BotInboundMessage, projectId: string) {
   const lead = await ensureLead(tenant, message.from, message.profileName);
 
   const data = await loadPublicListings(tenant.tenantSlug, { limit: 50 });
@@ -389,7 +376,12 @@ export async function handleBotMessage(
       if (replyId === ID.listings) return void (await sendListingsMenu(tenant, message.from, leadId));
       if (replyId === ID.agent) return void (await handleTalkToAgent(tenant, message));
       if (replyId.startsWith("bot:listing:")) {
-        return void (await sendListingDetail(tenant, message.from, leadId, replyId.slice("bot:listing:".length)));
+        return void (await sendListingDetail(
+          tenant,
+          message.from,
+          leadId,
+          replyId.slice("bot:listing:".length),
+        ));
       }
       if (replyId.startsWith("bot:book:")) {
         return void (await handleBookViewing(tenant, message, replyId.slice("bot:book:".length)));

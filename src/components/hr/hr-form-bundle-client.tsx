@@ -89,9 +89,7 @@ export function HrFormBundleClient({
 
   function handleStepSubmitted() {
     setSteps((prev) => {
-      const updated = prev.map((s, i) =>
-        i === activeIndex ? { ...s, status: "SUBMITTED" as const } : s,
-      );
+      const updated = prev.map((s, i) => (i === activeIndex ? { ...s, status: "SUBMITTED" as const } : s));
       const nextIdx = updated.findIndex((s) => s.status === "PENDING");
       if (nextIdx >= 0) {
         setActiveIndex(nextIdx);
@@ -121,8 +119,8 @@ export function HrFormBundleClient({
     return (
       <Shell brand={bundle.brand} title="All done" dashboardHref={dashboardHref ?? undefined}>
         <p className="text-sm text-slate-700">
-          Thank you{bundle.employeeName ? `, ${bundle.employeeName}` : ""}. All {steps.length} sections have been
-          submitted. HR will review your information.
+          Thank you{bundle.employeeName ? `, ${bundle.employeeName}` : ""}. All {steps.length} sections have
+          been submitted. HR will review your information.
         </p>
         {dashboardHref ? (
           <Link
@@ -133,7 +131,9 @@ export function HrFormBundleClient({
             Back to My dashboard
           </Link>
         ) : (
-          <p className="mt-4 text-sm text-slate-600">You can close this page. Contact HR if you need anything else.</p>
+          <p className="mt-4 text-sm text-slate-600">
+            You can close this page. Contact HR if you need anything else.
+          </p>
         )}
       </Shell>
     );
@@ -178,7 +178,7 @@ export function HrFormBundleClient({
                     current
                       ? "bg-slate-900 text-white shadow-sm"
                       : done
-                        ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+                        ? "bg-[var(--success-wash)] text-[var(--success)] ring-1 ring-[var(--success-line)]"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200",
                     disabled ? "cursor-not-allowed opacity-40" : "",
                   ].join(" ")}

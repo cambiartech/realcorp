@@ -1,7 +1,14 @@
 "use client";
 
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { DealStage } from "@/generated/prisma";
@@ -25,15 +32,15 @@ const STAGE_LABEL: Record<DealStage, string> = {
 };
 
 const STAGE_ACCENT: Record<string, string> = {
-  CLOSED_WON: "bg-green-500",
-  CLOSED_LOST: "bg-red-500",
-  RESERVATION_MADE: "bg-amber-500",
+  CLOSED_WON: "bg-[var(--success)]",
+  CLOSED_LOST: "bg-[var(--danger)]",
+  RESERVATION_MADE: "bg-[var(--warn)]",
 };
 
 const STAGE_BADGE: Record<string, string> = {
-  CLOSED_WON: "bg-green-500/15 text-green-700 border border-green-500/25",
-  CLOSED_LOST: "bg-red-500/15 text-red-700 border border-red-500/25",
-  RESERVATION_MADE: "bg-amber-500/15 text-amber-700 border border-amber-500/25",
+  CLOSED_WON: "bg-[var(--success-wash)] text-[var(--success)] border border-[var(--success-line)]",
+  CLOSED_LOST: "bg-[var(--danger-wash)] text-[var(--danger)] border border-[var(--danger-line)]",
+  RESERVATION_MADE: "bg-[var(--warn-wash)] text-[var(--warn)] border border-[var(--warn-line)]",
 };
 
 type DealData = {
@@ -132,7 +139,8 @@ export function DealDetailWorkspace({
     }
   }, [moveState, showSnackbar]);
 
-  const badgeStyle = STAGE_BADGE[deal.stage] ?? "bg-foreground/10 text-foreground border border-foreground/15";
+  const badgeStyle =
+    STAGE_BADGE[deal.stage] ?? "bg-foreground/10 text-foreground border border-foreground/15";
   const stageAccent = STAGE_ACCENT[deal.stage] ?? "bg-foreground";
 
   const title = [lead?.name, unit?.label].filter(Boolean).join(" · ") || "Deal";
@@ -146,7 +154,13 @@ export function DealDetailWorkspace({
             href={`/${tenantSlug}/deals`}
             className="mb-2 inline-flex items-center gap-1 text-xs text-muted hover:text-foreground"
           >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M15 6l-6 6 6 6" />
             </svg>
             Back to deals
@@ -157,7 +171,7 @@ export function DealDetailWorkspace({
               {deal.stageLabel}
             </span>
             {deal.pendingFinance ? (
-              <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+              <span className="rounded-full border border-[var(--danger-line)] bg-[var(--danger-wash)] px-2.5 py-0.5 text-xs font-semibold text-[var(--danger)]">
                 Pending finance
               </span>
             ) : null}
@@ -240,7 +254,16 @@ export function DealDetailWorkspace({
             <dl className="space-y-2 text-sm">
               <InfoRow label="Value" value={deal.value} />
               <InfoRow label="Owner" value={deal.ownerLabel} />
-              <InfoRow label="Finance" value={deal.financeDecision ? deal.financeDecision.replace(/_/g, " ") : deal.pendingFinance ? "Pending" : "N/A"} />
+              <InfoRow
+                label="Finance"
+                value={
+                  deal.financeDecision
+                    ? deal.financeDecision.replace(/_/g, " ")
+                    : deal.pendingFinance
+                      ? "Pending"
+                      : "N/A"
+                }
+              />
               <InfoRow label="Updated" value={deal.updatedAt} />
             </dl>
           </section>
@@ -253,13 +276,24 @@ export function DealDetailWorkspace({
                 <div className="flex items-start justify-between gap-2">
                   <dt className="shrink-0 text-muted">Name</dt>
                   <dd className="text-right">
-                    <Link href={`/${tenantSlug}/leads/${lead.id}`} className="font-medium text-foreground underline decoration-foreground/30 hover:opacity-80">
+                    <Link
+                      href={`/${tenantSlug}/leads/${lead.id}`}
+                      className="font-medium text-foreground underline decoration-foreground/30 hover:opacity-80"
+                    >
                       {lead.name}
                     </Link>
                   </dd>
                 </div>
-                <InfoRow label="Email" value={lead.email} href={lead.email ? `mailto:${lead.email}` : undefined} />
-                <InfoRow label="Phone" value={lead.phone} href={lead.phone ? `tel:${lead.phone}` : undefined} />
+                <InfoRow
+                  label="Email"
+                  value={lead.email}
+                  href={lead.email ? `mailto:${lead.email}` : undefined}
+                />
+                <InfoRow
+                  label="Phone"
+                  value={lead.phone}
+                  href={lead.phone ? `tel:${lead.phone}` : undefined}
+                />
               </dl>
             </section>
           ) : null}
@@ -273,7 +307,11 @@ export function DealDetailWorkspace({
                   <dt className="shrink-0 text-muted">Unit</dt>
                   <dd className="text-right font-medium text-foreground">{unit.label}</dd>
                 </div>
-                <InfoRow label="Project" value={unit.projectName} href={unit.projectId ? `/${tenantSlug}/projects/${unit.projectId}` : undefined} />
+                <InfoRow
+                  label="Project"
+                  value={unit.projectName}
+                  href={unit.projectId ? `/${tenantSlug}/projects/${unit.projectId}` : undefined}
+                />
                 <InfoRow label="Purpose" value={unit.purpose} />
                 <InfoRow label="Layout" value={unit.unitType} />
                 <InfoRow label="Status" value={unit.status} />
@@ -292,7 +330,10 @@ export function DealDetailWorkspace({
             {invoices.length === 0 ? (
               <div className="rounded-lg border border-foreground/10 p-5 text-center text-sm text-muted">
                 No invoices yet.{" "}
-                <Link href={`/${tenantSlug}/finance`} className="underline decoration-foreground/30 hover:text-foreground">
+                <Link
+                  href={`/${tenantSlug}/finance`}
+                  className="underline decoration-foreground/30 hover:text-foreground"
+                >
                   Go to Finance
                 </Link>{" "}
                 to create one.
@@ -327,9 +368,7 @@ export function DealDetailWorkspace({
 
           {/* Activity feed */}
           <section>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">
-              Activity feed
-            </p>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">Activity feed</p>
             <ActivityFeed
               tenantSlug={tenantSlug}
               entityType="DEAL"
@@ -344,123 +383,131 @@ export function DealDetailWorkspace({
       </div>
 
       {/* Edit modal */}
-      <ModalOverlay open={Boolean(isEditing)} onClose={() => setIsEditing(false)} panelClassName={MODAL_PANEL_SM}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Edit deal</h2>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-            <form ref={editFormRef} action={editAction} className="mt-4 space-y-3">
-              {editState && !editState.ok ? <FormAlert>{editState.error}</FormAlert> : null}
-              <div>
-                <label className="mb-1 block text-xs text-muted">Deal value (NGN)</label>
-                <input
-                  name="value"
-                  inputMode="decimal"
-                  defaultValue={deal.valueRaw ?? ""}
-                  placeholder="e.g. 45000000"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-muted">Assigned owner</label>
-                <UiSelect name="assignedUserId" defaultValue={deal.assignedUserId ?? ""}>
-                  <option value="">Unassigned</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.label}</option>
-                  ))}
-                </UiSelect>
-              </div>
-              <label className="flex items-center gap-2 text-sm text-muted">
-                <input
-                  type="checkbox"
-                  name="pendingFinance"
-                  defaultChecked={deal.pendingFinance}
-                  className="h-4 w-4 accent-black"
-                />
-                Mark as pending finance
-              </label>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editPending}
-                  aria-busy={editPending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
-                >
-                  {editPending ? <ButtonSpinner /> : null}
-                  {editPending ? "Saving…" : "Save changes"}
-                </button>
-              </div>
-            </form>
+      <ModalOverlay
+        open={Boolean(isEditing)}
+        onClose={() => setIsEditing(false)}
+        panelClassName={MODAL_PANEL_SM}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Edit deal</h2>
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <form ref={editFormRef} action={editAction} className="mt-4 space-y-3">
+          {editState && !editState.ok ? <FormAlert>{editState.error}</FormAlert> : null}
+          <div>
+            <label className="mb-1 block text-xs text-muted">Deal value (NGN)</label>
+            <input
+              name="value"
+              inputMode="decimal"
+              defaultValue={deal.valueRaw ?? ""}
+              placeholder="e.g. 45000000"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">Assigned owner</label>
+            <UiSelect name="assignedUserId" defaultValue={deal.assignedUserId ?? ""}>
+              <option value="">Unassigned</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              name="pendingFinance"
+              defaultChecked={deal.pendingFinance}
+              className="h-4 w-4 accent-black"
+            />
+            Mark as pending finance
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={editPending}
+              aria-busy={editPending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {editPending ? <ButtonSpinner /> : null}
+              {editPending ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
       {/* Move stage modal */}
-      <ModalOverlay open={Boolean(isMoving)} onClose={() => setIsMoving(false)} panelClassName={MODAL_PANEL_XS}>
-            <h2 className="text-lg font-semibold text-foreground">Move stage</h2>
-            <p className="mt-1 text-sm text-muted">Current: {deal.stageLabel}</p>
-            {moveState && !moveState.ok ? <FormAlert>{moveState.error}</FormAlert> : null}
-            <form ref={moveFormRef} action={moveAction} className="mt-4 space-y-3">
-              <UiSelect name="stage" defaultValue={deal.stage}>
-                {stageOrder.map((s) => (
-                  <option key={s} value={s}>{STAGE_LABEL[s]}</option>
-                ))}
-              </UiSelect>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsMoving(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={movePending}
-                  aria-busy={movePending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
-                >
-                  {movePending ? <ButtonSpinner /> : null}
-                  {movePending ? "Saving…" : "Move stage"}
-                </button>
-              </div>
-            </form>
+      <ModalOverlay
+        open={Boolean(isMoving)}
+        onClose={() => setIsMoving(false)}
+        panelClassName={MODAL_PANEL_XS}
+      >
+        <h2 className="text-lg font-semibold text-foreground">Move stage</h2>
+        <p className="mt-1 text-sm text-muted">Current: {deal.stageLabel}</p>
+        {moveState && !moveState.ok ? <FormAlert>{moveState.error}</FormAlert> : null}
+        <form ref={moveFormRef} action={moveAction} className="mt-4 space-y-3">
+          <UiSelect name="stage" defaultValue={deal.stage}>
+            {stageOrder.map((s) => (
+              <option key={s} value={s}>
+                {STAGE_LABEL[s]}
+              </option>
+            ))}
+          </UiSelect>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsMoving(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={movePending}
+              aria-busy={movePending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {movePending ? <ButtonSpinner /> : null}
+              {movePending ? "Saving…" : "Move stage"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
     </div>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value: string | null | undefined;
-  href?: string;
-}) {
+function InfoRow({ label, value, href }: { label: string; value: string | null | undefined; href?: string }) {
   if (!value) return null;
   return (
     <div className="flex items-start justify-between gap-2">
       <dt className="shrink-0 text-muted">{label}</dt>
       <dd className="text-right text-foreground">
         {href ? (
-          <a href={href} className="underline decoration-foreground/30 hover:opacity-80">{value}</a>
-        ) : value}
+          <a href={href} className="underline decoration-foreground/30 hover:opacity-80">
+            {value}
+          </a>
+        ) : (
+          value
+        )}
       </dd>
     </div>
   );

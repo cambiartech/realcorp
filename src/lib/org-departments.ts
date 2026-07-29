@@ -6,7 +6,9 @@ export function normalizeOrgDepartmentName(raw: string): string {
 
 export function mergeOrgDepartments(existing: string[] | null | undefined): string[] {
   return Array.from(
-    new Set([...(existing ?? []), ...DEFAULT_ORG_DEPARTMENTS].map(normalizeOrgDepartmentName).filter(Boolean)),
+    new Set(
+      [...(existing ?? []), ...DEFAULT_ORG_DEPARTMENTS].map(normalizeOrgDepartmentName).filter(Boolean),
+    ),
   );
 }
 

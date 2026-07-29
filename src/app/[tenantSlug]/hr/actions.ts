@@ -19,7 +19,12 @@ import {
 } from "@/generated/prisma";
 import { absoluteAppUrl } from "@/lib/app-url";
 import { mergeHrFormIntoProfile } from "@/lib/hr-form-merge";
-import { hrFormFillPath, HR_FORM_TYPE_LABELS, hrOnboardingBundlePath, sortFormTypes } from "@/lib/hr-form-types";
+import {
+  hrFormFillPath,
+  HR_FORM_TYPE_LABELS,
+  hrOnboardingBundlePath,
+  sortFormTypes,
+} from "@/lib/hr-form-types";
 import { hrOfferSignPath } from "@/lib/hr-offer-path";
 import { sanitizeOfferLetterHtml } from "@/lib/offer-letter-html";
 import { sanitizeRichTextHtml } from "@/lib/rich-text-sanitize";
@@ -141,15 +146,19 @@ export async function upsertEmployeeProfile(
     return v ? new Date(v) : null;
   };
   const pickMoney = (key: string, v: number | undefined) => {
-    if (!has(key)) return existingRow ? undefined : v ?? null;
+    if (!has(key)) return existingRow ? undefined : (v ?? null);
     return v ?? null;
   };
 
   const data: Prisma.EmployeeProfileUpdateInput = {
     ...(has("employeeNumber") ? { employeeNumber: strOrNull(parsed.data.employeeNumber) } : {}),
-    ...(has("status") ? { status: (parsed.data.status as EmployeeProfileStatus) || EmployeeProfileStatus.ACTIVE } : {}),
+    ...(has("status")
+      ? { status: (parsed.data.status as EmployeeProfileStatus) || EmployeeProfileStatus.ACTIVE }
+      : {}),
     ...(has("fullName") ? { fullName: parsed.data.fullName } : {}),
-    ...(pickStr("gender", parsed.data.gender) !== undefined ? { gender: pickStr("gender", parsed.data.gender) } : {}),
+    ...(pickStr("gender", parsed.data.gender) !== undefined
+      ? { gender: pickStr("gender", parsed.data.gender) }
+      : {}),
     ...(pickDate("dateOfBirth", parsed.data.dateOfBirth) !== undefined
       ? { dateOfBirth: pickDate("dateOfBirth", parsed.data.dateOfBirth) }
       : {}),
@@ -174,7 +183,9 @@ export async function upsertEmployeeProfile(
     ...(pickStr("addressState", parsed.data.addressState) !== undefined
       ? { addressState: pickStr("addressState", parsed.data.addressState) }
       : {}),
-    ...(pickStr("position", parsed.data.position) !== undefined ? { position: pickStr("position", parsed.data.position) } : {}),
+    ...(pickStr("position", parsed.data.position) !== undefined
+      ? { position: pickStr("position", parsed.data.position) }
+      : {}),
     ...(pickStr("department", parsed.data.department) !== undefined
       ? { department: pickStr("department", parsed.data.department) }
       : {}),
@@ -203,14 +214,22 @@ export async function upsertEmployeeProfile(
     ...(has("housingPercent") ? { housingPercent: parsed.data.housingPercent ?? 20 } : {}),
     ...(has("transportPercent") ? { transportPercent: parsed.data.transportPercent ?? 15 } : {}),
     ...(has("otherPercent") ? { otherPercent: parsed.data.otherPercent ?? 35 } : {}),
-    ...(has("emergencyContactJson") ? { emergencyContact: parsed.data.emergencyContactJson as Prisma.InputJsonValue } : {}),
+    ...(has("emergencyContactJson")
+      ? { emergencyContact: parsed.data.emergencyContactJson as Prisma.InputJsonValue }
+      : {}),
     ...(has("educationJson") ? { education: parsed.data.educationJson as Prisma.InputJsonValue } : {}),
     ...(has("nextOfKinJson") ? { nextOfKin: parsed.data.nextOfKinJson as Prisma.InputJsonValue } : {}),
     ...(has("healthInfoJson") ? { healthInfo: parsed.data.healthInfoJson as Prisma.InputJsonValue } : {}),
-    ...(has("additionalInfoJson") ? { additionalInfo: parsed.data.additionalInfoJson as Prisma.InputJsonValue } : {}),
+    ...(has("additionalInfoJson")
+      ? { additionalInfo: parsed.data.additionalInfoJson as Prisma.InputJsonValue }
+      : {}),
     ...(has("bankAccountJson") ? { bankAccount: parsed.data.bankAccountJson as Prisma.InputJsonValue } : {}),
-    ...(has("guarantorInfoJson") ? { guarantorInfo: parsed.data.guarantorInfoJson as Prisma.InputJsonValue } : {}),
-    ...(pickStr("hrNotes", parsed.data.hrNotes) !== undefined ? { hrNotes: pickStr("hrNotes", parsed.data.hrNotes) } : {}),
+    ...(has("guarantorInfoJson")
+      ? { guarantorInfo: parsed.data.guarantorInfoJson as Prisma.InputJsonValue }
+      : {}),
+    ...(pickStr("hrNotes", parsed.data.hrNotes) !== undefined
+      ? { hrNotes: pickStr("hrNotes", parsed.data.hrNotes) }
+      : {}),
   };
 
   const createData = {
@@ -472,7 +491,10 @@ export async function saveSelfAppraisal(
     include: { profile: { select: { userId: true } }, cycle: { select: { status: true } } },
   });
   if (!appraisal) return { ok: false, error: "Appraisal not found." };
-  if (appraisal.profile.userId !== session.user.id && !canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+  if (
+    appraisal.profile.userId !== session.user.id &&
+    !canManageHr(Boolean(session.user.isPlatformAdmin), membership)
+  ) {
     return { ok: false, error: "You can only update your own appraisal." };
   }
   if (appraisal.cycle.status !== HrAppraisalCycleStatus.OPEN) {
@@ -679,7 +701,9 @@ export async function markPayslipPayments(
   return { ok: true, count: slips.length };
 }
 
-export async function finalizeAllDraftPayslipRuns(tenantSlug: string): Promise<ActionResult & { count?: number }> {
+export async function finalizeAllDraftPayslipRuns(
+  tenantSlug: string,
+): Promise<ActionResult & { count?: number }> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
   const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
@@ -706,7 +730,10 @@ export async function finalizeAllDraftPayslipRuns(tenantSlug: string): Promise<A
   return { ok: true, count: result.count };
 }
 
-async function resolveEmployeeProfileId(tenantId: string, input: { employeeProfileId?: string; userId?: string }) {
+async function resolveEmployeeProfileId(
+  tenantId: string,
+  input: { employeeProfileId?: string; userId?: string },
+) {
   if (input.employeeProfileId) {
     const existing = await prisma.employeeProfile.findFirst({
       where: { id: input.employeeProfileId, tenantId },
@@ -736,7 +763,10 @@ async function resolveEmployeeProfileId(tenantId: string, input: { employeeProfi
   return profile.id;
 }
 
-export async function addHrDocument(tenantSlug: string, input: Record<string, unknown>): Promise<ActionResult> {
+export async function addHrDocument(
+  tenantSlug: string,
+  input: Record<string, unknown>,
+): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
   const parsed = addHrDocumentSchema.safeParse(input);
@@ -864,7 +894,8 @@ export async function createHrFormRequest(
       where: { tenantId: tenant.id, userId: input.userId, status: MembershipStatus.ACTIVE },
       include: { user: { select: { name: true, email: true } } },
     });
-    if (!member) return { ok: false, error: "That person is not on your Team list. Add them under Team first." };
+    if (!member)
+      return { ok: false, error: "That person is not on your Team list. Add them under Team first." };
 
     sendToEmail = member.user.email ?? undefined;
     const existing = await prisma.employeeProfile.findUnique({

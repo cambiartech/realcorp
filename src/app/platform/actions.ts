@@ -4,12 +4,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { sendInviteEmail } from "@/lib/email";
-import {
-  buildInviteUrl,
-  classifyInvite,
-  inviteExpiresAt,
-  newInviteToken,
-} from "@/lib/invitation-utils";
+import { buildInviteUrl, classifyInvite, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
 import { pickBestErrorEvent } from "@/lib/platform-error-details";
 import { readTenantModuleFlagsFromForm } from "@/lib/tenant-module-definitions";
 import { tenantModuleRevalidatePaths } from "@/lib/tenant-module-revalidate";
@@ -17,8 +12,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 type InviteActionResult =
-  | { ok: true; inviteUrl: string; emailSent: boolean; emailError?: string }
-  | { ok: false; error: string };
+  { ok: true; inviteUrl: string; emailSent: boolean; emailError?: string } | { ok: false; error: string };
 
 async function requirePlatformAdmin() {
   const session = await auth();
@@ -321,7 +315,10 @@ export async function platformLookupErrorReference(reference: string): Promise<
 
   const best = pickBestErrorEvent(mapped);
   const hasActionableDetail = Boolean(
-    best && best.message && !best.isSanitized && (best.stack || !/Server Components render/i.test(best.message)),
+    best &&
+    best.message &&
+    !best.isSanitized &&
+    (best.stack || !/Server Components render/i.test(best.message)),
   );
 
   return {

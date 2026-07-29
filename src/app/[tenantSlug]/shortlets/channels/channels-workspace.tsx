@@ -121,66 +121,124 @@ export function ChannelsWorkspace({
       )}
 
       {importLead ? (
-        <ModalOverlay open={Boolean(importLead)} onClose={() => setImportLead(null)} panelClassName={MODAL_PANEL_LG}>
-            <h2 className="text-lg font-bold">Import channel booking</h2>
-            <p className="mt-1 text-sm text-muted">
-              {importLead.name} · {importLead.source}
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              Creates a pending reservation. Apartment can be assigned later at check-in.
-            </p>
-            <form
-              className="mt-4 space-y-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                run(
-                  () =>
-                    importChannelLeadAsReservation(tenantSlug, {
-                      leadId: importLead.id,
-                      unitId: form.unitId || undefined,
-                      propertyId: form.propertyId || undefined,
-                      checkIn: form.checkIn,
-                      checkInTime: form.checkInTime,
-                      checkOut: form.checkOut,
-                      checkOutTime: form.checkOutTime,
-                      notes: form.notes || undefined,
-                    }),
-                  "Reservation created from channel inquiry.",
-                );
-              }}
-            >
-              {propertyOptions.length > 0 ? (
-                <label className="block text-sm text-muted">
-                  Location
-                  <UiSelect className="mt-1" value={form.propertyId} onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))}>
-                    <option value="">Select location (optional if apartment chosen)</option>
-                    {propertyOptions.map((o) => (
-                      <option key={o.id} value={o.id}>{o.label}</option>
-                    ))}
-                  </UiSelect>
-                </label>
-              ) : null}
+        <ModalOverlay
+          open={Boolean(importLead)}
+          onClose={() => setImportLead(null)}
+          panelClassName={MODAL_PANEL_LG}
+        >
+          <h2 className="text-lg font-bold">Import channel booking</h2>
+          <p className="mt-1 text-sm text-muted">
+            {importLead.name} · {importLead.source}
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Creates a pending reservation. Apartment can be assigned later at check-in.
+          </p>
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              run(
+                () =>
+                  importChannelLeadAsReservation(tenantSlug, {
+                    leadId: importLead.id,
+                    unitId: form.unitId || undefined,
+                    propertyId: form.propertyId || undefined,
+                    checkIn: form.checkIn,
+                    checkInTime: form.checkInTime,
+                    checkOut: form.checkOut,
+                    checkOutTime: form.checkOutTime,
+                    notes: form.notes || undefined,
+                  }),
+                "Reservation created from channel inquiry.",
+              );
+            }}
+          >
+            {propertyOptions.length > 0 ? (
               <label className="block text-sm text-muted">
-                Apartment <span className="text-xs">(optional)</span>
-                <UiSelect className="mt-1" value={form.unitId} onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))}>
-                  <option value="">Assign later</option>
-                  {unitOptions.map((o) => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
+                Location
+                <UiSelect
+                  className="mt-1"
+                  value={form.propertyId}
+                  onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))}
+                >
+                  <option value="">Select location (optional if apartment chosen)</option>
+                  {propertyOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
                   ))}
                 </UiSelect>
               </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input type="date" className="rounded-md border px-3 py-2 text-sm" value={form.checkIn} onChange={(e) => setForm((f) => ({ ...f, checkIn: e.target.value }))} required />
-                <input type="time" className="rounded-md border px-3 py-2 text-sm" value={form.checkInTime} onChange={(e) => setForm((f) => ({ ...f, checkInTime: e.target.value }))} required />
-                <input type="date" className="rounded-md border px-3 py-2 text-sm" value={form.checkOut} onChange={(e) => setForm((f) => ({ ...f, checkOut: e.target.value }))} required />
-                <input type="time" className="rounded-md border px-3 py-2 text-sm" value={form.checkOutTime} onChange={(e) => setForm((f) => ({ ...f, checkOutTime: e.target.value }))} required />
-              </div>
-              <textarea className="w-full rounded-md border px-3 py-2 text-sm" rows={3} placeholder="Notes" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setImportLead(null)} className="rounded-md border px-3 py-2 text-sm">Cancel</button>
-                <button type="submit" disabled={isPending} className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background">Create reservation</button>
-              </div>
-            </form>
+            ) : null}
+            <label className="block text-sm text-muted">
+              Apartment <span className="text-xs">(optional)</span>
+              <UiSelect
+                className="mt-1"
+                value={form.unitId}
+                onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))}
+              >
+                <option value="">Assign later</option>
+                {unitOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                type="date"
+                className="rounded-md border px-3 py-2 text-sm"
+                value={form.checkIn}
+                onChange={(e) => setForm((f) => ({ ...f, checkIn: e.target.value }))}
+                required
+              />
+              <input
+                type="time"
+                className="rounded-md border px-3 py-2 text-sm"
+                value={form.checkInTime}
+                onChange={(e) => setForm((f) => ({ ...f, checkInTime: e.target.value }))}
+                required
+              />
+              <input
+                type="date"
+                className="rounded-md border px-3 py-2 text-sm"
+                value={form.checkOut}
+                onChange={(e) => setForm((f) => ({ ...f, checkOut: e.target.value }))}
+                required
+              />
+              <input
+                type="time"
+                className="rounded-md border px-3 py-2 text-sm"
+                value={form.checkOutTime}
+                onChange={(e) => setForm((f) => ({ ...f, checkOutTime: e.target.value }))}
+                required
+              />
+            </div>
+            <textarea
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Notes"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setImportLead(null)}
+                className="rounded-md border px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background"
+              >
+                Create reservation
+              </button>
+            </div>
+          </form>
         </ModalOverlay>
       ) : null}
     </div>

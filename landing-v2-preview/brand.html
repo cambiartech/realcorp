@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Realcorp — brand assets</title>
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+  :root{--canvas:#F7F6F3;--ink:#16150F;--ink-2:#56524A;--ink-3:#8B857B;
+        --accent:#A8663C;--accent-light:#C98A55;--line:rgba(22,21,15,.09);
+        --sans:"Instrument Sans",system-ui,sans-serif;--mono:"JetBrains Mono",monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--sans);
+       -webkit-font-smoothing:antialiased;line-height:1.55}
+  .wrap{max-width:1080px;margin:0 auto;padding:56px 32px 96px}
+  h1{font-size:36px;letter-spacing:-.038em;font-weight:600;margin:0 0 10px}
+  h2{font-size:13px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;
+     color:var(--ink-3);font-weight:500;margin:52px 0 18px;padding-bottom:10px;
+     border-bottom:1px solid var(--line)}
+  .sub{color:var(--ink-2);font-size:16.5px;margin:0;max-width:66ch}
+  .card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:26px;margin-bottom:16px}
+  .card.dark{background:var(--ink);border-color:rgba(247,246,243,.14)}
+  .card.dark .cap{color:rgba(247,246,243,.5)}
+  .cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+       color:var(--ink-3);margin:0 0 18px}
+  .row{display:flex;align-items:center;gap:30px;flex-wrap:wrap}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+  .swatch{border-radius:12px;padding:16px;border:1px solid var(--line);background:#fff}
+  .chip{height:56px;border-radius:8px;margin-bottom:12px}
+  .name{font-weight:600;font-size:14px;letter-spacing:-.015em}
+  .hex{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+  .lock{display:inline-flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.032em}
+  .btn{display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:999px;
+       background:var(--ink);color:var(--canvas);font-size:13px;font-weight:500;border:0;
+       cursor:pointer;font-family:var(--sans)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;align-items:center}
+  .hint{font-size:13px;color:var(--ink-3);margin:8px 0 0}
+  code{font-family:var(--mono);font-size:12.5px;background:rgba(22,21,15,.05);
+       padding:2px 6px;border-radius:5px}
+  .rules{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.rules{grid-template-columns:1fr}}
+  .rule{border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:#fff}
+  .rule h3{margin:0 0 6px;font-size:15px;letter-spacing:-.018em}
+  .rule p{margin:0;font-size:14px;color:var(--ink-2)}
+  .rule.no{border-color:rgba(168,102,60,.3)}
+  .rule.no h3{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Realcorp brand assets</h1>
+  <p class="sub">Mark B — the R knocked out of an ink tile, with the leg in copper. Every asset below
+    is generated from the same 48×48 geometry, so nothing drifts out of sync.</p>
+
+  <h2>The mark</h2>
+  <div class="card">
+    <p class="cap">On light — <code>public/brand/svg/mark-ink.svg</code></p>
+    <div class="row" id="lightRow"></div>
+  </div>
+  <div class="card dark">
+    <p class="cap">On dark — <code>public/brand/svg/mark-light.svg</code></p>
+    <div class="row" id="darkRow"></div>
+  </div>
+
+  <h2>Lockups</h2>
+  <div class="card">
+    <p class="cap">Horizontal — default for headers, email signatures, letterheads</p>
+    <div class="row"><span class="lock" id="lockH" style="font-size:34px"></span></div>
+    <div class="btns">
+      <button class="btn" data-export="lockH" data-scale="2">Download @2x</button>
+      <button class="btn ghost" data-export="lockH" data-scale="4">@4x</button>
+      <button class="btn ghost" data-export="lockH" data-scale="8">@8x (print)</button>
+    </div>
+    <p class="hint">Exports use the live Instrument Sans webfont, so these PNGs are the accurate
+      ones. The <code>.png</code> files already in <code>public/brand/png/</code> were rendered with a
+      metric fallback — treat them as drafts and use these instead.</p>
+  </div>
+  <div class="card dark">
+    <p class="cap">Horizontal, reversed</p>
+    <div class="row"><span class="lock" id="lockHD" style="font-size:34px;color:#F7F6F3"></span></div>
+    <div class="btns">
+      <button class="btn" style="background:#F7F6F3;color:#16150F" data-export="lockHD" data-scale="2">Download @2x</button>
+      <button class="btn ghost" style="color:#F7F6F3;border-color:rgba(247,246,243,.25)" data-export="lockHD" data-scale="4">@4x</button>
+    </div>
+  </div>
+
+  <h2>Palette</h2>
+  <div class="grid" id="palette"></div>
+
+  <h2>Clear space & minimum size</h2>
+  <div class="rules">
+    <div class="rule">
+      <h3>Clear space</h3>
+      <p>Keep clear space equal to the height of the R's counter (the notch in the bowl) on all
+        four sides — roughly ⅛ of the tile.</p>
+    </div>
+    <div class="rule">
+      <h3>Minimum size</h3>
+      <p>16px for the tile mark on screen, 6mm in print. Below that, use the mono variant — the
+        copper leg muddies at small sizes on coloured stock.</p>
+    </div>
+    <div class="rule no">
+      <h3>Don't recolour the leg</h3>
+      <p>The copper leg is the only accent. If a single colour is required, use
+        <code>mark-mono-black</code> or <code>mark-mono-white</code>, not a tinted variant.</p>
+    </div>
+    <div class="rule no">
+      <h3>Don't set the wordmark in another face</h3>
+      <p>Instrument Sans SemiBold at −0.03em tracking. Nothing else.</p>
+    </div>
+  </div>
+
+  <h2>Typography</h2>
+  <div class="card">
+    <p style="margin:0 0 14px;font-size:40px;font-weight:600;letter-spacing:-.038em">Instrument Sans — display &amp; UI</p>
+    <p style="margin:0 0 14px;font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:40px;color:var(--accent)">Instrument Serif — the accent word</p>
+    <p style="margin:0;font-family:var(--mono);font-size:14px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3)">JetBrains Mono — labels &amp; eyebrows</p>
+  </div>
+</div>
+
+<script>
+const INK="#16150F", LIGHT="#F7F6F3", COP="#A8663C", COP_L="#C98A55";
+const R_BODY="M14 10h13a7 7 0 0 1 0 14h-7v14h-6V10Zm6 5h7a2 2 0 0 1 0 4h-7v-4Z";
+const R_LEG ="M27 24l9 14h-7.2L20 24Z";
+
+const mark = (s, tile, knock, leg) =>
+  `<svg width="${s}" height="${s}" viewBox="0 0 48 48" fill="none">
+     <rect width="48" height="48" rx="11" fill="${tile}"/>
+     <path d="${R_BODY}" fill="${knock}" fill-rule="evenodd"/>
+     <path d="${R_LEG}" fill="${leg}"/></svg>`;
+
+const SIZES=[96,64,48,32,24,16];
+lightRow.innerHTML = SIZES.map(s=>mark(s,INK,LIGHT,COP)).join("");
+darkRow .innerHTML = SIZES.map(s=>mark(s,LIGHT,INK,COP_L)).join("");
+lockH .innerHTML = mark(44,INK,LIGHT,COP)   + "Realcorp";
+lockHD.innerHTML = mark(44,LIGHT,INK,COP_L) + "Realcorp";
+
+const COLOURS=[
+  ["Ink","#16150F","Text, the mark's tile, dark bands"],
+  ["Canvas","#F7F6F3","Page background"],
+  ["Copper","#A8663C","The accent. Used once per screen"],
+  ["Copper light","#C98A55","Accent on dark surfaces only"],
+  ["Brass","#B08D57","Legacy Realcorp gold — secondary"],
+  ["Sand","#EFEDE7","Recessed panels"],
+  ["Ink 2","#56524A","Body copy"],
+  ["Ink 3","#8B857B","Captions, labels"],
+];
+palette.innerHTML = COLOURS.map(([n,hex,use])=>`
+  <div class="swatch">
+    <div class="chip" style="background:${hex};border:1px solid rgba(22,21,15,.08)"></div>
+    <div class="name">${n}</div>
+    <div class="hex">${hex}</div>
+    <div class="hex" style="text-transform:none;letter-spacing:0;margin-top:6px">${use}</div>
+  </div>`).join("");
+
+/* Rasterise a live DOM lockup at any scale, with the real webfont baked in. */
+document.querySelectorAll("[data-export]").forEach(btn=>{
+  btn.addEventListener("click", async ()=>{
+    const el = document.getElementById(btn.dataset.export);
+    const scale = +btn.dataset.scale;
+    const r = el.getBoundingClientRect();
+    const w = Math.ceil(r.width), h = Math.ceil(r.height);
+    const cs = getComputedStyle(el);
+
+    const html =
+      `<div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;gap:10px;
+        font-family:'Instrument Sans',sans-serif;font-weight:600;font-size:${cs.fontSize};
+        letter-spacing:-0.032em;color:${cs.color};line-height:1">${el.innerHTML}</div>`;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+        <foreignObject width="100%" height="100%">${html}</foreignObject></svg>`;
+
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    await img.decode();
+
+    const c = document.createElement("canvas");
+    c.width = w*scale; c.height = h*scale;
+    const ctx = c.getContext("2d");
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0);
+
+    const a = document.createElement("a");
+    a.download = `realcorp-${btn.dataset.export}-@${scale}x.png`;
+    a.href = c.toDataURL("image/png");
+    a.click();
+  });
+});
+</script>
+</body>
+</html>

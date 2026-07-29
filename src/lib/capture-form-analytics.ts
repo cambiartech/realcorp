@@ -23,16 +23,17 @@ function countByKey(rows: SessionSlice[], pick: (r: SessionSlice) => string | nu
     if (!key) continue;
     map.set(key, (map.get(key) ?? 0) + 1);
   }
-  return [...map.entries()]
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
+  return [...map.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
 }
 
-export function aggregateCaptureFormAnalytics(sessions: SessionSlice[], form: {
-  viewCount: number;
-  startCount: number;
-  submitCount: number;
-}) {
+export function aggregateCaptureFormAnalytics(
+  sessions: SessionSlice[],
+  form: {
+    viewCount: number;
+    startCount: number;
+    submitCount: number;
+  },
+) {
   const partials = sessions.filter(
     (s) =>
       s.status === LeadCaptureSessionStatus.PARTIAL ||
@@ -66,7 +67,10 @@ export function aggregateCaptureFormAnalytics(sessions: SessionSlice[], form: {
     hourBuckets,
     peakHour,
     abandonByField: countByKey(
-      sessions.filter((s) => s.status === LeadCaptureSessionStatus.ABANDONED || s.status === LeadCaptureSessionStatus.PARTIAL),
+      sessions.filter(
+        (s) =>
+          s.status === LeadCaptureSessionStatus.ABANDONED || s.status === LeadCaptureSessionStatus.PARTIAL,
+      ),
       (s) => s.lastFieldKey,
     ),
     deviceBreakdown: countByKey(sessions, (s) => s.deviceType),

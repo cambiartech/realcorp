@@ -12,8 +12,7 @@ export default async function HrPublicFormPage({ params }: { params: Promise<{ t
   const loaded = await loadHrFormRequestByToken(token);
   if (!loaded) notFound();
 
-  const bundleToken =
-    loaded.bundleToken ?? (await resolveBundleTokenForFormRequest(loaded));
+  const bundleToken = loaded.bundleToken ?? (await resolveBundleTokenForFormRequest(loaded));
   if (bundleToken) {
     redirect(
       hrOnboardingBundlePath(bundleToken, {

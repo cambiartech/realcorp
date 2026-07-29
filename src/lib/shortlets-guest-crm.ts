@@ -53,7 +53,11 @@ export async function findOrCreateShortletGuestClient(
   return created.id;
 }
 
-export function guestClientProfileHref(tenantSlug: string, clientId: string | null | undefined, moduleClients: boolean) {
+export function guestClientProfileHref(
+  tenantSlug: string,
+  clientId: string | null | undefined,
+  moduleClients: boolean,
+) {
   if (!clientId || !moduleClients) return null;
   return `/${tenantSlug}/clients/${clientId}`;
 }

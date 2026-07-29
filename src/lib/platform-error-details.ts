@@ -61,9 +61,9 @@ export function errorDetailScore(event: {
   return score;
 }
 
-export function pickBestErrorEvent<T extends { message: string | null; stack: string | null; metadata?: unknown }>(
-  events: T[],
-): T | null {
+export function pickBestErrorEvent<
+  T extends { message: string | null; stack: string | null; metadata?: unknown },
+>(events: T[]): T | null {
   if (events.length === 0) return null;
   return [...events].sort((a, b) => errorDetailScore(b) - errorDetailScore(a))[0] ?? null;
 }

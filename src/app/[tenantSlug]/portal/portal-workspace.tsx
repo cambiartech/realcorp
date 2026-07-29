@@ -21,7 +21,9 @@ export type InvestorContact = {
 
 function formatMoney(value: number, currency: string) {
   try {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(
+      value,
+    );
   } catch {
     return `${currency} ${value.toLocaleString()}`;
   }
@@ -33,7 +35,9 @@ function formatDate(iso: string) {
 
 function formatPrice(value: number, currency: string) {
   try {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(
+      value,
+    );
   } catch {
     return `${currency} ${value.toLocaleString()}`;
   }
@@ -101,14 +105,15 @@ export function PortalWorkspace({
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-foreground/10 bg-gradient-to-br from-foreground/[0.04] via-background to-emerald-500/[0.06] px-6 py-8 sm:px-8">
+      <div className="relative overflow-hidden rounded-2xl border border-foreground/10 bg-gradient-to-br from-foreground/[0.04] via-background to-[var(--success-wash)]/[0.06] px-6 py-8 sm:px-8">
         <div className="relative z-10 max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Investor dashboard</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {userName ? `Welcome back, ${userName.split(" ")[0]}` : "My portfolio"}
           </h1>
           <p className="mt-2 text-sm text-muted sm:text-base">
-            Track your investments with {tenantName}, discover new opportunities, and see earnings from your allocations.
+            Track your investments with {tenantName}, discover new opportunities, and see earnings from your
+            allocations.
           </p>
         </div>
         <Sparkles className="pointer-events-none absolute -right-2 -top-2 h-32 w-32 text-foreground/[0.04]" />
@@ -117,13 +122,14 @@ export function PortalWorkspace({
       {isAdminViewer ? (
         <div className="mt-4 rounded-xl border border-foreground/10 bg-foreground/[0.03] px-4 py-3 text-sm text-muted">
           Admin preview — link properties from <strong className="text-foreground">Clients</strong> or add
-          investors from <strong className="text-foreground">Stakeholders</strong> so they see their portfolio here.
+          investors from <strong className="text-foreground">Stakeholders</strong> so they see their portfolio
+          here.
         </div>
       ) : null}
 
       {/* Cross-tenant banner */}
-      {(otherOrgs.length > 0 || allOrganizations.length > 1) ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-500/20 bg-violet-500/[0.06] px-4 py-3">
+      {otherOrgs.length > 0 || allOrganizations.length > 1 ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--accent-line)] bg-[var(--accent)]/[0.06] px-4 py-3">
           <div className="text-sm text-foreground">
             {allOrganizations.length > 1 ? (
               <>
@@ -143,12 +149,15 @@ export function PortalWorkspace({
       ) : null}
 
       {/* Stats */}
-      <div className={`mt-6 grid gap-3 sm:grid-cols-2 ${showShortlets ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+      <div
+        className={`mt-6 grid gap-3 sm:grid-cols-2 ${showShortlets ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+      >
         <StatCard label="Your projects" value={String(totals.projects)} />
-        {showShortlets ? (
-          <StatCard label="Your shortlets" value={String(shortletTotals.units)} />
-        ) : null}
-        <StatCard label="Total allocated" value={totals.allocated > 0 ? formatMoney(totals.allocated, totals.currency) : "—"} />
+        {showShortlets ? <StatCard label="Your shortlets" value={String(shortletTotals.units)} /> : null}
+        <StatCard
+          label="Total allocated"
+          value={totals.allocated > 0 ? formatMoney(totals.allocated, totals.currency) : "—"}
+        />
         <StatCard
           label="Total collected"
           value={formatMoney(totals.collected + shortletTotals.collected, totals.currency)}
@@ -231,10 +240,14 @@ export function PortalWorkspace({
                   <tbody className="divide-y divide-foreground/[0.06]">
                     {filteredPayments.map((payment) => (
                       <tr key={payment.id} className="hover:bg-foreground/[0.02]">
-                        <td className="px-4 py-2.5 whitespace-nowrap text-muted">{formatDate(payment.paidAt)}</td>
+                        <td className="px-4 py-2.5 whitespace-nowrap text-muted">
+                          {formatDate(payment.paidAt)}
+                        </td>
                         <td className="px-4 py-2.5 text-foreground">{payment.label}</td>
                         <td className="px-4 py-2.5 text-muted">{payment.projectName}</td>
-                        <td className="px-4 py-2.5 text-right font-medium">{formatMoney(payment.amount, payment.currency)}</td>
+                        <td className="px-4 py-2.5 text-right font-medium">
+                          {formatMoney(payment.amount, payment.currency)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -249,15 +262,18 @@ export function PortalWorkspace({
             <div className="mt-8 rounded-xl border border-dashed border-foreground/15 px-6 py-14 text-center">
               <p className="text-sm font-medium text-foreground">No short-let apartments linked yet</p>
               <p className="mt-1 text-sm text-muted">
-                When {tenantName} links a short-let apartment to your client profile, it appears here with stay and
-                earnings data.
+                When {tenantName} links a short-let apartment to your client profile, it appears here with
+                stay and earnings data.
               </p>
             </div>
           ) : (
             <>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 <StatCard label="Linked apartments" value={String(shortletTotals.units)} />
-                <StatCard label="Total collected" value={formatMoney(shortletTotals.collected, shortletTotals.currency)} />
+                <StatCard
+                  label="Total collected"
+                  value={formatMoney(shortletTotals.collected, shortletTotals.currency)}
+                />
                 <StatCard
                   label="Your earnings"
                   value={formatMoney(shortletTotals.earnings, shortletTotals.currency)}
@@ -270,7 +286,10 @@ export function PortalWorkspace({
                 ))}
               </div>
               <p className="mt-4 text-center text-xs text-muted">
-                <Link href={`/${tenantSlug}/portal/shortlets`} className="font-medium underline underline-offset-2">
+                <Link
+                  href={`/${tenantSlug}/portal/shortlets`}
+                  className="font-medium underline underline-offset-2"
+                >
                   Open detailed shortlet report →
                 </Link>
               </p>
@@ -294,7 +313,9 @@ export function PortalWorkspace({
           {filteredDiscover.length === 0 ? (
             <div className="rounded-xl border border-dashed border-foreground/15 px-6 py-14 text-center">
               <p className="text-sm font-medium text-foreground">
-                {discoverListings.length === 0 ? "No new opportunities right now" : "No listings match your search"}
+                {discoverListings.length === 0
+                  ? "No new opportunities right now"
+                  : "No listings match your search"}
               </p>
               <p className="mt-1 text-sm text-muted">
                 {discoverListings.length === 0
@@ -351,7 +372,7 @@ function TabCountBadge({
 
   if (variant === "amber") {
     return (
-      <span className="ml-1 min-w-[1.25rem] rounded-full bg-amber-500/20 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-amber-900 dark:text-amber-100">
+      <span className="ml-1 min-w-[1.25rem] rounded-full bg-[var(--warn-wash)] px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-[var(--warn)]">
         {count}
       </span>
     );
@@ -359,7 +380,7 @@ function TabCountBadge({
 
   if (variant === "emerald") {
     return (
-      <span className="ml-1 min-w-[1.25rem] rounded-full bg-emerald-600 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white">
+      <span className="ml-1 min-w-[1.25rem] rounded-full bg-[var(--success)] px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white">
         {count}
       </span>
     );
@@ -389,7 +410,9 @@ function TabButton({
       onClick={onClick}
       className={[
         "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        active ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+        active
+          ? "bg-foreground text-background"
+          : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
       ].join(" ")}
     >
       <Icon className="h-4 w-4" />
@@ -402,11 +425,13 @@ function StatCard({ label, value, highlight }: { label: string; value: string; h
   return (
     <div
       className={`rounded-xl border px-4 py-3.5 ${
-        highlight ? "border-emerald-500/25 bg-emerald-500/[0.06]" : "border-foreground/10 bg-foreground/[0.02]"
+        highlight
+          ? "border-[var(--success-line)] bg-[var(--success)]/[0.06]"
+          : "border-foreground/10 bg-foreground/[0.02]"
       }`}
     >
       <p className="text-xs text-muted">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${highlight ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+      <p className={`mt-1 text-lg font-semibold ${highlight ? "text-[var(--success)] " : "text-foreground"}`}>
         {value}
       </p>
     </div>
@@ -441,12 +466,15 @@ function DiscoverCard({
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-4xl font-bold text-white" style={{ backgroundColor: accent }}>
+          <div
+            className="flex h-full items-center justify-center text-4xl font-bold text-white"
+            style={{ backgroundColor: accent }}
+          >
             {listing.name.charAt(0)}
           </div>
         )}
         {listing.unitsAvailable > 0 ? (
-          <span className="absolute left-3 top-3 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow">
+          <span className="absolute left-3 top-3 rounded-full bg-[var(--success)] px-2.5 py-1 text-[11px] font-semibold text-white shadow">
             {listing.unitsAvailable} units available
           </span>
         ) : null}
@@ -499,7 +527,9 @@ function ProjectCard({ tenantSlug, project }: { tenantSlug: string; project: Por
             <h3 className="font-semibold text-foreground group-hover:underline">{project.projectName}</h3>
             <p className="mt-0.5 text-xs text-muted">
               {STAKE_LABEL[project.stakeType]}
-              {project.allocationAmount > 0 ? ` · ${formatMoney(project.allocationAmount, project.currency)} allocated` : ""}
+              {project.allocationAmount > 0
+                ? ` · ${formatMoney(project.allocationAmount, project.currency)} allocated`
+                : ""}
               {location ? ` · ${location}` : ""}
             </p>
             {project.linkedUnitLabels && project.linkedUnitLabels.length > 0 ? (
@@ -511,7 +541,9 @@ function ProjectCard({ tenantSlug, project }: { tenantSlug: string; project: Por
           </div>
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              project.isPublished ? "bg-emerald-500/10 text-emerald-600" : "bg-foreground/[0.06] text-muted"
+              project.isPublished
+                ? "bg-[var(--success-wash)] text-[var(--success)]"
+                : "bg-foreground/[0.06] text-muted"
             }`}
           >
             {project.isPublished ? "Live" : "Private"}
@@ -526,7 +558,7 @@ function ProjectCard({ tenantSlug, project }: { tenantSlug: string; project: Por
             <span>{soldPct}%</span>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
-            <div className="h-full rounded-full bg-emerald-600" style={{ width: `${soldPct}%` }} />
+            <div className="h-full rounded-full bg-[var(--success)]" style={{ width: `${soldPct}%` }} />
           </div>
         </div>
         <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -544,9 +576,15 @@ function ProjectCard({ tenantSlug, project }: { tenantSlug: string; project: Por
 
 function Metric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-lg px-2 py-2 ${highlight ? "bg-emerald-500/[0.06]" : "bg-foreground/[0.03]"}`}>
+    <div
+      className={`rounded-lg px-2 py-2 ${highlight ? "bg-[var(--success)]/[0.06]" : "bg-foreground/[0.03]"}`}
+    >
       <dt className="text-[10px] text-muted">{label}</dt>
-      <dd className={`mt-0.5 text-xs font-semibold ${highlight ? "text-emerald-600" : "text-foreground"}`}>{value}</dd>
+      <dd
+        className={`mt-0.5 text-xs font-semibold ${highlight ? "text-[var(--success)]" : "text-foreground"}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -557,17 +595,15 @@ function ShortletCard({ tenantSlug, unit }: { tenantSlug: string; unit: Investor
   return (
     <Link
       href={href}
-      className="group block overflow-hidden rounded-xl border border-amber-500/20 bg-amber-500/[0.03] shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-500/35 hover:shadow-md"
+      className="group block overflow-hidden rounded-xl border border-[var(--warn-line)] bg-[var(--warn)]/[0.03] shadow-sm transition-all hover:-translate-y-0.5 hover:border-[var(--warn-line)] hover:shadow-md"
     >
-      <div className="flex items-center gap-3 border-b border-amber-500/15 bg-amber-500/[0.06] px-4 py-3">
-        <BedDouble className="h-5 w-5 text-amber-700 dark:text-amber-300" />
+      <div className="flex items-center gap-3 border-b border-[var(--warn-line)] bg-[var(--warn)]/[0.06] px-4 py-3">
+        <BedDouble className="h-5 w-5 text-[var(--warn)]" />
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
-            Short-let
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--warn)]">Short-let</p>
           <h3 className="truncate font-semibold text-foreground group-hover:underline">{unit.unitName}</h3>
         </div>
-        <span className="ml-auto shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-900 dark:text-amber-100">
+        <span className="ml-auto shrink-0 rounded-full bg-[var(--warn-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warn)]">
           Active
         </span>
       </div>
@@ -639,7 +675,7 @@ function InvestorInterestModal({
       >
         {submitted ? (
           <div className="py-6 text-center">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+            <CheckCircle2 className="mx-auto h-10 w-10 text-[var(--success)]" />
             <h3 className="mt-3 text-lg font-semibold">Interest recorded</h3>
             <p className="mt-1 text-sm text-muted">
               Our team will follow up about <strong className="text-foreground">{listing.name}</strong> at{" "}
@@ -658,7 +694,9 @@ function InvestorInterestModal({
           <>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Express interest</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                  Express interest
+                </p>
                 <h3 className="mt-0.5 text-base font-semibold">{listing.name}</h3>
                 {location ? <p className="text-xs text-muted">{location}</p> : null}
                 <p className="mt-1 text-xs font-medium text-foreground">{price}</p>
@@ -673,9 +711,9 @@ function InvestorInterestModal({
               </button>
             </div>
 
-            <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-3">
+            <div className="mt-4 rounded-lg border border-[var(--success-line)] bg-[var(--success)]/[0.06] px-3 py-3">
               <div className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--success)]" />
                 <div className="min-w-0 text-sm">
                   <p className="font-medium text-foreground">Using your investor profile</p>
                   <p className="mt-1 text-muted">
@@ -727,9 +765,7 @@ function InvestorInterestModal({
                 />
               </div>
 
-              {state && !state.ok ? (
-                <p className="text-sm font-medium text-error">{state.error}</p>
-              ) : null}
+              {state && !state.ok ? <p className="text-sm font-medium text-error">{state.error}</p> : null}
 
               <button
                 type="submit"
@@ -741,8 +777,6 @@ function InvestorInterestModal({
                 {pending ? "Sending…" : "Confirm interest"}
               </button>
             </form>
-
-          
           </>
         )}
       </div>

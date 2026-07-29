@@ -2,7 +2,11 @@ import type { Prisma } from "@/generated/prisma";
 
 type Tx = Prisma.TransactionClient;
 
-export function splitGuestName(guestName: string): { firstName: string; lastName: string | null; fullName: string } {
+export function splitGuestName(guestName: string): {
+  firstName: string;
+  lastName: string | null;
+  fullName: string;
+} {
   const trimmed = guestName.trim().replace(/\s+/g, " ");
   const parts = trimmed.split(" ");
   const firstName = parts[0] || trimmed;

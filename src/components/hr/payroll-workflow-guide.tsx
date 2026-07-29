@@ -78,7 +78,8 @@ export function PayrollWorkflowGuide({
       </div>
       <p className="mt-3 text-[11px] text-muted">
         <strong className="text-foreground">Published</strong> = employee can download the payslip.{" "}
-        <strong className="text-foreground">Paid</strong> = you confirm the net salary was transferred (manual; no bank API).
+        <strong className="text-foreground">Paid</strong> = you confirm the net salary was transferred
+        (manual; no bank API).
       </p>
     </div>
   );

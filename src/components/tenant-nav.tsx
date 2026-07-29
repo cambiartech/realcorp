@@ -178,7 +178,9 @@ function TenantBrandLink({
     <Link href={href} className="group inline-flex min-w-0 items-center gap-2">
       {mark}
       <span className="min-w-0">
-        <span className="block truncate text-sm font-bold tracking-tight text-foreground group-hover:opacity-90">{tenantName}</span>
+        <span className="block truncate text-sm font-bold tracking-tight text-foreground group-hover:opacity-90">
+          {tenantName}
+        </span>
         <span className="block text-[10px] text-muted">Organization</span>
       </span>
     </Link>
@@ -267,7 +269,8 @@ export function TenantSidebar({
   useEffect(() => {
     const shortletsItem = coreItems.find((i) => i.key === "shortlets");
     if (!shortletsItem) return;
-    if (pathname === shortletsItem.href || pathname.startsWith(`${shortletsItem.href}/`)) setShortletsOpen(true);
+    if (pathname === shortletsItem.href || pathname.startsWith(`${shortletsItem.href}/`))
+      setShortletsOpen(true);
   }, [pathname, coreItems]);
 
   function toggleCollapsed() {
@@ -353,29 +356,44 @@ export function TenantSidebar({
   const financeItem = coreItems.find((i) => i.key === "finance");
   const financeSubItems: FinanceSubItem[] = financeItem
     ? [
-        { id: "overview",      label: "Overview",      href: `${financeItem.href}/overview`,      icon: LayoutDashboard },
-        { id: "receivables",   label: "Receivables",   href: `${financeItem.href}/receivables`,   icon: TrendingUp },
-        { id: "payables",      label: "Payables",      href: `${financeItem.href}/payables`,      icon: TrendingDown },
-        { id: "sales-receipts",label: "Sales Receipts",href: `${financeItem.href}/sales-receipts`,icon: Receipt },
-        { id: "documents",     label: "Documents",     href: `${financeItem.href}/documents`,     icon: FileText },
-        { id: "invoices",      label: "Invoices",      href: `${financeItem.href}/invoices`,      icon: CreditCard },
-        { id: "payments",      label: "Payments",      href: `${financeItem.href}/payments`,      icon: Banknote },
-        { id: "expenses",      label: "Expenses",      href: `${financeItem.href}/expenses`,      icon: ShoppingBag },
-        { id: "banking",       label: "Banking",       href: `${financeItem.href}/banking`,       icon: Landmark },
-        { id: "reports",       label: "Reports",       href: `${financeItem.href}/reports`,       icon: BarChart2 },
-        { id: "audit-logs",    label: "Audit Logs",    href: `${financeItem.href}/audit-logs`,    icon: ClipboardList },
-        { id: "settings",      label: "Settings",      href: `${financeItem.href}/settings`,      icon: Settings },
+        { id: "overview", label: "Overview", href: `${financeItem.href}/overview`, icon: LayoutDashboard },
+        {
+          id: "receivables",
+          label: "Receivables",
+          href: `${financeItem.href}/receivables`,
+          icon: TrendingUp,
+        },
+        { id: "payables", label: "Payables", href: `${financeItem.href}/payables`, icon: TrendingDown },
+        {
+          id: "sales-receipts",
+          label: "Sales Receipts",
+          href: `${financeItem.href}/sales-receipts`,
+          icon: Receipt,
+        },
+        { id: "documents", label: "Documents", href: `${financeItem.href}/documents`, icon: FileText },
+        { id: "invoices", label: "Invoices", href: `${financeItem.href}/invoices`, icon: CreditCard },
+        { id: "payments", label: "Payments", href: `${financeItem.href}/payments`, icon: Banknote },
+        { id: "expenses", label: "Expenses", href: `${financeItem.href}/expenses`, icon: ShoppingBag },
+        { id: "banking", label: "Banking", href: `${financeItem.href}/banking`, icon: Landmark },
+        { id: "reports", label: "Reports", href: `${financeItem.href}/reports`, icon: BarChart2 },
+        {
+          id: "audit-logs",
+          label: "Audit Logs",
+          href: `${financeItem.href}/audit-logs`,
+          icon: ClipboardList,
+        },
+        { id: "settings", label: "Settings", href: `${financeItem.href}/settings`, icon: Settings },
       ]
     : [];
   const hrItem = coreItems.find((i) => i.key === "hr");
   const hrSubItems: FinanceSubItem[] = hrItem
     ? canManageHr
       ? [
-          { id: "people",     label: "People",       href: `${hrItem.href}/people`,     icon: Users },
-          { id: "payslips",   label: "Payslips",     href: `${hrItem.href}/payslips`,   icon: Banknote },
-          { id: "appraisals", label: "Appraisals",   href: `${hrItem.href}/appraisals`, icon: Star },
-          { id: "documents",  label: "Documents",    href: `${hrItem.href}/documents`,  icon: FileText },
-          { id: "insights",   label: "Insights",     href: `${hrItem.href}/insights`,   icon: BarChart2 },
+          { id: "people", label: "People", href: `${hrItem.href}/people`, icon: Users },
+          { id: "payslips", label: "Payslips", href: `${hrItem.href}/payslips`, icon: Banknote },
+          { id: "appraisals", label: "Appraisals", href: `${hrItem.href}/appraisals`, icon: Star },
+          { id: "documents", label: "Documents", href: `${hrItem.href}/documents`, icon: FileText },
+          { id: "insights", label: "Insights", href: `${hrItem.href}/insights`, icon: BarChart2 },
           ...(hasHrEmployeeProfile
             ? [{ id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard`, icon: UserCircle }]
             : []),
@@ -387,13 +405,28 @@ export function TenantSidebar({
   const shortletsItem = coreItems.find((i) => i.key === "shortlets");
   const shortletsSubItems: FinanceSubItem[] = shortletsItem
     ? [
-        { id: "front-desk", label: "Front desk", href: `${shortletsItem.href}/front-desk`, icon: ConciergeBell },
+        {
+          id: "front-desk",
+          label: "Front desk",
+          href: `${shortletsItem.href}/front-desk`,
+          icon: ConciergeBell,
+        },
         { id: "rooms", label: "Room board", href: `${shortletsItem.href}/rooms`, icon: BedDouble },
-        { id: "reservations", label: "Reservations", href: `${shortletsItem.href}/reservations`, icon: CalendarDays },
+        {
+          id: "reservations",
+          label: "Reservations",
+          href: `${shortletsItem.href}/reservations`,
+          icon: CalendarDays,
+        },
         { id: "locations", label: "Locations", href: `${shortletsItem.href}/locations`, icon: MapPin },
         { id: "apartments", label: "Apartments", href: `${shortletsItem.href}/apartments`, icon: Building2 },
         { id: "guests", label: "Guests", href: `${shortletsItem.href}/guests`, icon: Users },
-        { id: "inspections", label: "Inspections", href: `${shortletsItem.href}/inspections`, icon: ClipboardCheck },
+        {
+          id: "inspections",
+          label: "Inspections",
+          href: `${shortletsItem.href}/inspections`,
+          icon: ClipboardCheck,
+        },
         { id: "channels", label: "Channels", href: `${shortletsItem.href}/channels`, icon: Radio },
         { id: "folio", label: "Guest bill", href: `${shortletsItem.href}/folio`, icon: Receipt },
         { id: "reports", label: "Reports", href: `${shortletsItem.href}/reports`, icon: BarChart2 },
@@ -450,7 +483,9 @@ export function TenantSidebar({
       return pathname === shortletsItem.href || pathname === `${shortletsItem.href}/front-desk`;
     }
     if (id === "locations" || id === "apartments") {
-      return pathname === `${shortletsItem.href}/${id}` || pathname.startsWith(`${shortletsItem.href}/${id}/`);
+      return (
+        pathname === `${shortletsItem.href}/${id}` || pathname.startsWith(`${shortletsItem.href}/${id}/`)
+      );
     }
     return pathname === `${shortletsItem.href}/${id}`;
   }
@@ -479,7 +514,11 @@ export function TenantSidebar({
       ].join(" ")}
     >
       <div className="flex min-h-0 flex-1 flex-col px-4 py-5">
-        <div className={collapsed ? "flex shrink-0 justify-center" : "flex shrink-0 items-start justify-between gap-2"}>
+        <div
+          className={
+            collapsed ? "flex shrink-0 justify-center" : "flex shrink-0 items-start justify-between gap-2"
+          }
+        >
           {collapsed ? (
             <button
               type="button"
@@ -509,7 +548,13 @@ export function TenantSidebar({
                 title="Collapse sidebar"
                 aria-label="Collapse sidebar"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M15 6l-6 6 6 6" />
                 </svg>
               </button>
@@ -544,12 +589,15 @@ export function TenantSidebar({
                 >
                   <span>Sales</span>
                   <ChevronDown
-                    className={["h-3.5 w-3.5 transition-transform duration-150", salesOpen ? "" : "-rotate-90"].join(" ")}
+                    className={[
+                      "h-3.5 w-3.5 transition-transform duration-150",
+                      salesOpen ? "" : "-rotate-90",
+                    ].join(" ")}
                     strokeWidth={2}
                   />
                 </button>
               )}
-              {(collapsed || salesOpen) ? (
+              {collapsed || salesOpen ? (
                 <div className={collapsed ? "space-y-1" : "mt-0.5 space-y-0.5 pl-3"}>
                   {salesItems.map((item) => (
                     <NavLink
@@ -587,7 +635,10 @@ export function TenantSidebar({
                   >
                     <span>Marketing</span>
                     <ChevronDown
-                      className={["h-3.5 w-3.5 transition-transform duration-150", marketingOpen ? "" : "-rotate-90"].join(" ")}
+                      className={[
+                        "h-3.5 w-3.5 transition-transform duration-150",
+                        marketingOpen ? "" : "-rotate-90",
+                      ].join(" ")}
                       strokeWidth={2}
                     />
                   </button>
@@ -630,7 +681,10 @@ export function TenantSidebar({
                   >
                     <span>Finance</span>
                     <ChevronDown
-                      className={["h-3.5 w-3.5 transition-transform duration-150", financeOpen ? "" : "-rotate-90"].join(" ")}
+                      className={[
+                        "h-3.5 w-3.5 transition-transform duration-150",
+                        financeOpen ? "" : "-rotate-90",
+                      ].join(" ")}
                       strokeWidth={2}
                     />
                   </button>
@@ -673,7 +727,10 @@ export function TenantSidebar({
                   >
                     <span>{canManageHr ? "People" : "My HR"}</span>
                     <ChevronDown
-                      className={["h-3.5 w-3.5 transition-transform duration-150", hrOpen ? "" : "-rotate-90"].join(" ")}
+                      className={[
+                        "h-3.5 w-3.5 transition-transform duration-150",
+                        hrOpen ? "" : "-rotate-90",
+                      ].join(" ")}
                       strokeWidth={2}
                     />
                   </button>
@@ -715,7 +772,10 @@ export function TenantSidebar({
                   >
                     <span>Short Lets</span>
                     <ChevronDown
-                      className={["h-3.5 w-3.5 transition-transform duration-150", shortletsOpen ? "" : "-rotate-90"].join(" ")}
+                      className={[
+                        "h-3.5 w-3.5 transition-transform duration-150",
+                        shortletsOpen ? "" : "-rotate-90",
+                      ].join(" ")}
                       strokeWidth={2}
                     />
                   </button>
@@ -739,8 +799,15 @@ export function TenantSidebar({
 
           {/* Remaining top-level items */}
           {postGroupItems.length > 0 ? (
-            <div className={hasSalesItems || hasMarketingItems || hasFinanceItems || hasHrItems || hasShortletsItems ? "pt-1" : ""}>
-              {!collapsed && (hasSalesItems || hasMarketingItems || hasFinanceItems || hasHrItems || hasShortletsItems) ? (
+            <div
+              className={
+                hasSalesItems || hasMarketingItems || hasFinanceItems || hasHrItems || hasShortletsItems
+                  ? "pt-1"
+                  : ""
+              }
+            >
+              {!collapsed &&
+              (hasSalesItems || hasMarketingItems || hasFinanceItems || hasHrItems || hasShortletsItems) ? (
                 <div className="mb-1 border-t border-foreground/10" />
               ) : null}
               {visibleNavKeys.includes("portal") ? (
@@ -818,7 +885,12 @@ export function TenantMobileDock({
           />
         ))}
         {canAccessPlatform ? (
-          <MobileItem navKey="settings" label="Platform" href="/platform" active={isActive(pathname, "/platform")} />
+          <MobileItem
+            navKey="settings"
+            label="Platform"
+            href="/platform"
+            active={isActive(pathname, "/platform")}
+          />
         ) : null}
         <MobileItem navKey="dashboard" label="Home" href="/" active={isActive(pathname, "/")} />
       </div>
@@ -890,11 +962,17 @@ function NavLink({
     <Link
       href={href}
       title={collapsed ? label : undefined}
+      aria-current={active ? "page" : undefined}
       className={[
-        "block rounded-md px-3 py-2 text-sm transition-colors",
+        // A solid black pill for every active item made the whole sidebar
+        // shout. A tinted row with a copper edge reads as "you are here"
+        // without competing with the page content.
+        "relative block rounded-md px-3 py-2 text-sm transition-colors",
         collapsed ? "text-center" : "",
         indented ? "py-1.5 text-[0.8125rem]" : "",
-        active ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+        active
+          ? "bg-[var(--field)] font-semibold text-foreground before:absolute before:left-0 before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-[var(--accent)] before:content-['']"
+          : "text-muted hover:bg-[var(--field)] hover:text-foreground",
       ].join(" ")}
     >
       {collapsed ? (
@@ -929,7 +1007,9 @@ function MobileItem({
       title={label}
       className={[
         "inline-flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-2.5 py-1.5 transition-colors",
-        active ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+        active
+          ? "bg-foreground text-background"
+          : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
       ].join(" ")}
     >
       <Icon className="h-5 w-5" strokeWidth={1.9} />

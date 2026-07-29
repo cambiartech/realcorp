@@ -53,7 +53,10 @@ export async function buildSalesReceiptPdf(input: SalesReceiptPdfInput): Promise
     y,
     width,
     rows: [
-      { label: "Issue date", value: new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(input.issuedAt) },
+      {
+        label: "Issue date",
+        value: new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(input.issuedAt),
+      },
       { label: "From", value: input.brand.companyName },
       { label: "To", value: input.customerName || "—" },
     ],

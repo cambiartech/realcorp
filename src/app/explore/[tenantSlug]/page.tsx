@@ -16,11 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ tenantSlu
   };
 }
 
-export default async function ExplorePage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function ExplorePage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const [brand, result] = await Promise.all([
     loadPublicListingBrand(tenantSlug),

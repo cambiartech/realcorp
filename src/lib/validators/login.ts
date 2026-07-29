@@ -1,11 +1,7 @@
 import { z } from "zod";
 
 export const loginCredentialsSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required.")
-    .email("Enter a valid email address."),
+  email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
   password: z.string().min(1, "Password is required."),
 });
 
@@ -18,9 +14,7 @@ export function parseLoginForm(formData: FormData) {
   });
 }
 
-export function zodIssuesToFieldRecord(
-  issues: z.ZodIssue[],
-): Partial<Record<LoginFieldName, string>> {
+export function zodIssuesToFieldRecord(issues: z.ZodIssue[]): Partial<Record<LoginFieldName, string>> {
   const out: Partial<Record<LoginFieldName, string>> = {};
   for (const issue of issues) {
     const key = issue.path[0];

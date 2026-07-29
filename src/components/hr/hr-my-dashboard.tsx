@@ -15,7 +15,12 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { RichTextDisplay, RichTextField } from "@/components/rich-text-field";
 import { groupAppraisalActionsBySection, parseSelfAppraisalFormData } from "@/lib/appraisal-form-utils";
 import { appraisalRatingLabel } from "@/lib/appraisal-competencies";
-import { getManagerRating, getSelfRating, parseActionScores, type AppraisalCriterionScore } from "@/lib/appraisal-scores";
+import {
+  getManagerRating,
+  getSelfRating,
+  parseActionScores,
+  type AppraisalCriterionScore,
+} from "@/lib/appraisal-scores";
 
 type MyTab = "overview" | "payslips" | "record" | "documents" | "appraisals";
 
@@ -144,12 +149,13 @@ export function HrMyDashboard({
   const onboardingComplete = onboarding.state === "complete";
 
   const pendingActionCount =
-    (onboardingPending ? onboarding.pendingCount : 0) +
-    (myView.pendingOfferSignUrl ? 1 : 0);
+    (onboardingPending ? onboarding.pendingCount : 0) + (myView.pendingOfferSignUrl ? 1 : 0);
 
   function scrollToActionRequired() {
     requestAnimationFrame(() => {
-      document.getElementById("my-hr-action-required")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById("my-hr-action-required")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -177,9 +183,8 @@ export function HrMyDashboard({
 
   async function submitAppraisal(appraisalId: string, form: HTMLFormElement) {
     const fd = new FormData(form);
-    const actions = actionsByCycleType.get(
-      myView.appraisals.find((a) => a.id === appraisalId)?.cycleType ?? "",
-    ) ?? [];
+    const actions =
+      actionsByCycleType.get(myView.appraisals.find((a) => a.id === appraisalId)?.cycleType ?? "") ?? [];
     const { selfNotes, actionResponses } = parseSelfAppraisalFormData(
       fd,
       actions.map((a) => a.id),
@@ -199,13 +204,13 @@ export function HrMyDashboard({
 
   if (!myView.profile) {
     return (
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 text-center">
+      <div className="rounded-xl border border-[var(--warn-line)] bg-[var(--warn-wash)] p-6 text-center">
         {canManageHr ? (
           <>
             <p className="text-sm font-semibold text-foreground">No personal HR record for this login</p>
             <p className="mt-2 text-sm text-muted">
-              You are signed in as HR admin. Use <strong>People</strong> to manage staff. My dashboard is only for team
-              members who have an employee record (including you, if you are also on payroll).
+              You are signed in as HR admin. Use <strong>People</strong> to manage staff. My dashboard is only
+              for team members who have an employee record (including you, if you are also on payroll).
             </p>
             <Link
               href={`/${tenantSlug}/hr/people`}
@@ -218,14 +223,15 @@ export function HrMyDashboard({
           <>
             <p className="text-sm font-semibold text-foreground">Your HR record is not set up yet</p>
             <p className="mt-2 text-sm text-muted">
-              Your HR record is being set up. Complete any forms below, or ask HR to finish onboarding from People.
+              Your HR record is being set up. Complete any forms below, or ask HR to finish onboarding from
+              People.
             </p>
           </>
         )}
         {onboardingPending || onboardingComplete || myView.pendingOfferSignUrl ? (
           <div className="mt-4 text-left">
             {onboardingComplete ? (
-              <p className="text-sm text-emerald-800">Onboarding forms submitted — HR will review.</p>
+              <p className="text-sm text-[var(--success)]">Onboarding forms submitted — HR will review.</p>
             ) : null}
             {onboardingPending && onboarding.state === "pending" && onboarding.masterUrl ? (
               <>
@@ -241,7 +247,10 @@ export function HrMyDashboard({
             <ul className="mt-2 space-y-2">
               {myView.pendingOfferSignUrl ? (
                 <li>
-                  <a href={myView.pendingOfferSignUrl} className="text-sm font-semibold text-foreground underline">
+                  <a
+                    href={myView.pendingOfferSignUrl}
+                    className="text-sm font-semibold text-foreground underline"
+                  >
                     Offer letter — sign online
                   </a>
                 </li>
@@ -267,9 +276,10 @@ export function HrMyDashboard({
   return (
     <div className="space-y-4">
       {previewAs ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3">
           <p className="text-sm text-foreground">
-            <strong>HR preview</strong> — {previewAs.name}&apos;s dashboard ({previewAs.email}). This is not your login.
+            <strong>HR preview</strong> — {previewAs.name}&apos;s dashboard ({previewAs.email}). This is not
+            your login.
           </p>
           <Link href={`/${tenantSlug}/hr/people`} className="text-xs font-semibold underline">
             ← Back to People
@@ -293,7 +303,9 @@ export function HrMyDashboard({
             onClick={() => setTab(t.id)}
             className={[
               "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              tab === t.id ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+              tab === t.id
+                ? "bg-foreground text-background"
+                : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
             ].join(" ")}
           >
             {t.label}
@@ -314,15 +326,18 @@ export function HrMyDashboard({
       {tab === "overview" ? (
         <div className="space-y-3">
           {onboardingComplete ? (
-            <div className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 p-4">
-              <p className="text-sm font-semibold text-emerald-900">Onboarding forms complete</p>
-              <p className="mt-1 text-sm text-emerald-800">
+            <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4">
+              <p className="text-sm font-semibold text-[var(--success)]">Onboarding forms complete</p>
+              <p className="mt-1 text-sm text-[var(--success)]">
                 You submitted {onboarding.submittedCount} section{onboarding.submittedCount === 1 ? "" : "s"}.
                 HR will review your information
                 {onboarding.submittedAtLabel !== "—" ? ` (last update ${onboarding.submittedAtLabel})` : ""}.
               </p>
               {onboarding.viewUrl ? (
-                <a href={onboarding.viewUrl} className="mt-2 inline-block text-xs font-semibold text-emerald-900 underline">
+                <a
+                  href={onboarding.viewUrl}
+                  className="mt-2 inline-block text-xs font-semibold text-[var(--success)] underline"
+                >
                   View submitted forms
                 </a>
               ) : null}
@@ -332,7 +347,7 @@ export function HrMyDashboard({
             onboardingPending && onboarding.masterUrl ? (
               <a
                 href={onboarding.masterUrl}
-                className="block w-full rounded-lg border border-violet-500/40 bg-violet-500/10 p-4 text-left hover:bg-violet-500/15 sm:col-span-2 lg:col-span-4"
+                className="block w-full rounded-lg border border-[var(--accent-line)] bg-[var(--accent-wash)] p-4 text-left hover:bg-[var(--accent-wash)] sm:col-span-2 lg:col-span-4"
               >
                 <p className="text-2xl font-bold text-foreground">{onboarding.pendingCount}</p>
                 <p className="text-xs text-muted">
@@ -345,59 +360,63 @@ export function HrMyDashboard({
               <button
                 type="button"
                 onClick={scrollToActionRequired}
-                className="w-full rounded-lg border border-violet-500/40 bg-violet-500/10 p-4 text-left hover:bg-violet-500/15 sm:col-span-2 lg:col-span-4"
+                className="w-full rounded-lg border border-[var(--accent-line)] bg-[var(--accent-wash)] p-4 text-left hover:bg-[var(--accent-wash)] sm:col-span-2 lg:col-span-4"
               >
                 <p className="text-2xl font-bold text-foreground">{pendingActionCount}</p>
                 <p className="text-xs text-muted">Forms or offer waiting for you — tap to view</p>
               </button>
             )
           ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => setTab("payslips")}
-            className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
-          >
-            <p className="text-2xl font-bold text-foreground">{myView.payslips.length}</p>
-            <p className="text-xs text-muted">Payslips available</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("documents")}
-            className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
-          >
-            <p className="text-2xl font-bold text-foreground">{myView.documents.length}</p>
-            <p className="text-xs text-muted">HR documents</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("appraisals")}
-            className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
-          >
-            <p className="text-2xl font-bold text-foreground">{openAppraisals.length}</p>
-            <p className="text-xs text-muted">Appraisals to complete</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("record")}
-            className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
-          >
-            <p className="text-2xl font-bold text-foreground">✓</p>
-            <p className="text-xs text-muted">View my record</p>
-          </button>
-        </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <button
+              type="button"
+              onClick={() => setTab("payslips")}
+              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+            >
+              <p className="text-2xl font-bold text-foreground">{myView.payslips.length}</p>
+              <p className="text-xs text-muted">Payslips available</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("documents")}
+              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+            >
+              <p className="text-2xl font-bold text-foreground">{myView.documents.length}</p>
+              <p className="text-xs text-muted">HR documents</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("appraisals")}
+              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+            >
+              <p className="text-2xl font-bold text-foreground">{openAppraisals.length}</p>
+              <p className="text-xs text-muted">Appraisals to complete</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("record")}
+              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+            >
+              <p className="text-2xl font-bold text-foreground">✓</p>
+              <p className="text-xs text-muted">View my record</p>
+            </button>
+          </div>
         </div>
       ) : null}
 
       {tab === "overview" && (onboardingPending || myView.pendingOfferSignUrl) ? (
-        <div id="my-hr-action-required" className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-4">
+        <div
+          id="my-hr-action-required"
+          className="rounded-lg border border-[var(--accent-line)] bg-[var(--accent-wash)] p-4"
+        >
           <p className="text-sm font-semibold text-foreground">Action required — from HR</p>
           {onboardingPending && onboarding.masterUrl ? (
             <a
               href={onboarding.masterUrl}
               className="mt-3 flex w-full items-center justify-center rounded-md border border-foreground bg-foreground px-4 py-3 text-sm font-semibold text-background"
             >
-              Continue onboarding ({onboarding.pendingCount} section{onboarding.pendingCount === 1 ? "" : "s"} left)
+              Continue onboarding ({onboarding.pendingCount} section{onboarding.pendingCount === 1 ? "" : "s"}{" "}
+              left)
             </a>
           ) : null}
           <ul className="mt-2 space-y-2">
@@ -416,8 +435,7 @@ export function HrMyDashboard({
               ? myView.pendingForms.map((f) => (
                   <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span>
-                      {f.formTypeLabel}{" "}
-                      <span className="text-muted">(due {f.expiresLabel})</span>
+                      {f.formTypeLabel} <span className="text-muted">(due {f.expiresLabel})</span>
                     </span>
                     <a
                       href={f.fillUrl}
@@ -432,9 +450,7 @@ export function HrMyDashboard({
         </div>
       ) : null}
 
-      {tab === "overview" && myYtd ? (
-        <PayslipYtdCard ytd={myYtd} currency={currency} />
-      ) : null}
+      {tab === "overview" && myYtd ? <PayslipYtdCard ytd={myYtd} currency={currency} /> : null}
 
       {tab === "overview" && myView.goals.length > 0 ? (
         <div className="rounded-lg border border-foreground/10 p-4">
@@ -452,38 +468,41 @@ export function HrMyDashboard({
 
       {tab === "payslips" ? (
         myView.payslips.length === 0 ? (
-          <p className="text-sm text-muted">No finalized payslips yet. They appear here after HR publishes each month.</p>
+          <p className="text-sm text-muted">
+            No finalized payslips yet. They appear here after HR publishes each month.
+          </p>
         ) : (
           <div className="space-y-4">
             {myYtd ? <PayslipYtdCard ytd={myYtd} currency={currency} /> : null}
             <div className="space-y-2">
-            {myView.payslips.map((s) => (
-              <div
-                key={s.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-foreground/10 px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium text-foreground">{s.periodLabel}</p>
-                  <p className="text-xs text-muted">
-                    Net pay: {currency} {s.calc.netPay.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="mt-1 text-[10px] font-medium">
-                    {s.paymentStatusValue === "PAID" ? (
-                      <span className="text-emerald-700">Salary paid · {s.paidAtLabel}</span>
-                    ) : (
-                      <span className="text-amber-800">Payment processing</span>
-                    )}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setViewPayslipId(s.id)}
-                  className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold hover:bg-foreground/[0.06]"
+              {myView.payslips.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-foreground/10 px-4 py-3"
                 >
-                  View & download
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <p className="font-medium text-foreground">{s.periodLabel}</p>
+                    <p className="text-xs text-muted">
+                      Net pay: {currency}{" "}
+                      {s.calc.netPay.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="mt-1 text-[10px] font-medium">
+                      {s.paymentStatusValue === "PAID" ? (
+                        <span className="text-[var(--success)]">Salary paid · {s.paidAtLabel}</span>
+                      ) : (
+                        <span className="text-[var(--warn)]">Payment processing</span>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setViewPayslipId(s.id)}
+                    className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold hover:bg-foreground/[0.06]"
+                  >
+                    View & download
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )
@@ -491,7 +510,9 @@ export function HrMyDashboard({
 
       {tab === "record" ? (
         <div>
-          <p className="mb-3 text-xs text-muted">Read-only view of what HR has on file. Contact HR to request changes.</p>
+          <p className="mb-3 text-xs text-muted">
+            Read-only view of what HR has on file. Contact HR to request changes.
+          </p>
           <div className="mb-3 flex flex-wrap gap-1">
             {(["personal", "job", "bank", "emergency"] as const).map((s) => (
               <button
@@ -513,7 +534,10 @@ export function HrMyDashboard({
                 <ReadRow label="Full name" value={p.fullName} />
                 <ReadRow label="Mobile" value={p.phoneMobile} />
                 <ReadRow label="Work email" value={p.workEmail} />
-                <ReadRow label="Address" value={[p.addressStreet, p.addressCity, p.addressState].filter(Boolean).join(", ")} />
+                <ReadRow
+                  label="Address"
+                  value={[p.addressStreet, p.addressCity, p.addressState].filter(Boolean).join(", ")}
+                />
               </>
             ) : null}
             {recordSection === "job" ? (
@@ -531,7 +555,10 @@ export function HrMyDashboard({
               <>
                 <ReadRow label="Account holder" value={p.bankAccountHolderName} />
                 <ReadRow label="Bank" value={p.bankName} />
-                <ReadRow label="Account number" value={p.bankAccountNumber ? `•••• ${p.bankAccountNumber.slice(-4)}` : null} />
+                <ReadRow
+                  label="Account number"
+                  value={p.bankAccountNumber ? `•••• ${p.bankAccountNumber.slice(-4)}` : null}
+                />
                 <ReadRow label="Account type" value={p.bankAccountType} />
               </>
             ) : null}
@@ -616,7 +643,9 @@ export function HrMyDashboard({
                     <div className="mt-4 space-y-5">
                       {grouped.map((group) => (
                         <div key={group.section}>
-                          <p className="text-xs font-bold uppercase tracking-wide text-muted">{group.label}</p>
+                          <p className="text-xs font-bold uppercase tracking-wide text-muted">
+                            {group.label}
+                          </p>
                           <div className="mt-2 space-y-3">
                             {group.actions.map((action) => {
                               const score = scores[action.id];

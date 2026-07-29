@@ -17,19 +17,16 @@ type SnackbarContextValue = {
 
 const SnackbarContext = createContext<SnackbarContextValue | null>(null);
 
-const TONE_STYLES: Record<
-  SnackbarTone,
-  { border: string; iconBg: string; icon: string; label: string }
-> = {
+const TONE_STYLES: Record<SnackbarTone, { border: string; iconBg: string; icon: string; label: string }> = {
   success: {
-    border: "border-emerald-500/35",
-    iconBg: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+    border: "border-[var(--success-line)]",
+    iconBg: "bg-[var(--success-wash)] text-[var(--success)] ",
     icon: "✓",
     label: "Success",
   },
   error: {
-    border: "border-red-500/40",
-    iconBg: "bg-red-500/12 text-red-700 dark:text-red-300",
+    border: "border-[var(--danger-line)]",
+    iconBg: "bg-[var(--danger-wash)] text-[var(--danger)] ",
     icon: "!",
     label: "Error",
   },
@@ -109,7 +106,13 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
                   className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
                   aria-label="Dismiss notification"
                 >
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M6 6l12 12M18 6 6 18" />
                   </svg>
                 </button>

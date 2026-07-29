@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Realcorp — landing v2 preview</title>
+<style>@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap");</style>
+<style>
+  html,body{margin:0;padding:0;background:#F7F6F3}
+  /* static preview — no JS, so force every animated element visible */
+  .rc [style*="opacity"]{opacity:1 !important;transform:none !important}
+  .rc .faq-a{height:auto !important;opacity:1 !important}
+  .rc .nav-sheet{display:none}
+/* ═══════════════════════════════════════════════════════════════
+   Realcorp — landing v2
+   Warm-minimal system. Scoped entirely under .rc — nothing here
+   can leak into the app. The v1 landing.css is untouched.
+   ═══════════════════════════════════════════════════════════════ */
+
+
+.rc {
+  /* ── Surfaces ─────────────────────────────────────────────── */
+  --canvas:      #F7F6F3;   /* warm off-white page */
+  --paper:       #FFFFFF;   /* raised cards */
+  --sand:        #EFEDE7;   /* recessed bands */
+  --ink:         #16150F;   /* warm near-black */
+  --ink-2:       #56524A;
+  --ink-3:       #8B857B;
+  --ink-4:       #B4AEA4;
+
+  /* ── Accent ───────────────────────────────────────────────── */
+  --accent:      #A8663C;   /* copper */
+  --accent-deep: #8A5230;
+  --accent-soft: #B08D57;   /* the original Realcorp brass */
+  --accent-wash: #F1E7DE;
+
+  /* ── Lines & shadow ───────────────────────────────────────── */
+  --line:        rgba(22, 21, 15, 0.09);
+  --line-2:      rgba(22, 21, 15, 0.16);
+  --shadow-sm:   0 1px 2px rgba(22,21,15,.05), 0 4px 12px rgba(22,21,15,.04);
+  --shadow-md:   0 2px 4px rgba(22,21,15,.04), 0 12px 32px rgba(22,21,15,.07);
+  --shadow-lg:   0 4px 8px rgba(22,21,15,.04), 0 30px 70px rgba(22,21,15,.11);
+
+  /* ── Type ─────────────────────────────────────────────────── */
+  /* Supplied by next/font (see v2/fonts.ts); the stacks are the fallback. */
+  --sans:  "Instrument Sans",  system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --mono:  "JetBrains Mono",  ui-monospace, Menlo, monospace;
+
+  /* ── Metrics ──────────────────────────────────────────────── */
+  --w:       1200px;
+  --w-wide:  1360px;
+  --gutter:  clamp(20px, 5vw, 40px);
+  --sec-y:   clamp(72px, 8.5vw, 132px);
+  --r-sm:    8px;
+  --r-md:    14px;
+  --r-lg:    20px;
+
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  width: 100%;
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+/* Dark band inverts the tokens rather than overriding every rule. */
+.rc .on-ink,
+.rc-ink {
+  --canvas:  #16150F;
+  --paper:   #201E17;
+  --sand:    #1B1A13;
+  --ink:     #F7F6F3;
+  --ink-2:   #B6B0A4;
+  --ink-3:   #8B857B;
+  --ink-4:   #5E594F;
+  --line:    rgba(247, 246, 243, 0.12);
+  --line-2:  rgba(247, 246, 243, 0.22);
+  --accent:  #C98A55;
+  --accent-wash: rgba(201, 138, 85, 0.14);
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.rc *,
+.rc *::before,
+.rc *::after { box-sizing: border-box; }
+
+.rc img,
+.rc svg { display: block; max-width: 100%; }
+.rc a { color: inherit; text-decoration: none; }
+.rc button { font: inherit; cursor: pointer; background: none; border: 0; color: inherit; }
+.rc ul { list-style: none; margin: 0; padding: 0; }
+.rc ::selection { background: var(--accent); color: #fff; }
+.rc :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── Layout ──────────────────────────────────────────────────── */
+.rc .wrap  { width: 100%; max-width: var(--w);      margin-inline: auto; padding-inline: var(--gutter); }
+.rc .wrap-wide { width: 100%; max-width: var(--w-wide); margin-inline: auto; padding-inline: var(--gutter); }
+.rc .sec   { padding-block: var(--sec-y); position: relative; }
+.rc .sec-tight { padding-block: clamp(56px, 6vw, 88px); }
+
+/* ── Type scale ──────────────────────────────────────────────── */
+.rc .eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+}
+.rc .eyebrow::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: var(--accent);
+  flex: none;
+}
+.rc .eyebrow.no-rule::before { display: none; }
+
+.rc .h1 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: clamp(40px, 6.4vw, 78px);
+  line-height: 1.02;
+  letter-spacing: -0.038em;
+  margin: 0;
+  text-wrap: balance;
+}
+.rc .h2 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: clamp(30px, 3.9vw, 50px);
+  line-height: 1.06;
+  letter-spacing: -0.032em;
+  margin: 0;
+  text-wrap: balance;
+}
+.rc .h3 {
+  font-weight: 600;
+  font-size: clamp(19px, 1.6vw, 22px);
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+  margin: 0;
+}
+.rc .h4 {
+  font-weight: 600;
+  font-size: 16.5px;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+  margin: 0;
+}
+/* The one editorial flourish: an italic serif word inside a sans headline. */
+.rc .em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+  color: var(--accent);
+}
+.rc .lede {
+  font-size: clamp(17px, 1.45vw, 20px);
+  line-height: 1.5;
+  color: var(--ink-2);
+  max-width: 54ch;
+  margin: 0;
+  letter-spacing: -0.012em;
+  text-wrap: pretty;
+}
+.rc .body {
+  font-size: 15.5px;
+  line-height: 1.58;
+  color: var(--ink-2);
+  margin: 0;
+  letter-spacing: -0.006em;
+  text-wrap: pretty;
+}
+.rc .small {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  margin: 0;
+}
+.rc .mono {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.rc .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  padding-inline: 22px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: transform .18s cubic-bezier(.2,.7,.3,1),
+              background-color .18s ease,
+              border-color .18s ease,
+              box-shadow .18s ease,
+              color .18s ease;
+}
+.rc .btn:active { transform: translateY(1px) scale(.99); }
+.rc .btn-primary {
+  background: var(--ink);
+  color: var(--canvas);
+  box-shadow: var(--shadow-sm);
+}
+.rc .btn-primary:hover {
+  background: #000;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.rc-ink .btn-primary, .rc .on-ink .btn-primary { background: var(--canvas); color: #16150F; }
+.rc .btn-copper { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+.rc .btn-copper:hover { background: var(--accent-deep); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.rc .btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+.rc .btn-ghost:hover { background: var(--paper); border-color: var(--ink-4); transform: translateY(-1px); }
+.rc .btn-sm { height: 38px; padding-inline: 16px; font-size: 13.5px; }
+.rc .btn .chev { transition: transform .2s cubic-bezier(.2,.7,.3,1); }
+.rc .btn:hover .chev { transform: translateX(3px); }
+
+.rc .textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--accent);
+}
+.rc .textlink .chev { transition: transform .2s cubic-bezier(.2,.7,.3,1); }
+.rc .textlink:hover .chev { transform: translateX(3px); }
+
+/* ── Pills / chips ───────────────────────────────────────────── */
+.rc .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding-inline: 6px 14px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  color: var(--ink-2);
+  letter-spacing: -0.008em;
+  white-space: nowrap;
+  max-width: 100%;
+}
+@media (max-width: 560px) {
+  .rc .pill {
+    white-space: normal;
+    height: auto;
+    min-height: 32px;
+    padding: 5px 13px 5px 5px;
+    border-radius: 18px;
+    font-size: 12.5px;
+    line-height: 1.35;
+    text-align: left;
+  }
+}
+.rc .pill b {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding-inline: 9px;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Wordmark ────────────────────────────────────────────────── */
+.rc .v2-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+/* ═══ NAV ═══════════════════════════════════════════════════════ */
+.rc .nav {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  transition: background-color .25s ease, border-color .25s ease, backdrop-filter .25s ease;
+  border-bottom: 1px solid transparent;
+}
+.rc .nav.stuck {
+  background: color-mix(in srgb, var(--canvas) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom-color: var(--line);
+}
+.rc .nav-in {
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.rc .nav-mid {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14.5px;
+  letter-spacing: -0.012em;
+}
+.rc .nav-mid a {
+  padding: 8px 13px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: color .15s ease, background-color .15s ease;
+}
+.rc .nav-mid a:hover { color: var(--ink); background: rgba(22,21,15,.045); }
+.rc .nav-end { display: flex; align-items: center; gap: 10px; }
+.rc .nav-signin { font-size: 14.5px; color: var(--ink-2); padding: 8px 12px; }
+.rc .nav-signin:hover { color: var(--ink); }
+.rc .nav-burger {
+  display: none;
+  width: 40px; height: 40px;
+  align-items: center; justify-content: center;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--ink);
+}
+.rc .nav-sheet {
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--canvas) 96%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.rc .nav-sheet-in { display: flex; flex-direction: column; padding-block: 8px 22px; }
+.rc .nav-sheet-in a {
+  padding: 14px 2px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+.rc .nav-sheet-in .btn { margin-top: 18px; width: 100%; }
+@media (max-width: 940px) {
+  .rc .nav-mid, .rc .nav-signin, .rc .nav-end .btn { display: none; }
+  .rc .nav-burger { display: inline-flex; }
+}
+
+/* ═══ HERO ══════════════════════════════════════════════════════ */
+.rc .hero {
+  position: relative;
+  padding-top: clamp(56px, 7vw, 96px);
+  padding-bottom: clamp(40px, 5vw, 64px);
+  isolation: isolate;
+  text-align: center;
+}
+.rc .hero-in {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+.rc .hero h1 { max-width: 17ch; }
+.rc .hero .lede { max-width: 60ch; font-size: clamp(17px, 1.5vw, 20.5px); }
+.rc .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.rc .hero-note {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: center;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.rc .hero-note span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.rc .hero-note i {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent); font-style: normal;
+}
+
+/* Animated backdrop */
+.rc .backdrop {
+  position: absolute;
+  inset: -10% -5% auto -5%;
+  height: 130%;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 92%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 55%, transparent 92%);
+}
+.rc .backdrop-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(22,21,15,.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(22,21,15,.055) 1px, transparent 1px);
+  background-size: 68px 68px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 78%);
+}
+.rc .backdrop-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: .5;
+  will-change: transform;
+}
+.rc .glow-a { width: 46vw; height: 34vw; left: 6%;  top: -6%;  background: radial-gradient(circle, rgba(176,141,87,.55), transparent 66%); }
+.rc .glow-b { width: 40vw; height: 30vw; right: 4%; top: 2%;   background: radial-gradient(circle, rgba(168,102,60,.42), transparent 66%); }
+.rc .glow-c { width: 52vw; height: 26vw; left: 24%; top: 22%;  background: radial-gradient(circle, rgba(120,142,150,.30), transparent 68%); }
+
+/* Product frame */
+.rc .shot {
+  position: relative;
+  margin-top: clamp(36px, 4.5vw, 64px);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 10px;
+  box-shadow: var(--shadow-lg);
+  will-change: transform;
+}
+.rc .shot-inner {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--sand);
+  line-height: 0;
+}
+.rc .shot img { width: 100%; height: auto; }
+.rc .shot-chrome {
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 4px 10px;
+}
+.rc .shot-chrome i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); }
+.rc .shot-chrome span {
+  margin-left: auto; font-family: var(--mono); font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4);
+}
+
+/* ═══ LOGO STRIP ════════════════════════════════════════════════ */
+.rc .strip { border-block: 1px solid var(--line); padding-block: 26px; }
+.rc .strip-in { display: flex; align-items: center; gap: clamp(20px, 4vw, 52px); flex-wrap: wrap; justify-content: center; }
+.rc .strip-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-4);
+  width: 100%; text-align: center; margin-bottom: 4px;
+}
+.rc .strip-logo {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 17px; font-weight: 600; letter-spacing: -.028em;
+  color: var(--ink-4);
+  white-space: nowrap;
+  transition: color .2s ease;
+}
+.rc .strip-logo:hover { color: var(--ink-2); }
+.rc .strip-logo svg { opacity: .6; }
+
+/* ═══ SECTION HEADS ═════════════════════════════════════════════ */
+.rc .head { max-width: 62ch; margin-bottom: clamp(36px, 4vw, 56px); }
+.rc .head.center { margin-inline: auto; text-align: center; }
+.rc .head.center .eyebrow { justify-content: center; }
+.rc .head .h2 { margin-top: 16px; }
+.rc .head .lede { margin-top: 16px; }
+.rc .head.center .lede { margin-inline: auto; }
+.rc .head-split {
+  display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(24px, 4vw, 64px);
+  align-items: end; margin-bottom: clamp(36px, 4vw, 56px);
+}
+@media (max-width: 860px) { .rc .head-split { grid-template-columns: 1fr; align-items: start; gap: 18px; } }
+
+/* ═══ SHIFT (problem → outcome) ═════════════════════════════════ */
+.rc .shift { display: grid; grid-template-columns: 1fr auto 1fr; gap: clamp(20px, 3vw, 44px); align-items: stretch; }
+@media (max-width: 860px) { .rc .shift { grid-template-columns: 1fr; } .rc .shift-arrow { display: none; } }
+.rc .shift-col {
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  padding: clamp(24px, 3vw, 34px);
+  background: var(--paper);
+}
+.rc .shift-col.before { background: transparent; border-style: dashed; }
+.rc .shift-col.after { box-shadow: var(--shadow-md); border-color: transparent; }
+.rc .shift-col h4 { margin-bottom: 18px; }
+.rc .shift-col li {
+  display: flex; gap: 11px; padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14.5px; color: var(--ink-2); letter-spacing: -.008em;
+}
+.rc .shift-col li:first-of-type { border-top: 0; }
+.rc .shift-col li svg { flex: none; margin-top: 2px; }
+.rc .shift-col.before li { color: var(--ink-3); }
+.rc .shift-col.before li svg { color: var(--ink-4); }
+.rc .shift-col.after li svg { color: var(--accent); }
+.rc .shift-arrow { align-self: center; color: var(--ink-4); }
+
+/* ═══ ROLE TABS ═════════════════════════════════════════════════ */
+.rc .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 28px; }
+.rc .tab {
+  position: relative;
+  padding: 9px 17px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  letter-spacing: -.012em;
+  white-space: nowrap;
+  background: transparent;
+  transition: color .22s ease, background-color .22s ease;
+}
+.rc .tab:hover { color: var(--ink); background: rgba(22,21,15,.05); }
+.rc .tab[data-on="true"] { color: var(--canvas); background: var(--ink); }
+.rc .tab[data-on="true"]:hover { background: #000; }
+.rc .tab-panel {
+  display: grid; grid-template-columns: .85fr 1.15fr;
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: clamp(24px, 3.2vw, 44px);
+  box-shadow: var(--shadow-md);
+}
+@media (max-width: 900px) { .rc .tab-panel { grid-template-columns: 1fr; } }
+.rc .tab-panel ul { margin-top: 22px; display: grid; gap: 14px; }
+.rc .tab-panel li { display: flex; gap: 12px; font-size: 15px; color: var(--ink-2); letter-spacing: -.008em; }
+.rc .tab-panel li svg { flex: none; margin-top: 3px; color: var(--accent); }
+.rc .tab-shot {
+  border-radius: var(--r-md); overflow: hidden;
+  border: 1px solid var(--line); background: var(--sand); line-height: 0;
+  box-shadow: var(--shadow-sm);
+}
+.rc .tab-shot img { width: 100%; height: auto; }
+
+/* ═══ MODULE GRID ═══════════════════════════════════════════════ */
+.rc .mods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+@media (max-width: 900px) { .rc .mods { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .rc .mods { grid-template-columns: 1fr; } }
+.rc .mod {
+  background: var(--canvas);
+  padding: clamp(24px, 2.6vw, 34px);
+  display: flex; flex-direction: column; gap: 12px;
+  transition: background-color .25s ease;
+}
+.rc .mod:hover { background: var(--paper); }
+.rc .mod-top { display: flex; align-items: center; justify-content: space-between; }
+.rc .mod-ico {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--accent-wash); color: var(--accent-deep);
+}
+.rc .mod-ico svg { width: 19px; height: 19px; }
+.rc .mod-n { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--ink-4); }
+.rc .mod ul { display: grid; gap: 6px; margin-top: 4px; }
+.rc .mod li { font-size: 13.5px; color: var(--ink-3); padding-left: 15px; position: relative; letter-spacing: -.004em; }
+.rc .mod li::before {
+  content: ""; position: absolute; left: 0; top: 9px;
+  width: 7px; height: 1px; background: var(--accent); opacity: .7;
+}
+
+/* ═══ LEDGER CHAIN ══════════════════════════════════════════════ */
+.rc .chain { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+@media (max-width: 1000px) { .rc .chain { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 620px)  { .rc .chain { grid-template-columns: repeat(2, 1fr); } }
+.rc .chain-node {
+  position: relative;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 20px 18px 22px;
+  display: flex; flex-direction: column; gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.rc .chain-node .k { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.rc .chain-node .t { font-weight: 600; font-size: 15.5px; letter-spacing: -.018em; }
+.rc .chain-node .d { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+.rc .chain-rail {
+  height: 1px; background: var(--line-2); margin-block: 0 24px; position: relative; overflow: hidden;
+}
+.rc .chain-pulse {
+  position: absolute; inset-block: 0; width: 22%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+/* ═══ PROOF (dark band) ═════════════════════════════════════════ */
+.rc .proof { background: #16150F; color: #F7F6F3; border-radius: 0; position: relative; overflow: hidden; }
+.rc .proof::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 20% 0%, rgba(201,138,85,.18), transparent 70%);
+  pointer-events: none;
+}
+.rc .proof-in { position: relative; display: grid; grid-template-columns: 1.15fr 1fr; gap: clamp(32px, 5vw, 80px); align-items: center; }
+@media (max-width: 900px) { .rc .proof-in { grid-template-columns: 1fr; } }
+.rc .proof blockquote {
+  margin: 0;
+  font-size: clamp(24px, 2.9vw, 38px);
+  line-height: 1.18;
+  letter-spacing: -.032em;
+  font-weight: 500;
+}
+.rc .proof blockquote .em { color: #C98A55; }
+.rc .proof cite {
+  display: block; margin-top: 26px; font-style: normal;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .13em;
+  text-transform: uppercase; color: rgba(247,246,243,.5);
+}
+.rc .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: rgba(247,246,243,.14); border: 1px solid rgba(247,246,243,.14); border-radius: var(--r-md); overflow: hidden; }
+.rc .stat { background: #16150F; padding: 26px 22px; }
+.rc .stat .v { font-size: clamp(28px, 3.4vw, 42px); font-weight: 600; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.rc .stat .k { margin-top: 10px; font-family: var(--mono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: rgba(247,246,243,.5); }
+
+/* ═══ SECURITY ══════════════════════════════════════════════════ */
+.rc .sec-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(16px, 2vw, 28px); }
+@media (max-width: 900px) { .rc .sec-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .rc .sec-grid { grid-template-columns: 1fr; } }
+.rc .sec-card { display: flex; flex-direction: column; gap: 10px; padding-top: 22px; border-top: 1px solid var(--line-2); }
+.rc .sec-card svg { color: var(--accent); }
+
+/* ═══ FAQ ═══════════════════════════════════════════════════════ */
+.rc .faq { max-width: 820px; margin-inline: auto; border-top: 1px solid var(--line); }
+.rc .faq-item { border-bottom: 1px solid var(--line); }
+/* The question is a real <h3> for extraction; it just shouldn't look like one. */
+.rc .faq-h { margin: 0; font-size: inherit; font-weight: inherit; }
+.rc .faq-q {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 22px 0; text-align: left;
+  font-size: clamp(16px, 1.5vw, 18.5px); font-weight: 500; letter-spacing: -.018em;
+}
+.rc .faq-q:hover { color: var(--accent); }
+.rc .faq-ico { flex: none; color: var(--ink-3); transition: transform .25s ease; }
+.rc .faq-item[data-open="true"] .faq-ico { transform: rotate(45deg); color: var(--accent); }
+.rc .faq-a { overflow: hidden; }
+.rc .faq-a p { padding-bottom: 24px; max-width: 62ch; }
+
+/* ═══ CTA ═══════════════════════════════════════════════════════ */
+.rc .cta {
+  position: relative; overflow: hidden;
+  border-radius: var(--r-lg);
+  background: #16150F;
+  color: #F7F6F3;
+  padding: clamp(48px, 6vw, 88px) clamp(24px, 4vw, 64px);
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 22px;
+}
+.rc .cta::before {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 55% 70% at 50% 118%, rgba(201,138,85,.34), transparent 70%),
+    linear-gradient(to bottom, rgba(247,246,243,.05), transparent 40%);
+}
+.rc .cta > * { position: relative; }
+.rc .cta .lede { color: rgba(247,246,243,.68); max-width: 52ch; }
+.rc .cta .btn-primary { background: #F7F6F3; color: #16150F; }
+.rc .cta .btn-ghost { color: #F7F6F3; border-color: rgba(247,246,243,.28); }
+.rc .cta .btn-ghost:hover { background: rgba(247,246,243,.08); border-color: rgba(247,246,243,.5); }
+
+/* ═══ FOOTER ════════════════════════════════════════════════════ */
+.rc footer { border-top: 1px solid var(--line); padding-block: clamp(44px, 5vw, 68px) 28px; }
+.rc .foot-grid { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: clamp(24px, 3vw, 40px); }
+@media (max-width: 780px) { .rc .foot-grid { grid-template-columns: 1fr 1fr; } }
+.rc .foot-col h5 {
+  margin: 0 0 14px; font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink-4); font-weight: 500;
+}
+.rc .foot-col li { margin-bottom: 9px; }
+.rc .foot-col a { font-size: 14px; color: var(--ink-2); transition: color .15s ease; }
+.rc .foot-col a:hover { color: var(--accent); }
+.rc .foot-bottom {
+  margin-top: clamp(36px, 4vw, 56px); padding-top: 22px; border-top: 1px solid var(--line);
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-4);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE
+   Everything below only narrows the page — no new layout ideas, so
+   there is one source of truth per component above.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Respect notches and rounded corners on phones. */
+@supports (padding: max(0px)) {
+  .rc .wrap,
+  .rc .wrap-wide {
+    padding-left: max(var(--gutter), env(safe-area-inset-left));
+    padding-right: max(var(--gutter), env(safe-area-inset-right));
+  }
+}
+
+/* ── Tablet ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .rc { --sec-y: clamp(56px, 11vw, 84px); }
+  .rc .shot { padding: 7px; border-radius: 16px; }
+  .rc .shot-chrome { padding-bottom: 8px; }
+  .rc .shot-chrome span { font-size: 9px; }
+  .rc .tab-panel { padding: 22px 20px 24px; }
+  .rc .stat { padding: 20px 18px; }
+  .rc .chain-node { padding: 16px 15px 18px; }
+}
+
+/* ── Phone ──────────────────────────────────────────────────── */
+@media (max-width: 620px) {
+  .rc .h1 { font-size: clamp(33px, 9.4vw, 44px); line-height: 1.05; letter-spacing: -0.032em; }
+  .rc .h2 { font-size: clamp(26px, 7.6vw, 34px); letter-spacing: -0.028em; }
+  .rc .hero { padding-top: 34px; }
+  .rc .hero .lede { font-size: 16px; line-height: 1.55; }
+  .rc .hero-in { gap: 20px; }
+
+  /* One clear primary action, thumb-sized. */
+  .rc .hero-cta { width: 100%; flex-direction: column; gap: 10px; }
+  .rc .hero-cta .btn { width: 100%; height: 50px; font-size: 15px; }
+
+  .rc .hero-note { gap: 10px 16px; font-size: 9.5px; letter-spacing: 0.1em; }
+  .rc .nav-in { height: 60px; }
+  .rc .nav-burger { width: 44px; height: 44px; }
+  .rc .v2-wordmark { font-size: 17.5px; gap: 8px; }
+
+  /* Role tabs become a swipeable row instead of wrapping to two lines. */
+  .rc .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    padding-bottom: 4px;
+  }
+  .rc .tabs::-webkit-scrollbar { display: none; }
+  .rc .tab { flex: none; scroll-snap-align: start; padding: 10px 16px; }
+
+  .rc .tab-panel ul { margin-top: 18px; gap: 12px; }
+  .rc .tab-panel li { font-size: 14.5px; }
+
+  .rc .shift-col { padding: 20px 18px; }
+  .rc .shift-col li { font-size: 14px; padding: 10px 0; }
+
+  .rc .mod { padding: 22px 20px; }
+  .rc .sec-card { padding-top: 18px; }
+
+  .rc .proof blockquote { font-size: 23px; line-height: 1.22; }
+  .rc .stat .v { font-size: 28px; }
+  .rc .stat .k { font-size: 9.5px; }
+
+  .rc .faq-q { padding: 18px 0; font-size: 16px; gap: 14px; }
+  .rc .faq-a p { padding-bottom: 20px; font-size: 14.5px; }
+
+  .rc .cta { border-radius: 16px; padding: 40px 20px 44px; }
+  .rc .cta .lede { font-size: 16px; }
+
+  .rc .foot-bottom { flex-direction: column; gap: 8px; }
+}
+
+/* ── Small phone ────────────────────────────────────────────── */
+@media (max-width: 400px) {
+  .rc { --gutter: 18px; }
+  .rc .h1 { font-size: 32px; }
+  .rc .strip-in { gap: 14px 20px; }
+  .rc .strip-logo { font-size: 15px; }
+  .rc .stats { grid-template-columns: 1fr; }
+  .rc .foot-grid { grid-template-columns: 1fr; gap: 26px; }
+  .rc .chain { grid-template-columns: 1fr; }
+}
+
+/* Never let a wide child force a sideways scroll. */
+.rc .wrap > *,
+.rc .wrap-wide > * { min-width: 0; }
+
+/* ── Motion safety ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .rc *, .rc *::before, .rc *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .rc .backdrop-glow { display: none; }
+}
+
+</style>
+</head><body><div hidden=""><!--$--><!--/$--></div><div class="rc instrument_sans_56f05ae5-module__aakdHa__variable instrument_serif_fb6127c6-module__ugF91G__variable jetbrains_mono_b8c3aead-module__oMA0ga__variable"><noscript><style>.rc [style*="opacity:0"]{opacity:1!important;transform:none!important}</style></noscript><header class="nav"><div class="wrap nav-in"><a aria-label="Realcorp — home" href="/"><span class="v2-wordmark"><svg width="30" height="30" viewBox="0 0 48 48" fill="none" role="img" aria-label="Realcorp"><rect width="48" height="48" rx="11" fill="currentColor"></rect><path d="M14 10h13a7 7 0 0 1 0 14h-7v14h-6V10Zm6 5h7a2 2 0 0 1 0 4h-7v-4Z" fill="var(--canvas)" fill-rule="evenodd"></path><path d="M27 24l9 14h-7.2L20 24Z" fill="var(--accent)"></path></svg><span>Realcorp</span></span></a><nav class="nav-mid" aria-label="Primary"><a href="#platform">Platform</a><a href="#modules">Modules</a><a href="#ledger">How it works</a><a href="#customers">Customers</a><a href="#faq">FAQ</a></nav><div class="nav-end"><a class="nav-signin" href="/login">Sign in</a><a class="btn btn-primary btn-sm" href="#cta">Book a demo <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="chev" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg></a><button type="button" class="nav-burger" aria-expanded="false" aria-label="Open menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5h18M3 12h18M3 17.5h18"></path></svg></button></div></div></header><main><section class="hero" id="platform"><div class="backdrop" aria-hidden="true"><div class="backdrop-grid"></div><div class="backdrop-glow glow-a"></div><div class="backdrop-glow glow-b"></div><div class="backdrop-glow glow-c"></div></div><div class="wrap-wide"><div class="hero-in"><a class="pill" href="#modules" style="opacity:0;transform:translateY(22px)"><b>New</b> Shortlets, channel manager &amp; night audit<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg></a><h1 class="h1" style="opacity:0;transform:translateY(22px)">Everything a <span class="em">real corporation</span> runs on.</h1><p class="lede" style="opacity:0;transform:translateY(22px)">Sales, inventory, finance and people on one ledger — not four systems pretending to talk. A contract signed this morning is a locked unit, a payment schedule and a commission accrual before lunch. Property-first, built for companies that build real things.</p><div class="hero-cta" style="opacity:0;transform:translateY(22px)"><a class="btn btn-primary" href="#cta">Book a demo <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="chev" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg></a><a class="btn btn-ghost" href="#ledger">See how it works</a></div><div class="hero-note" style="opacity:0;transform:translateY(22px)"><span><i></i>Live in under a week</span><span><i></i>Your data, not a sandbox</span><span><i></i>SSO on day one</span></div></div><div><div class="shot" style="opacity:0;transform:translateY(40px) scale(0.985)"><div class="shot-chrome"><i></i><i></i><i></i><span>realcorp · command center</span></div><div class="shot-inner"><img src="../public/screenshots/sc-1.png" alt="Realcorp command centre: lead and deal counters, collections against target, pipeline against target, pending finance approvals and a live inventory snapshot on one dashboard"/></div></div></div></div></section><section class="strip" id="customers"><div class="wrap strip-in"><div class="strip-label">Trusted by real corporations — property-first, built to scale</div><div class="strip-logo" style="opacity:0;transform:translateY(22px)"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path d="M4 14 10 3l6 11H4Z"></path></svg>Kingsway Estates</div><div class="strip-logo" style="opacity:0;transform:translateY(22px)"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><rect x="4" y="4" width="10" height="10" rx="2"></rect></svg>Marigold Group</div><div class="strip-logo" style="opacity:0;transform:translateY(22px)"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path d="M9 3l6 6-6 6-6-6 6-6Z"></path></svg>Lekki Heights</div><div class="strip-logo" style="opacity:0;transform:translateY(22px)"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path d="M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3Zm0 3.5A2.5 2.5 0 1 1 9 11.5a2.5 2.5 0 0 1 0-5Z"></path></svg>Sterling Realty</div><div class="strip-logo" style="opacity:0;transform:translateY(22px)"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><path d="M3 15V6l6-3 6 3v9H3Z"></path></svg>Adron Homes</div></div></section><section class="sec"><div class="wrap"><div class="head center" style="opacity:0;transform:translateY(22px)"><div class="eyebrow">The shift</div><h2 class="h2">Stop reconciling. Start <span class="em">closing.</span></h2><p class="lede">The problem was never that your team lacked software. It is that eleven tools each hold a different version of the same number, and not one of them holds the corporation.</p></div><div class="shift"><div class="shift-col before" style="opacity:0;transform:translateY(22px)"><h3 class="h4">Today</h3><ul><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg>Unit availability lives in a WhatsApp thread</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg>Finance re-keys every signed contract by hand</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg>Commission is argued about after the fact</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg>Month-end is four days of reconciliation</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg>Nobody can say who changed the price, or when</li></ul></div><div class="shift-arrow" style="opacity:0;transform:translateY(22px)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"></path></svg></div><div class="shift-col after" style="opacity:0;transform:translateY(22px)"><h3 class="h4">On Realcorp</h3><ul><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>One unit record, one status, visible to every desk</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>A signed contract posts its own receivable schedule</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>Commission accrues off the same number sales closed</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>Month-end is a review, not a rebuild</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>Every field change is stamped, attributed, exportable</li></ul></div></div></div></section><section class="sec" style="padding-top:0"><div class="wrap"><div class="head-split" style="opacity:0;transform:translateY(22px)"><div><div class="eyebrow">Built for every desk</div><h2 class="h2" style="margin-top:16px">Four teams. <span class="em">One record.</span></h2></div><p class="body">Sales does not wait on finance. Finance does not chase sales. Operations and HR read the same unit, the same contract and the same number — because there is only one of each.</p></div><div class="tabs" role="tablist" aria-label="Teams"><button type="button" role="tab" aria-selected="true" data-on="true" class="tab"><span>Sales</span></button><button type="button" role="tab" aria-selected="false" data-on="false" class="tab"><span>Finance</span></button><button type="button" role="tab" aria-selected="false" data-on="false" class="tab"><span>Operations</span></button><button type="button" role="tab" aria-selected="false" data-on="false" class="tab"><span>People</span></button></div><div class="tab-panel" style="opacity:0;transform:translateY(14px)"><div><h3 class="h3">Work the pipeline, not the spreadsheet.</h3><p class="body" style="margin-top:12px">Leads arrive from WhatsApp, Meta and your own forms already scored and assigned. Reps move deals, hold units, and generate contracts without leaving the record.</p><ul><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>WhatsApp &amp; Meta lead capture with routing rules</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>Deal stages with unit allocation and locking built in</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>Quote → contract → commission in one handoff</li><li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5"></path></svg>Activity feed every manager can actually read</li></ul></div><div class="tab-shot"><img src="../public/screenshots/sc-5.png" alt="Realcorp sales workspace — Work the pipeline, not the spreadsheet"/></div></div></div></section><section class="sec" id="modules" style="padding-top:0"><div class="wrap"><div class="head-split" style="opacity:0;transform:translateY(22px)"><div><div class="eyebrow">§ Modules</div><h2 class="h2" style="margin-top:16px">Six modules. <span class="em">One ledger.</span></h2></div><p class="body">Every module reads from and writes to the same record. The pipeline closes a deal; the payment plan posts to receivables; the audit trail keeps everyone honest. No exports, no reconciliation theatre.</p></div><div class="mods"><div class="mod" style="opacity:0;transform:translateY(22px)"><div class="mod-top"><span class="mod-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M6 12h12M9 18h6"></path></svg></span><span class="mod-n">01</span></div><h3 class="h4">Sales CRM</h3><p class="body" style="font-size:14.5px">Capture, score, assign and close — without a single export.</p><ul><li>WhatsApp &amp; Meta capture</li><li>Scoring and routing rules</li><li>Deals, stages, activity</li><li>Quote-to-contract</li></ul></div><div class="mod" style="opacity:0;transform:translateY(22px)"><div class="mod-top"><span class="mod-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v15"></path><path d="M15 10h3a2 2 0 0 1 2 2v9M2 21h20M8 8h3M8 12h3M8 16h3"></path></svg></span><span class="mod-n">02</span></div><h3 class="h4">Projects &amp; inventory</h3><p class="body" style="font-size:14.5px">Every unit, its status, and the deal that holds it.</p><ul><li>Unit inventory</li><li>Allocation, locking, release</li><li>Shortlets &amp; front desk</li><li>Floor plans and price lists</li></ul></div><div class="mod" style="opacity:0;transform:translateY(22px)"><div class="mod-top"><span class="mod-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5V4.5Z"></path><path d="M8 7h8M8 11h5"></path></svg></span><span class="mod-n">03</span></div><h3 class="h4">Finance</h3><p class="body" style="font-size:14.5px">Milestones, receivables, reconciliation and audit in one ledger.</p><ul><li>Milestone payment plans</li><li>Receivables &amp; payables</li><li>Bank reconciliation</li><li>Vendor bills &amp; audit logs</li></ul></div><div class="mod" style="opacity:0;transform:translateY(22px)"><div class="mod-top"><span class="mod-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.6"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16.5 5.2a3.6 3.6 0 0 1 0 6.9M18 20a6.4 6.4 0 0 0-2.2-4.4"></path></svg></span><span class="mod-n">04</span></div><h3 class="h4">People &amp; HR</h3><p class="body" style="font-size:14.5px">From offer letter to payslip, with the right forms attached.</p><ul><li>Bundled onboarding</li><li>Offers and contracts</li><li>Payslips &amp; deductions</li><li>Departments &amp; reporting lines</li></ul></div><div class="mod" style="opacity:0;transform:translateY(22px)"><div class="mod-top"><span class="mod-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 9 4.6-9 4.6-9-4.6 9-4.6Z"></path><path d="m3 12.6 9 4.6 9-4.6"></path><path d="m3 17.2 9 4.6 9-4.6"></path></svg></span><span class="mod-n">05</span></div><h3 class="h4">Multi-tenant platform</h3><p class="body" style="font-size:14.5px">An isolated workspace per organization, one console to run them.</p><ul><li>Isolated tenant data</li><li>Platform console</li><li>SSO &amp; role-based access</li><li>Per-tenant branding</li></ul></div><div class="mod" style="opacity:0;transform:translateY(22px)"><div class="mod-top"><span class="mod-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.6L14 19V5L7.6 9.5H5a1 1 0 0 0-1 1Z"></path><path d="M17.5 8.5a5 5 0 0 1 0 7M20 6a8.5 8.5 0 0 1 0 12"></path></svg></span><span class="mod-n">06</span></div><h3 class="h4">Marketing</h3><p class="body" style="font-size:14.5px">Campaigns that close the loop back into the pipeline.</p><ul><li>Email &amp; WhatsApp broadcasts</li><li>Embedded capture forms</li><li>Campaign attribution</li><li>Audience segmentation</li></ul></div></div></div></section><section class="sec" id="ledger" style="padding-top:0"><div class="wrap"><div class="head center" style="opacity:0;transform:translateY(22px)"><div class="eyebrow">How it works</div><h2 class="h2">A lead becomes a payslip <span class="em">without retyping.</span></h2><p class="lede">This is the whole product in one line. Each step inherits the last one&#x27;s numbers, so nobody re-enters anything and nobody argues about which figure is real.</p></div><div class="chain-rail"><div class="chain-pulse" style="transform:translateX(-30%)"></div></div><div class="chain"><div class="chain-node" style="opacity:0;transform:translateY(22px)"><span class="k">01</span><span class="t">Lead</span><span class="d">Arrives from WhatsApp, Meta or a form. Scored and routed.</span></div><div class="chain-node" style="opacity:0;transform:translateY(22px)"><span class="k">02</span><span class="t">Deal</span><span class="d">Stages, documents and the rep who owns the outcome.</span></div><div class="chain-node" style="opacity:0;transform:translateY(22px)"><span class="k">03</span><span class="t">Unit</span><span class="d">Allocated and locked the moment the deal reaches contract.</span></div><div class="chain-node" style="opacity:0;transform:translateY(22px)"><span class="k">04</span><span class="t">Plan</span><span class="d">Milestones generated from the contract, not retyped.</span></div><div class="chain-node" style="opacity:0;transform:translateY(22px)"><span class="k">05</span><span class="t">Ledger</span><span class="d">Receivables age, payments match, the audit trail writes itself.</span></div><div class="chain-node" style="opacity:0;transform:translateY(22px)"><span class="k">06</span><span class="t">Payslip</span><span class="d">Commission accrues off the same number sales closed on.</span></div></div></div></section><section class="sec proof"><div class="wrap proof-in"><div style="opacity:0;transform:translateY(22px)"><div class="eyebrow" style="color:rgba(247,246,243,.5)">A note from operations</div><blockquote style="margin-top:24px">“From contract to payslip, the <span class="em">same number</span> <!-- -->reaches every desk. Month-end went from four days to one afternoon.”</blockquote><cite>Hannah Reyes · SVP Operations · Kingsway Estates</cite></div><div class="stats" style="opacity:0;transform:translateY(22px)"><div class="stat"><div class="v"><span>0<!-- --> hrs</span></div><div class="k">Saved every week</div></div><div class="stat"><div class="v"><span>$<!-- -->0.0<!-- -->B</span></div><div class="k">Gross volume tracked</div></div><div class="stat"><div class="v"><span>0.0<!-- -->%</span></div><div class="k">Audit-trail coverage</div></div><div class="stat"><div class="v"><span>0<!-- -->+</span></div><div class="k">Organizations live</div></div></div></div></section><section class="sec"><div class="wrap"><div class="head" style="opacity:0;transform:translateY(22px)"><div class="eyebrow">Platform</div><h2 class="h2">Built to survive an <span class="em">audit.</span></h2><p class="lede">The reason finance teams trust a single ledger is that it can be proven. Realcorp is built so every number has a provenance.</p></div><div class="sec-grid"><div class="sec-card" style="opacity:0;transform:translateY(22px)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.8 9 4.6-9 4.6-9-4.6 9-4.6Z"></path><path d="m3 12.6 9 4.6 9-4.6"></path><path d="m3 17.2 9 4.6 9-4.6"></path></svg><h3 class="h4">Tenant isolation</h3><p class="small">Each organization gets its own workspace and its own data boundary — enforced at the query layer, not the UI.</p></div><div class="sec-card" style="opacity:0;transform:translateY(22px)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4"></circle><path d="m10.5 12.5 8-8M16 7l2.5 2.5M13.5 9.5 16 12"></path></svg><h3 class="h4">SSO &amp; granular roles</h3><p class="small">Sign-in through your identity provider, with permissions scoped per module, per project, per desk.</p></div><div class="sec-card" style="opacity:0;transform:translateY(22px)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"></path><path d="M3 4v4.5h4.5M12 7.5V12l3 2"></path></svg><h3 class="h4">Immutable audit trail</h3><p class="small">Who changed what, when, and what it was before. Exportable for any auditor who asks.</p></div><div class="sec-card" style="opacity:0;transform:translateY(22px)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.2"></circle><path d="M3 12h18M12 2.8c2.4 2.6 3.6 5.7 3.6 9.2s-1.2 6.6-3.6 9.2c-2.4-2.6-3.6-5.7-3.6-9.2S9.6 5.4 12 2.8Z"></path></svg><h3 class="h4">Regional data residency</h3><p class="small">Run in the region your regulator expects. Lagos, London, New York or your own cloud.</p></div></div><div style="opacity:0;transform:translateY(22px)"><p class="small" style="margin-top:32px;display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v6c0 5-3.4 8.4-8 9.5C7.4 20.4 4 17 4 12V6l8-3.5Z"></path><path d="m9 12 2 2 4-4"></path></svg>Encryption in transit and at rest · role-scoped access · full export on request.</p></div></div></section><section class="sec" id="faq" style="padding-top:0"><div class="wrap"><div class="head center" style="opacity:0;transform:translateY(22px)"><div class="eyebrow">Questions</div><h2 class="h2">The ones people actually ask.</h2></div><div class="faq"><div class="faq-item" data-open="true"><h3 class="faq-h"><button type="button" class="faq-q" aria-expanded="true">How long does onboarding actually take?<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="faq-ico" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></h3><div class="faq-a" style="height:auto;opacity:1"><p class="body">Most organizations are live inside a week. Realcorp migrates your project list, unit inventory, open deals and chart of accounts before the first training session, so day one is your real data rather than a sandbox.</p></div></div><div class="faq-item" data-open="false"><h3 class="faq-h"><button type="button" class="faq-q" aria-expanded="false">Do we have to stop using WhatsApp?<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="faq-ico" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></h3></div><div class="faq-item" data-open="false"><h3 class="faq-h"><button type="button" class="faq-q" aria-expanded="false">Is Realcorp only for property companies?<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="faq-ico" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></h3></div><div class="faq-item" data-open="false"><h3 class="faq-h"><button type="button" class="faq-q" aria-expanded="false">Can we run more than one company on it?<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="faq-ico" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></h3></div><div class="faq-item" data-open="false"><h3 class="faq-h"><button type="button" class="faq-q" aria-expanded="false">What happens to the spreadsheets we already have?<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="faq-ico" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></h3></div></div></div></section><section class="sec" id="cta" style="padding-top:0"><div class="wrap"><div class="cta" style="opacity:0;transform:translateY(22px)"><div class="eyebrow" style="color:rgba(247,246,243,.55)">Let&#x27;s talk</div><h2 class="h2" style="max-width:20ch">See Realcorp running <span class="em">your projects.</span></h2><p class="lede">Thirty minutes with a solutions engineer, in a workspace pre-loaded with your project list. So the demo is about your business, not a fictional one.</p><div class="hero-cta"><a class="btn btn-primary" href="mailto:hello@realcoerp.com">Book a demo <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="chev" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg></a><a class="btn btn-ghost" href="/login">Sign in to your workspace</a></div></div></div></section></main><footer><div class="wrap"><div class="foot-grid"><div><span class="v2-wordmark"><svg width="28" height="28" viewBox="0 0 48 48" fill="none" role="img" aria-label="Realcorp"><rect width="48" height="48" rx="11" fill="currentColor"></rect><path d="M14 10h13a7 7 0 0 1 0 14h-7v14h-6V10Zm6 5h7a2 2 0 0 1 0 4h-7v-4Z" fill="var(--canvas)" fill-rule="evenodd"></path><path d="M27 24l9 14h-7.2L20 24Z" fill="var(--accent)"></path></svg><span>Realcorp</span></span><p class="small" style="margin-top:14px;max-width:34ch">Everything a real corporation runs on. Offices in Lagos, New York and Dubai.</p></div><div class="foot-col"><h5>Product</h5><ul><li><a href="#platform">Platform</a></li><li><a href="#modules">Modules</a></li><li><a href="#ledger">How it works</a></li><li><a href="#cta">Pricing</a></li></ul></div><div class="foot-col"><h5>Company</h5><ul><li><a href="/about">About</a></li><li><a href="#customers">Customers</a></li><li><a href="/careers">Careers</a></li><li><a href="mailto:hello@realcoerp.com">Contact</a></li></ul></div><div class="foot-col"><h5>Legal</h5><ul><li><a href="/privacy">Privacy</a></li><li><a href="/terms">Terms</a></li><li><a href="/security">Security</a></li><li><a href="/dpa">DPA</a></li></ul></div></div><div class="foot-bottom"><span>© <!-- -->2026<!-- --> Realcorp, Inc.</span><span>Lagos · New York · Dubai</span></div></div></footer></div><!--$--><!--/$--><div class="pointer-events-none fixed inset-x-4 bottom-4 z-[70] mx-auto flex w-auto max-w-[24rem] flex-col gap-2.5 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:mx-0 sm:w-[min(92vw,24rem)]" aria-live="polite" aria-relevant="additions"></div></body></html>

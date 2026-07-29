@@ -63,8 +63,7 @@ export default async function InvoiceDetailPage({
   if (!invoice) notFound();
 
   const brand = brandingFromSettings(tenant.name, tenant.settings);
-  const customerName =
-    invoice.deal?.propertyClient?.fullName || invoice.deal?.lead?.name || "—";
+  const customerName = invoice.deal?.propertyClient?.fullName || invoice.deal?.lead?.name || "—";
 
   const bankLines = normalizeFinanceOptionList(tenant.settings?.financeBankAccounts);
   const bankAccounts = parseBankAccounts(bankLines);
@@ -86,7 +85,12 @@ export default async function InvoiceDetailPage({
           ← Back to invoices
         </Link>
         {invoice.pdfUrl ? (
-          <a href={invoice.pdfUrl} target="_blank" rel="noreferrer" className="text-sm font-semibold text-foreground underline">
+          <a
+            href={invoice.pdfUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-semibold text-foreground underline"
+          >
             Download PDF
           </a>
         ) : null}
@@ -110,7 +114,9 @@ export default async function InvoiceDetailPage({
         sentToEmail={invoice.sentToEmail}
         sentAtLabel={
           invoice.sentAt
-            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(invoice.sentAt)
+            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+                invoice.sentAt,
+              )
             : null
         }
       />

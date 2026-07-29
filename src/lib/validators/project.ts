@@ -2,7 +2,11 @@ import { UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { z } from "zod";
 
 export const createProjectSchema = z.object({
-  name: z.string().trim().min(2, "Project name must be at least 2 characters.").max(120, "Project name is too long."),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Project name must be at least 2 characters.")
+    .max(120, "Project name is too long."),
   basePrice: z
     .string()
     .trim()
@@ -25,7 +29,11 @@ export const createUnitSchema = z.object({
 });
 
 export const createPricingPlanSchema = z.object({
-  name: z.string().trim().min(2, "Plan name must be at least 2 characters.").max(120, "Plan name is too long."),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Plan name must be at least 2 characters.")
+    .max(120, "Plan name is too long."),
   price: z
     .string()
     .trim()
@@ -103,7 +111,10 @@ export function parseCreateUnitsBulkForm(formData: FormData) {
     try {
       const parsed = JSON.parse(rawLabels) as unknown;
       if (Array.isArray(parsed)) {
-        labels = parsed.filter((x): x is string => typeof x === "string").map((s) => s.trim()).filter(Boolean);
+        labels = parsed
+          .filter((x): x is string => typeof x === "string")
+          .map((s) => s.trim())
+          .filter(Boolean);
       }
     } catch {
       labels = [];

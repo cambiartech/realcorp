@@ -40,7 +40,8 @@ export function YearlyAppraisalArchive({ entries }: { entries: YearlyArchiveEntr
     return (
       <div className="rounded-lg border border-dashed border-foreground/15 p-8 text-center text-sm text-muted">
         <Archive className="mx-auto mb-2 h-8 w-8 opacity-40" />
-        No signed-off yearly reviews yet. Close a yearly period after manager reviews are complete — completed reviews appear here.
+        No signed-off yearly reviews yet. Close a yearly period after manager reviews are complete — completed
+        reviews appear here.
       </div>
     );
   }
@@ -78,7 +79,7 @@ export function YearlyAppraisalArchive({ entries }: { entries: YearlyArchiveEntr
                     {reviewed.length} signed off · Avg rating {avgRating} · Closed {entry.closedLabel}
                   </p>
                 </div>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-800">
+                <span className="rounded-full bg-[var(--success-wash)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--success)]">
                   Archive
                 </span>
               </button>
@@ -101,11 +102,15 @@ export function YearlyAppraisalArchive({ entries }: { entries: YearlyArchiveEntr
                             <p className="font-medium">{a.employeeName}</p>
                             <p className="text-xs text-muted">{a.position}</p>
                             {a.managerNotes ? (
-                              <p className="mt-1 text-xs text-muted line-clamp-2">Manager: {a.managerNotes}</p>
+                              <p className="mt-1 text-xs text-muted line-clamp-2">
+                                Manager: {a.managerNotes}
+                              </p>
                             ) : null}
                           </td>
                           <td className="px-4 py-3 text-muted">{a.department || "—"}</td>
-                          <td className="px-4 py-3">{a.overallRating != null ? `${a.overallRating}/5` : "—"}</td>
+                          <td className="px-4 py-3">
+                            {a.overallRating != null ? `${a.overallRating}/5` : "—"}
+                          </td>
                           <td className="px-4 py-3 text-muted">{a.reviewedAtLabel}</td>
                           <td className="px-4 py-3 text-muted">{a.reviewerLabel}</td>
                         </tr>

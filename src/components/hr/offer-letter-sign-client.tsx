@@ -49,10 +49,13 @@ export function OfferLetterSignClient({
     <div className="min-h-screen bg-slate-50 py-6 px-4" style={brandingCssVars(brand)}>
       <div className="mx-auto max-w-3xl">
         <BrandedDocumentShell brand={brand} title="Offer of employment" subtitle={`Hello, ${employeeName}`}>
-          <div className="space-y-3 text-sm leading-relaxed text-slate-800" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+          <div
+            className="space-y-3 text-sm leading-relaxed text-slate-800"
+            dangerouslySetInnerHTML={{ __html: bodyHtml }}
+          />
 
           {done ? (
-            <div className="mt-8 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-900">
+            <div className="mt-8 rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4 text-sm text-[var(--success)]">
               <p className="font-semibold">Thank you — your signed offer was received.</p>
               {signedAtLabel ? <p className="mt-1 text-xs">Signed {signedAtLabel}</p> : null}
               {signaturePreview ? (
@@ -67,7 +70,7 @@ export function OfferLetterSignClient({
               <div className="mt-3">
                 <SignaturePad onChange={setSignature} />
               </div>
-              {error ? <p className="mt-2 text-xs text-red-700">{error}</p> : null}
+              {error ? <p className="mt-2 text-xs text-[var(--danger)]">{error}</p> : null}
               <button
                 type="button"
                 disabled={pending}

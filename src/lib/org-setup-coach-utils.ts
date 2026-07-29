@@ -72,10 +72,7 @@ export function writeCelebratedSteps(tenantSlug: string, userId: string, ids: Or
   }
 }
 
-export function findNewlyCompletedSteps(
-  previous: OrgSetupStep[],
-  current: OrgSetupStep[],
-): OrgSetupStep[] {
+export function findNewlyCompletedSteps(previous: OrgSetupStep[], current: OrgSetupStep[]): OrgSetupStep[] {
   const prevDone = new Set(previous.filter((s) => s.done).map((s) => s.id));
   return current.filter((s) => s.done && !prevDone.has(s.id));
 }

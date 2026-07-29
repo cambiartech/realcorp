@@ -29,7 +29,8 @@ export function PayslipPrintView({
   currency: string;
   calc: PayslipCalculation;
 }) {
-  const money = (n: number) => `${currency} ${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const money = (n: number) =>
+    `${currency} ${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const earningsRows = Array.isArray(calc.earnings) ? calc.earnings : [];
   const deductionRows = Array.isArray(calc.deductions) ? calc.deductions : [];
 
@@ -85,7 +86,9 @@ export function PayslipPrintView({
             <tr key={row.code}>
               <td className="border border-slate-200 px-3 py-2">{row.label.replace(/\s*\(\d+%\)/, "")}</td>
               <td className="border border-slate-200 px-3 py-2 text-right text-slate-600">{row.percent}%</td>
-              <td className="border border-slate-200 px-3 py-2 text-right font-medium">{money(row.amount)}</td>
+              <td className="border border-slate-200 px-3 py-2 text-right font-medium">
+                {money(row.amount)}
+              </td>
             </tr>
           ))}
           <tr className="bg-slate-100 font-semibold">
@@ -113,7 +116,9 @@ export function PayslipPrintView({
           {deductionRows.map((row) => (
             <tr key={row.code}>
               <td className="border border-slate-200 px-3 py-2">{row.label}</td>
-              <td className="border border-slate-200 px-3 py-2 text-right font-medium">{money(row.amount)}</td>
+              <td className="border border-slate-200 px-3 py-2 text-right font-medium">
+                {money(row.amount)}
+              </td>
             </tr>
           ))}
           <tr className="bg-slate-800 font-bold text-white">

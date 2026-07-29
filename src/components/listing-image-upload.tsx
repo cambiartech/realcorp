@@ -98,7 +98,7 @@ export function ListingImageUpload({
   return (
     <div className="space-y-4">
       {error ? (
-        <div className="rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+        <div className="rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-xs text-[var(--danger)]">
           {error}
         </div>
       ) : null}
@@ -135,7 +135,10 @@ export function ListingImageUpload({
         {galleryUrls.length > 0 ? (
           <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {galleryUrls.map((url, i) => (
-              <div key={url} className="relative aspect-square overflow-hidden rounded-md border border-foreground/10">
+              <div
+                key={url}
+                className="relative aspect-square overflow-hidden rounded-md border border-foreground/10"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="h-full w-full object-cover" />
                 <button

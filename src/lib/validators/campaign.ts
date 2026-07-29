@@ -9,9 +9,17 @@ export const createCampaignSchema = z.object({
     .string()
     .trim()
     .max(64, "Code is too long.")
-    .transform((v) => v.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, ""))
+    .transform((v) =>
+      v
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-+|-+$/g, ""),
+    )
     .refine((v) => v.length >= 3, "Code must be at least 3 characters.")
-    .refine((v) => codePattern.test(v), "Use lowercase letters, numbers, and hyphens (e.g. spring-launch-2026)."),
+    .refine(
+      (v) => codePattern.test(v),
+      "Use lowercase letters, numbers, and hyphens (e.g. spring-launch-2026).",
+    ),
   description: z
     .string()
     .trim()

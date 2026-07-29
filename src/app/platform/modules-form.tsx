@@ -93,7 +93,8 @@ export function PlatformModulesForm({
         >
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <p className="text-xs text-muted">
-              Enable modules this organization has paid for. Disabled modules are hidden from their sidebar and routes — including all sub-pages listed below.
+              Enable modules this organization has paid for. Disabled modules are hidden from their sidebar
+              and routes — including all sub-pages listed below.
             </p>
 
             <div className="mt-4 space-y-5">
@@ -102,7 +103,9 @@ export function PlatformModulesForm({
                 if (items.length === 0) return null;
                 return (
                   <section key={group.id}>
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted">{group.label}</p>
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted">
+                      {group.label}
+                    </p>
                     <div className="space-y-1">
                       {items.map((def) => (
                         <ModuleCheckbox
@@ -124,7 +127,7 @@ export function PlatformModulesForm({
           <div className="shrink-0 border-t border-foreground/10 bg-background px-5 py-4">
             {feedback ? (
               <p
-                className={`mb-3 text-xs ${feedback.kind === "ok" ? "text-emerald-600" : "text-rose-600"}`}
+                className={`mb-3 text-xs ${feedback.kind === "ok" ? "text-[var(--success)]" : "text-[var(--danger)]"}`}
               >
                 {feedback.message}
               </p>
@@ -170,7 +173,12 @@ function ModuleCheckbox({
 }) {
   return (
     <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-transparent px-2 py-2 hover:border-foreground/10 hover:bg-foreground/[0.03]">
-      <input type="checkbox" name={name} defaultChecked={defaultChecked} className="mt-0.5 h-4 w-4 accent-foreground" />
+      <input
+        type="checkbox"
+        name={name}
+        defaultChecked={defaultChecked}
+        className="mt-0.5 h-4 w-4 accent-foreground"
+      />
       <span className="min-w-0">
         <span className="block text-sm font-medium text-foreground">{label}</span>
         {hint ? <span className="mt-0.5 block text-xs leading-snug text-muted">{hint}</span> : null}

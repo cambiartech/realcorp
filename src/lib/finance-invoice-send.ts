@@ -67,8 +67,7 @@ export async function deliverInvoiceEmail(
   const bankAccountLines = normalizeFinanceOptionList(settings?.financeBankAccounts);
   const bankAccounts = parseBankAccounts(bankAccountLines);
 
-  const customerName =
-    invoice.deal?.propertyClient?.fullName || invoice.deal?.lead?.name || null;
+  const customerName = invoice.deal?.propertyClient?.fullName || invoice.deal?.lead?.name || null;
 
   const pdfBytes = await buildInvoicePdf({
     brand: financePdfBrandFromSettings(input.tenantName, settings),
@@ -231,9 +230,5 @@ export function resolveInvoiceRecipientEmail(invoice: {
     lead?: { email: string | null } | null;
   } | null;
 }): string {
-  return (
-    invoice.deal?.propertyClient?.email?.trim() ||
-    invoice.deal?.lead?.email?.trim() ||
-    ""
-  );
+  return invoice.deal?.propertyClient?.email?.trim() || invoice.deal?.lead?.email?.trim() || "";
 }

@@ -4,7 +4,9 @@ function str(v: FormDataEntryValue | null): string {
   return String(v ?? "").trim();
 }
 
-function parseMoney(value: FormDataEntryValue | null): { ok: true; value?: number } | { ok: false; error: string } {
+function parseMoney(
+  value: FormDataEntryValue | null,
+): { ok: true; value?: number } | { ok: false; error: string } {
   const raw = str(value);
   if (!raw) return { ok: true, value: undefined };
   const normalized = raw.replace(/,/g, "");

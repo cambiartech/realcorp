@@ -53,7 +53,8 @@ export function parseCreatePropertyClientForm(formData: FormData) {
     country: formData.get("country") || undefined,
     status: formData.get("status") || PropertyClientStatus.PROSPECT,
     notes: formData.get("notes") || undefined,
-    sendPortalInvite: formData.get("sendPortalInvite") === "on" || formData.get("sendPortalInvite") === "true",
+    sendPortalInvite:
+      formData.get("sendPortalInvite") === "on" || formData.get("sendPortalInvite") === "true",
   });
 }
 

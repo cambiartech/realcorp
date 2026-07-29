@@ -24,13 +24,19 @@ export function BrandedDocumentShell({
     >
       <header
         className="rounded-t-xl px-6 py-5 text-white print:rounded-none"
-        style={{ background: `linear-gradient(135deg, var(--hr-brand-primary) 0%, var(--hr-brand-accent) 100%)` }}
+        style={{
+          background: `linear-gradient(135deg, var(--hr-brand-primary) 0%, var(--hr-brand-accent) 100%)`,
+        }}
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             {brand.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand.logoUrl} alt="" className="h-14 w-auto max-w-[140px] rounded bg-white/95 object-contain p-1" />
+              <img
+                src={brand.logoUrl}
+                alt=""
+                className="h-14 w-auto max-w-[140px] rounded bg-white/95 object-contain p-1"
+              />
             ) : (
               <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/15 text-lg font-bold">
                 {brand.companyName.slice(0, 2).toUpperCase()}
@@ -55,7 +61,9 @@ export function BrandedDocumentShell({
       <div className="px-6 py-6">{children}</div>
 
       {footerNote ? (
-        <footer className="border-t border-slate-200 px-6 py-4 text-center text-xs text-slate-500">{footerNote}</footer>
+        <footer className="border-t border-slate-200 px-6 py-4 text-center text-xs text-slate-500">
+          {footerNote}
+        </footer>
       ) : null}
     </div>
   );
@@ -64,7 +72,10 @@ export function BrandedDocumentShell({
 export function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-6">
-      <h2 className="mb-3 border-b-2 pb-1 text-sm font-bold uppercase tracking-wide" style={{ borderColor: "var(--hr-brand-accent)", color: "var(--hr-brand-primary)" }}>
+      <h2
+        className="mb-3 border-b-2 pb-1 text-sm font-bold uppercase tracking-wide"
+        style={{ borderColor: "var(--hr-brand-accent)", color: "var(--hr-brand-primary)" }}
+      >
         {title}
       </h2>
       {children}

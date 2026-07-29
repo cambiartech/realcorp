@@ -10,11 +10,7 @@ import { TeamWorkspace } from "./team-workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function TenantTeamPage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function TenantTeamPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) notFound();

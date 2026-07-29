@@ -103,10 +103,26 @@ export default async function TenantHomePage({
   monthEnd.setMonth(monthEnd.getMonth() + 1);
 
   const moduleTasksEnabled = tenant.settings?.moduleTasks ?? true;
-  const canManageOrgSetup =
-    Boolean(session.user.isPlatformAdmin) || role === MembershipRole.ORG_ADMIN;
+  const canManageOrgSetup = Boolean(session.user.isPlatformAdmin) || role === MembershipRole.ORG_ADMIN;
 
-  const [goal, preference, deals, units, leads, invoices, payments, users, projects, activitiesCount, whatsappCount, inboundWebhookLastAt, hrOnboardingStatus, myWorkTasksRaw, activeMemberCount, pendingInviteCount] = await Promise.all([
+  const [
+    goal,
+    preference,
+    deals,
+    units,
+    leads,
+    invoices,
+    payments,
+    users,
+    projects,
+    activitiesCount,
+    whatsappCount,
+    inboundWebhookLastAt,
+    hrOnboardingStatus,
+    myWorkTasksRaw,
+    activeMemberCount,
+    pendingInviteCount,
+  ] = await Promise.all([
     prisma.tenantGoal.findFirst({
       where: { tenantId: tenant.id, isActive: true },
       orderBy: { updatedAt: "desc" },
@@ -142,7 +158,15 @@ export default async function TenantHomePage({
     }),
     prisma.lead.findMany({
       where: { tenantId: tenant.id },
-      select: { id: true, assignedUserId: true, createdAt: true, source: true, projectInterest: true, name: true, email: true },
+      select: {
+        id: true,
+        assignedUserId: true,
+        createdAt: true,
+        source: true,
+        projectInterest: true,
+        name: true,
+        email: true,
+      },
       take: 2000,
     }),
     prisma.invoice.findMany({
@@ -287,11 +311,15 @@ export default async function TenantHomePage({
   const expectedThisMonth = invoices
     .filter((inv) => inv.dueDate && inv.dueDate >= monthStart && inv.dueDate < monthEnd)
     .reduce((sum, inv) => sum + Number(inv.balanceDue), 0);
-  const overdueInvoices = invoices.filter((inv) => inv.dueDate && inv.dueDate < new Date() && Number(inv.balanceDue) > 0);
+  const overdueInvoices = invoices.filter(
+    (inv) => inv.dueDate && inv.dueDate < new Date() && Number(inv.balanceDue) > 0,
+  );
   const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + Number(inv.balanceDue), 0);
   const overdueCount = overdueInvoices.length;
   const pendingVerificationCount = pendingFinanceCount;
-  const invoicesMtdCount = invoices.filter((inv) => inv.createdAt >= monthStart && inv.createdAt < monthEnd).length;
+  const invoicesMtdCount = invoices.filter(
+    (inv) => inv.createdAt >= monthStart && inv.createdAt < monthEnd,
+  ).length;
   const teamPipelineCount = deals.filter((d) => d.stage !== "CLOSED_WON" && d.stage !== "CLOSED_LOST").length;
   const unassignedLeads = leads.filter((l) => !l.assignedUserId).length;
   const myPipelineCount = deals.filter(
@@ -299,7 +327,9 @@ export default async function TenantHomePage({
   ).length;
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
-  const myNewLeads7d = leads.filter((l) => l.assignedUserId === session.user.id && l.createdAt >= weekAgo).length;
+  const myNewLeads7d = leads.filter(
+    (l) => l.assignedUserId === session.user.id && l.createdAt >= weekAgo,
+  ).length;
 
   const stageOrder = ["NEW_LEAD", "CONTACTED", "QUALIFIED", "NEGOTIATION", "RESERVATION_MADE"];
   const leadFunnel = stageOrder.map((stage) => ({
@@ -332,7 +362,10 @@ export default async function TenantHomePage({
   const leaderboardByUser = new Map<string, number>();
   for (const d of deals) {
     if (d.stage !== "CLOSED_WON" || !d.assignedUserId) continue;
-    leaderboardByUser.set(d.assignedUserId, (leaderboardByUser.get(d.assignedUserId) || 0) + Number(d.value || 0));
+    leaderboardByUser.set(
+      d.assignedUserId,
+      (leaderboardByUser.get(d.assignedUserId) || 0) + Number(d.value || 0),
+    );
   }
   const leaderboard = Array.from(leaderboardByUser.entries())
     .map(([id, value]) => ({ label: userMap.get(id) || "Unknown", value }))
@@ -352,11 +385,13 @@ export default async function TenantHomePage({
     const stageDeals = deals.filter((d) => d.stage === stage);
     const avgDays =
       stageDeals.length > 0
-        ? stageDeals.reduce((sum, d) => sum + (Date.now() - d.createdAt.getTime()) / 86_400_000, 0) / stageDeals.length
+        ? stageDeals.reduce((sum, d) => sum + (Date.now() - d.createdAt.getTime()) / 86_400_000, 0) /
+          stageDeals.length
         : 0;
     const nextStage = velocityStages[idx + 1];
     const nextCount = nextStage ? deals.filter((d) => d.stage === nextStage).length : 0;
-    const dropOffPct = stageDeals.length > 0 ? Math.max(0, ((stageDeals.length - nextCount) / stageDeals.length) * 100) : 0;
+    const dropOffPct =
+      stageDeals.length > 0 ? Math.max(0, ((stageDeals.length - nextCount) / stageDeals.length) * 100) : 0;
     return {
       stage: stage.replaceAll("_", " "),
       avgDays: Number(avgDays.toFixed(1)),
@@ -612,8 +647,8 @@ export default async function TenantHomePage({
         onboarding: {
           connectIntegrationDone: Boolean(
             tenant.settings?.metaPageAccessToken ||
-              (tenant.settings?.whatsappAccessToken && tenant.settings?.whatsappPhoneNumberId) ||
-              tenant.settings?.termiiApiKey,
+            (tenant.settings?.whatsappAccessToken && tenant.settings?.whatsappPhoneNumberId) ||
+            tenant.settings?.termiiApiKey,
           ),
           importedLeadsDone: leads.length > 0,
           createdDealDone: deals.length > 0,
@@ -653,8 +688,8 @@ export default async function TenantHomePage({
         filterOptions: {
           owners: users.map((u) => ({ id: u.user.id, label: u.user.name || u.user.email || u.user.id })),
           projects: projects.map((p) => ({ id: p.id, label: p.name })),
-          leadSources: Array.from(new Set(leads.map((l) => l.source).filter(Boolean) as string[])).sort((a, b) =>
-            a.localeCompare(b),
+          leadSources: Array.from(new Set(leads.map((l) => l.source).filter(Boolean) as string[])).sort(
+            (a, b) => a.localeCompare(b),
           ),
         },
         kpiInvoiceRows: invoices.map((inv) => ({
@@ -668,7 +703,9 @@ export default async function TenantHomePage({
           balanceDue: Number(inv.balanceDue),
           currency: inv.currency,
           ownerId: inv.deal?.assignedUserId || null,
-          ownerLabel: inv.deal?.assignedUserId ? userMap.get(inv.deal.assignedUserId) || "Unknown" : "Unassigned",
+          ownerLabel: inv.deal?.assignedUserId
+            ? userMap.get(inv.deal.assignedUserId) || "Unknown"
+            : "Unassigned",
           projectId: inv.deal?.unit?.project?.id || null,
           projectName: inv.deal?.unit?.project?.name || inv.deal?.lead?.projectInterest || "No project",
         })),
@@ -689,7 +726,8 @@ export default async function TenantHomePage({
           projectName:
             p.invoice?.deal?.unit?.project?.name || p.invoice?.deal?.lead?.projectInterest || "No project",
           recordedByLabel:
-            p.recordedByLabel || (p.recordedByUserId ? userMap.get(p.recordedByUserId) || "Unknown" : "Unknown"),
+            p.recordedByLabel ||
+            (p.recordedByUserId ? userMap.get(p.recordedByUserId) || "Unknown" : "Unknown"),
         })),
       }}
     />

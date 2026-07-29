@@ -84,7 +84,8 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
         <div>
           <h2 className="text-lg font-semibold">Locations</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Sites and buildings where your short-let apartments live — Akoka HQ, Lekki branch, etc. Independent from sales Projects.
+            Sites and buildings where your short-let apartments live — Akoka HQ, Lekki branch, etc.
+            Independent from sales Projects.
           </p>
         </div>
         <button
@@ -100,7 +101,11 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
         <div className="rounded-lg border border-foreground/10 p-8 text-center">
           <p className="font-medium">No locations yet</p>
           <p className="mt-1 text-sm text-muted">Add your first site, then create apartments under it.</p>
-          <button type="button" onClick={openCreate} className="mt-4 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background">
+          <button
+            type="button"
+            onClick={openCreate}
+            className="mt-4 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+          >
             Add location
           </button>
         </div>
@@ -127,19 +132,21 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
                   <td className="px-4 py-3">{loc.isActive ? "Active" : "Inactive"}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      <button type="button" disabled={isPending} onClick={() => openEdit(loc)} className="rounded border px-2 py-1 text-xs">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => openEdit(loc)}
+                        className="rounded border px-2 py-1 text-xs"
+                      >
                         Edit
                       </button>
                       <button
                         type="button"
                         disabled={isPending || loc.apartmentCount > 0}
                         onClick={() =>
-                          run(
-                            () => deleteShortletProperty(tenantSlug, loc.id),
-                            "Location deleted.",
-                          )
+                          run(() => deleteShortletProperty(tenantSlug, loc.id), "Location deleted.")
                         }
-                        className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-600 disabled:opacity-40"
+                        className="rounded border border-[var(--danger-line)] px-2 py-1 text-xs text-[var(--danger)] disabled:opacity-40"
                       >
                         Delete
                       </button>
@@ -173,33 +180,88 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-muted sm:col-span-2">
                 Location name
-                <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  required
+                />
               </label>
               <label className="block text-sm text-muted">
                 Location code
-                <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm" placeholder="HQ" value={form.locationCode} onChange={(e) => setForm((f) => ({ ...f, locationCode: e.target.value }))} />
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="HQ"
+                  value={form.locationCode}
+                  onChange={(e) => setForm((f) => ({ ...f, locationCode: e.target.value }))}
+                />
               </label>
               <label className="flex items-end gap-2 pb-2 text-sm">
-                <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))} />
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                />
                 Active location
               </label>
             </div>
             <label className="block text-sm text-muted">
               Street address
-              <textarea className="mt-1 w-full rounded-md border px-3 py-2 text-sm" rows={2} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+              <textarea
+                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                rows={2}
+                value={form.address}
+                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+              />
             </label>
             <div className="grid gap-3 sm:grid-cols-3">
-              <input className="rounded-md border px-3 py-2 text-sm" placeholder="City" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
-              <input className="rounded-md border px-3 py-2 text-sm" placeholder="State" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} />
-              <input className="rounded-md border px-3 py-2 text-sm" placeholder="Country" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} />
+              <input
+                className="rounded-md border px-3 py-2 text-sm"
+                placeholder="City"
+                value={form.city}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+              />
+              <input
+                className="rounded-md border px-3 py-2 text-sm"
+                placeholder="State"
+                value={form.state}
+                onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
+              />
+              <input
+                className="rounded-md border px-3 py-2 text-sm"
+                placeholder="Country"
+                value={form.country}
+                onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+              />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input className="rounded-md border px-3 py-2 text-sm" placeholder="Phone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-              <input type="email" className="rounded-md border px-3 py-2 text-sm" placeholder="Email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+              <input
+                className="rounded-md border px-3 py-2 text-sm"
+                placeholder="Phone"
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+              <input
+                type="email"
+                className="rounded-md border px-3 py-2 text-sm"
+                placeholder="Email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setOpen(false)} className="rounded-md border px-3 py-2 text-sm">Cancel</button>
-              <button type="submit" disabled={isPending} className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-md border px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background"
+              >
                 {editId ? "Update location" : "Create location"}
               </button>
             </div>

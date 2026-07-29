@@ -67,9 +67,9 @@ export function OnboardingForm() {
         {state.emailSent ? (
           <p className="mt-4 text-muted">Invite email sent to the org admin.</p>
         ) : (
-          <p className="mt-4 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-foreground">
-            Email could not be sent{state.emailError ? `: ${state.emailError}` : ""}. Copy the link below and send it
-            manually, or use Platform → Invites to resend later.
+          <p className="mt-4 rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-foreground">
+            Email could not be sent{state.emailError ? `: ${state.emailError}` : ""}. Copy the link below and
+            send it manually, or use Platform → Invites to resend later.
           </p>
         )}
         <p className="mt-4 text-muted">Invite link (valid 14 days):</p>
@@ -115,9 +115,7 @@ export function OnboardingForm() {
           required
           placeholder="bo-properties"
           aria-invalid={Boolean(fieldErrors.slug)}
-          aria-describedby={
-            fieldErrors.slug ? "onboard-slug-error" : "onboard-slug-hint"
-          }
+          aria-describedby={fieldErrors.slug ? "onboard-slug-error" : "onboard-slug-hint"}
           className={`${fieldClass(Boolean(fieldErrors.slug))} font-mono text-sm`}
         />
         <p id="onboard-slug-hint" className="mt-1 text-xs text-muted">
@@ -137,7 +135,12 @@ export function OnboardingForm() {
         required
         error={fieldErrors.adminEmail}
       />
-      <Field name="adminName" label={labels.adminName} placeholder="Full name" error={fieldErrors.adminName} />
+      <Field
+        name="adminName"
+        label={labels.adminName}
+        placeholder="Full name"
+        error={fieldErrors.adminName}
+      />
       <div>
         <label htmlFor="onboard-plan" className="mb-1 block text-sm text-muted">
           {labels.plan}

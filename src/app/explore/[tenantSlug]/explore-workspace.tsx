@@ -145,9 +145,7 @@ export function ExploreWorkspace({
       )}
 
       {!embed ? (
-        <p className="mt-10 text-center text-xs text-muted">
-          Powered by {brand.tenantName} · Realcorp
-        </p>
+        <p className="mt-10 text-center text-xs text-muted">Powered by {brand.tenantName} · Realcorp</p>
       ) : null}
 
       {inquiryFor ? (
@@ -191,7 +189,7 @@ function ListingCard({
           </div>
         )}
         {listing.unitsAvailable > 0 ? (
-          <span className="absolute left-3 top-3 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow">
+          <span className="absolute left-3 top-3 rounded-full bg-[var(--success)] px-2.5 py-1 text-[11px] font-semibold text-white shadow">
             {listing.unitsAvailable} available
           </span>
         ) : null}
@@ -349,9 +347,7 @@ function InquiryModal({
                   className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 />
               </div>
-              {state && !state.ok ? (
-                <p className="text-sm font-medium text-error">{state.error}</p>
-              ) : null}
+              {state && !state.ok ? <p className="text-sm font-medium text-error">{state.error}</p> : null}
               <button
                 type="submit"
                 disabled={pending}

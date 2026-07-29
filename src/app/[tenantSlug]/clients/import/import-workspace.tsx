@@ -6,7 +6,10 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { importClients, type ImportClientRow } from "../actions";
 
 function parseCsv(text: string): string[][] {
-  const clean = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const clean = text
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -166,13 +169,16 @@ export function ClientImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6">
-        <Link href={`/${tenantSlug}/clients`} className="mb-2 inline-flex items-center gap-1 text-xs text-muted hover:text-foreground">
+        <Link
+          href={`/${tenantSlug}/clients`}
+          className="mb-2 inline-flex items-center gap-1 text-xs text-muted hover:text-foreground"
+        >
           ← Back to clients
         </Link>
         <h1 className="text-2xl font-bold text-foreground">Import clients from CSV</h1>
         <p className="mt-1 text-sm text-muted">
-          Bring in existing property owners and investors. Only <strong>Name</strong> is required — optionally include
-          project, unit, and pricing plan to link holdings in one go.
+          Bring in existing property owners and investors. Only <strong>Name</strong> is required — optionally
+          include project, unit, and pricing plan to link holdings in one go.
         </p>
       </div>
 
@@ -193,7 +199,10 @@ export function ClientImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
             "Role",
             "Notes",
           ].map((col) => (
-            <span key={col} className="rounded border border-foreground/10 bg-background px-2 py-0.5 font-mono text-xs">
+            <span
+              key={col}
+              className="rounded border border-foreground/10 bg-background px-2 py-0.5 font-mono text-xs"
+            >
               {col}
             </span>
           ))}
@@ -219,7 +228,9 @@ export function ClientImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
       )}
 
       {error ? (
-        <div className="mt-4 rounded-lg border border-red-400/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">{error}</div>
+        <div className="mt-4 rounded-lg border border-[var(--danger-line)] bg-[var(--danger-wash)] px-4 py-3 text-sm text-[var(--danger)]">
+          {error}
+        </div>
       ) : null}
 
       {state.phase === "preview" && (
@@ -227,11 +238,11 @@ export function ClientImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium">{state.fileName}</span>
-              <span className="rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-semibold text-green-600">
+              <span className="rounded-full bg-[var(--success-wash)] px-2.5 py-0.5 text-xs font-semibold text-[var(--success)]">
                 {validCount} valid
               </span>
               {invalidCount > 0 ? (
-                <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-600">
+                <span className="rounded-full bg-[var(--danger-wash)] px-2.5 py-0.5 text-xs font-semibold text-[var(--danger)]">
                   {invalidCount} skipped
                 </span>
               ) : null}
@@ -275,7 +286,7 @@ export function ClientImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
                 </thead>
                 <tbody className="divide-y divide-foreground/10">
                   {state.rows.map((row, i) => (
-                    <tr key={i} className={row._valid ? "" : "bg-red-500/[0.03]"}>
+                    <tr key={i} className={row._valid ? "" : "bg-[var(--danger)]/[0.03]"}>
                       <td className="px-3 py-2 text-muted">{i + 1}</td>
                       <td className="px-3 py-2">{row._valid ? "✓" : row._errors.join("; ")}</td>
                       <td className="px-3 py-2 font-medium">{row.fullName || "—"}</td>
@@ -294,11 +305,13 @@ export function ClientImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
       )}
 
       {state.phase === "done" && (
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-green-400/30 bg-green-500/5 px-8 py-14 text-center">
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-[var(--success-line)] bg-[var(--success-wash)] px-8 py-14 text-center">
           <p className="text-xl font-bold">{state.count} clients imported</p>
           <p className="text-sm text-muted">
             {state.unitsLinked} unit link(s) created
-            {state.unitLinkSkipped > 0 ? ` · ${state.unitLinkSkipped} row(s) could not match project/unit` : ""}
+            {state.unitLinkSkipped > 0
+              ? ` · ${state.unitLinkSkipped} row(s) could not match project/unit`
+              : ""}
           </p>
           <div className="flex gap-3">
             <Link

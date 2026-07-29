@@ -28,10 +28,7 @@ export function hrFormFillPath(token: string) {
   return `/hr-form/${token}`;
 }
 
-export function hrOnboardingBundlePath(
-  bundleToken: string,
-  query?: { form?: string; tenant?: string },
-) {
+export function hrOnboardingBundlePath(bundleToken: string, query?: { form?: string; tenant?: string }) {
   const params = new URLSearchParams();
   if (query?.tenant) params.set("tenant", query.tenant);
   if (query?.form) params.set("form", query.form);

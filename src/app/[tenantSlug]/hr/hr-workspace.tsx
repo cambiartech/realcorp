@@ -178,7 +178,12 @@ export function HrWorkspace(props: {
   peopleOnboardUserId?: string;
   offerByUserId?: Record<
     string,
-    { bodyHtml: string; status: "DRAFT" | "AWAITING_SIGNATURE" | "SIGNED"; signUrl?: string; profileId: string }
+    {
+      bodyHtml: string;
+      status: "DRAFT" | "AWAITING_SIGNATURE" | "SIGNED";
+      signUrl?: string;
+      profileId: string;
+    }
   >;
   documentsForUserId?: string;
   documentsReturnOnboardUserId?: string;
@@ -199,8 +204,20 @@ export function HrWorkspace(props: {
       paymentStatusValue: string;
       paidAtLabel: string;
     }>;
-    documents: Array<{ id: string; category: string; title: string; fileUrl: string; uploadedAtLabel: string }>;
-    goals: Array<{ id: string; title: string; progressPercent: number; status: string; dueDateLabel: string }>;
+    documents: Array<{
+      id: string;
+      category: string;
+      title: string;
+      fileUrl: string;
+      uploadedAtLabel: string;
+    }>;
+    goals: Array<{
+      id: string;
+      title: string;
+      progressPercent: number;
+      status: string;
+      dueDateLabel: string;
+    }>;
     pendingForms: Array<{
       id: string;
       formTypeLabel: string;
@@ -285,11 +302,23 @@ export function HrWorkspace(props: {
   } = props;
 
   const headings: Record<HrTab, { title: string; subtitle: string }> = {
-    people: { title: "People", subtitle: "Employee records — biodata, job, bank, and pay setup (Bo Properties forms)." },
-    payslips: { title: "Payslips", subtitle: "Generate monthly payslips. Employees download from My HR after you finalize." },
-    appraisals: { title: "Appraisals", subtitle: "Monthly performance scores, manager reviews, and yearly archive." },
+    people: {
+      title: "People",
+      subtitle: "Employee records — biodata, job, bank, and pay setup (Bo Properties forms).",
+    },
+    payslips: {
+      title: "Payslips",
+      subtitle: "Generate monthly payslips. Employees download from My HR after you finalize.",
+    },
+    appraisals: {
+      title: "Appraisals",
+      subtitle: "Monthly performance scores, manager reviews, and yearly archive.",
+    },
     documents: { title: "Documents", subtitle: "NDAs, offer letters, guarantor forms, and other HR files." },
-    insights: { title: "Insights", subtitle: "Headcount, joiners, appraisal backlog, and employee register export." },
+    insights: {
+      title: "Insights",
+      subtitle: "Headcount, joiners, appraisal backlog, and employee register export.",
+    },
     my: { title: "My dashboard", subtitle: "Your payslips, HR record, documents, and self-appraisals." },
   };
 
@@ -335,7 +364,9 @@ export function HrWorkspace(props: {
         ) : null}
 
         {activeTab === "people" && !canManageHr ? (
-          <p className="text-sm text-muted">People records are managed by HR. Use My HR for your own information.</p>
+          <p className="text-sm text-muted">
+            People records are managed by HR. Use My HR for your own information.
+          </p>
         ) : null}
 
         {activeTab === "payslips" && canManageHr ? (
@@ -375,7 +406,9 @@ export function HrWorkspace(props: {
         ) : null}
 
         {activeTab === "appraisals" && !canManageHr ? (
-          <p className="text-sm text-muted">Appraisals are completed from My dashboard when HR opens a review period.</p>
+          <p className="text-sm text-muted">
+            Appraisals are completed from My dashboard when HR opens a review period.
+          </p>
         ) : null}
 
         {activeTab === "documents" && canManageHr ? (
@@ -413,7 +446,6 @@ export function HrWorkspace(props: {
           />
         ) : null}
       </section>
-
     </div>
   );
 }

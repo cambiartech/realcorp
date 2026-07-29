@@ -1,10 +1,10 @@
 function projectCode(name: string) {
-  const words = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "UNIT";
-  const initials = words.slice(0, 3).map((w) => w.charAt(0).toUpperCase()).join("");
+  const initials = words
+    .slice(0, 3)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join("");
   return initials || "UNIT";
 }
 
@@ -20,9 +20,7 @@ function maxTrailingNumber(labels: string[]) {
 }
 
 function nextAlphabetBucket(labels: string[]) {
-  const letters = labels
-    .map((l) => l.trim().charAt(0).toUpperCase())
-    .filter((ch) => ch >= "A" && ch <= "Z");
+  const letters = labels.map((l) => l.trim().charAt(0).toUpperCase()).filter((ch) => ch >= "A" && ch <= "Z");
   if (letters.length === 0) return "A";
   const top = letters.sort().at(-1) ?? "A";
   const code = top.charCodeAt(0);

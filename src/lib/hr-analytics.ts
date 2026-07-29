@@ -38,9 +38,7 @@ export function buildHrAnalytics(input: {
     (p) => p.status === "ACTIVE" && p.dateOfJoining && p.dateOfJoining >= yearStart,
   ).length;
 
-  const leaversYtd = input.profiles.filter(
-    (p) => p.status === "EXITED" && p.updatedAt >= yearStart,
-  ).length;
+  const leaversYtd = input.profiles.filter((p) => p.status === "EXITED" && p.updatedAt >= yearStart).length;
 
   const now = new Date();
   const openAppraisals = input.appraisals.filter((a) => a.cycleStatus === "OPEN");

@@ -53,7 +53,7 @@ export function HrTagsInput({
     <div className="block text-sm">
       <span className="mb-1 block font-medium text-slate-700">
         {label}
-        {required ? <span className="text-red-600"> *</span> : null}
+        {required ? <span className="text-[var(--danger)]"> *</span> : null}
       </span>
       <input type="hidden" name={name} value={tags.join(", ")} required={required && tags.length === 0} />
       {tags.length > 0 ? (

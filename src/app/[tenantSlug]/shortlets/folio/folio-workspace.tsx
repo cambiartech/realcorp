@@ -73,14 +73,21 @@ export function FolioWorkspace({ tenantSlug, activeStays, serviceItems, recentLi
       <section className="rounded-lg border border-foreground/10 p-4">
         <h2 className="font-semibold text-foreground">Guest bill — post charge to room</h2>
         <p className="mt-1 text-sm text-muted">
-          A folio is the guest&apos;s running bill (room, restaurant, laundry, etc.). Post charges here and they appear on the guest bill at checkout.
+          A folio is the guest&apos;s running bill (room, restaurant, laundry, etc.). Post charges here and
+          they appear on the guest bill at checkout.
         </p>
         <div className="mt-4 space-y-3">
           <label className="block text-sm text-muted">
             Active stay
-            <UiSelect className="mt-1" value={form.reservationId} onChange={(e) => setForm((f) => ({ ...f, reservationId: e.target.value }))}>
+            <UiSelect
+              className="mt-1"
+              value={form.reservationId}
+              onChange={(e) => setForm((f) => ({ ...f, reservationId: e.target.value }))}
+            >
               {activeStays.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
               ))}
             </UiSelect>
           </label>
@@ -89,10 +96,19 @@ export function FolioWorkspace({ tenantSlug, activeStays, serviceItems, recentLi
             <UiSelect
               className="mt-1"
               value={form.department}
-              onChange={(e) => setForm((f) => ({ ...f, department: e.target.value as typeof f.department, serviceItemId: "", unitPrice: "" }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  department: e.target.value as typeof f.department,
+                  serviceItemId: "",
+                  unitPrice: "",
+                }))
+              }
             >
               {DEPARTMENTS.map((d) => (
-                <option key={d.value} value={d.value}>{d.label}</option>
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
               ))}
             </UiSelect>
           </label>
@@ -115,7 +131,9 @@ export function FolioWorkspace({ tenantSlug, activeStays, serviceItems, recentLi
               >
                 <option value="">Custom item</option>
                 {deptItems.map((i) => (
-                  <option key={i.id} value={i.id}>{i.name} — {i.priceLabel}</option>
+                  <option key={i.id} value={i.id}>
+                    {i.name} — {i.priceLabel}
+                  </option>
                 ))}
               </UiSelect>
             </label>
@@ -188,11 +206,19 @@ export function FolioWorkspace({ tenantSlug, activeStays, serviceItems, recentLi
             </thead>
             <tbody>
               {recentLines.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-6 text-muted">No folio charges yet.</td></tr>
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-muted">
+                    No folio charges yet.
+                  </td>
+                </tr>
               ) : (
                 recentLines.map((line) => (
                   <tr key={line.id} className="border-t border-foreground/10">
-                    <td className="px-4 py-3">{line.guestName}<br /><span className="text-xs text-muted">{line.unitName}</span></td>
+                    <td className="px-4 py-3">
+                      {line.guestName}
+                      <br />
+                      <span className="text-xs text-muted">{line.unitName}</span>
+                    </td>
                     <td className="px-4 py-3">{line.department}</td>
                     <td className="px-4 py-3">{line.description}</td>
                     <td className="px-4 py-3">{line.amountLabel}</td>

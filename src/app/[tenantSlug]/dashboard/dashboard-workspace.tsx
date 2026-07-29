@@ -22,7 +22,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSnackbar } from "@/components/snackbar";
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
 import { TenantPageShell } from "@/components/tenant-page-shell";
 import type { OrgSetupStep } from "@/lib/org-setup-checklist";
 import { UiSelect } from "@/components/ui-select";
@@ -64,8 +71,19 @@ type WidgetValue = {
   leadFunnel: Array<{ stage: string; count: number }>;
   leaderboard: Array<{ label: string; value: number }>;
   stageVelocity: Array<{ stage: string; avgDays: number; dropOffPct: number }>;
-  leadSourceQuality: Array<{ source: string; leads: number; wonDeals: number; winRate: number; wonValue: number }>;
-  topProjectsIntelligence: Array<{ project: string; leads: number; dealValue: number; conversionRate: number }>;
+  leadSourceQuality: Array<{
+    source: string;
+    leads: number;
+    wonDeals: number;
+    winRate: number;
+    wonValue: number;
+  }>;
+  topProjectsIntelligence: Array<{
+    project: string;
+    leads: number;
+    dealValue: number;
+    conversionRate: number;
+  }>;
   repLeaderboardTrend: Array<{ label: string; current: number; previous: number; deltaPct: number }>;
   onboarding: {
     connectIntegrationDone: boolean;
@@ -98,7 +116,13 @@ type WidgetValue = {
     inboundWebhookLastAt: string | null;
   };
   revenueMonthly: Array<{ label: string; month: number; year: number; value: number }>;
-  pipelineVsTargetMonthly: Array<{ label: string; month: number; year: number; pipeline: number; target: number }>;
+  pipelineVsTargetMonthly: Array<{
+    label: string;
+    month: number;
+    year: number;
+    pipeline: number;
+    target: number;
+  }>;
   revenueWeekly: Array<{ label: string; value: number }>;
   pipelineVsTargetWeekly: Array<{ label: string; pipeline: number; target: number }>;
   kpiLeadRows: Array<{
@@ -282,7 +306,11 @@ function readDashboardDraft(tenantSlug: string): DashboardUiDraftV1 | null {
       roleView: d.roleView,
       widgetIds,
       chartRange:
-        d.chartRange === "WEEK" || d.chartRange === "1M" || d.chartRange === "6M" || d.chartRange === "12M" || d.chartRange === "YTD"
+        d.chartRange === "WEEK" ||
+        d.chartRange === "1M" ||
+        d.chartRange === "6M" ||
+        d.chartRange === "12M" ||
+        d.chartRange === "YTD"
           ? d.chartRange
           : "1M",
       globalRange:
@@ -295,7 +323,9 @@ function readDashboardDraft(tenantSlug: string): DashboardUiDraftV1 | null {
           ? d.globalRange
           : "1M",
       module:
-        d.module === "ALL" || d.module === "SALES" || d.module === "FINANCE" || d.module === "PROJECTS" ? d.module : "ALL",
+        d.module === "ALL" || d.module === "SALES" || d.module === "FINANCE" || d.module === "PROJECTS"
+          ? d.module
+          : "ALL",
       owner: typeof d.owner === "string" ? d.owner : "",
       project: typeof d.project === "string" ? d.project : "",
       source: typeof d.source === "string" ? d.source : "",
@@ -326,7 +356,10 @@ type DashboardBootstrapUi = {
 };
 
 /** SSR/client first paint — must not read localStorage or widgets will not match the server HTML. */
-function getServerAlignedDashboardUi(initialRoleView: RoleView, initialWidgetIds: string[]): DashboardBootstrapUi {
+function getServerAlignedDashboardUi(
+  initialRoleView: RoleView,
+  initialWidgetIds: string[],
+): DashboardBootstrapUi {
   const defaultForRole = ROLE_WIDGETS[initialRoleView];
   const mergedInitial = Array.from(
     new Set<string>([
@@ -413,8 +446,12 @@ export function DashboardWorkspace({
   const [openGoal, setOpenGoal] = useState(false);
   const [pending, setPending] = useState(false);
   const [chartRange, setChartRange] = useState<"WEEK" | "1M" | "6M" | "12M" | "YTD">(initialUi.chartRange);
-  const [globalRange, setGlobalRange] = useState<"TODAY" | "WEEK" | "1M" | "6M" | "12M" | "YTD">(initialUi.globalRange);
-  const [moduleFilter, setModuleFilter] = useState<"ALL" | "SALES" | "FINANCE" | "PROJECTS">(initialUi.module);
+  const [globalRange, setGlobalRange] = useState<"TODAY" | "WEEK" | "1M" | "6M" | "12M" | "YTD">(
+    initialUi.globalRange,
+  );
+  const [moduleFilter, setModuleFilter] = useState<"ALL" | "SALES" | "FINANCE" | "PROJECTS">(
+    initialUi.module,
+  );
   const [ownerFilter, setOwnerFilter] = useState(initialUi.owner);
   const [projectFilter, setProjectFilter] = useState(initialUi.project);
   const [sourceFilter, setSourceFilter] = useState(initialUi.source);
@@ -459,7 +496,9 @@ export function DashboardWorkspace({
   const [openSavedViews, setOpenSavedViews] = useState(false);
   const [openOnboardingGuide, setOpenOnboardingGuide] = useState(false);
   const [showSetupPanel, setShowSetupPanel] = useState(!orgSetupCriticalComplete);
-  const [openKpiDetail, setOpenKpiDetail] = useState<null | "LEADS_TODAY" | "DEALS_TODAY" | "PROJECTS" | "TOP_PROJECTS">(null);
+  const [openKpiDetail, setOpenKpiDetail] = useState<
+    null | "LEADS_TODAY" | "DEALS_TODAY" | "PROJECTS" | "TOP_PROJECTS"
+  >(null);
   const [openFinanceDetail, setOpenFinanceDetail] = useState<
     null | "COLLECTIONS_TREND" | "OVERDUE_AGING" | "HEALTH_PROJECT_TEAM" | "TARGET_ATTAINMENT"
   >(null);
@@ -527,12 +566,7 @@ export function DashboardWorkspace({
     if (chartRange === "12M") return values.pipelineVsTargetMonthly;
     if (chartRange === "YTD") return values.pipelineVsTargetMonthly.filter((x) => x.year === currentYear);
     return values.pipelineVsTargetMonthly.slice(-6);
-  }, [
-    chartRange,
-    values.pipelineVsTargetMonthly,
-    values.pipelineVsTargetWeekly,
-    currentYear,
-  ]);
+  }, [chartRange, values.pipelineVsTargetMonthly, values.pipelineVsTargetWeekly, currentYear]);
 
   const rangeStart = useMemo(() => {
     const nowDate = new Date();
@@ -567,12 +601,23 @@ export function DashboardWorkspace({
       if (created < rangeStart) return false;
       if (ownerFilter && row.ownerId !== ownerFilter) return false;
       if (sourceFilter && row.source !== sourceFilter) return false;
-      if (projectFilter && row.projectInterest !== values.filterOptions.projects.find((p) => p.id === projectFilter)?.label)
+      if (
+        projectFilter &&
+        row.projectInterest !== values.filterOptions.projects.find((p) => p.id === projectFilter)?.label
+      )
         return false;
       if (moduleFilter !== "ALL" && moduleFilter !== "SALES") return false;
       return true;
     });
-  }, [values.kpiLeadRows, values.filterOptions.projects, rangeStart, ownerFilter, sourceFilter, projectFilter, moduleFilter]);
+  }, [
+    values.kpiLeadRows,
+    values.filterOptions.projects,
+    rangeStart,
+    ownerFilter,
+    sourceFilter,
+    projectFilter,
+    moduleFilter,
+  ]);
 
   const filteredDeals = useMemo(() => {
     return values.kpiDealRows.filter((row) => {
@@ -666,8 +711,14 @@ export function DashboardWorkspace({
   }, [filteredFinanceInvoices]);
 
   const financeHealthRows = useMemo(() => {
-    const byProject = new Map<string, { label: string; invoiced: number; collected: number; outstanding: number }>();
-    const byOwner = new Map<string, { label: string; invoiced: number; collected: number; outstanding: number }>();
+    const byProject = new Map<
+      string,
+      { label: string; invoiced: number; collected: number; outstanding: number }
+    >();
+    const byOwner = new Map<
+      string,
+      { label: string; invoiced: number; collected: number; outstanding: number }
+    >();
     for (const i of filteredFinanceInvoices) {
       const pKey = i.projectId || "none";
       const oKey = i.ownerId || "none";
@@ -691,16 +742,26 @@ export function DashboardWorkspace({
       byOwner.set(oKey, ob);
     }
     return {
-      projects: Array.from(byProject.values()).sort((a, b) => b.outstanding - a.outstanding).slice(0, 8),
-      owners: Array.from(byOwner.values()).sort((a, b) => b.outstanding - a.outstanding).slice(0, 8),
+      projects: Array.from(byProject.values())
+        .sort((a, b) => b.outstanding - a.outstanding)
+        .slice(0, 8),
+      owners: Array.from(byOwner.values())
+        .sort((a, b) => b.outstanding - a.outstanding)
+        .slice(0, 8),
     };
   }, [filteredFinanceInvoices, filteredFinancePayments]);
 
   const fiscalAttainment = useMemo(() => {
-    if (!goal) return { periods: [] as Array<{ period: string; actual: number; target: number; attainmentPct: number }> };
+    if (!goal)
+      return {
+        periods: [] as Array<{ period: string; actual: number; target: number; attainmentPct: number }>,
+      };
     const start = new Date(goal.fiscalYearStart);
     const end = new Date(goal.fiscalYearEnd);
-    const totalMonths = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1);
+    const totalMonths = Math.max(
+      1,
+      (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1,
+    );
     const periodTarget = goal.revenueTarget ? goal.revenueTarget / totalMonths : 0;
     const periods: Array<{ period: string; actual: number; target: number; attainmentPct: number }> = [];
     for (let i = 0; i < totalMonths; i += 1) {
@@ -725,7 +786,11 @@ export function DashboardWorkspace({
     const today = new Date();
     return filteredLeads.filter((r) => {
       const d = new Date(r.createdAt);
-      return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+      return (
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate()
+      );
     }).length;
   }, [filteredLeads]);
 
@@ -733,20 +798,34 @@ export function DashboardWorkspace({
     const today = new Date();
     return filteredDeals.filter((r) => {
       const d = new Date(r.createdAt);
-      return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+      return (
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate()
+      );
     }).length;
   }, [filteredDeals]);
 
   const topProjects = useMemo(() => {
-    const map = new Map<string, { projectId: string | null; projectName: string; dealCount: number; totalValue: number }>();
+    const map = new Map<
+      string,
+      { projectId: string | null; projectName: string; dealCount: number; totalValue: number }
+    >();
     for (const deal of filteredDeals) {
       const key = deal.projectId || "no-project";
-      const curr = map.get(key) || { projectId: deal.projectId, projectName: deal.projectName, dealCount: 0, totalValue: 0 };
+      const curr = map.get(key) || {
+        projectId: deal.projectId,
+        projectName: deal.projectName,
+        dealCount: 0,
+        totalValue: 0,
+      };
       curr.dealCount += 1;
       curr.totalValue += deal.value;
       map.set(key, curr);
     }
-    return Array.from(map.values()).sort((a, b) => b.totalValue - a.totalValue).slice(0, 5);
+    return Array.from(map.values())
+      .sort((a, b) => b.totalValue - a.totalValue)
+      .slice(0, 5);
   }, [filteredDeals]);
 
   const leadsMiniSeries = useMemo(() => {
@@ -875,8 +954,12 @@ export function DashboardWorkspace({
     setSourceFilter("");
   }
 
-  const ownerLabel = ownerFilter ? values.filterOptions.owners.find((x) => x.id === ownerFilter)?.label || ownerFilter : "";
-  const projectLabel = projectFilter ? values.filterOptions.projects.find((x) => x.id === projectFilter)?.label || projectFilter : "";
+  const ownerLabel = ownerFilter
+    ? values.filterOptions.owners.find((x) => x.id === ownerFilter)?.label || ownerFilter
+    : "";
+  const projectLabel = projectFilter
+    ? values.filterOptions.projects.find((x) => x.id === projectFilter)?.label || projectFilter
+    : "";
 
   async function submitGoal(formData: FormData) {
     setPending(true);
@@ -902,8 +985,8 @@ export function DashboardWorkspace({
     <TenantPageShell>
       {canManageOrgSetup && !orgSetupCriticalComplete ? (
         <div className="mb-4 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3 text-sm text-muted">
-          <span className="font-medium text-foreground">Setup coach</span> is active at the bottom of your screen — it
-          will guide you step by step and celebrate each completion. Only visible to org admins.
+          <span className="font-medium text-foreground">Setup coach</span> is active at the bottom of your
+          screen — it will guide you step by step and celebrate each completion. Only visible to org admins.
         </div>
       ) : null}
 
@@ -946,8 +1029,8 @@ export function DashboardWorkspace({
           className={[
             "mt-4 rounded-lg border p-4",
             values.hrOnboarding.state === "complete"
-              ? "border-emerald-500/30 bg-emerald-500/5"
-              : "border-violet-500/30 bg-violet-500/5",
+              ? "border-[var(--success-line)] bg-[var(--success-wash)]"
+              : "border-[var(--accent-line)] bg-[var(--accent-wash)]",
           ].join(" ")}
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -957,8 +1040,8 @@ export function DashboardWorkspace({
                 <>
                   <p className="mt-1 text-sm font-semibold text-foreground">All forms submitted</p>
                   <p className="mt-1 text-xs text-muted">
-                    {values.hrOnboarding.submittedCount} section{values.hrOnboarding.submittedCount === 1 ? "" : "s"}{" "}
-                    sent to HR
+                    {values.hrOnboarding.submittedCount} section
+                    {values.hrOnboarding.submittedCount === 1 ? "" : "s"} sent to HR
                     {values.hrOnboarding.submittedAtLabel !== "—"
                       ? ` · ${values.hrOnboarding.submittedAtLabel}`
                       : ""}
@@ -967,8 +1050,8 @@ export function DashboardWorkspace({
               ) : (
                 <>
                   <p className="mt-1 text-sm font-semibold text-foreground">
-                    {values.hrOnboarding.pendingCount} section{values.hrOnboarding.pendingCount === 1 ? "" : "s"} still
-                    to complete
+                    {values.hrOnboarding.pendingCount} section
+                    {values.hrOnboarding.pendingCount === 1 ? "" : "s"} still to complete
                   </p>
                   <p className="mt-1 text-xs text-muted">
                     {values.hrOnboarding.sectionLabels.join(" · ")}
@@ -1006,15 +1089,18 @@ export function DashboardWorkspace({
       ) : null}
 
       {values.tasksModuleEnabled && values.myWorkTasks.length > 0 ? (
-        <section className="mt-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5 px-4 py-3">
+        <section className="mt-4 rounded-lg border border-[var(--info-line)] bg-[var(--info-wash)] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">Your tasks</p>
-              <span className="rounded-full border border-indigo-300/40 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+              <span className="rounded-full border border-[var(--info-line)] bg-[var(--info-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--info)]">
                 {values.myOpenTaskCount} open
               </span>
             </div>
-            <Link href={values.tasksPageUrl} className="text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
+            <Link
+              href={values.tasksPageUrl}
+              className="text-xs font-semibold text-[var(--info)] hover:underline"
+            >
               View all →
             </Link>
           </div>
@@ -1034,7 +1120,10 @@ export function DashboardWorkspace({
             </div>
           ) : null}
           {values.myOpenTaskCount > 1 ? (
-            <Link href={values.tasksPageUrl} className="mt-2 inline-block text-[11px] font-medium text-muted hover:text-foreground">
+            <Link
+              href={values.tasksPageUrl}
+              className="mt-2 inline-block text-[11px] font-medium text-muted hover:text-foreground"
+            >
               View {values.myOpenTaskCount - 1} more task{values.myOpenTaskCount - 1 === 1 ? "" : "s"} →
             </Link>
           ) : null}
@@ -1063,55 +1152,58 @@ export function DashboardWorkspace({
 
         {showSetupPanel ? (
           <div className="mt-3 grid gap-3 lg:grid-cols-3">
-        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization setup</p>
-            {canManageOrgSetup ? (
-              <button
-                type="button"
-                onClick={() => setOpenOnboardingGuide(true)}
-                className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2"
-              >
-                Open full guide
-              </button>
-            ) : null}
-          </div>
-          {canManageOrgSetup ? (
-            <ul className="mt-2 space-y-1.5 text-sm">
-              {orgSetupSteps.map((step) => (
-                <ChecklistRow key={step.id} label={step.title} done={step.done} />
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-muted">Ask an org admin to complete workspace setup.</p>
-          )}
-        </section>
-        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; ops</p>
-          <ul className="mt-2 space-y-1.5 text-sm">
-            <ChecklistRow label="Connect at least one integration" done={values.onboarding.connectIntegrationDone} />
-            <ChecklistRow label="Import your first leads" done={values.onboarding.importedLeadsDone} />
-            <ChecklistRow label="Create your first deal" done={values.onboarding.createdDealDone} />
-            <ChecklistRow label="Send first follow-up" done={values.onboarding.followUpSentDone} />
-            <ChecklistRow label="Complete first task/activity" done={values.onboarding.firstTaskDone} />
-          </ul>
-        </section>
-        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Integration health</p>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-            <HealthPill label="Meta Leads" ok={values.integrationHealth.metaLeads} />
-            <HealthPill label="WhatsApp" ok={values.integrationHealth.whatsapp} />
-            <HealthPill label="SMS (Termii)" ok={values.integrationHealth.sms} />
-            <div className="rounded-md border border-foreground/10 px-2 py-1.5">
-              <p className="text-[11px] text-muted">Webhook</p>
-              <p className="text-xs font-medium text-foreground">
-                {values.integrationHealth.inboundWebhookLastAt
-                  ? `Last event ${new Date(values.integrationHealth.inboundWebhookLastAt).toLocaleString()}`
-                  : "No events yet"}
-              </p>
-            </div>
-          </div>
-        </section>
+            <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization setup</p>
+                {canManageOrgSetup ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpenOnboardingGuide(true)}
+                    className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
+                  >
+                    Open full guide
+                  </button>
+                ) : null}
+              </div>
+              {canManageOrgSetup ? (
+                <ul className="mt-2 space-y-1.5 text-sm">
+                  {orgSetupSteps.map((step) => (
+                    <ChecklistRow key={step.id} label={step.title} done={step.done} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-muted">Ask an org admin to complete workspace setup.</p>
+              )}
+            </section>
+            <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; ops</p>
+              <ul className="mt-2 space-y-1.5 text-sm">
+                <ChecklistRow
+                  label="Connect at least one integration"
+                  done={values.onboarding.connectIntegrationDone}
+                />
+                <ChecklistRow label="Import your first leads" done={values.onboarding.importedLeadsDone} />
+                <ChecklistRow label="Create your first deal" done={values.onboarding.createdDealDone} />
+                <ChecklistRow label="Send first follow-up" done={values.onboarding.followUpSentDone} />
+                <ChecklistRow label="Complete first task/activity" done={values.onboarding.firstTaskDone} />
+              </ul>
+            </section>
+            <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Integration health</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                <HealthPill label="Meta Leads" ok={values.integrationHealth.metaLeads} />
+                <HealthPill label="WhatsApp" ok={values.integrationHealth.whatsapp} />
+                <HealthPill label="SMS (Termii)" ok={values.integrationHealth.sms} />
+                <div className="rounded-md border border-foreground/10 px-2 py-1.5">
+                  <p className="text-[11px] text-muted">Webhook</p>
+                  <p className="text-xs font-medium text-foreground">
+                    {values.integrationHealth.inboundWebhookLastAt
+                      ? `Last event ${new Date(values.integrationHealth.inboundWebhookLastAt).toLocaleString()}`
+                      : "No events yet"}
+                  </p>
+                </div>
+              </div>
+            </section>
           </div>
         ) : null}
       </div>
@@ -1178,7 +1270,7 @@ export function DashboardWorkspace({
           <button
             type="button"
             onClick={clearGlobalFilters}
-            className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2 dark:text-indigo-400"
+            className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
           >
             Clear all
           </button>
@@ -1208,7 +1300,8 @@ export function DashboardWorkspace({
                   Dashboard & filters
                 </h2>
                 <p className="mt-1 text-xs text-muted">
-                  Role and chart period affect trend widgets; the fields below scope KPI cards, drill-downs, and finance lists.
+                  Role and chart period affect trend widgets; the fields below scope KPI cards, drill-downs,
+                  and finance lists.
                 </p>
               </div>
               <button
@@ -1226,7 +1319,9 @@ export function DashboardWorkspace({
                   Collections and pipeline trend charts only—not KPI totals or tables.
                 </p>
                 <div className="mt-3">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Dashboard view</label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                    Dashboard view
+                  </label>
                   <UiSelect
                     value={roleView}
                     disabled={roleViewOptions.length <= 1 || pending}
@@ -1249,7 +1344,9 @@ export function DashboardWorkspace({
                     ? `${goal.label}: ${goal.fiscalYearStart} to ${goal.fiscalYearEnd}`
                     : "No fiscal goal set yet."}
                 </p>
-                <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-muted">Chart period</p>
+                <p className="mb-2 mt-3 text-xs font-semibold uppercase tracking-wide text-muted">
+                  Chart period
+                </p>
                 <div className="inline-flex flex-wrap gap-1 rounded-md border border-foreground/10 bg-background p-1">
                   {(["WEEK", "1M", "6M", "12M", "YTD"] as const).map((range) => (
                     <button
@@ -1258,7 +1355,9 @@ export function DashboardWorkspace({
                       onClick={() => setChartRange(range)}
                       className={[
                         "rounded px-2.5 py-1 text-xs font-semibold",
-                        chartRange === range ? "bg-foreground text-background" : "text-muted hover:text-foreground",
+                        chartRange === range
+                          ? "bg-foreground text-background"
+                          : "text-muted hover:text-foreground",
                       ].join(" ")}
                     >
                       {range === "WEEK" ? "This Week" : range === "1M" ? "1 Month" : range}
@@ -1270,8 +1369,13 @@ export function DashboardWorkspace({
               <p className="mb-3 mt-6 text-xs font-semibold uppercase tracking-wide text-muted">KPI scope</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Date range</label>
-                  <UiSelect value={globalRange} onChange={(e) => setGlobalRange(e.target.value as typeof globalRange)}>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                    Date range
+                  </label>
+                  <UiSelect
+                    value={globalRange}
+                    onChange={(e) => setGlobalRange(e.target.value as typeof globalRange)}
+                  >
                     <option value="TODAY">Today</option>
                     <option value="WEEK">This Week</option>
                     <option value="1M">1 Month</option>
@@ -1281,8 +1385,13 @@ export function DashboardWorkspace({
                   </UiSelect>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Module</label>
-                  <UiSelect value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value as typeof moduleFilter)}>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                    Module
+                  </label>
+                  <UiSelect
+                    value={moduleFilter}
+                    onChange={(e) => setModuleFilter(e.target.value as typeof moduleFilter)}
+                  >
                     <option value="ALL">All modules</option>
                     <option value="SALES">Sales</option>
                     <option value="FINANCE">Finance</option>
@@ -1290,7 +1399,9 @@ export function DashboardWorkspace({
                   </UiSelect>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Owner</label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                    Owner
+                  </label>
                   <UiSelect value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
                     <option value="">All owners</option>
                     {values.filterOptions.owners.map((opt) => (
@@ -1301,7 +1412,9 @@ export function DashboardWorkspace({
                   </UiSelect>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Project</label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                    Project
+                  </label>
                   <UiSelect value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
                     <option value="">All projects</option>
                     {values.filterOptions.projects.map((opt) => (
@@ -1312,7 +1425,9 @@ export function DashboardWorkspace({
                   </UiSelect>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">Lead source</label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                    Lead source
+                  </label>
                   <UiSelect value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
                     <option value="">All sources</option>
                     {values.filterOptions.leadSources.map((opt) => (
@@ -1323,7 +1438,11 @@ export function DashboardWorkspace({
                   </UiSelect>
                 </div>
               </div>
-              {globalRange !== "1M" || moduleFilter !== "ALL" || ownerFilter || projectFilter || sourceFilter ? (
+              {globalRange !== "1M" ||
+              moduleFilter !== "ALL" ||
+              ownerFilter ||
+              projectFilter ||
+              sourceFilter ? (
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-4">
                   {globalRange !== "1M" ? (
                     <button
@@ -1378,7 +1497,7 @@ export function DashboardWorkspace({
                   <button
                     type="button"
                     onClick={clearGlobalFilters}
-                    className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2 dark:text-indigo-400"
+                    className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
                   >
                     Clear all
                   </button>
@@ -1437,122 +1556,138 @@ export function DashboardWorkspace({
       {openSavedViews ? (
         <div className="fixed bottom-20 right-6 z-40 flex max-h-[min(70vh,520px)] w-[min(92vw,560px)] flex-col overflow-hidden rounded-xl border border-foreground/10 bg-foreground/[0.02] shadow-2xl">
           <div className="shrink-0 border-b border-foreground/10 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Saved views</h3>
-              <p className="text-xs text-muted">Save current filters and re-apply them in one click.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Saved views</h3>
+                <p className="text-xs text-muted">Save current filters and re-apply them in one click.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenSavedViews(false)}
+                className="rounded-md border border-foreground/15 px-2 py-1 text-xs text-muted hover:text-foreground"
+              >
+                Close
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setOpenSavedViews(false)}
-              className="rounded-md border border-foreground/15 px-2 py-1 text-xs text-muted hover:text-foreground"
-            >
-              Close
-            </button>
-          </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-3">
-          <div className="grid gap-2 sm:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto]">
-            <UiSelect defaultValue="" onChange={(e) => e.target.value && applyFilterPreset(e.target.value)}>
-              <option value="">Select a saved view</option>
-              {filterPresets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </UiSelect>
-            <input
-              value={presetDraftName}
-              onChange={(e) => setPresetDraftName(e.target.value)}
-              placeholder="Name this view"
-              className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-            />
-            <button
-              type="button"
-              onClick={saveFilterPreset}
-              className="rounded-md border border-foreground/20 px-3 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.06]"
-            >
-              Save
-            </button>
-          </div>
-
-          {filterPresets.length > 0 ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {filterPresets.slice(0, 6).map((preset) => (
-                <div key={preset.id} className="inline-flex items-center overflow-hidden rounded-full border border-foreground/15">
-                  <button
-                    type="button"
-                    onClick={() => applyFilterPreset(preset.id)}
-                    className="px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.06]"
-                  >
+            <div className="grid gap-2 sm:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto]">
+              <UiSelect defaultValue="" onChange={(e) => e.target.value && applyFilterPreset(e.target.value)}>
+                <option value="">Select a saved view</option>
+                {filterPresets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
                     {preset.label}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeFilterPreset(preset.id)}
-                    className="border-l border-foreground/15 px-2 py-1 text-xs text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                    aria-label={`Delete ${preset.label}`}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+                  </option>
+                ))}
+              </UiSelect>
+              <input
+                value={presetDraftName}
+                onChange={(e) => setPresetDraftName(e.target.value)}
+                placeholder="Name this view"
+                className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+              <button
+                type="button"
+                onClick={saveFilterPreset}
+                className="rounded-md border border-foreground/20 px-3 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.06]"
+              >
+                Save
+              </button>
             </div>
-          ) : (
-            <p className="mt-3 text-xs text-muted">No saved views yet.</p>
-          )}
+
+            {filterPresets.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {filterPresets.slice(0, 6).map((preset) => (
+                  <div
+                    key={preset.id}
+                    className="inline-flex items-center overflow-hidden rounded-full border border-foreground/15"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => applyFilterPreset(preset.id)}
+                      className="px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.06]"
+                    >
+                      {preset.label}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFilterPreset(preset.id)}
+                      className="border-l border-foreground/15 px-2 py-1 text-xs text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+                      aria-label={`Delete ${preset.label}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-muted">No saved views yet.</p>
+            )}
           </div>
         </div>
       ) : null}
 
-      <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* One surface, one accent. Colour is reserved for status, not decoration. */}
+      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <button
           type="button"
           onClick={() => setOpenKpiDetail("LEADS_TODAY")}
-          className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-4 text-left hover:bg-violet-500/15"
+          className="rc-card-interactive p-4"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">Leads today</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{leadsTodayCount}</p>
-          <MiniBars values={leadsMiniSeries} tone="violet" />
-          <p className="mt-1 text-xs text-muted">Click for lead-level breakdown</p>
+          <p className="rc-metric-label">Leads today</p>
+          <p className="rc-metric-value" data-zero={leadsTodayCount === 0}>
+            {leadsTodayCount}
+          </p>
+          <MiniBars values={leadsMiniSeries} tone="accent" />
+          <p className="rc-metric-hint">Lead-level breakdown</p>
         </button>
         <button
           type="button"
           onClick={() => setOpenKpiDetail("DEALS_TODAY")}
-          className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-left hover:bg-indigo-500/15"
+          className="rc-card-interactive p-4"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Deals today</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{dealsTodayCount}</p>
-          <MiniBars values={dealsMiniSeries} tone="indigo" />
-          <p className="mt-1 text-xs text-muted">Click for deal-level breakdown</p>
+          <p className="rc-metric-label">Deals today</p>
+          <p className="rc-metric-value" data-zero={dealsTodayCount === 0}>
+            {dealsTodayCount}
+          </p>
+          <MiniBars values={dealsMiniSeries} tone="info" />
+          <p className="rc-metric-hint">Deal-level breakdown</p>
         </button>
         <button
           type="button"
           onClick={() => setOpenKpiDetail("PROJECTS")}
-          className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-left hover:bg-cyan-500/15"
+          className="rc-card-interactive p-4"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">Projects</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{filteredProjects.length}</p>
-          <p className="mt-1 text-xs text-muted">Click for project activity</p>
+          <p className="rc-metric-label">Projects</p>
+          <p className="rc-metric-value" data-zero={filteredProjects.length === 0}>
+            {filteredProjects.length}
+          </p>
+          <p className="rc-metric-hint">Project activity</p>
         </button>
         <button
           type="button"
           onClick={() => setOpenKpiDetail("TOP_PROJECTS")}
-          className="rounded-xl border border-foreground/20 bg-foreground/[0.04] p-4 text-left hover:bg-foreground/[0.07]"
+          className="rc-card-interactive p-4"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Top projects</p>
-          <p className="mt-2 text-base font-semibold text-foreground">{topProjects[0]?.projectName || "No ranked project yet"}</p>
-          <p className="mt-2 text-xs text-muted">
-            {topProjects[0] ? `${topProjects[0].dealCount} deals / ${formatMoney(topProjects[0].totalValue)}` : "Click to see rankings"}
+          <p className="rc-metric-label">Top project</p>
+          <p className="mt-2 text-lg font-semibold leading-snug text-foreground">
+            {topProjects[0]?.projectName || (
+              <span className="text-[var(--faint)] font-medium">Nothing ranked yet</span>
+            )}
+          </p>
+          <p className="rc-metric-hint">
+            {topProjects[0]
+              ? `${topProjects[0].dealCount} deals · ${formatMoney(topProjects[0].totalValue)}`
+              : "Rankings appear once deals are logged"}
           </p>
         </button>
       </section>
 
-      <section className="mt-5">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Phase 3 Finance Analytics</h2>
-          <p className="text-xs text-muted">All cards support transaction-level drilldown.</p>
+      <section className="mt-6">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="rc-section-title">Finance analytics</h2>
+          <p className="text-xs text-[var(--faint)]">Every card drills through to transactions</p>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <button
@@ -1572,7 +1707,10 @@ export function DashboardWorkspace({
           >
             <p className="text-xs uppercase tracking-wide text-muted">Overdue aging buckets</p>
             <p className="mt-1 text-sm text-foreground">
-              {formatMoney(overdueAging.d1_30 + overdueAging.d31_60 + overdueAging.d61_90 + overdueAging.d90p)} overdue
+              {formatMoney(
+                overdueAging.d1_30 + overdueAging.d31_60 + overdueAging.d61_90 + overdueAging.d90p,
+              )}{" "}
+              overdue
             </p>
           </button>
           <button
@@ -1619,30 +1757,30 @@ export function DashboardWorkspace({
         zClassName="z-[70]"
         panelClassName="relative flex h-full w-full max-w-3xl shrink-0 flex-col overflow-hidden border-l border-foreground/10 bg-background shadow-2xl"
       >
-          <div className="relative flex h-full w-full flex-col overflow-hidden">
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 px-5 py-4 pr-14">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  {openKpiDetail === "LEADS_TODAY"
-                    ? "Leads Today Breakdown"
-                    : openKpiDetail === "DEALS_TODAY"
-                      ? "Deals Today Breakdown"
-                      : openKpiDetail === "PROJECTS"
-                        ? "Project Breakdown"
-                        : "Top Projects Breakdown"}
-                </h3>
-                <p className="text-xs text-muted">Filtered by the current global dashboard controls.</p>
-              </div>
+        <div className="relative flex h-full w-full flex-col overflow-hidden">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 px-5 py-4 pr-14">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">
+                {openKpiDetail === "LEADS_TODAY"
+                  ? "Leads Today Breakdown"
+                  : openKpiDetail === "DEALS_TODAY"
+                    ? "Deals Today Breakdown"
+                    : openKpiDetail === "PROJECTS"
+                      ? "Project Breakdown"
+                      : "Top Projects Breakdown"}
+              </h3>
+              <p className="text-xs text-muted">Filtered by the current global dashboard controls.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setOpenKpiDetail(null)}
-              className="absolute right-4 top-4 z-[80] rounded-md border border-foreground/15 bg-background px-2 py-1 text-xs text-muted hover:text-foreground"
-            >
-              Close
-            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpenKpiDetail(null)}
+            className="absolute right-4 top-4 z-[80] rounded-md border border-foreground/15 bg-background px-2 py-1 text-xs text-muted hover:text-foreground"
+          >
+            Close
+          </button>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2">
             {openKpiDetail === "LEADS_TODAY" ? (
               <div className="overflow-hidden rounded-lg border border-foreground/10">
                 <table className="w-full text-left text-sm">
@@ -1664,7 +1802,7 @@ export function DashboardWorkspace({
                         <td className="px-3 py-2">{row.projectInterest}</td>
                         <td className="px-3 py-2">
                           <Link
-                            className="text-xs font-semibold text-indigo-600 hover:underline"
+                            className="text-xs font-semibold text-[var(--info)] hover:underline"
                             href={`/${tenantSlug}/leads?owner=${encodeURIComponent(row.ownerId || "")}&source=${encodeURIComponent(row.source)}`}
                           >
                             Open Leads
@@ -1707,7 +1845,7 @@ export function DashboardWorkspace({
                         <td className="px-3 py-2">{row.projectName}</td>
                         <td className="px-3 py-2">
                           <Link
-                            className="text-xs font-semibold text-indigo-600 hover:underline"
+                            className="text-xs font-semibold text-[var(--info)] hover:underline"
                             href={`/${tenantSlug}/deals?owner=${encodeURIComponent(row.ownerId || "")}&stage=${encodeURIComponent(row.stage)}&projectId=${encodeURIComponent(row.projectId || "")}`}
                           >
                             Open Deals
@@ -1749,7 +1887,7 @@ export function DashboardWorkspace({
                           <td className="px-3 py-2">{formatMoney(total)}</td>
                           <td className="px-3 py-2">
                             <Link
-                              className="text-xs font-semibold text-indigo-600 hover:underline"
+                              className="text-xs font-semibold text-[var(--info)] hover:underline"
                               href={`/${tenantSlug}/projects?projectId=${encodeURIComponent(project.id)}`}
                             >
                               Open Projects
@@ -1791,7 +1929,7 @@ export function DashboardWorkspace({
                         <td className="px-3 py-2">{formatMoney(row.totalValue)}</td>
                         <td className="px-3 py-2">
                           <Link
-                            className="text-xs font-semibold text-indigo-600 hover:underline"
+                            className="text-xs font-semibold text-[var(--info)] hover:underline"
                             href={`/${tenantSlug}/deals?projectId=${encodeURIComponent(row.projectId || "")}`}
                           >
                             Open Deals
@@ -1810,8 +1948,8 @@ export function DashboardWorkspace({
                 </table>
               </div>
             ) : null}
-            </div>
           </div>
+        </div>
       </ModalOverlay>
 
       <ModalOverlay
@@ -1821,463 +1959,505 @@ export function DashboardWorkspace({
         zClassName="z-[70]"
         panelClassName="relative flex h-full w-full max-w-3xl shrink-0 flex-col overflow-hidden border-l border-foreground/10 bg-background shadow-2xl"
       >
-          <div className="relative flex h-full w-full flex-col overflow-hidden">
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 px-5 py-4 pr-14">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  {openFinanceDetail === "COLLECTIONS_TREND"
-                    ? "Collections Trend"
-                    : openFinanceDetail === "OVERDUE_AGING"
-                      ? "Overdue Aging Buckets"
-                      : openFinanceDetail === "HEALTH_PROJECT_TEAM"
-                        ? "Invoice/Payment Health by Project & Team"
-                        : "Target Attainment by Fiscal Period"}
-                </h3>
-                <p className="text-xs text-muted">Drilldown to transaction-level details for the active dashboard filters.</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setOpenFinanceDetail(null)}
-              className="absolute right-4 top-4 z-[80] rounded-md border border-foreground/15 bg-background px-2 py-1 text-xs text-muted hover:text-foreground"
-            >
-              Close
-            </button>
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2">
-              {openFinanceDetail === "COLLECTIONS_TREND" ? (
-                <div className="space-y-4">
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Period</th>
-                          <th className="px-3 py-2">Invoiced</th>
-                          <th className="px-3 py-2">Collected</th>
-                          <th className="px-3 py-2">Outstanding</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {collectionsTrend.map((row) => (
-                          <tr key={row.label} className="border-t border-foreground/10">
-                            <td className="px-3 py-2">{row.label}</td>
-                            <td className="px-3 py-2">{formatMoney(row.invoiced)}</td>
-                            <td className="px-3 py-2">{formatMoney(row.collected)}</td>
-                            <td className="px-3 py-2">{formatMoney(row.outstanding)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Payment ID</th>
-                          <th className="px-3 py-2">Invoice</th>
-                          <th className="px-3 py-2">Project</th>
-                          <th className="px-3 py-2">Owner</th>
-                          <th className="px-3 py-2">Amount</th>
-                          <th className="px-3 py-2">Paid at</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredFinancePayments.slice(0, 120).map((row) => (
-                          <tr key={row.id} className="border-t border-foreground/10">
-                            <td className="px-3 py-2 font-mono text-xs text-muted">{row.id.slice(0, 8)}</td>
-                            <td className="px-3 py-2">{row.invoiceNumber}</td>
-                            <td className="px-3 py-2">{row.projectName}</td>
-                            <td className="px-3 py-2">{row.ownerLabel}</td>
-                            <td className="px-3 py-2">{formatMoney(row.amount)}</td>
-                            <td className="px-3 py-2">{new Date(row.paidAt).toLocaleDateString("en-NG")}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
-              {openFinanceDetail === "OVERDUE_AGING" ? (
-                <div className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-md border border-foreground/10 p-3 text-sm">Current: {formatMoney(overdueAging.current)}</div>
-                    <div className="rounded-md border border-foreground/10 p-3 text-sm">1-30: {formatMoney(overdueAging.d1_30)}</div>
-                    <div className="rounded-md border border-foreground/10 p-3 text-sm">31-60: {formatMoney(overdueAging.d31_60)}</div>
-                    <div className="rounded-md border border-foreground/10 p-3 text-sm">61-90: {formatMoney(overdueAging.d61_90)}</div>
-                    <div className="rounded-md border border-foreground/10 p-3 text-sm">90+: {formatMoney(overdueAging.d90p)}</div>
-                    <div className="rounded-md border border-foreground/10 p-3 text-sm">No due date: {formatMoney(overdueAging.noDueDate)}</div>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Invoice</th>
-                          <th className="px-3 py-2">Project</th>
-                          <th className="px-3 py-2">Owner</th>
-                          <th className="px-3 py-2">Due date</th>
-                          <th className="px-3 py-2">Balance</th>
-                          <th className="px-3 py-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredFinanceInvoices
-                          .filter((x) => x.balanceDue > 0 && x.status !== "VOID")
-                          .slice(0, 120)
-                          .map((row) => (
-                            <tr key={row.id} className="border-t border-foreground/10">
-                              <td className="px-3 py-2">{row.invoiceNumber}</td>
-                              <td className="px-3 py-2">{row.projectName}</td>
-                              <td className="px-3 py-2">{row.ownerLabel}</td>
-                              <td className="px-3 py-2">{row.dueDate ? new Date(row.dueDate).toLocaleDateString("en-NG") : "—"}</td>
-                              <td className="px-3 py-2">{formatMoney(row.balanceDue)}</td>
-                              <td className="px-3 py-2">{formatEnumLabel(row.status)}</td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
-              {openFinanceDetail === "HEALTH_PROJECT_TEAM" ? (
-                <div className="space-y-4">
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Project</th>
-                          <th className="px-3 py-2">Invoiced</th>
-                          <th className="px-3 py-2">Collected</th>
-                          <th className="px-3 py-2">Outstanding</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {financeHealthRows.projects.map((row) => (
-                          <tr key={row.label} className="border-t border-foreground/10">
-                            <td className="px-3 py-2">{row.label}</td>
-                            <td className="px-3 py-2">{formatMoney(row.invoiced)}</td>
-                            <td className="px-3 py-2">{formatMoney(row.collected)}</td>
-                            <td className="px-3 py-2">{formatMoney(row.outstanding)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Owner / Team</th>
-                          <th className="px-3 py-2">Invoiced</th>
-                          <th className="px-3 py-2">Collected</th>
-                          <th className="px-3 py-2">Outstanding</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {financeHealthRows.owners.map((row) => (
-                          <tr key={row.label} className="border-t border-foreground/10">
-                            <td className="px-3 py-2">{row.label}</td>
-                            <td className="px-3 py-2">{formatMoney(row.invoiced)}</td>
-                            <td className="px-3 py-2">{formatMoney(row.collected)}</td>
-                            <td className="px-3 py-2">{formatMoney(row.outstanding)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
-              {openFinanceDetail === "TARGET_ATTAINMENT" ? (
-                <div className="space-y-4">
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Fiscal period</th>
-                          <th className="px-3 py-2">Actual</th>
-                          <th className="px-3 py-2">Target</th>
-                          <th className="px-3 py-2">Attainment</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {fiscalAttainment.periods.map((row) => (
-                          <tr key={row.period} className="border-t border-foreground/10">
-                            <td className="px-3 py-2">{row.period}</td>
-                            <td className="px-3 py-2">{formatMoney(row.actual)}</td>
-                            <td className="px-3 py-2">{formatMoney(row.target)}</td>
-                            <td className="px-3 py-2">{row.attainmentPct}%</td>
-                          </tr>
-                        ))}
-                        {fiscalAttainment.periods.length === 0 ? (
-                          <tr>
-                            <td className="px-3 py-3 text-muted" colSpan={4}>
-                              Set fiscal goals to enable target attainment analytics.
-                            </td>
-                          </tr>
-                        ) : null}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-foreground/10">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
-                        <tr>
-                          <th className="px-3 py-2">Payment</th>
-                          <th className="px-3 py-2">Invoice</th>
-                          <th className="px-3 py-2">Project</th>
-                          <th className="px-3 py-2">Owner</th>
-                          <th className="px-3 py-2">Amount</th>
-                          <th className="px-3 py-2">Date</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredFinancePayments.slice(0, 120).map((row) => (
-                          <tr key={row.id} className="border-t border-foreground/10">
-                            <td className="px-3 py-2 font-mono text-xs text-muted">{row.id.slice(0, 8)}</td>
-                            <td className="px-3 py-2">{row.invoiceNumber}</td>
-                            <td className="px-3 py-2">{row.projectName}</td>
-                            <td className="px-3 py-2">{row.ownerLabel}</td>
-                            <td className="px-3 py-2">{formatMoney(row.amount)}</td>
-                            <td className="px-3 py-2">{new Date(row.paidAt).toLocaleDateString("en-NG")}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
+        <div className="relative flex h-full w-full flex-col overflow-hidden">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 px-5 py-4 pr-14">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">
+                {openFinanceDetail === "COLLECTIONS_TREND"
+                  ? "Collections Trend"
+                  : openFinanceDetail === "OVERDUE_AGING"
+                    ? "Overdue Aging Buckets"
+                    : openFinanceDetail === "HEALTH_PROJECT_TEAM"
+                      ? "Invoice/Payment Health by Project & Team"
+                      : "Target Attainment by Fiscal Period"}
+              </h3>
+              <p className="text-xs text-muted">
+                Drilldown to transaction-level details for the active dashboard filters.
+              </p>
             </div>
           </div>
-      </ModalOverlay>
-
-      <ModalOverlay open={openOnboardingGuide} onClose={() => setOpenOnboardingGuide(false)} panelClassName={MODAL_PANEL_XL}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Setup guide</h2>
-                <p className="mt-1 text-sm text-muted">
-                  Configure organization &amp; finance first, then connect sales workflows.
-                </p>
+          <button
+            type="button"
+            onClick={() => setOpenFinanceDetail(null)}
+            className="absolute right-4 top-4 z-[80] rounded-md border border-foreground/15 bg-background px-2 py-1 text-xs text-muted hover:text-foreground"
+          >
+            Close
+          </button>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2">
+            {openFinanceDetail === "COLLECTIONS_TREND" ? (
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Period</th>
+                        <th className="px-3 py-2">Invoiced</th>
+                        <th className="px-3 py-2">Collected</th>
+                        <th className="px-3 py-2">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {collectionsTrend.map((row) => (
+                        <tr key={row.label} className="border-t border-foreground/10">
+                          <td className="px-3 py-2">{row.label}</td>
+                          <td className="px-3 py-2">{formatMoney(row.invoiced)}</td>
+                          <td className="px-3 py-2">{formatMoney(row.collected)}</td>
+                          <td className="px-3 py-2">{formatMoney(row.outstanding)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Payment ID</th>
+                        <th className="px-3 py-2">Invoice</th>
+                        <th className="px-3 py-2">Project</th>
+                        <th className="px-3 py-2">Owner</th>
+                        <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Paid at</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredFinancePayments.slice(0, 120).map((row) => (
+                        <tr key={row.id} className="border-t border-foreground/10">
+                          <td className="px-3 py-2 font-mono text-xs text-muted">{row.id.slice(0, 8)}</td>
+                          <td className="px-3 py-2">{row.invoiceNumber}</td>
+                          <td className="px-3 py-2">{row.projectName}</td>
+                          <td className="px-3 py-2">{row.ownerLabel}</td>
+                          <td className="px-3 py-2">{formatMoney(row.amount)}</td>
+                          <td className="px-3 py-2">{new Date(row.paidAt).toLocaleDateString("en-NG")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpenOnboardingGuide(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-            <div className="mt-4 space-y-4">
-              {canManageOrgSetup ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Required for go-live</p>
-                  <div className="mt-2 space-y-2">
-                    {orgSetupSteps.map((step) => (
-                      <GuideItem key={step.id} done={step.done} title={step.title} href={step.href} />
-                    ))}
+            ) : null}
+
+            {openFinanceDetail === "OVERDUE_AGING" ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-md border border-foreground/10 p-3 text-sm">
+                    Current: {formatMoney(overdueAging.current)}
+                  </div>
+                  <div className="rounded-md border border-foreground/10 p-3 text-sm">
+                    1-30: {formatMoney(overdueAging.d1_30)}
+                  </div>
+                  <div className="rounded-md border border-foreground/10 p-3 text-sm">
+                    31-60: {formatMoney(overdueAging.d31_60)}
+                  </div>
+                  <div className="rounded-md border border-foreground/10 p-3 text-sm">
+                    61-90: {formatMoney(overdueAging.d61_90)}
+                  </div>
+                  <div className="rounded-md border border-foreground/10 p-3 text-sm">
+                    90+: {formatMoney(overdueAging.d90p)}
+                  </div>
+                  <div className="rounded-md border border-foreground/10 p-3 text-sm">
+                    No due date: {formatMoney(overdueAging.noDueDate)}
                   </div>
                 </div>
-              ) : null}
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; operations</p>
-                <div className="mt-2 space-y-2">
-                  <GuideItem done={values.onboarding.connectIntegrationDone} title="Connect integrations" href={`/${tenantSlug}/settings?tab=integrations`} />
-                  <GuideItem done={values.onboarding.importedLeadsDone} title="Import your first leads" href={`/${tenantSlug}/leads/import`} />
-                  <GuideItem done={values.onboarding.createdDealDone} title="Create first deal" href={`/${tenantSlug}/deals`} />
-                  <GuideItem done={values.onboarding.followUpSentDone} title="Send first follow-up" href={`/${tenantSlug}/activities?channel=WHATSAPP`} />
-                  <GuideItem done={values.onboarding.firstTaskDone} title="Complete first task" href={`/${tenantSlug}/activities?status=PENDING`} />
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Invoice</th>
+                        <th className="px-3 py-2">Project</th>
+                        <th className="px-3 py-2">Owner</th>
+                        <th className="px-3 py-2">Due date</th>
+                        <th className="px-3 py-2">Balance</th>
+                        <th className="px-3 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredFinanceInvoices
+                        .filter((x) => x.balanceDue > 0 && x.status !== "VOID")
+                        .slice(0, 120)
+                        .map((row) => (
+                          <tr key={row.id} className="border-t border-foreground/10">
+                            <td className="px-3 py-2">{row.invoiceNumber}</td>
+                            <td className="px-3 py-2">{row.projectName}</td>
+                            <td className="px-3 py-2">{row.ownerLabel}</td>
+                            <td className="px-3 py-2">
+                              {row.dueDate ? new Date(row.dueDate).toLocaleDateString("en-NG") : "—"}
+                            </td>
+                            <td className="px-3 py-2">{formatMoney(row.balanceDue)}</td>
+                            <td className="px-3 py-2">{formatEnumLabel(row.status)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
+            ) : null}
+
+            {openFinanceDetail === "HEALTH_PROJECT_TEAM" ? (
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Project</th>
+                        <th className="px-3 py-2">Invoiced</th>
+                        <th className="px-3 py-2">Collected</th>
+                        <th className="px-3 py-2">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {financeHealthRows.projects.map((row) => (
+                        <tr key={row.label} className="border-t border-foreground/10">
+                          <td className="px-3 py-2">{row.label}</td>
+                          <td className="px-3 py-2">{formatMoney(row.invoiced)}</td>
+                          <td className="px-3 py-2">{formatMoney(row.collected)}</td>
+                          <td className="px-3 py-2">{formatMoney(row.outstanding)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Owner / Team</th>
+                        <th className="px-3 py-2">Invoiced</th>
+                        <th className="px-3 py-2">Collected</th>
+                        <th className="px-3 py-2">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {financeHealthRows.owners.map((row) => (
+                        <tr key={row.label} className="border-t border-foreground/10">
+                          <td className="px-3 py-2">{row.label}</td>
+                          <td className="px-3 py-2">{formatMoney(row.invoiced)}</td>
+                          <td className="px-3 py-2">{formatMoney(row.collected)}</td>
+                          <td className="px-3 py-2">{formatMoney(row.outstanding)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {openFinanceDetail === "TARGET_ATTAINMENT" ? (
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Fiscal period</th>
+                        <th className="px-3 py-2">Actual</th>
+                        <th className="px-3 py-2">Target</th>
+                        <th className="px-3 py-2">Attainment</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fiscalAttainment.periods.map((row) => (
+                        <tr key={row.period} className="border-t border-foreground/10">
+                          <td className="px-3 py-2">{row.period}</td>
+                          <td className="px-3 py-2">{formatMoney(row.actual)}</td>
+                          <td className="px-3 py-2">{formatMoney(row.target)}</td>
+                          <td className="px-3 py-2">{row.attainmentPct}%</td>
+                        </tr>
+                      ))}
+                      {fiscalAttainment.periods.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-3 text-muted" colSpan={4}>
+                            Set fiscal goals to enable target attainment analytics.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="overflow-hidden rounded-lg border border-foreground/10">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.05] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Payment</th>
+                        <th className="px-3 py-2">Invoice</th>
+                        <th className="px-3 py-2">Project</th>
+                        <th className="px-3 py-2">Owner</th>
+                        <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredFinancePayments.slice(0, 120).map((row) => (
+                        <tr key={row.id} className="border-t border-foreground/10">
+                          <td className="px-3 py-2 font-mono text-xs text-muted">{row.id.slice(0, 8)}</td>
+                          <td className="px-3 py-2">{row.invoiceNumber}</td>
+                          <td className="px-3 py-2">{row.projectName}</td>
+                          <td className="px-3 py-2">{row.ownerLabel}</td>
+                          <td className="px-3 py-2">{formatMoney(row.amount)}</td>
+                          <td className="px-3 py-2">{new Date(row.paidAt).toLocaleDateString("en-NG")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={openOnboardingGuide}
+        onClose={() => setOpenOnboardingGuide(false)}
+        panelClassName={MODAL_PANEL_XL}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Setup guide</h2>
+            <p className="mt-1 text-sm text-muted">
+              Configure organization &amp; finance first, then connect sales workflows.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpenOnboardingGuide(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <div className="mt-4 space-y-4">
+          {canManageOrgSetup ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Required for go-live</p>
+              <div className="mt-2 space-y-2">
+                {orgSetupSteps.map((step) => (
+                  <GuideItem key={step.id} done={step.done} title={step.title} href={step.href} />
+                ))}
+              </div>
             </div>
+          ) : null}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; operations</p>
+            <div className="mt-2 space-y-2">
+              <GuideItem
+                done={values.onboarding.connectIntegrationDone}
+                title="Connect integrations"
+                href={`/${tenantSlug}/settings?tab=integrations`}
+              />
+              <GuideItem
+                done={values.onboarding.importedLeadsDone}
+                title="Import your first leads"
+                href={`/${tenantSlug}/leads/import`}
+              />
+              <GuideItem
+                done={values.onboarding.createdDealDone}
+                title="Create first deal"
+                href={`/${tenantSlug}/deals`}
+              />
+              <GuideItem
+                done={values.onboarding.followUpSentDone}
+                title="Send first follow-up"
+                href={`/${tenantSlug}/activities?channel=WHATSAPP`}
+              />
+              <GuideItem
+                done={values.onboarding.firstTaskDone}
+                title="Complete first task"
+                href={`/${tenantSlug}/activities?status=PENDING`}
+              />
+            </div>
+          </div>
+        </div>
       </ModalOverlay>
 
       <ModalOverlay open={openBuilder} onClose={() => setOpenBuilder(false)} panelClassName={MODAL_PANEL_2XL}>
-            <div className="flex shrink-0 items-start justify-between border-b border-foreground/10 px-5 py-4">
-              <h2 className="text-lg font-semibold text-foreground">Dashboard Builder</h2>
-              <button
-                type="button"
-                onClick={() => setOpenBuilder(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
+        <div className="flex shrink-0 items-start justify-between border-b border-foreground/10 px-5 py-4">
+          <h2 className="text-lg font-semibold text-foreground">Dashboard Builder</h2>
+          <button
+            type="button"
+            onClick={() => setOpenBuilder(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <div>
-                <label className="mb-1 block text-sm text-muted">Role view</label>
-                <UiSelect
-                  value={roleView}
-                  onChange={(e) => {
-                    const next = e.target.value as RoleView;
-                    setRoleView(next);
-                    setSelectedWidgets(ROLE_WIDGETS[next]);
-                  }}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div>
+            <label className="mb-1 block text-sm text-muted">Role view</label>
+            <UiSelect
+              value={roleView}
+              onChange={(e) => {
+                const next = e.target.value as RoleView;
+                setRoleView(next);
+                setSelectedWidgets(ROLE_WIDGETS[next]);
+              }}
+            >
+              {roleViewOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role.replaceAll("_", " ")}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+
+          <div className="mt-4 grid gap-2">
+            {widgetPool.map((id) => {
+              const checked = selectedWidgets.includes(id);
+              return (
+                <label
+                  key={id}
+                  className="flex items-center gap-2 rounded-md border border-foreground/10 px-3 py-2 text-sm"
                 >
-                  {roleViewOptions.map((role) => (
-                    <option key={role} value={role}>
-                      {role.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      setSelectedWidgets((curr) => (checked ? curr.filter((x) => x !== id) : [...curr, id]))
+                    }
+                  />
+                  <span>{WIDGET_LABELS[id] || id}</span>
+                </label>
+              );
+            })}
+          </div>
 
-              <div className="mt-4 grid gap-2">
-                {widgetPool.map((id) => {
-                  const checked = selectedWidgets.includes(id);
-                  return (
-                    <label key={id} className="flex items-center gap-2 rounded-md border border-foreground/10 px-3 py-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() =>
-                          setSelectedWidgets((curr) =>
-                            checked ? curr.filter((x) => x !== id) : [...curr, id],
-                          )
-                        }
-                      />
-                      <span>{WIDGET_LABELS[id] || id}</span>
-                    </label>
-                  );
-                })}
-              </div>
-
-              {enabledWidgets.length > 0 ? (
-                <div className="mt-4">
-                  <p className="mb-2 text-sm font-semibold text-foreground">Widget order (drag to arrange)</p>
-                  <DndContext
-                    id="tenant-dashboard-widget-order"
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleWidgetDragEnd}
-                  >
-                    <SortableContext items={enabledWidgets} strategy={rectSortingStrategy}>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {enabledWidgets.map((id) => (
-                          <SortableWidgetItem key={id} id={id} label={WIDGET_LABELS[id] || id} />
-                        ))}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex shrink-0 justify-end gap-2 border-t border-foreground/10 px-5 py-4">
-              <button
-                type="button"
-                onClick={() => setOpenBuilder(false)}
-                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+          {enabledWidgets.length > 0 ? (
+            <div className="mt-4">
+              <p className="mb-2 text-sm font-semibold text-foreground">Widget order (drag to arrange)</p>
+              <DndContext
+                id="tenant-dashboard-widget-order"
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleWidgetDragEnd}
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={saveBuilder}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
-              >
-                  {pending ? <InlineSpinner /> : null}
-                {pending ? "Saving..." : "Save dashboard"}
-              </button>
+                <SortableContext items={enabledWidgets} strategy={rectSortingStrategy}>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {enabledWidgets.map((id) => (
+                      <SortableWidgetItem key={id} id={id} label={WIDGET_LABELS[id] || id} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 justify-end gap-2 border-t border-foreground/10 px-5 py-4">
+          <button
+            type="button"
+            onClick={() => setOpenBuilder(false)}
+            className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={saveBuilder}
+            aria-busy={pending}
+            className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+          >
+            {pending ? <InlineSpinner /> : null}
+            {pending ? "Saving..." : "Save dashboard"}
+          </button>
+        </div>
       </ModalOverlay>
 
       <ModalOverlay open={openGoal} onClose={() => setOpenGoal(false)} panelClassName={MODAL_PANEL_2XL}>
-            <div className="flex shrink-0 items-start justify-between border-b border-foreground/10 px-5 py-4">
-              <h2 className="text-lg font-semibold text-foreground">Fiscal / Business Year Goals</h2>
-              <button
-                type="button"
-                onClick={() => setOpenGoal(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
+        <div className="flex shrink-0 items-start justify-between border-b border-foreground/10 px-5 py-4">
+          <h2 className="text-lg font-semibold text-foreground">Fiscal / Business Year Goals</h2>
+          <button
+            type="button"
+            onClick={() => setOpenGoal(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
 
-            <form action={submitGoal} className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block text-sm text-muted">Goal label</label>
-                    <input
-                      name="label"
-                      defaultValue={goal?.label || "FY 2026"}
-                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm text-muted">Fiscal year start</label>
-                    <input
-                      name="fiscalYearStart"
-                      type="date"
-                      defaultValue={goal?.fiscalYearStart || ""}
-                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm text-muted">Fiscal year end</label>
-                    <input
-                      name="fiscalYearEnd"
-                      type="date"
-                      defaultValue={goal?.fiscalYearEnd || ""}
-                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm text-muted">Revenue target</label>
-                    <input
-                      name="revenueTarget"
-                      inputMode="decimal"
-                      defaultValue={goal?.revenueTarget != null ? String(goal.revenueTarget) : ""}
-                      placeholder="Optional (e.g. 120000000)"
-                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm text-muted">Pipeline target (optional)</label>
-                    <input
-                      name="pipelineTarget"
-                      inputMode="decimal"
-                      defaultValue={goal?.pipelineTarget != null ? String(goal.pipelineTarget) : ""}
-                      placeholder="Optional (open pipeline value target)"
-                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    />
-                    <p className="mt-1 text-[11px] text-muted">
-                      Pipeline target is the total value of active/open deals you want in the pipeline (not collected cash).
-                    </p>
-                  </div>
-                </div>
+        <form action={submitGoal} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm text-muted">Goal label</label>
+                <input
+                  name="label"
+                  defaultValue={goal?.label || "FY 2026"}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
               </div>
-              <div className="flex shrink-0 justify-end gap-2 border-t border-foreground/10 px-5 py-4">
-                <button
-                  type="button"
-                  onClick={() => setOpenGoal(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
-                >
-                  {pending ? <InlineSpinner /> : null}
-                  {pending ? "Saving..." : "Save goals"}
-                </button>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Fiscal year start</label>
+                <input
+                  name="fiscalYearStart"
+                  type="date"
+                  defaultValue={goal?.fiscalYearStart || ""}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
               </div>
-            </form>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Fiscal year end</label>
+                <input
+                  name="fiscalYearEnd"
+                  type="date"
+                  defaultValue={goal?.fiscalYearEnd || ""}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Revenue target</label>
+                <input
+                  name="revenueTarget"
+                  inputMode="decimal"
+                  defaultValue={goal?.revenueTarget != null ? String(goal.revenueTarget) : ""}
+                  placeholder="Optional (e.g. 120000000)"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Pipeline target (optional)</label>
+                <input
+                  name="pipelineTarget"
+                  inputMode="decimal"
+                  defaultValue={goal?.pipelineTarget != null ? String(goal.pipelineTarget) : ""}
+                  placeholder="Optional (open pipeline value target)"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+                <p className="mt-1 text-[11px] text-muted">
+                  Pipeline target is the total value of active/open deals you want in the pipeline (not
+                  collected cash).
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 justify-end gap-2 border-t border-foreground/10 px-5 py-4">
+            <button
+              type="button"
+              onClick={() => setOpenGoal(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? <InlineSpinner /> : null}
+              {pending ? "Saving..." : "Save goals"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
     </TenantPageShell>
   );
@@ -2320,15 +2500,16 @@ function WidgetCard({
   const maxRepCurrent = Math.max(1, ...values.repLeaderboardTrend.map((x) => x.current));
   const inventoryTotal = Math.max(1, values.availableUnits + values.reservedUnits + values.soldUnits);
   const revenuePct =
-    goal?.revenueTarget && goal.revenueTarget > 0 ? Math.min(100, (values.revenueMtd / goal.revenueTarget) * 100) : null;
+    goal?.revenueTarget && goal.revenueTarget > 0
+      ? Math.min(100, (values.revenueMtd / goal.revenueTarget) * 100)
+      : null;
   const pipelinePct =
-    goal?.pipelineTarget && goal.pipelineTarget > 0 ? Math.min(100, (values.pipelineOpen / goal.pipelineTarget) * 100) : null;
+    goal?.pipelineTarget && goal.pipelineTarget > 0
+      ? Math.min(100, (values.pipelineOpen / goal.pipelineTarget) * 100)
+      : null;
 
   const maxRevenueMonth = Math.max(1, ...revenueSeries.map((x) => x.value));
-  const maxPipelineTrend = Math.max(
-    1,
-    ...pipelineSeries.map((x) => Math.max(x.pipeline, x.target)),
-  );
+  const maxPipelineTrend = Math.max(1, ...pipelineSeries.map((x) => Math.max(x.pipeline, x.target)));
 
   let title = id;
   let body: React.ReactNode = <p className="mt-2 text-sm text-muted">No data.</p>;
@@ -2348,7 +2529,9 @@ function WidgetCard({
             style={{ width: `${revenuePct ?? 0}%`, backgroundColor: chartPalette.revenue }}
           />
         </div>
-        <p className="mt-1 text-xs text-muted">{revenuePct != null ? `${revenuePct.toFixed(1)}% of target` : "Set goal to track progress"}</p>
+        <p className="mt-1 text-xs text-muted">
+          {revenuePct != null ? `${revenuePct.toFixed(1)}% of target` : "Set goal to track progress"}
+        </p>
       </>
     );
   } else if (id === "pipeline_target_progress") {
@@ -2365,7 +2548,9 @@ function WidgetCard({
             style={{ width: `${pipelinePct ?? 0}%`, backgroundColor: chartPalette.pipeline }}
           />
         </div>
-        <p className="mt-1 text-xs text-muted">{pipelinePct != null ? `${pipelinePct.toFixed(1)}% of target` : "Set goal to track progress"}</p>
+        <p className="mt-1 text-xs text-muted">
+          {pipelinePct != null ? `${pipelinePct.toFixed(1)}% of target` : "Set goal to track progress"}
+        </p>
       </>
     );
   } else if (id === "lead_funnel") {
@@ -2381,7 +2566,10 @@ function WidgetCard({
             <div className="mt-1 h-2 rounded-full bg-foreground/10">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${Math.max(6, (item.count / maxFunnel) * 100)}%`, backgroundColor: chartPalette.funnel }}
+                style={{
+                  width: `${Math.max(6, (item.count / maxFunnel) * 100)}%`,
+                  backgroundColor: chartPalette.funnel,
+                }}
               />
             </div>
           </div>
@@ -2401,7 +2589,10 @@ function WidgetCard({
             <div className="mt-1 h-2 rounded-full bg-foreground/10">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${Math.max(8, (x.value / maxLeaderboard) * 100)}%`, backgroundColor: chartPalette.leaderboard }}
+                style={{
+                  width: `${Math.max(8, (x.value / maxLeaderboard) * 100)}%`,
+                  backgroundColor: chartPalette.leaderboard,
+                }}
               />
             </div>
           </div>
@@ -2418,12 +2609,17 @@ function WidgetCard({
           <div key={row.stage} className="rounded-md border border-foreground/10 p-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-foreground">{row.stage}</span>
-              <span className="text-muted">{row.avgDays}d avg | {row.dropOffPct}% drop-off</span>
+              <span className="text-muted">
+                {row.avgDays}d avg | {row.dropOffPct}% drop-off
+              </span>
             </div>
             <div className="mt-1 h-2 rounded-full bg-foreground/10">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${Math.min(100, Math.max(6, row.dropOffPct))}%`, backgroundColor: "#ef4444" }}
+                style={{
+                  width: `${Math.min(100, Math.max(6, row.dropOffPct))}%`,
+                  backgroundColor: "#ef4444",
+                }}
               />
             </div>
           </div>
@@ -2440,12 +2636,17 @@ function WidgetCard({
           <div key={row.source}>
             <div className="flex items-center justify-between text-xs text-muted">
               <span className="truncate">{row.source}</span>
-              <span>{row.winRate}% win | {row.wonDeals}/{row.leads}</span>
+              <span>
+                {row.winRate}% win | {row.wonDeals}/{row.leads}
+              </span>
             </div>
             <div className="mt-1 h-2 rounded-full bg-foreground/10">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${Math.max(8, (row.leads / maxSourceLeads) * 100)}%`, backgroundColor: "#0891b2" }}
+                style={{
+                  width: `${Math.max(8, (row.leads / maxSourceLeads) * 100)}%`,
+                  backgroundColor: "#0891b2",
+                }}
               />
             </div>
           </div>
@@ -2462,12 +2663,17 @@ function WidgetCard({
           <div key={row.project}>
             <div className="flex items-center justify-between text-xs text-muted">
               <span className="truncate">{row.project}</span>
-              <span>{row.leads} leads | {row.conversionRate}% conv</span>
+              <span>
+                {row.leads} leads | {row.conversionRate}% conv
+              </span>
             </div>
             <div className="mt-1 h-2 rounded-full bg-foreground/10">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${Math.max(8, (row.dealValue / maxProjectValue) * 100)}%`, backgroundColor: "#7c3aed" }}
+                style={{
+                  width: `${Math.max(8, (row.dealValue / maxProjectValue) * 100)}%`,
+                  backgroundColor: "#7c3aed",
+                }}
               />
             </div>
           </div>
@@ -2484,14 +2690,18 @@ function WidgetCard({
           <div key={row.label}>
             <div className="flex items-center justify-between text-xs text-muted">
               <span className="truncate">{row.label}</span>
-              <span className={row.deltaPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
-                {row.deltaPct >= 0 ? "+" : ""}{row.deltaPct}% | {money(row.current)}
+              <span className={row.deltaPct >= 0 ? "text-[var(--success)] " : "text-[var(--danger)] "}>
+                {row.deltaPct >= 0 ? "+" : ""}
+                {row.deltaPct}% | {money(row.current)}
               </span>
             </div>
             <div className="mt-1 h-2 rounded-full bg-foreground/10">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${Math.max(8, (row.current / maxRepCurrent) * 100)}%`, backgroundColor: chartPalette.leaderboard }}
+                style={{
+                  width: `${Math.max(8, (row.current / maxRepCurrent) * 100)}%`,
+                  backgroundColor: chartPalette.leaderboard,
+                }}
               />
             </div>
           </div>
@@ -2544,13 +2754,21 @@ function WidgetCard({
     body = (
       <div className="mt-3">
         <svg viewBox={`0 0 ${w} ${h}`} className="w-full">
-          <line x1="10" y1={h - 10} x2={w - 10} y2={h - 10} stroke="currentColor" className="text-foreground/20" />
+          <line
+            x1="10"
+            y1={h - 10}
+            x2={w - 10}
+            y2={h - 10}
+            stroke="currentColor"
+            className="text-foreground/20"
+          />
           <polyline fill="none" stroke={chartPalette.pipeline} strokeWidth="3" points={pointsPipeline} />
           <polyline fill="none" stroke={chartPalette.target} strokeWidth="3" points={pointsTarget} />
         </svg>
         <div className="mt-2 flex items-center gap-4 text-[11px] text-muted">
           <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartPalette.pipeline }} /> Pipeline
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartPalette.pipeline }} />{" "}
+            Pipeline
           </span>
           <span className="inline-flex items-center gap-1">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartPalette.target }} /> Target
@@ -2570,7 +2788,7 @@ function WidgetCard({
     const topTask = values.myWorkTasks[0];
     body = values.tasksModuleEnabled ? (
       <>
-        <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+        <div className="mt-3 rounded-md border border-[var(--info-line)] bg-[var(--info-wash)] p-3">
           <p className="text-xl font-bold text-foreground">{values.myOpenTaskCount}</p>
           <p className="text-[11px] text-muted">open task{values.myOpenTaskCount === 1 ? "" : "s"}</p>
         </div>
@@ -2583,7 +2801,10 @@ function WidgetCard({
             </p>
           </div>
         ) : null}
-        <Link href={values.tasksPageUrl} className="mt-2 inline-block text-xs font-semibold text-indigo-600 hover:underline">
+        <Link
+          href={values.tasksPageUrl}
+          className="mt-2 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+        >
           {values.myOpenTaskCount > 1 ? `View ${values.myOpenTaskCount - 1} more →` : "View tasks →"}
         </Link>
       </>
@@ -2596,9 +2817,18 @@ function WidgetCard({
       <>
         <div className="mt-2 h-3 overflow-hidden rounded-full bg-foreground/10">
           <div className="flex h-full w-full">
-            <div className="bg-emerald-500" style={{ width: `${(values.availableUnits / inventoryTotal) * 100}%` }} />
-            <div className="bg-amber-500" style={{ width: `${(values.reservedUnits / inventoryTotal) * 100}%` }} />
-            <div className="bg-rose-500" style={{ width: `${(values.soldUnits / inventoryTotal) * 100}%` }} />
+            <div
+              className="bg-[var(--success)]"
+              style={{ width: `${(values.availableUnits / inventoryTotal) * 100}%` }}
+            />
+            <div
+              className="bg-[var(--warn)]"
+              style={{ width: `${(values.reservedUnits / inventoryTotal) * 100}%` }}
+            />
+            <div
+              className="bg-[var(--danger)]"
+              style={{ width: `${(values.soldUnits / inventoryTotal) * 100}%` }}
+            />
           </div>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
@@ -2610,18 +2840,62 @@ function WidgetCard({
     );
   } else {
     const flat: Record<string, { title: string; value: string; tone: string }> = {
-      pending_finance_count: { title: "Pending Finance", value: `${values.pendingFinanceCount} deal(s)`, tone: "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300" },
-      expected_month: { title: "Expected This Month", value: money(values.expectedThisMonth), tone: "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300" },
-      overdue_installments: { title: "Overdue Installments", value: `${values.overdueCount} item(s) | ${money(values.overdueAmount)}`, tone: "bg-orange-50 border-orange-200 text-orange-800 dark:bg-orange-500/10 dark:border-orange-500/30 dark:text-orange-300" },
-      pending_verification: { title: "Pending Verification", value: `${values.pendingVerificationCount} deal(s)`, tone: "bg-violet-50 border-violet-200 text-violet-800 dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-300" },
-      recent_payments: { title: "Invoices This Month", value: `${values.invoicesMtdCount} invoice(s)`, tone: "bg-cyan-50 border-cyan-200 text-cyan-800 dark:bg-cyan-500/10 dark:border-cyan-500/30 dark:text-cyan-300" },
-      team_pipeline: { title: "Team Pipeline", value: `${values.teamPipelineCount} open deal(s)`, tone: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-300" },
-      unassigned_leads: { title: "Unassigned Leads", value: `${values.unassignedLeads} lead(s)`, tone: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-500/10 dark:border-yellow-500/30 dark:text-yellow-300" },
-      my_pipeline: { title: "My Pipeline", value: `${values.myPipelineCount} deal(s)`, tone: "bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:text-indigo-300" },
-      my_new_leads: { title: "My New Leads (7d)", value: `${values.myNewLeads7d} lead(s)`, tone: "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-800 dark:bg-fuchsia-500/10 dark:border-fuchsia-500/30 dark:text-fuchsia-300" },
-      my_open_tasks: { title: "My Open Tasks", value: `${values.myOpenTaskCount} task(s)`, tone: "bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:text-indigo-300" },
+      pending_finance_count: {
+        title: "Pending Finance",
+        value: `${values.pendingFinanceCount} deal(s)`,
+        tone: "bg-[var(--danger-wash)] border-[var(--danger-line)] text-[var(--danger)]",
+      },
+      expected_month: {
+        title: "Expected This Month",
+        value: money(values.expectedThisMonth),
+        tone: "bg-[var(--success-wash)] border-[var(--success-line)] text-[var(--success)]",
+      },
+      overdue_installments: {
+        title: "Overdue Installments",
+        value: `${values.overdueCount} item(s) | ${money(values.overdueAmount)}`,
+        tone: "bg-[var(--warn-wash)] border-[var(--warn-line)] text-[var(--warn)]",
+      },
+      pending_verification: {
+        title: "Pending Verification",
+        value: `${values.pendingVerificationCount} deal(s)`,
+        tone: "bg-[var(--accent-wash)] border-[var(--accent-line)] text-[var(--accent)]",
+      },
+      recent_payments: {
+        title: "Invoices This Month",
+        value: `${values.invoicesMtdCount} invoice(s)`,
+        tone: "bg-[var(--info-wash)] border-[var(--info-line)] text-[var(--info)]",
+      },
+      team_pipeline: {
+        title: "Team Pipeline",
+        value: `${values.teamPipelineCount} open deal(s)`,
+        tone: "bg-[var(--info-wash)] border-[var(--info-line)] text-[var(--info)]",
+      },
+      unassigned_leads: {
+        title: "Unassigned Leads",
+        value: `${values.unassignedLeads} lead(s)`,
+        tone: "bg-[var(--warn-wash)] border-[var(--warn-line)] text-[var(--warn)]",
+      },
+      my_pipeline: {
+        title: "My Pipeline",
+        value: `${values.myPipelineCount} deal(s)`,
+        tone: "bg-[var(--info-wash)] border-[var(--info-line)] text-[var(--info)]",
+      },
+      my_new_leads: {
+        title: "My New Leads (7d)",
+        value: `${values.myNewLeads7d} lead(s)`,
+        tone: "bg-[var(--accent-wash)] border-[var(--accent-line)] text-[var(--accent)]",
+      },
+      my_open_tasks: {
+        title: "My Open Tasks",
+        value: `${values.myOpenTaskCount} task(s)`,
+        tone: "bg-[var(--info-wash)] border-[var(--info-line)] text-[var(--info)]",
+      },
     };
-    const c = flat[id] || { title: id, value: "No data.", tone: "bg-foreground/5 border-foreground/10 text-foreground" };
+    const c = flat[id] || {
+      title: id,
+      value: "No data.",
+      tone: "bg-foreground/5 border-foreground/10 text-foreground",
+    };
     title = c.title;
     body = (
       <div className={`mt-3 rounded-md border p-3 ${c.tone}`}>
@@ -2638,13 +2912,21 @@ function WidgetCard({
   );
 }
 
-function StatPill({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "rose" }) {
+function StatPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "emerald" | "amber" | "rose";
+}) {
   const classes =
     tone === "emerald"
-      ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+      ? "border-[var(--success-line)] bg-[var(--success-wash)] text-[var(--success)] "
       : tone === "amber"
-        ? "border-amber-300/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-        : "border-rose-300/50 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+        ? "border-[var(--warn-line)] bg-[var(--warn-wash)] text-[var(--warn)] "
+        : "border-[var(--danger-line)] bg-[var(--danger-wash)] text-[var(--danger)] ";
   return (
     <div className={`rounded-md border px-2 py-1 ${classes}`}>
       <p className="text-[10px] uppercase tracking-wide">{label}</p>
@@ -2656,7 +2938,9 @@ function StatPill({ label, value, tone }: { label: string; value: number; tone: 
 function ChecklistRow({ label, done }: { label: string; done: boolean }) {
   return (
     <li className="flex items-center gap-2">
-      <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-500/15 text-emerald-700" : "bg-foreground/10 text-muted"}`}>
+      <span
+        className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? "bg-[var(--success-wash)] text-[var(--success)]" : "bg-foreground/10 text-muted"}`}
+      >
         {done ? "✓" : "•"}
       </span>
       <span className={done ? "text-foreground" : "text-muted"}>{label}</span>
@@ -2668,7 +2952,7 @@ function HealthPill({ label, ok }: { label: string; ok: boolean }) {
   return (
     <div className="rounded-md border border-foreground/10 px-2 py-1.5">
       <p className="text-[11px] text-muted">{label}</p>
-      <p className={`text-xs font-medium ${ok ? "text-emerald-700" : "text-amber-700"}`}>
+      <p className={`text-xs font-medium ${ok ? "text-[var(--success)]" : "text-[var(--warn)]"}`}>
         {ok ? "Connected" : "Needs setup"}
       </p>
     </div>
@@ -2682,7 +2966,9 @@ function GuideItem({ done, title, href }: { done: boolean; title: string; href: 
       className="flex items-center justify-between rounded-md border border-foreground/10 px-3 py-2 text-sm hover:bg-foreground/[0.04]"
     >
       <div className="flex items-center gap-2">
-        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? "bg-emerald-500/15 text-emerald-700" : "bg-foreground/10 text-muted"}`}>
+        <span
+          className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? "bg-[var(--success-wash)] text-[var(--success)]" : "bg-foreground/10 text-muted"}`}
+        >
           {done ? "✓" : "→"}
         </span>
         <span className={done ? "text-foreground" : "text-muted"}>{title}</span>
@@ -2734,13 +3020,24 @@ function formatMoney(value: number) {
   return `NGN ${Math.round(value).toLocaleString()}`;
 }
 
-function MiniBars({ values, tone }: { values: number[]; tone: "violet" | "indigo" }) {
+function MiniBars({ values, tone }: { values: number[]; tone: "accent" | "info" }) {
   const max = Math.max(1, ...values);
-  const color = tone === "violet" ? "bg-violet-500/80" : "bg-indigo-500/80";
+  const allZero = values.every((v) => v === 0);
+  // With no data the bars would all sit at the 12% floor and read as a broken
+  // chart. A flat baseline is honest and looks deliberate.
+  const color = allZero ? "var(--border-strong)" : tone === "accent" ? "var(--accent)" : "var(--info)";
   return (
-    <div className="mt-2 flex h-8 items-end gap-1">
+    <div className="mt-3 flex h-7 items-end gap-[3px]" aria-hidden="true">
       {values.map((v, idx) => (
-        <div key={`${tone}-${idx}`} className={`w-full rounded-sm ${color}`} style={{ height: `${Math.max(12, (v / max) * 100)}%` }} />
+        <div
+          key={`${tone}-${idx}`}
+          className="w-full rounded-[2px]"
+          style={{
+            height: allZero ? "2px" : `${Math.max(10, (v / max) * 100)}%`,
+            background: color,
+            opacity: allZero ? 1 : 0.35 + 0.65 * (v / max),
+          }}
+        />
       ))}
     </div>
   );

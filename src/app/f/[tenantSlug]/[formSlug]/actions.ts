@@ -5,7 +5,11 @@ import {
   LeadCaptureFormStatus,
   LeadCaptureSessionStatus,
 } from "@/generated/prisma";
-import { resolveCampaignFromUtm, parseDeviceFromUserAgent, parseGeoFromHeaders } from "@/lib/capture-form-attribution";
+import {
+  resolveCampaignFromUtm,
+  parseDeviceFromUserAgent,
+  parseGeoFromHeaders,
+} from "@/lib/capture-form-attribution";
 import { computeCompletionPct, parseCaptureFormFields } from "@/lib/capture-form-types";
 import {
   buildLeadNotesFromCaptureValues,
@@ -203,10 +207,8 @@ export async function submitCaptureForm(
     const notes = buildLeadNotesFromCaptureValues(fields, parsed.data.values);
 
     const attr = parsed.data.attribution ?? {};
-    const { campaignId: resolvedCampaignId, campaignName: resolvedCampaignName } = await resolveCampaignFromUtm(
-      tenant.id,
-      attr.utmCampaign,
-    );
+    const { campaignId: resolvedCampaignId, campaignName: resolvedCampaignName } =
+      await resolveCampaignFromUtm(tenant.id, attr.utmCampaign);
     const campaignId = form.campaignId ?? resolvedCampaignId;
     const campaignName = form.campaign?.name ?? resolvedCampaignName;
 
@@ -335,9 +337,8 @@ export async function submitCaptureForm(
 
     const leadPhone = resolveLeadPhoneFromValues(fields, parsed.data.values);
     if (form.autoWhatsAppEnabled && leadPhone) {
-      const { renderCaptureFormWhatsAppMessage, sendCaptureFormAutoWhatsApp } = await import(
-        "@/lib/capture-form-whatsapp"
-      );
+      const { renderCaptureFormWhatsAppMessage, sendCaptureFormAutoWhatsApp } =
+        await import("@/lib/capture-form-whatsapp");
       const message = renderCaptureFormWhatsAppMessage(form.autoWhatsAppMessage, {
         name: name ?? "there",
         formTitle: form.title,

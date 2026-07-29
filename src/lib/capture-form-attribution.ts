@@ -28,10 +28,7 @@ export function parseGeoFromHeaders(headers: Headers): {
 } {
   return {
     ipCountry:
-      headers.get("x-country") ||
-      headers.get("cf-ipcountry") ||
-      headers.get("x-nf-geo-country") ||
-      undefined,
+      headers.get("x-country") || headers.get("cf-ipcountry") || headers.get("x-nf-geo-country") || undefined,
     ipRegion: headers.get("x-nf-geo-region") || headers.get("x-region") || undefined,
     ipCity: headers.get("x-nf-geo-city") || headers.get("x-city") || undefined,
   };

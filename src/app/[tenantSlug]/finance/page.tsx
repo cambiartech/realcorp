@@ -105,8 +105,13 @@ export default async function FinanceQueuePage({
   const savedBanks = normalizeFinanceOptionList(tenant.settings?.financeBankAccounts);
   const savedModes = normalizeFinanceOptionList(tenant.settings?.financePaymentModes);
   const mergedModes =
-    savedModes.length > 0 ? Array.from(new Set([...DEFAULT_PAYMENT_MODES, ...savedModes])) : DEFAULT_PAYMENT_MODES;
-  const currenciesMerged = mergeCurrencyOptions(tenant.settings?.financeCurrencies, tenant.defaultCurrency || "NGN");
+    savedModes.length > 0
+      ? Array.from(new Set([...DEFAULT_PAYMENT_MODES, ...savedModes]))
+      : DEFAULT_PAYMENT_MODES;
+  const currenciesMerged = mergeCurrencyOptions(
+    tenant.settings?.financeCurrencies,
+    tenant.defaultCurrency || "NGN",
+  );
 
   const financeOptions = {
     bankAccounts: savedBanks,
@@ -125,7 +130,11 @@ export default async function FinanceQueuePage({
     entityType?: string;
     entityId?: string;
     createdAt?: { gte?: Date; lte?: Date };
-    OR?: Array<{ summary: { contains: string; mode: "insensitive" } } | { action: { contains: string; mode: "insensitive" } } | { actorLabel: { contains: string; mode: "insensitive" } }>;
+    OR?: Array<
+      | { summary: { contains: string; mode: "insensitive" } }
+      | { action: { contains: string; mode: "insensitive" } }
+      | { actorLabel: { contains: string; mode: "insensitive" } }
+    >;
   } = {
     tenantId: tenant.id,
   };
@@ -148,8 +157,26 @@ export default async function FinanceQueuePage({
     ];
   }
 
-  const [deals, recentDecisions, users, dealOptions, projects, units, invoices, payments, expenses, vendorBills, salesReceipts, masterLogs, totalLogs, allLogValues, invoiceAuditEvents, bankRows, bankImports, bankRowStats] =
-    await Promise.all([
+  const [
+    deals,
+    recentDecisions,
+    users,
+    dealOptions,
+    projects,
+    units,
+    invoices,
+    payments,
+    expenses,
+    vendorBills,
+    salesReceipts,
+    masterLogs,
+    totalLogs,
+    allLogValues,
+    invoiceAuditEvents,
+    bankRows,
+    bankImports,
+    bankRowStats,
+  ] = await Promise.all([
     prisma.deal.findMany({
       where: { tenantId: tenant.id, pendingFinance: true },
       orderBy: { createdAt: "asc" },
@@ -198,14 +225,36 @@ export default async function FinanceQueuePage({
       orderBy: { createdAt: "desc" },
       include: {
         payments: { select: { id: true, amount: true, paidAt: true }, orderBy: { paidAt: "desc" } },
-        deal: { select: { id: true, unitId: true, unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } }, lead: { select: { name: true, email: true } }, propertyClient: { select: { fullName: true, email: true } } } },
+        deal: {
+          select: {
+            id: true,
+            unitId: true,
+            unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } },
+            lead: { select: { name: true, email: true } },
+            propertyClient: { select: { fullName: true, email: true } },
+          },
+        },
       },
       take: 300,
     }),
     prisma.paymentRecord.findMany({
       where: { tenantId: tenant.id },
       orderBy: { paidAt: "desc" },
-      include: { invoice: { select: { invoiceNumber: true, title: true, department: true, deal: { select: { unitId: true, unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } } } } } } },
+      include: {
+        invoice: {
+          select: {
+            invoiceNumber: true,
+            title: true,
+            department: true,
+            deal: {
+              select: {
+                unitId: true,
+                unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } },
+              },
+            },
+          },
+        },
+      },
       take: 300,
     }),
     prisma.expense.findMany({
@@ -297,19 +346,37 @@ export default async function FinanceQueuePage({
   }
 
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
-  const unitMap = new Map(units.map((u) => [u.id, { label: u.label, projectId: u.projectId, projectName: projectMap.get(u.projectId) || "Unknown project" }]));
+  const unitMap = new Map(
+    units.map((u) => [
+      u.id,
+      {
+        label: u.label,
+        projectId: u.projectId,
+        projectName: projectMap.get(u.projectId) || "Unknown project",
+      },
+    ]),
+  );
 
   const userMap = new Map(users.map((u) => [u.user.id, u.user]));
-  const invoiceEventMap = new Map<string, { reminderCount: number; lastReminderAt: Date | null; lastSentAt: Date | null }>();
+  const invoiceEventMap = new Map<
+    string,
+    { reminderCount: number; lastReminderAt: Date | null; lastSentAt: Date | null }
+  >();
   for (const event of invoiceAuditEvents) {
     if (!event.entityId) continue;
-    const existing = invoiceEventMap.get(event.entityId) || { reminderCount: 0, lastReminderAt: null, lastSentAt: null };
+    const existing = invoiceEventMap.get(event.entityId) || {
+      reminderCount: 0,
+      lastReminderAt: null,
+      lastSentAt: null,
+    };
     if (event.action === "SEND_REMINDER") {
       existing.reminderCount += 1;
-      if (!existing.lastReminderAt || event.createdAt > existing.lastReminderAt) existing.lastReminderAt = event.createdAt;
+      if (!existing.lastReminderAt || event.createdAt > existing.lastReminderAt)
+        existing.lastReminderAt = event.createdAt;
     }
     if (event.action === "SEND") {
-      if (!existing.lastSentAt || event.createdAt > existing.lastSentAt) existing.lastSentAt = event.createdAt;
+      if (!existing.lastSentAt || event.createdAt > existing.lastSentAt)
+        existing.lastSentAt = event.createdAt;
     }
     invoiceEventMap.set(event.entityId, existing);
   }
@@ -325,7 +392,11 @@ export default async function FinanceQueuePage({
       isOpen && dueDate && dueDate.getTime() < startOfToday.getTime()
         ? Math.floor((startOfToday.getTime() - dueDate.getTime()) / MS_PER_DAY)
         : 0;
-    const eventMeta = invoiceEventMap.get(invoice.id) || { reminderCount: 0, lastReminderAt: null, lastSentAt: null };
+    const eventMeta = invoiceEventMap.get(invoice.id) || {
+      reminderCount: 0,
+      lastReminderAt: null,
+      lastSentAt: null,
+    };
     return {
       id: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -337,16 +408,22 @@ export default async function FinanceQueuePage({
       currency: invoice.currency,
       balanceLabel: `${invoice.currency} ${Number(invoice.balanceDue).toLocaleString()}`,
       balanceValue: Number(invoice.balanceDue),
-      dueDateLabel: dueDate ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(dueDate) : "No due date",
+      dueDateLabel: dueDate
+        ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(dueDate)
+        : "No due date",
       dueDateValue: dueDate ? dueDate.toISOString().slice(0, 10) : "",
       issuedAtValue: invoice.createdAt.toISOString().slice(0, 10),
       paymentsCount: invoice.payments.length,
       lastPaymentLabel: invoice.payments[0]
-        ? `${invoice.currency} ${Number(invoice.payments[0].amount).toLocaleString()} on ${new Intl.DateTimeFormat("en-NG", {
-            dateStyle: "medium",
-          }).format(invoice.payments[0].paidAt)}`
+        ? `${invoice.currency} ${Number(invoice.payments[0].amount).toLocaleString()} on ${new Intl.DateTimeFormat(
+            "en-NG",
+            {
+              dateStyle: "medium",
+            },
+          ).format(invoice.payments[0].paidAt)}`
         : "No payments",
-      canRecordPayment: Number(invoice.balanceDue) > 0 && invoice.status !== "VOID" && invoice.status !== "DRAFT",
+      canRecordPayment:
+        Number(invoice.balanceDue) > 0 && invoice.status !== "VOID" && invoice.status !== "DRAFT",
       canSend: invoice.status === "DRAFT",
       canResend:
         invoice.status !== "DRAFT" &&
@@ -359,12 +436,17 @@ export default async function FinanceQueuePage({
       sentToEmail: invoice.sentToEmail,
       canVoid: invoice.status !== "VOID" && Number(invoice.amount) - Number(invoice.balanceDue) <= 0,
       canSendReminder:
-        invoice.status !== "DRAFT" && invoice.status !== "VOID" && invoice.status !== "PAID" && Number(invoice.balanceDue) > 0,
+        invoice.status !== "DRAFT" &&
+        invoice.status !== "VOID" &&
+        invoice.status !== "PAID" &&
+        Number(invoice.balanceDue) > 0,
       isOverdue: overdueDays > 0,
       overdueDays,
       reminderCount: eventMeta.reminderCount,
       lastReminderLabel: eventMeta.lastReminderAt
-        ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(eventMeta.lastReminderAt)
+        ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+            eventMeta.lastReminderAt,
+          )
         : "Never",
       followUpOwner: invoice.deal?.lead?.name || invoice.deal?.lead?.email || "Unassigned contact",
       projectId: invoice.deal?.unit?.project?.id || "",
@@ -375,7 +457,9 @@ export default async function FinanceQueuePage({
     };
   });
 
-  const openInvoices = invoiceRows.filter((x) => x.balanceValue > 0 && x.statusValue !== "VOID" && x.statusValue !== "PAID");
+  const openInvoices = invoiceRows.filter(
+    (x) => x.balanceValue > 0 && x.statusValue !== "VOID" && x.statusValue !== "PAID",
+  );
   const overdueInvoices = openInvoices
     .filter((x) => x.isOverdue)
     .sort((a, b) => b.overdueDays - a.overdueDays)
@@ -413,7 +497,9 @@ export default async function FinanceQueuePage({
   const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const monthLabel = (key: string) => {
     const [y, m] = key.split("-").map((x) => Number(x));
-    return new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }).format(new Date(y, (m || 1) - 1, 1));
+    return new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }).format(
+      new Date(y, (m || 1) - 1, 1),
+    );
   };
   const recentMonthKeys: string[] = [];
   for (let i = 11; i >= 0; i -= 1) {
@@ -525,7 +611,9 @@ export default async function FinanceQueuePage({
               "Unknown"
             : "Unknown"),
         reviewedAtLabel: deal.financeReviewedAt
-          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(deal.financeReviewedAt)
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+              deal.financeReviewedAt,
+            )
           : "Unknown time",
       }))}
       dealOptions={dealOptions.map((deal) => ({
@@ -541,24 +629,24 @@ export default async function FinanceQueuePage({
             ? `${payment.standaloneTitle}${payment.payerName ? ` · ${payment.payerName}` : ""}`
             : "Direct payment";
         return {
-        id: payment.id,
-        invoiceLabel,
-        isDirect,
-        amountLabel: `${payment.currency} ${Number(payment.amount).toLocaleString()}`,
-        amountValue: Number(payment.amount),
-        method: canManage ? payment.method || "—" : "Restricted",
-        reference: canManage ? payment.reference || "—" : "Restricted",
-        referenceRaw: payment.reference || "",
-        paidAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(payment.paidAt),
-        paidAtValue: payment.paidAt.toISOString().slice(0, 10),
-        recordedBy: canManage ? payment.recordedByLabel || "Unknown" : "Restricted",
-        hasAttachment: Boolean(payment.attachmentUrl),
-      projectId: payment.invoice?.deal?.unit?.project?.id || "",
-      projectLabel: payment.invoice?.deal?.unit?.project?.name || "Unassigned project",
-      unitId: payment.invoice?.deal?.unit?.id || "",
-      unitLabel: payment.invoice?.deal?.unit?.label || "Unassigned unit",
-        department: payment.department || payment.invoice?.department || "",
-      };
+          id: payment.id,
+          invoiceLabel,
+          isDirect,
+          amountLabel: `${payment.currency} ${Number(payment.amount).toLocaleString()}`,
+          amountValue: Number(payment.amount),
+          method: canManage ? payment.method || "—" : "Restricted",
+          reference: canManage ? payment.reference || "—" : "Restricted",
+          referenceRaw: payment.reference || "",
+          paidAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(payment.paidAt),
+          paidAtValue: payment.paidAt.toISOString().slice(0, 10),
+          recordedBy: canManage ? payment.recordedByLabel || "Unknown" : "Restricted",
+          hasAttachment: Boolean(payment.attachmentUrl),
+          projectId: payment.invoice?.deal?.unit?.project?.id || "",
+          projectLabel: payment.invoice?.deal?.unit?.project?.name || "Unassigned project",
+          unitId: payment.invoice?.deal?.unit?.id || "",
+          unitLabel: payment.invoice?.deal?.unit?.label || "Unassigned unit",
+          department: payment.department || payment.invoice?.department || "",
+        };
       })}
       expenses={expenses.map((expense) => ({
         id: expense.id,
@@ -569,20 +657,25 @@ export default async function FinanceQueuePage({
         paidThroughAccount: expense.paidThroughAccount || "—",
         reference: expense.reference || "—",
         referenceRaw: expense.reference || "",
-        expenseDateLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(expense.expenseDate),
+        expenseDateLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
+          expense.expenseDate,
+        ),
         expenseDateValue: expense.expenseDate.toISOString().slice(0, 10),
         hasAttachment: Boolean(expense.attachmentUrl),
         projectId: expense.projectId || "",
-        projectLabel: expense.projectId ? (projectMap.get(expense.projectId) || "Unknown project") : "Unassigned project",
+        projectLabel: expense.projectId
+          ? projectMap.get(expense.projectId) || "Unknown project"
+          : "Unassigned project",
         unitId: expense.unitId || "",
-        unitLabel: expense.unitId ? (unitMap.get(expense.unitId)?.label || "Unknown unit") : "Unassigned unit",
+        unitLabel: expense.unitId ? unitMap.get(expense.unitId)?.label || "Unknown unit" : "Unassigned unit",
         department: expense.department || "",
       }))}
       salesReceipts={salesReceipts.map((receipt) => ({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
         title: receipt.title,
-        customerName: receipt.customerName || receipt.deal?.propertyClient?.fullName || receipt.deal?.lead?.name || "—",
+        customerName:
+          receipt.customerName || receipt.deal?.propertyClient?.fullName || receipt.deal?.lead?.name || "—",
         defaultEmail: receipt.deal?.propertyClient?.email || receipt.deal?.lead?.email || "",
         amountLabel: `${receipt.currency} ${Number(receipt.amount).toLocaleString()}`,
         paymentMode: receipt.paymentMode || "—",
@@ -596,7 +689,9 @@ export default async function FinanceQueuePage({
       }))}
       masterLogs={masterLogs.map((log) => ({
         id: log.id,
-        timestamp: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(log.createdAt),
+        timestamp: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+          log.createdAt,
+        ),
         actor: canManage ? log.actorLabel || "System" : "Restricted",
         module: log.module,
         action: log.action,
@@ -625,8 +720,8 @@ export default async function FinanceQueuePage({
         modules: Array.from(new Set(allLogValues.map((x) => x.module))).sort((a, b) => a.localeCompare(b)),
         actions: Array.from(new Set(allLogValues.map((x) => x.action))).sort((a, b) => a.localeCompare(b)),
         actors: canManage
-          ? Array.from(new Set(allLogValues.map((x) => x.actorLabel).filter(Boolean) as string[])).sort((a, b) =>
-              a.localeCompare(b),
+          ? Array.from(new Set(allLogValues.map((x) => x.actorLabel).filter(Boolean) as string[])).sort(
+              (a, b) => a.localeCompare(b),
             )
           : [],
       }}
@@ -657,7 +752,10 @@ export default async function FinanceQueuePage({
         currency: tenant.defaultCurrency,
         companyName: tenant.name,
         companyLogoUrl: tenant.settings?.logoUrl ?? null,
-        generatedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(now),
+        generatedAtLabel: new Intl.DateTimeFormat("en-NG", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(now),
         pnlLite: {
           invoicedLabel: `${tenant.defaultCurrency} ${totalInvoiced.toLocaleString()}`,
           collectedLabel: `${tenant.defaultCurrency} ${totalCollected.toLocaleString()}`,
@@ -709,9 +807,10 @@ export default async function FinanceQueuePage({
         return {
           id: x.id,
           sourceName: x.sourceName,
-          importedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
-            x.importedAt,
-          ),
+          importedAtLabel: new Intl.DateTimeFormat("en-NG", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          }).format(x.importedAt),
           totalRows: s.total,
           matchedRows: s.matched,
           unmatchedRows: s.unmatched,
@@ -750,7 +849,9 @@ export default async function FinanceQueuePage({
           balanceLabel: `${bill.currency} ${Number(bill.balanceDue).toLocaleString()}`,
           balanceValue: Number(bill.balanceDue),
           currency: bill.currency,
-          dueDateLabel: dueDate ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(dueDate) : "No due date",
+          dueDateLabel: dueDate
+            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(dueDate)
+            : "No due date",
           dueDateValue: dueDate ? dueDate.toISOString().slice(0, 10) : "",
           issuedAtValue: bill.issuedAt.toISOString().slice(0, 10),
           department: bill.department || "",

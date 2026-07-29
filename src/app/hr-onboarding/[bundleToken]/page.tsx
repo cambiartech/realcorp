@@ -21,7 +21,11 @@ export default async function HrOnboardingBundlePage({
   const initialFormType = form && bundle.steps.some((s) => s.formType === form) ? (form as HrFormType) : null;
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 p-8 text-center text-sm text-slate-600">Loading…</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 p-8 text-center text-sm text-slate-600">Loading…</div>
+      }
+    >
       <HrFormBundleClient
         bundle={bundle}
         tenantSlug={bundle.tenantSlug || tenantFromQuery}

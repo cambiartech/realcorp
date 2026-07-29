@@ -80,7 +80,12 @@ export function ListingEditorModal({
         {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
 
         <label className="flex cursor-pointer items-center gap-2 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
-          <input type="checkbox" name="isPublished" defaultChecked={project.isPublished} className="h-4 w-4 accent-foreground" />
+          <input
+            type="checkbox"
+            name="isPublished"
+            defaultChecked={project.isPublished}
+            className="h-4 w-4 accent-foreground"
+          />
           <span className="text-sm font-medium text-foreground">Publish this project publicly</span>
         </label>
 
@@ -98,15 +103,29 @@ export function ListingEditorModal({
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-sm text-muted">City</label>
-            <input name="locationCity" defaultValue={project.locationCity ?? ""} placeholder="e.g. Lekki" className={FIELD_CLASS} />
+            <input
+              name="locationCity"
+              defaultValue={project.locationCity ?? ""}
+              placeholder="e.g. Lekki"
+              className={FIELD_CLASS}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">State</label>
-            <input name="locationState" defaultValue={project.locationState ?? ""} placeholder="e.g. Lagos" className={FIELD_CLASS} />
+            <input
+              name="locationState"
+              defaultValue={project.locationState ?? ""}
+              placeholder="e.g. Lagos"
+              className={FIELD_CLASS}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Address (optional)</label>
-            <input name="locationAddress" defaultValue={project.locationAddress ?? ""} className={FIELD_CLASS} />
+            <input
+              name="locationAddress"
+              defaultValue={project.locationAddress ?? ""}
+              className={FIELD_CLASS}
+            />
           </div>
         </div>
 

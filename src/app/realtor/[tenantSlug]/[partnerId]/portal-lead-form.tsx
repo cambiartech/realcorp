@@ -50,7 +50,9 @@ export function PortalLeadForm({
       ) : null}
 
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Lead name *</label>
+        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">
+          Lead name *
+        </label>
         <input
           name="name"
           required
@@ -75,7 +77,9 @@ export function PortalLeadForm({
         />
       </div>
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Project interest</label>
+        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">
+          Project interest
+        </label>
         <UiSelect name="projectInterest" defaultValue="">
           <option value="">Not specified</option>
           {projectOptions.map((p) => (
@@ -86,7 +90,9 @@ export function PortalLeadForm({
         </UiSelect>
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">Budget range</label>
+        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">
+          Budget range
+        </label>
         <input
           name="budgetRange"
           className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-400 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
@@ -101,24 +107,32 @@ export function PortalLeadForm({
         </UiSelect>
       </div>
       <div className="sm:col-span-2 border-t border-stone-200 pt-3 dark:border-stone-700">
-        <p className="text-xs font-semibold text-stone-600 dark:text-stone-400">Campaign attribution (optional)</p>
+        <p className="text-xs font-semibold text-stone-600 dark:text-stone-400">
+          Campaign attribution (optional)
+        </p>
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">utm_source</label>
+        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">
+          utm_source
+        </label>
         <input
           name="utmSource"
           className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 font-mono text-sm text-stone-900 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">utm_medium</label>
+        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">
+          utm_medium
+        </label>
         <input
           name="utmMedium"
           className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 font-mono text-sm text-stone-900 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
         />
       </div>
       <div className="sm:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">utm_campaign (matches active campaign code)</label>
+        <label className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-400">
+          utm_campaign (matches active campaign code)
+        </label>
         <input
           name="utmCampaign"
           placeholder="e.g. spring-launch-2026"

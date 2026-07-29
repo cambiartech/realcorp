@@ -45,8 +45,9 @@ function EventCard({
       ) : null}
       {event.userEmail ? <p className="text-xs">User: {event.userEmail}</p> : null}
       {event.isSanitized ? (
-        <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-xs text-foreground">
-          Browser-only report — Next.js hides the real message in production. Check the highlighted server report below or Netlify runtime logs.
+        <p className="mt-2 rounded border border-[var(--warn-line)] bg-[var(--warn-wash)] px-2 py-1.5 text-xs text-foreground">
+          Browser-only report — Next.js hides the real message in production. Check the highlighted server
+          report below or Netlify runtime logs.
         </p>
       ) : null}
       {event.name || event.message ? (
@@ -81,7 +82,8 @@ export function ErrorReferenceLookup({ className = "mt-8" }: { className?: strin
     <section className={`${className} rounded-lg border border-foreground/10 p-5`}>
       <h2 className="text-base font-semibold text-foreground">Look up reference</h2>
       <p className="mt-1 text-sm text-muted">
-        Paste the error reference from the failed page. After deploy, server-side captures include the real message and stack — not the generic browser text.
+        Paste the error reference from the failed page. After deploy, server-side captures include the real
+        message and stack — not the generic browser text.
       </p>
       <form onSubmit={handleLookup} className="mt-4 flex flex-wrap gap-2">
         <input
@@ -106,17 +108,18 @@ export function ErrorReferenceLookup({ className = "mt-8" }: { className?: strin
           ) : (
             <div className="space-y-4">
               <p className="text-muted">
-                <strong className="text-foreground">{result.count}</strong> report{result.count === 1 ? "" : "s"} for{" "}
-                <code className="font-mono text-xs">{result.digest}</code>.
+                <strong className="text-foreground">{result.count}</strong> report
+                {result.count === 1 ? "" : "s"} for <code className="font-mono text-xs">{result.digest}</code>
+                .
               </p>
 
               {!result.hasActionableDetail ? (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+                <div className="rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-xs text-foreground">
                   <p className="font-medium">Only generic browser reports on file for this reference.</p>
                   <p className="mt-1 text-muted">
                     Reproduce the error once after the latest deploy, then look up again — or open{" "}
-                    <strong className="text-foreground">Netlify → Site → Logs → Runtime</strong> and search for{" "}
-                    <code className="font-mono">{result.digest}</code> or{" "}
+                    <strong className="text-foreground">Netlify → Site → Logs → Runtime</strong> and search
+                    for <code className="font-mono">{result.digest}</code> or{" "}
                     <code className="font-mono">[onRequestError]</code>.
                   </p>
                 </div>
@@ -124,7 +127,9 @@ export function ErrorReferenceLookup({ className = "mt-8" }: { className?: strin
 
               {result.bestEvent ? (
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">Most useful report</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">
+                    Most useful report
+                  </p>
                   <EventCard
                     event={{
                       ...result.bestEvent,

@@ -8,7 +8,10 @@ import { importLeads, type ImportLeadRow } from "../actions";
 // CSV parser — handles quoted fields, CRLF and LF, UTF-8 BOM
 // ---------------------------------------------------------------------------
 function parseCsv(text: string): string[][] {
-  const clean = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const clean = text
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -17,14 +20,25 @@ function parseCsv(text: string): string[][] {
   for (let i = 0; i < clean.length; i++) {
     const ch = clean[i];
     if (inQuotes) {
-      if (ch === '"' && clean[i + 1] === '"') { field += '"'; i++; }
-      else if (ch === '"') inQuotes = false;
+      if (ch === '"' && clean[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (ch === '"') inQuotes = false;
       else field += ch;
     } else {
-      if (ch === '"') { inQuotes = true; }
-      else if (ch === ",") { row.push(field); field = ""; }
-      else if (ch === "\n") { row.push(field); field = ""; rows.push(row); row = []; }
-      else { field += ch; }
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        row.push(field);
+        field = "";
+      } else if (ch === "\n") {
+        row.push(field);
+        field = "";
+        rows.push(row);
+        row = [];
+      } else {
+        field += ch;
+      }
     }
   }
   row.push(field);
@@ -34,13 +48,25 @@ function parseCsv(text: string): string[][] {
 
 // Canonical column aliases
 const COL_MAP: Record<string, keyof ImportLeadRow> = {
-  name: "name", "full name": "name", "lead name": "name", fullname: "name",
-  email: "email", "email address": "email",
-  phone: "phone", "phone number": "phone", mobile: "phone", tel: "phone",
-  source: "source", "lead source": "source",
-  project: "projectInterest", "project interest": "projectInterest", "project name": "projectInterest",
-  budget: "budgetRange", "budget range": "budgetRange",
-  campaign: "campaignName", "campaign name": "campaignName",
+  name: "name",
+  "full name": "name",
+  "lead name": "name",
+  fullname: "name",
+  email: "email",
+  "email address": "email",
+  phone: "phone",
+  "phone number": "phone",
+  mobile: "phone",
+  tel: "phone",
+  source: "source",
+  "lead source": "source",
+  project: "projectInterest",
+  "project interest": "projectInterest",
+  "project name": "projectInterest",
+  budget: "budgetRange",
+  "budget range": "budgetRange",
+  campaign: "campaignName",
+  "campaign name": "campaignName",
 };
 
 type PreviewRow = ImportLeadRow & { _valid: boolean; _errors: string[] };
@@ -118,7 +144,10 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
     const clean: ImportLeadRow[] = validRows.map(({ _valid: _v, _errors: _e, ...rest }) => rest);
     const result = await importLeads(tenantSlug, clean);
     setLoading(false);
-    if (!result.ok) { setError(result.error); return; }
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
     setState({ phase: "done", count: result.count });
   }
 
@@ -146,16 +175,20 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
 
       {/* Column legend */}
       <div className="mb-6 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Recognised column names</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+          Recognised column names
+        </p>
         <div className="flex flex-wrap gap-2">
-          {[
-            "Name", "Email", "Phone", "Source",
-            "Project (interest)", "Budget (range)", "Campaign",
-          ].map((col) => (
-            <span key={col} className="rounded border border-foreground/10 bg-background px-2 py-0.5 font-mono text-xs text-foreground/80">
-              {col}
-            </span>
-          ))}
+          {["Name", "Email", "Phone", "Source", "Project (interest)", "Budget (range)", "Campaign"].map(
+            (col) => (
+              <span
+                key={col}
+                className="rounded border border-foreground/10 bg-background px-2 py-0.5 font-mono text-xs text-foreground/80"
+              >
+                {col}
+              </span>
+            ),
+          )}
         </div>
         <p className="mt-2 text-xs text-muted">
           Column names are case-insensitive. Extra columns are ignored. Download a{" "}
@@ -173,25 +206,29 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
       {/* Upload zone */}
       {state.phase === "idle" && (
         <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-foreground/20 bg-foreground/[0.01] px-6 py-14 text-center transition-colors hover:border-foreground/40 hover:bg-foreground/[0.03]">
-          <svg viewBox="0 0 24 24" className="h-10 w-10 text-muted" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0l-3 3m3-3l3 3" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            viewBox="0 0 24 24"
+            className="h-10 w-10 text-muted"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <path
+              d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0l-3 3m3-3l3 3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           <div>
             <p className="font-semibold text-foreground">Click to upload or drag &amp; drop</p>
             <p className="mt-1 text-sm text-muted">CSV files only · max 1 000 rows</p>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="sr-only"
-            onChange={handleFile}
-          />
+          <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" onChange={handleFile} />
         </label>
       )}
 
       {error && (
-        <div className="mt-4 rounded-lg border border-red-400/30 bg-red-500/5 px-4 py-3 text-sm text-red-600">
+        <div className="mt-4 rounded-lg border border-[var(--danger-line)] bg-[var(--danger-wash)] px-4 py-3 text-sm text-[var(--danger)]">
           {error}
         </div>
       )}
@@ -202,11 +239,11 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-foreground">{state.fileName}</span>
-              <span className="rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-semibold text-green-600">
+              <span className="rounded-full bg-[var(--success-wash)] px-2.5 py-0.5 text-xs font-semibold text-[var(--success)]">
                 {validCount} valid
               </span>
               {invalidCount > 0 && (
-                <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-600">
+                <span className="rounded-full bg-[var(--danger-wash)] px-2.5 py-0.5 text-xs font-semibold text-[var(--danger)]">
                   {invalidCount} skipped
                 </span>
               )}
@@ -214,7 +251,10 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => { setState({ phase: "idle" }); if (fileRef.current) fileRef.current.value = ""; }}
+                onClick={() => {
+                  setState({ phase: "idle" });
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
                 className="rounded-md border border-foreground/15 px-3 py-1.5 text-sm text-muted hover:bg-foreground/[0.04] hover:text-foreground"
               >
                 Change file
@@ -248,18 +288,20 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
                 </thead>
                 <tbody className="divide-y divide-foreground/10">
                   {state.rows.map((row, i) => (
-                    <tr key={i} className={row._valid ? "" : "bg-red-500/[0.03]"}>
+                    <tr key={i} className={row._valid ? "" : "bg-[var(--danger)]/[0.03]"}>
                       <td className="px-3 py-2 tabular-nums text-muted">{i + 1}</td>
                       <td className="px-3 py-2">
                         {row._valid ? (
-                          <span className="text-green-600">✓</span>
+                          <span className="text-[var(--success)]">✓</span>
                         ) : (
-                          <span className="text-red-500" title={row._errors.join("; ")}>
+                          <span className="text-[var(--danger)]" title={row._errors.join("; ")}>
                             ✕ {row._errors.join("; ")}
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2 font-medium text-foreground">{row.name || <span className="italic text-muted">—</span>}</td>
+                      <td className="px-3 py-2 font-medium text-foreground">
+                        {row.name || <span className="italic text-muted">—</span>}
+                      </td>
                       <td className="px-3 py-2 text-muted">{row.email ?? "—"}</td>
                       <td className="px-3 py-2 text-muted">{row.phone ?? "—"}</td>
                       <td className="px-3 py-2 text-muted">{row.source ?? "—"}</td>
@@ -277,9 +319,19 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
 
       {/* Success */}
       {state.phase === "done" && (
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-green-400/30 bg-green-500/5 px-8 py-14 text-center">
-          <svg viewBox="0 0 24 24" className="h-12 w-12 text-green-500" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-[var(--success-line)] bg-[var(--success-wash)] px-8 py-14 text-center">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-12 w-12 text-[var(--success)]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
+            <path
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           <div>
             <p className="text-xl font-bold text-foreground">{state.count} leads imported!</p>
@@ -296,7 +348,10 @@ export function LeadImportWorkspace({ tenantSlug }: { tenantSlug: string }) {
             </Link>
             <button
               type="button"
-              onClick={() => { setState({ phase: "idle" }); if (fileRef.current) fileRef.current.value = ""; }}
+              onClick={() => {
+                setState({ phase: "idle" });
+                if (fileRef.current) fileRef.current.value = "";
+              }}
               className="rounded-md border border-foreground/15 px-5 py-2 text-sm font-medium text-muted hover:bg-foreground/[0.04] hover:text-foreground"
             >
               Import another file

@@ -17,10 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 // ---------------------------------------------------------------------------
 // GET — verification handshake
 // ---------------------------------------------------------------------------
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const url = new URL(req.url);
   const mode = url.searchParams.get("hub.mode");
@@ -66,10 +63,7 @@ function extractField(fields: MetaLeadField[], ...names: string[]): string | nul
   return null;
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
 
   // Verify X-Hub-Signature-256 — optional but strongly recommended in production.
@@ -128,8 +122,7 @@ export async function POST(
       }
 
       const name =
-        extractField(fields, "full_name", "name", "first_name") ??
-        `Meta lead ${value.id.slice(-6)}`;
+        extractField(fields, "full_name", "name", "first_name") ?? `Meta lead ${value.id.slice(-6)}`;
       const email = extractField(fields, "email");
       const phone = extractField(fields, "phone_number", "phone");
       const project = extractField(fields, "property", "project", "project_interest");

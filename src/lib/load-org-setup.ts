@@ -9,7 +9,8 @@ export async function loadOrgSetupForUser(tenantId: string, userId: string, isPl
   });
 
   const canManageOrgSetup =
-    isPlatformAdmin || (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
+    isPlatformAdmin ||
+    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
 
   if (!canManageOrgSetup) {
     return { canManageOrgSetup: false as const };

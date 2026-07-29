@@ -6,7 +6,8 @@ const SLIDES: Array<{ src: string; title: string; caption: string }> = [
   {
     src: "/screenshots/sc-1.png",
     title: "Command center",
-    caption: "Role-based dashboards with finance analytics, pipeline intelligence, and inventory at a glance.",
+    caption:
+      "Role-based dashboards with finance analytics, pipeline intelligence, and inventory at a glance.",
   },
   {
     src: "/screenshots/sc-2.png",
@@ -21,7 +22,8 @@ const SLIDES: Array<{ src: string; title: string; caption: string }> = [
   {
     src: "/screenshots/sc-4.png",
     title: "Reports",
-    caption: "Profit, cash flow, and balance summaries with exportable views across projects and departments.",
+    caption:
+      "Profit, cash flow, and balance summaries with exportable views across projects and departments.",
   },
   {
     src: "/screenshots/sc-5.png",
@@ -58,8 +60,8 @@ export function LandingProductShowcase() {
             <h2 className="headline">See it in the workspace.</h2>
           </div>
           <p className="body">
-            One ledger across sales, inventory, finance, and people — the same platform whether you run one market or
-            many.
+            One ledger across sales, inventory, finance, and people — the same platform whether you run one
+            market or many.
           </p>
         </div>
 

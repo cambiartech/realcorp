@@ -2,32 +2,26 @@
 
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-export function TenantHeaderActions({
-  tenantSlug,
-  userLabel,
-}: {
-  tenantSlug: string;
-  userLabel: string;
-}) {
+export function TenantHeaderActions({ tenantSlug, userLabel }: { tenantSlug: string; userLabel: string }) {
   return (
-    <div className="flex items-center gap-2 sm:gap-3">
-      <span className="hidden max-w-[160px] truncate text-xs text-muted sm:inline" title={userLabel}>
+    <div className="flex items-center gap-1.5 sm:gap-2">
+      <span className="hidden max-w-[160px] truncate text-xs text-muted lg:inline" title={userLabel}>
         {userLabel}
       </span>
-      <Link
-        href={`/${tenantSlug}/settings`}
-        className="text-xs font-medium text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
-      >
+      <Link href={`/${tenantSlug}/settings`} className="rc-btn rc-btn-ghost rc-btn-sm">
         Account
       </Link>
       <button
         type="button"
         onClick={() => signOut({ callbackUrl: "/login" })}
-        className="rounded-md border border-foreground/15 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
+        className="rc-btn rc-btn-secondary rc-btn-sm"
       >
         Sign out
       </button>
+      {/* Lives in the header rather than floating over it. */}
+      <ThemeToggle />
     </div>
   );
 }

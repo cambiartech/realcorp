@@ -1,7 +1,14 @@
 "use client";
 
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { DataExportMenu } from "@/components/shortlets/data-export-menu";
@@ -109,7 +116,10 @@ export function DealsWorkspace({
   const [timelineDeal, setTimelineDeal] = useState<DealCard | null>(null);
   const [timelineLogs, setTimelineLogs] = useState<TimelineLogRow[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
-  const [createState, createAction, createPending] = useActionState(createDeal.bind(null, tenantSlug), initial);
+  const [createState, createAction, createPending] = useActionState(
+    createDeal.bind(null, tenantSlug),
+    initial,
+  );
   const [moveState, moveAction, movePending] = useActionState(
     moveDealStage.bind(null, tenantSlug, activeDeal?.id ?? ""),
     initial,
@@ -181,7 +191,8 @@ export function DealsWorkspace({
   );
 
   const pipelineValue = useMemo(
-    () => boardDeals.filter((d) => d.stage !== "CLOSED_LOST").reduce((s, d) => s + parseDealValue(d.value), 0),
+    () =>
+      boardDeals.filter((d) => d.stage !== "CLOSED_LOST").reduce((s, d) => s + parseDealValue(d.value), 0),
     [boardDeals],
   );
 
@@ -281,7 +292,7 @@ export function DealsWorkspace({
               ))}
               <a
                 href={`/${tenantSlug}/deals`}
-                className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2"
+                className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
               >
                 Clear filters
               </a>
@@ -297,7 +308,13 @@ export function DealsWorkspace({
               title="Kanban view"
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]"}`}
             >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <rect x="3" y="3" width="5" height="18" rx="1" />
                 <rect x="10" y="3" width="5" height="12" rx="1" />
                 <rect x="17" y="3" width="4" height="15" rx="1" />
@@ -309,7 +326,13 @@ export function DealsWorkspace({
               title="List view"
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]"}`}
             >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <line x1="8" y1="6" x2="21" y2="6" />
                 <line x1="8" y1="12" x2="21" y2="12" />
                 <line x1="8" y1="18" x2="21" y2="18" />
@@ -363,7 +386,9 @@ export function DealsWorkspace({
             <tbody className="divide-y divide-foreground/10">
               {deals.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-sm text-muted">No deals yet.</td>
+                  <td colSpan={7} className="px-4 py-8 text-sm text-muted">
+                    No deals yet.
+                  </td>
                 </tr>
               ) : (
                 deals.map((deal) => (
@@ -371,21 +396,28 @@ export function DealsWorkspace({
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {deal.leadId ? (
-                          <Link href={`/${tenantSlug}/leads/${deal.leadId}`} className="font-medium text-foreground hover:underline">
+                          <Link
+                            href={`/${tenantSlug}/leads/${deal.leadId}`}
+                            className="font-medium text-foreground hover:underline"
+                          >
                             {deal.leadName}
                           </Link>
                         ) : (
                           <span className="font-medium text-foreground">{deal.leadName}</span>
                         )}
                         {deal.leadScore > 0 && (
-                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${deal.leadScore >= 70 ? "bg-red-500/10 text-red-600" : deal.leadScore >= 40 ? "bg-amber-400/10 text-amber-600" : "bg-foreground/5 text-muted"}`}>
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${deal.leadScore >= 70 ? "bg-[var(--danger-wash)] text-[var(--danger)]" : deal.leadScore >= 40 ? "bg-[var(--warn-wash)] text-[var(--warn)]" : "bg-foreground/5 text-muted"}`}
+                          >
                             {deal.leadScore}
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${deal.stage === "CLOSED_WON" ? "bg-green-500/10 text-green-600" : deal.stage === "CLOSED_LOST" ? "bg-red-500/10 text-red-600" : deal.stage === "RESERVATION_MADE" ? "bg-amber-500/10 text-amber-600" : "bg-foreground/5 text-muted"}`}>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${deal.stage === "CLOSED_WON" ? "bg-[var(--success-wash)] text-[var(--success)]" : deal.stage === "CLOSED_LOST" ? "bg-[var(--danger-wash)] text-[var(--danger)]" : deal.stage === "RESERVATION_MADE" ? "bg-[var(--warn-wash)] text-[var(--warn)]" : "bg-foreground/5 text-muted"}`}
+                      >
                         {STAGE_LABEL[deal.stage]}
                       </span>
                     </td>
@@ -413,192 +445,198 @@ export function DealsWorkspace({
       )}
 
       {/* Kanban board */}
-      {viewMode === "kanban" && <div className="mt-6 overflow-x-auto pb-2">
-        <DndContext
-          id="tenant-deals-board"
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
-        >
-          <div className="grid min-w-[1280px] grid-cols-9 gap-3">
-            {STAGE_ORDER.map((stage) => (
-              <StageColumn
-                key={stage}
-                stage={stage}
-                count={grouped.get(stage)?.length ?? 0}
-                active={hoverStage === stage}
-              >
-                <div className="space-y-2 p-2">
-                  {(grouped.get(stage) ?? []).map((deal) => (
-                    <DealCardItem
-                      key={deal.id}
-                      deal={deal}
-                      tenantSlug={tenantSlug}
-                      isDragging={draggingDealId === deal.id}
-                      dragDisabled={isDraggingSavePending}
-                      onMoveClick={() => setActiveDeal(deal)}
-                      onTimelineClick={() => openTimeline(deal)}
-                    />
-                  ))}
-                  {(grouped.get(stage)?.length ?? 0) === 0 ? (
-                    <p className="rounded-md border border-dashed border-foreground/15 p-2 text-[11px] text-muted">
-                      No deals
-                    </p>
-                  ) : null}
-                </div>
-              </StageColumn>
-            ))}
-          </div>
-        </DndContext>
-      </div>}
-
-      <ModalOverlay open={Boolean(isCreateOpen)} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_LG}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Create deal</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+      {viewMode === "kanban" && (
+        <div className="mt-6 overflow-x-auto pb-2">
+          <DndContext
+            id="tenant-deals-board"
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+          >
+            <div className="grid min-w-[1280px] grid-cols-9 gap-3">
+              {STAGE_ORDER.map((stage) => (
+                <StageColumn
+                  key={stage}
+                  stage={stage}
+                  count={grouped.get(stage)?.length ?? 0}
+                  active={hoverStage === stage}
+                >
+                  <div className="space-y-2 p-2">
+                    {(grouped.get(stage) ?? []).map((deal) => (
+                      <DealCardItem
+                        key={deal.id}
+                        deal={deal}
+                        tenantSlug={tenantSlug}
+                        isDragging={draggingDealId === deal.id}
+                        dragDisabled={isDraggingSavePending}
+                        onMoveClick={() => setActiveDeal(deal)}
+                        onTimelineClick={() => openTimeline(deal)}
+                      />
+                    ))}
+                    {(grouped.get(stage)?.length ?? 0) === 0 ? (
+                      <p className="rounded-md border border-dashed border-foreground/15 p-2 text-[11px] text-muted">
+                        No deals
+                      </p>
+                    ) : null}
+                  </div>
+                </StageColumn>
+              ))}
             </div>
+          </DndContext>
+        </div>
+      )}
 
-            <form ref={createFormRef} action={createAction} className="mt-4 grid gap-3 sm:grid-cols-2">
-              {createState && !createState.ok ? (
-                <div className="sm:col-span-2">
-                  <FormAlert>{createState.error}</FormAlert>
-                </div>
-              ) : null}
+      <ModalOverlay
+        open={Boolean(isCreateOpen)}
+        onClose={() => setIsCreateOpen(false)}
+        panelClassName={MODAL_PANEL_LG}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Create deal</h2>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
 
-              <div>
-                <label htmlFor="deal-lead" className="mb-1 block text-sm text-muted">
-                  Lead (optional)
-                </label>
-                <UiSelect id="deal-lead" name="leadId" defaultValue={defaultLeadId || ""}>
-                  <option value="">None</option>
-                  {leads.map((lead) => (
-                    <option key={lead.id} value={lead.id}>
-                      {lead.label}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="deal-unit" className="mb-1 block text-sm text-muted">
-                  Unit (optional)
-                </label>
-                <UiSelect id="deal-unit" name="unitId" defaultValue="">
-                  <option value="">None</option>
-                  {units.map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.label}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
+        <form ref={createFormRef} action={createAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+          {createState && !createState.ok ? (
+            <div className="sm:col-span-2">
+              <FormAlert>{createState.error}</FormAlert>
+            </div>
+          ) : null}
 
-              <div>
-                <label htmlFor="deal-owner" className="mb-1 block text-sm text-muted">
-                  Assign owner
-                </label>
-                <UiSelect id="deal-owner" name="assignedUserId" defaultValue="">
-                  <option value="">Use current user</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.label}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="deal-value" className="mb-1 block text-sm text-muted">
-                  Deal value (optional)
-                </label>
-                <input
-                  id="deal-value"
-                  name="value"
-                  inputMode="decimal"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
+          <div>
+            <label htmlFor="deal-lead" className="mb-1 block text-sm text-muted">
+              Lead (optional)
+            </label>
+            <UiSelect id="deal-lead" name="leadId" defaultValue={defaultLeadId || ""}>
+              <option value="">None</option>
+              {leads.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label htmlFor="deal-unit" className="mb-1 block text-sm text-muted">
+              Unit (optional)
+            </label>
+            <UiSelect id="deal-unit" name="unitId" defaultValue="">
+              <option value="">None</option>
+              {units.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
 
-              <div>
-                <label htmlFor="deal-stage" className="mb-1 block text-sm text-muted">
-                  Stage
-                </label>
-                <UiSelect id="deal-stage" name="stage" defaultValue={DealStage.NEW_LEAD}>
-                  {Object.values(DealStage).map((stage) => (
-                    <option key={stage} value={stage}>
-                      {STAGE_LABEL[stage]}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <label className="mt-6 inline-flex items-center gap-2 text-sm text-muted">
-                <input type="checkbox" name="pendingFinance" className="h-4 w-4 accent-black" />
-                Mark as pending finance
-              </label>
+          <div>
+            <label htmlFor="deal-owner" className="mb-1 block text-sm text-muted">
+              Assign owner
+            </label>
+            <UiSelect id="deal-owner" name="assignedUserId" defaultValue="">
+              <option value="">Use current user</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label htmlFor="deal-value" className="mb-1 block text-sm text-muted">
+              Deal value (optional)
+            </label>
+            <input
+              id="deal-value"
+              name="value"
+              inputMode="decimal"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
 
-              <div className="sm:col-span-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createPending}
-                  aria-busy={createPending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {createPending ? <ButtonSpinner /> : null}
-                  {createPending ? "Creating..." : "Create deal"}
-                </button>
-              </div>
-            </form>
+          <div>
+            <label htmlFor="deal-stage" className="mb-1 block text-sm text-muted">
+              Stage
+            </label>
+            <UiSelect id="deal-stage" name="stage" defaultValue={DealStage.NEW_LEAD}>
+              {Object.values(DealStage).map((stage) => (
+                <option key={stage} value={stage}>
+                  {STAGE_LABEL[stage]}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <label className="mt-6 inline-flex items-center gap-2 text-sm text-muted">
+            <input type="checkbox" name="pendingFinance" className="h-4 w-4 accent-black" />
+            Mark as pending finance
+          </label>
+
+          <div className="sm:col-span-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createPending}
+              aria-busy={createPending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {createPending ? <ButtonSpinner /> : null}
+              {createPending ? "Creating..." : "Create deal"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
       {activeDeal ? (
         <ModalOverlay open onClose={() => setActiveDeal(null)} panelClassName={MODAL_PANEL_SM}>
-            <h2 className="text-lg font-semibold text-foreground">Move deal stage</h2>
-            <p className="mt-1 text-sm text-muted">{activeDeal.leadName}</p>
-            {moveState && !moveState.ok ? <FormAlert>{moveState.error}</FormAlert> : null}
-            <form action={moveAction} className="mt-4 space-y-3">
-              <UiSelect name="stage" defaultValue={activeDeal.stage}>
-                {Object.values(DealStage).map((stage) => (
-                  <option key={stage} value={stage}>
-                    {STAGE_LABEL[stage]}
-                  </option>
-                ))}
-              </UiSelect>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveDeal(null)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={movePending}
-                  aria-busy={movePending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {movePending ? <ButtonSpinner /> : null}
-                  {movePending ? "Saving..." : "Move stage"}
-                </button>
-              </div>
-            </form>
+          <h2 className="text-lg font-semibold text-foreground">Move deal stage</h2>
+          <p className="mt-1 text-sm text-muted">{activeDeal.leadName}</p>
+          {moveState && !moveState.ok ? <FormAlert>{moveState.error}</FormAlert> : null}
+          <form action={moveAction} className="mt-4 space-y-3">
+            <UiSelect name="stage" defaultValue={activeDeal.stage}>
+              {Object.values(DealStage).map((stage) => (
+                <option key={stage} value={stage}>
+                  {STAGE_LABEL[stage]}
+                </option>
+              ))}
+            </UiSelect>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveDeal(null)}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={movePending}
+                aria-busy={movePending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {movePending ? <ButtonSpinner /> : null}
+                {movePending ? "Saving..." : "Move stage"}
+              </button>
+            </div>
+          </form>
         </ModalOverlay>
       ) : null}
 
@@ -609,38 +647,38 @@ export function DealsWorkspace({
           variant="drawer"
           panelClassName="h-full w-full max-w-md overflow-y-auto border-l border-foreground/10 bg-foreground/[0.02] p-4 shadow-2xl"
         >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Deal Timeline</h2>
-                <p className="text-xs text-muted">{timelineDeal.leadName}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTimelineDeal(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close timeline"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Deal Timeline</h2>
+              <p className="text-xs text-muted">{timelineDeal.leadName}</p>
             </div>
-            {timelineLoading ? (
-              <p className="mt-4 text-sm text-muted">Loading timeline...</p>
-            ) : timelineLogs.length === 0 ? (
-              <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
-            ) : (
-              <ul className="mt-4 space-y-2">
-                {timelineLogs.map((log) => (
-                  <li key={log.id} className="rounded-md border border-foreground/10 p-3">
-                    <p className="text-xs text-muted">{log.timestamp}</p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
-                    <p className="text-xs text-muted">By: {log.actor}</p>
-                    <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <button
+              type="button"
+              onClick={() => setTimelineDeal(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+              aria-label="Close timeline"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+          {timelineLoading ? (
+            <p className="mt-4 text-sm text-muted">Loading timeline...</p>
+          ) : timelineLogs.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {timelineLogs.map((log) => (
+                <li key={log.id} className="rounded-md border border-foreground/10 p-3">
+                  <p className="text-xs text-muted">{log.timestamp}</p>
+                  <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
+                  <p className="text-xs text-muted">By: {log.actor}</p>
+                  <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </ModalOverlay>
       ) : null}
     </div>
@@ -694,7 +732,13 @@ function DealCardItem({
   onMoveClick: () => void;
   onTimelineClick: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging: internalDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging: internalDragging,
+  } = useDraggable({
     id: deal.id,
     data: { stage: deal.stage },
   });
@@ -714,7 +758,10 @@ function DealCardItem({
         isDragging || internalDragging ? "opacity-60" : "",
       ].join(" ")}
     >
-      <Link href={`/${tenantSlug}/deals/${deal.id}`} className="block font-semibold text-foreground hover:underline hover:decoration-foreground/30">
+      <Link
+        href={`/${tenantSlug}/deals/${deal.id}`}
+        className="block font-semibold text-foreground hover:underline hover:decoration-foreground/30"
+      >
         {deal.leadName}
       </Link>
       <p className="mt-0.5 text-muted">{deal.unitLabel}</p>

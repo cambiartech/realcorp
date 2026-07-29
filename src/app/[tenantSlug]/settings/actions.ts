@@ -308,14 +308,18 @@ export async function updateOrgModules(tenantSlug: string, _prev: unknown, formD
     await prisma.tenantSettings.create({
       data: {
         tenantId: tenant.id,
-        ...(roleModuleGrantsParsed ? { roleModuleGrants: roleModuleGrantsParsed as Prisma.InputJsonValue } : {}),
+        ...(roleModuleGrantsParsed
+          ? { roleModuleGrants: roleModuleGrantsParsed as Prisma.InputJsonValue }
+          : {}),
       },
     });
   } else {
     await prisma.tenantSettings.update({
       where: { tenantId: tenant.id },
       data: {
-        roleModuleGrants: roleModuleGrantsParsed ? (roleModuleGrantsParsed as Prisma.InputJsonValue) : Prisma.JsonNull,
+        roleModuleGrants: roleModuleGrantsParsed
+          ? (roleModuleGrantsParsed as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
       },
     });
   }

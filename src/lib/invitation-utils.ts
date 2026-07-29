@@ -19,10 +19,12 @@ export function newInviteToken() {
 
 export type InviteLinkStatus = "valid" | "expired" | "accepted" | "not_found";
 
-export function classifyInvite(invite: {
-  acceptedAt: Date | null;
-  expiresAt: Date;
-} | null): InviteLinkStatus {
+export function classifyInvite(
+  invite: {
+    acceptedAt: Date | null;
+    expiresAt: Date;
+  } | null,
+): InviteLinkStatus {
   if (!invite) return "not_found";
   if (invite.acceptedAt) return "accepted";
   if (invite.expiresAt <= new Date()) return "expired";

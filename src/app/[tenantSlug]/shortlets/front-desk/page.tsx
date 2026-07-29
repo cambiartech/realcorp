@@ -23,10 +23,7 @@ export default async function FrontDeskPage({ params }: { params: Promise<{ tena
       where: {
         tenantId: ctx.tenant.id,
         status: { in: [...ACTIVE_FOLIO_STATUS_VALUES] },
-        OR: [
-          { checkIn: { gte: todayStart, lt: todayEnd } },
-          { checkOut: { gte: todayStart, lt: todayEnd } },
-        ],
+        OR: [{ checkIn: { gte: todayStart, lt: todayEnd } }, { checkOut: { gte: todayStart, lt: todayEnd } }],
       },
       include: { unit: { select: { name: true } }, property: { select: { name: true } } },
       orderBy: { checkIn: "asc" },
@@ -72,7 +69,9 @@ export default async function FrontDeskPage({ params }: { params: Promise<{ tena
     .filter((r) => r.status === "CHECKED_IN" && r.checkOut >= todayStart && r.checkOut < todayEnd)
     .map((r) => {
       const overdue = isCheckoutOverdue(r.checkOut, ctx.pmsSettings.checkOutTime, now);
-      const dueSoon = !overdue && isCheckoutDueSoon(r.checkOut, ctx.pmsSettings.checkOutTime, ctx.pmsSettings.checkoutAlertHours, now);
+      const dueSoon =
+        !overdue &&
+        isCheckoutDueSoon(r.checkOut, ctx.pmsSettings.checkOutTime, ctx.pmsSettings.checkoutAlertHours, now);
       return {
         id: r.id,
         guestName: r.guestName,

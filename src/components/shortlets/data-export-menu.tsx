@@ -66,31 +66,43 @@ export function DataExportMenu({
   }
 
   return (
-    <div className={["flex flex-wrap gap-2", className].filter(Boolean).join(" ")}>
+    /* Exports are a secondary concern — grouped as one segmented control so
+       they stop competing with the page's real primary action. */
+    <div
+      className={[
+        "inline-flex overflow-hidden rounded-[var(--r-sm)] border border-[var(--border-strong)]",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      role="group"
+      aria-label="Export"
+    >
       <button
         type="button"
         disabled={busy || rows.length === 0}
         onClick={() => downloadCsv(filename, headers, rows, keys)}
-        className="rounded-md border border-foreground/15 px-3 py-1.5 text-sm hover:bg-foreground/[0.06] disabled:opacity-50"
+        className="rc-btn rc-btn-ghost rc-btn-sm rounded-none border-r border-[var(--border-subtle)]"
         title="Raw data for imports — use Excel for meeting-ready reports with charts"
       >
-        Export CSV
+        CSV
       </button>
       <button
         type="button"
         disabled={busy || rows.length === 0}
         onClick={() => void exportExcel()}
-        className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+        className="rc-btn rc-btn-ghost rc-btn-sm rounded-none font-semibold text-foreground"
+        title="Formatted report with charts"
       >
-        {busy ? "Building…" : "Export Excel"}
+        {busy ? "Building…" : "Excel"}
       </button>
       {showPdf ? (
         <button
           type="button"
           onClick={downloadPdfViaPrint}
-          className="rounded-md border border-foreground/15 px-3 py-1.5 text-sm hover:bg-foreground/[0.06]"
+          className="rc-btn rc-btn-ghost rc-btn-sm rounded-none border-l border-[var(--border-subtle)]"
         >
-          Export PDF
+          PDF
         </button>
       ) : null}
     </div>

@@ -45,7 +45,10 @@ function UtmBreakdownTable({ title, rows }: { title: string; rows: UtmRow[] }) {
               <span className="text-muted">{row.count}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
-              <div className="h-full bg-foreground/50" style={{ width: `${Math.round((row.count / max) * 100)}%` }} />
+              <div
+                className="h-full bg-foreground/50"
+                style={{ width: `${Math.round((row.count / max) * 100)}%` }}
+              />
             </div>
           </li>
         ))}
@@ -152,7 +155,18 @@ export function CaptureFormDetailWorkspace({
         ref: linkRef || undefined,
         partner: linkPartner || undefined,
       }),
-    [siteOrigin, tenantSlug, form.slug, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, linkRef, linkPartner],
+    [
+      siteOrigin,
+      tenantSlug,
+      form.slug,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmContent,
+      utmTerm,
+      linkRef,
+      linkPartner,
+    ],
   );
 
   async function saveFields() {
@@ -170,7 +184,10 @@ export function CaptureFormDetailWorkspace({
   }
 
   async function toggleStatus() {
-    const next = form.status === LeadCaptureFormStatus.ACTIVE ? LeadCaptureFormStatus.PAUSED : LeadCaptureFormStatus.ACTIVE;
+    const next =
+      form.status === LeadCaptureFormStatus.ACTIVE
+        ? LeadCaptureFormStatus.PAUSED
+        : LeadCaptureFormStatus.ACTIVE;
     const result = await updateLeadCaptureFormStatus(tenantSlug, form.id, next);
     if (result.ok) {
       showSnackbar(`Form ${next === LeadCaptureFormStatus.ACTIVE ? "activated" : "paused"}.`, "success");
@@ -211,7 +228,11 @@ export function CaptureFormDetailWorkspace({
             {formatEnumLabel(form.status)}
           </span>
           {canEdit ? (
-            <button type="button" onClick={() => void toggleStatus()} className="rounded-md border px-3 py-1.5 text-xs">
+            <button
+              type="button"
+              onClick={() => void toggleStatus()}
+              className="rounded-md border px-3 py-1.5 text-xs"
+            >
               {form.status === LeadCaptureFormStatus.ACTIVE ? "Pause" : "Activate"}
             </button>
           ) : null}
@@ -277,10 +298,21 @@ export function CaptureFormDetailWorkspace({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {[
               { label: "Views", value: analytics.funnel.views },
-              { label: "Started", value: analytics.funnel.starts, sub: `${analytics.funnel.viewToStartPct}% of views` },
+              {
+                label: "Started",
+                value: analytics.funnel.starts,
+                sub: `${analytics.funnel.viewToStartPct}% of views`,
+              },
               { label: "Partial / abandon", value: analytics.funnel.partials },
-              { label: "Submissions", value: analytics.funnel.submits, sub: `${analytics.funnel.startToSubmitPct}% of starts` },
-              { label: "Peak hour (local)", value: analytics.peakHour != null ? `${analytics.peakHour}:00` : "—" },
+              {
+                label: "Submissions",
+                value: analytics.funnel.submits,
+                sub: `${analytics.funnel.startToSubmitPct}% of starts`,
+              },
+              {
+                label: "Peak hour (local)",
+                value: analytics.peakHour != null ? `${analytics.peakHour}:00` : "—",
+              },
             ].map((s) => (
               <div key={s.label} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                 <p className="text-xs uppercase tracking-wide text-muted">{s.label}</p>
@@ -304,7 +336,9 @@ export function CaptureFormDetailWorkspace({
 
           {analytics.hourBuckets.length > 0 ? (
             <div className="rounded-lg border border-foreground/10 p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Time of day (visitor local hour)</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+                Time of day (visitor local hour)
+              </p>
               <div className="flex flex-wrap gap-2">
                 {analytics.hourBuckets.map((b) => (
                   <span key={b.hour} className="rounded border border-foreground/10 px-2 py-1 text-xs">
@@ -325,8 +359,8 @@ export function CaptureFormDetailWorkspace({
       {tab === "links" ? (
         <div className="mt-6 max-w-2xl space-y-4">
           <p className="text-sm text-muted">
-            Build tracked links for bio posts, stories, or sales reps. All five UTM parameters are captured on every visit
-            and stored on the lead when they submit.
+            Build tracked links for bio posts, stories, or sales reps. All five UTM parameters are captured on
+            every visit and stored on the lead when they submit.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
@@ -372,7 +406,11 @@ export function CaptureFormDetailWorkspace({
           <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
             <p className="mb-2 text-xs font-semibold uppercase text-muted">Generated URL</p>
             <p className="break-all font-mono text-xs text-foreground">{previewUrl}</p>
-            <button type="button" onClick={() => void copyUrl()} className="mt-3 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background">
+            <button
+              type="button"
+              onClick={() => void copyUrl()}
+              className="mt-3 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+            >
               Copy link
             </button>
           </div>
@@ -407,7 +445,8 @@ export function CaptureFormDetailWorkspace({
             <div>
               <p className="text-sm font-semibold">QR code</p>
               <p className="mt-1 text-sm text-muted">
-                Print on flyers, show at open houses, or add to WhatsApp status. Scans open your tracked form URL.
+                Print on flyers, show at open houses, or add to WhatsApp status. Scans open your tracked form
+                URL.
               </p>
             </div>
             <div className="inline-block rounded-xl border border-foreground/10 bg-white p-4">
@@ -440,10 +479,19 @@ export function CaptureFormDetailWorkspace({
               {embedSnippet}
             </pre>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => void copyText(embedSnippet, "Embed code")} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background">
+              <button
+                type="button"
+                onClick={() => void copyText(embedSnippet, "Embed code")}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+              >
                 Copy embed code
               </button>
-              <a href={embedPreviewUrl} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm">
+              <a
+                href={embedPreviewUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border px-4 py-2 text-sm"
+              >
                 Preview embed
               </a>
             </div>
@@ -457,11 +505,23 @@ export function CaptureFormDetailWorkspace({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Internal name</label>
-              <input name="name" defaultValue={form.name} required disabled={!canEdit} className="w-full border border-foreground/15 bg-field px-3 py-2" />
+              <input
+                name="name"
+                defaultValue={form.name}
+                required
+                disabled={!canEdit}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Public headline</label>
-              <input name="title" defaultValue={form.title} required disabled={!canEdit} className="w-full border border-foreground/15 bg-field px-3 py-2" />
+              <input
+                name="title"
+                defaultValue={form.title}
+                required
+                disabled={!canEdit}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
             </div>
             <div className="sm:col-span-2">
               <RichTextField
@@ -486,7 +546,11 @@ export function CaptureFormDetailWorkspace({
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Community partner</label>
-              <UiSelect name="realtorPartnerId" defaultValue={form.realtorPartnerId ?? ""} disabled={!canEdit}>
+              <UiSelect
+                name="realtorPartnerId"
+                defaultValue={form.realtorPartnerId ?? ""}
+                disabled={!canEdit}
+              >
                 <option value="">None</option>
                 {partners.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -497,15 +561,31 @@ export function CaptureFormDetailWorkspace({
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Lead source label</label>
-              <input name="defaultSource" defaultValue={form.defaultSource ?? "Lead Form"} disabled={!canEdit} className="w-full border border-foreground/15 bg-field px-3 py-2" />
+              <input
+                name="defaultSource"
+                defaultValue={form.defaultSource ?? "Lead Form"}
+                disabled={!canEdit}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Redirect URL (optional)</label>
-              <input name="redirectUrl" defaultValue={form.redirectUrl ?? ""} disabled={!canEdit} className="w-full border border-foreground/15 bg-field px-3 py-2" />
+              <input
+                name="redirectUrl"
+                defaultValue={form.redirectUrl ?? ""}
+                disabled={!canEdit}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm text-muted">Thank you message</label>
-              <textarea name="thankYouMessage" rows={2} defaultValue={form.thankYouMessage ?? ""} disabled={!canEdit} className="w-full border border-foreground/15 bg-field px-3 py-2" />
+              <textarea
+                name="thankYouMessage"
+                rows={2}
+                defaultValue={form.thankYouMessage ?? ""}
+                disabled={!canEdit}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
             </div>
             <div className="sm:col-span-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
               <label className="flex items-center gap-2 text-sm font-medium">
@@ -518,7 +598,8 @@ export function CaptureFormDetailWorkspace({
                 Auto WhatsApp follow-up on submit
               </label>
               <p className="mt-1 text-xs text-muted">
-                Requires WhatsApp Cloud API in Settings → Integrations. Sends when the lead includes a phone number.
+                Requires WhatsApp Cloud API in Settings → Integrations. Sends when the lead includes a phone
+                number.
               </p>
               <label className="mb-1 mt-3 block text-sm text-muted">Message template</label>
               <textarea
@@ -531,11 +612,17 @@ export function CaptureFormDetailWorkspace({
                 }
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
               />
-              <p className="mt-1 text-xs text-muted">Placeholders: {"{name}"}, {"{form_title}"}, {"{org_name}"}</p>
+              <p className="mt-1 text-xs text-muted">
+                Placeholders: {"{name}"}, {"{form_title}"}, {"{org_name}"}
+              </p>
             </div>
           </div>
           {canEdit ? (
-            <button type="submit" disabled={settingsPending} className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background">
+            <button
+              type="submit"
+              disabled={settingsPending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+            >
               {settingsPending ? <ButtonSpinner /> : null}
               Save settings
             </button>

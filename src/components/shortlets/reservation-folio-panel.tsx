@@ -99,7 +99,7 @@ export function ReservationFolioPanel({
         </div>
         <div className="rounded-md border border-foreground/10 p-3">
           <p className="text-xs text-muted">Balance due</p>
-          <p className={`font-semibold ${balanceDue > 0 ? "text-amber-700 dark:text-amber-400" : ""}`}>{balanceLabel}</p>
+          <p className={`font-semibold ${balanceDue > 0 ? "text-[var(--warn)] " : ""}`}>{balanceLabel}</p>
         </div>
       </div>
 
@@ -139,7 +139,9 @@ export function ReservationFolioPanel({
           <ul className="mt-2 space-y-1 text-sm">
             {payments.map((p) => (
               <li key={p.id} className="flex justify-between border-t border-foreground/10 py-1.5">
-                <span>{p.paidAtLabel} · {p.method}</span>
+                <span>
+                  {p.paidAtLabel} · {p.method}
+                </span>
                 <span className="font-medium">{p.amountLabel}</span>
               </li>
             ))}

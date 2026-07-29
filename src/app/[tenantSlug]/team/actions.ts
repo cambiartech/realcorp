@@ -16,8 +16,7 @@ import {
 import { z } from "zod";
 
 export type TeamInviteResult =
-  | { ok: true; inviteUrl: string; emailSent: boolean; emailError?: string }
-  | { ok: false; error: string };
+  { ok: true; inviteUrl: string; emailSent: boolean; emailError?: string } | { ok: false; error: string };
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -158,7 +157,8 @@ export async function updateMembershipRole(
 
   const canManage =
     session.user.isPlatformAdmin ||
-    (actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN);
+    (actorMembership?.status === MembershipStatus.ACTIVE &&
+      actorMembership.role === MembershipRole.ORG_ADMIN);
   if (!canManage) {
     return { ok: false, error: "Only organization admins can change roles." };
   }
@@ -205,14 +205,14 @@ export async function updateMembershipRole(
   return { ok: true };
 }
 
-export async function resendInvitation(
-  tenantSlug: string,
-  invitationId: string,
-): Promise<ActionResult> {
+export async function resendInvitation(tenantSlug: string, invitationId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
-  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true, name: true } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true },
+  });
   if (!tenant) return { ok: false, error: "Organization not found." };
 
   const membership = await prisma.membership.findUnique({
@@ -266,7 +266,9 @@ export async function resendInvitation(
   });
 
   revalidatePath(`/${tenantSlug}/team`);
-  return emailResult.ok ? { ok: true } : { ok: false, error: emailResult.error || "Failed to send invite email." };
+  return emailResult.ok
+    ? { ok: true }
+    : { ok: false, error: emailResult.error || "Failed to send invite email." };
 }
 
 export async function refreshInvitationToken(
@@ -276,7 +278,10 @@ export async function refreshInvitationToken(
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
-  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true, name: true } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, name: true },
+  });
   if (!tenant) return { ok: false, error: "Organization not found." };
 
   const membership = await prisma.membership.findUnique({
@@ -325,13 +330,12 @@ export async function refreshInvitationToken(
   });
 
   revalidatePath(`/${tenantSlug}/team`);
-  return emailResult.ok ? { ok: true } : { ok: false, error: emailResult.error || "Failed to send invite email." };
+  return emailResult.ok
+    ? { ok: true }
+    : { ok: false, error: emailResult.error || "Failed to send invite email." };
 }
 
-export async function deleteInvitation(
-  tenantSlug: string,
-  invitationId: string,
-): Promise<ActionResult> {
+export async function deleteInvitation(tenantSlug: string, invitationId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
@@ -387,7 +391,8 @@ export async function setMembershipStatus(
   });
   const canManage =
     session.user.isPlatformAdmin ||
-    (actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN);
+    (actorMembership?.status === MembershipStatus.ACTIVE &&
+      actorMembership.role === MembershipRole.ORG_ADMIN);
   if (!canManage) return { ok: false, error: "Only organization admins can manage members." };
 
   const target = await prisma.membership.findFirst({
@@ -444,7 +449,8 @@ export async function saveMembershipModulePermissions(
   });
   const canManage =
     session.user.isPlatformAdmin ||
-    (actorMembership?.status === MembershipStatus.ACTIVE && actorMembership.role === MembershipRole.ORG_ADMIN);
+    (actorMembership?.status === MembershipStatus.ACTIVE &&
+      actorMembership.role === MembershipRole.ORG_ADMIN);
   if (!canManage) return { ok: false, error: "Only organization admins can change module access." };
 
   const target = await prisma.membership.findFirst({

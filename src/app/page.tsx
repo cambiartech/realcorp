@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
-import { LandingPage } from "@/components/marketing/landing-page";
+import { LandingV2 } from "@/components/marketing/v2/landing-v2";
+import { landingMetadata } from "@/components/marketing/v2/landing-seo";
 
-export const metadata: Metadata = {
-  title: "Realcorp · ERP for real corporations",
-  description:
-    "Realcorp is the operating system for real corporations. Sales, inventory, finance, and people on one connected platform — property-first, built for how real businesses run.",
-  openGraph: {
-    title: "Realcorp · ERP for real corporations",
-    description:
-      "Sales, inventory, finance, and people connected on a single ledger of record. Built for real corporations worldwide — property-first, built to scale.",
-    url: "https://realcorp.com/",
-    siteName: "Realcorp",
-  },
-};
+export const metadata: Metadata = landingMetadata;
 
+/**
+ * The previous landing page is still on disk at
+ * `@/components/marketing/landing-page` (with `@/styles/landing.css`) if we
+ * ever need to roll back — swap the import below and nothing else changes.
+ */
 export default function Home() {
-  return <LandingPage />;
+  return <LandingV2 />;
 }

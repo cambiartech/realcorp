@@ -6,7 +6,11 @@ export const createInvoiceInputSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
-  title: z.string().trim().min(2, "Invoice title must be at least 2 characters.").max(120, "Invoice title is too long."),
+  title: z
+    .string()
+    .trim()
+    .min(2, "Invoice title must be at least 2 characters.")
+    .max(120, "Invoice title is too long."),
   amount: z.coerce.number().positive("Amount must be greater than zero."),
   currency: z
     .string()
@@ -28,7 +32,11 @@ export const createInvoiceInputSchema = z.object({
 });
 
 export const updateInvoiceInputSchema = z.object({
-  title: z.string().trim().min(2, "Invoice title must be at least 2 characters.").max(120, "Invoice title is too long."),
+  title: z
+    .string()
+    .trim()
+    .min(2, "Invoice title must be at least 2 characters.")
+    .max(120, "Invoice title is too long."),
   amount: z.coerce.number().positive("Amount must be greater than zero."),
   currency: z
     .string()
@@ -172,7 +180,11 @@ export const createSalesReceiptInputSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
-  title: z.string().trim().min(2, "Receipt title must be at least 2 characters.").max(120, "Receipt title is too long."),
+  title: z
+    .string()
+    .trim()
+    .min(2, "Receipt title must be at least 2 characters.")
+    .max(120, "Receipt title is too long."),
   customerName: z
     .string()
     .trim()
@@ -300,7 +312,12 @@ export const createVendorBillInputSchema = z
         path: ["recurrencePeriodCount"],
       });
     }
-    if (data.isRecurring && data.recurrenceRangeMode === "END_DATE" && data.recurrenceEndDate && data.dueDate) {
+    if (
+      data.isRecurring &&
+      data.recurrenceRangeMode === "END_DATE" &&
+      data.recurrenceEndDate &&
+      data.dueDate
+    ) {
       const start = new Date(`${data.dueDate}T12:00:00`).getTime();
       const end = new Date(`${data.recurrenceEndDate}T12:00:00`).getTime();
       if (!Number.isNaN(start) && !Number.isNaN(end) && end < start) {

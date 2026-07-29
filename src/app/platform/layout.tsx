@@ -17,10 +17,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
               <Link href="/platform" className="text-muted hover:text-foreground">
                 Home
               </Link>
-              <Link
-                href="/platform/onboarding"
-                className="text-muted hover:text-foreground"
-              >
+              <Link href="/platform/onboarding" className="text-muted hover:text-foreground">
                 Onboard org
               </Link>
               <Link href="/platform/errors" className="text-muted hover:text-foreground">

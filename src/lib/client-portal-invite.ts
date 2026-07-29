@@ -151,7 +151,11 @@ export async function batchResolveClientPortalStatus(
     emails.length
       ? prisma.user.findMany({
           where: { email: { in: emails } },
-          select: { id: true, email: true, memberships: { where: { tenantId }, select: { status: true, role: true } } },
+          select: {
+            id: true,
+            email: true,
+            memberships: { where: { tenantId }, select: { status: true, role: true } },
+          },
         })
       : Promise.resolve([]),
   ]);

@@ -45,7 +45,9 @@ export function FinanceDocumentShell({
             ) : null}
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">{documentLabel}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+              {documentLabel}
+            </p>
             <p className="mt-1 text-2xl font-bold tracking-tight text-neutral-900">{documentNumber}</p>
           </div>
         </div>
@@ -62,11 +64,7 @@ export function FinanceDocumentShell({
   );
 }
 
-export function FinanceMetaGrid({
-  rows,
-}: {
-  rows: Array<{ label: string; value: string; wide?: boolean }>;
-}) {
+export function FinanceMetaGrid({ rows }: { rows: Array<{ label: string; value: string; wide?: boolean }> }) {
   return (
     <dl className="mb-6 grid gap-4 border-b border-neutral-200 pb-6 sm:grid-cols-2">
       {rows.map((row) => (
@@ -128,8 +126,16 @@ export function FinanceLineTable({
         <div className="mt-4 flex flex-col items-end gap-1.5">
           {totals.map((t) => (
             <div key={t.label} className="flex min-w-[220px] justify-between gap-8 text-sm">
-              <span className={t.emphasis ? "font-semibold text-neutral-900" : "text-neutral-500"}>{t.label}</span>
-              <span className={t.emphasis ? "text-base font-bold tabular-nums text-neutral-900" : "tabular-nums text-neutral-900"}>
+              <span className={t.emphasis ? "font-semibold text-neutral-900" : "text-neutral-500"}>
+                {t.label}
+              </span>
+              <span
+                className={
+                  t.emphasis
+                    ? "text-base font-bold tabular-nums text-neutral-900"
+                    : "tabular-nums text-neutral-900"
+                }
+              >
                 {t.value}
               </span>
             </div>
@@ -162,7 +168,13 @@ export function FinanceDetailGrid({ items }: { items: Array<{ label: string; val
   );
 }
 
-export function FinanceNotesBlock({ title = "Notes", children }: { title?: string; children: React.ReactNode }) {
+export function FinanceNotesBlock({
+  title = "Notes",
+  children,
+}: {
+  title?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="mt-6 border-t border-neutral-200 pt-5">
       <h3 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{title}</h3>

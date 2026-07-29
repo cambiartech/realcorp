@@ -98,7 +98,10 @@ export function RichTextField({
         </div>
       ) : null}
       {readOnly ? (
-        <RichTextDisplay html={html} className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2" />
+        <RichTextDisplay
+          html={html}
+          className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2"
+        />
       ) : (
         <div
           ref={editorRef}

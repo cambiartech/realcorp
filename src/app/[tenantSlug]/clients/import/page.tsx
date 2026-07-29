@@ -7,11 +7,7 @@ import { ClientImportWorkspace } from "./import-workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientImportPage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function ClientImportPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) notFound();

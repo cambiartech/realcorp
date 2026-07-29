@@ -57,7 +57,8 @@ export default async function ReservationsPage({ params }: { params: Promise<{ t
         nights: r.nights,
         totalAmountLabel: `${r.currency} ${Number(r.totalAmount).toLocaleString()}`,
         balanceLabel: `${r.currency} ${Number(r.balanceDue).toLocaleString()}`,
-        cautionFeeLabel: r.cautionFee != null ? `${r.currency} ${Number(r.cautionFee).toLocaleString()}` : null,
+        cautionFeeLabel:
+          r.cautionFee != null ? `${r.currency} ${Number(r.cautionFee).toLocaleString()}` : null,
         status: formatReservationStatusLabel(r.status),
         statusValue: r.status,
         checkIn: r.checkIn.toISOString().slice(0, 10),

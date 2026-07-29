@@ -131,16 +131,25 @@ export function BiodataFormFields({ v }: { v: InitialValues }) {
           <hr className="border-slate-200" />
           <p className="text-xs font-semibold uppercase text-slate-500">Job details (from HR)</p>
           {v.position ? <HrFormLockedField label="Position" name="position" value={v.position} /> : null}
-          {v.department ? <HrFormLockedField label="Department" name="department" value={v.department} /> : null}
+          {v.department ? (
+            <HrFormLockedField label="Department" name="department" value={v.department} />
+          ) : null}
           {hasAssignedId ? (
             <HrFormLockedField label="Employee ID" name="employeeNumber" value={v.employeeNumber} hint="" />
           ) : (
-            <p className="text-xs text-slate-600">Your employee ID will be assigned automatically by HR when your record is approved.</p>
+            <p className="text-xs text-slate-600">
+              Your employee ID will be assigned automatically by HR when your record is approved.
+            </p>
           )}
           {locked(v.dateOfJoining) ? (
             <HrFormLockedField label="Date of joining" name="dateOfJoining" value={v.dateOfJoining} />
           ) : (
-            <HrFormField label="Date of joining" name="dateOfJoining" type="date" defaultValue={v.dateOfJoining} />
+            <HrFormField
+              label="Date of joining"
+              name="dateOfJoining"
+              type="date"
+              defaultValue={v.dateOfJoining}
+            />
           )}
         </>
       ) : (
@@ -159,9 +168,16 @@ export function BiodataFormFields({ v }: { v: InitialValues }) {
           {hasAssignedId ? (
             <HrFormLockedField label="Employee ID" name="employeeNumber" value={v.employeeNumber} hint="" />
           ) : (
-            <p className="text-xs text-slate-600">Employee ID is assigned by the system — you do not need to enter one.</p>
+            <p className="text-xs text-slate-600">
+              Employee ID is assigned by the system — you do not need to enter one.
+            </p>
           )}
-          <HrFormField label="Date of joining" name="dateOfJoining" type="date" defaultValue={v.dateOfJoining} />
+          <HrFormField
+            label="Date of joining"
+            name="dateOfJoining"
+            type="date"
+            defaultValue={v.dateOfJoining}
+          />
         </>
       )}
 
@@ -179,7 +195,11 @@ export function BiodataFormFields({ v }: { v: InitialValues }) {
         <span>Same person as emergency contact above</span>
       </label>
 
-      <div id={nokSectionId} className={sameAsEmergency ? "hidden" : "space-y-4"} aria-hidden={sameAsEmergency}>
+      <div
+        id={nokSectionId}
+        className={sameAsEmergency ? "hidden" : "space-y-4"}
+        aria-hidden={sameAsEmergency}
+      >
         <HrFormField label="Full name" name="nextOfKinName" defaultValue={v.nextOfKinName}>
           <input
             ref={nokNameRef}

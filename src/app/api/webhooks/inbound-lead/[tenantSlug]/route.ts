@@ -37,10 +37,7 @@ function str(v: unknown): string | null {
   return null;
 }
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
 
   // ------------------------------------------------------------------
@@ -48,8 +45,7 @@ export async function POST(
   // ------------------------------------------------------------------
   const authHeader = req.headers.get("authorization") ?? "";
   const queryToken = new URL(req.url).searchParams.get("token") ?? "";
-  const incomingToken =
-    authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : queryToken;
+  const incomingToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : queryToken;
 
   if (!incomingToken) {
     return NextResponse.json({ ok: false, error: "Missing auth token" }, { status: 401 });
@@ -80,11 +76,17 @@ export async function POST(
     } else if (contentType.includes("application/x-www-form-urlencoded")) {
       const text = await req.text();
       const sp = new URLSearchParams(text);
-      sp.forEach((v, k) => { body[k] = v; });
+      sp.forEach((v, k) => {
+        body[k] = v;
+      });
     } else {
       // Try JSON first, fall back to text
       const text = await req.text();
-      try { body = JSON.parse(text) as InboundPayload; } catch { /* ignore */ }
+      try {
+        body = JSON.parse(text) as InboundPayload;
+      } catch {
+        /* ignore */
+      }
     }
   } catch {
     return NextResponse.json({ ok: false, error: "Could not parse body" }, { status: 400 });
@@ -102,11 +104,7 @@ export async function POST(
 
   const email = str(body.email);
   const phone = str(body.phone) ?? str(body.phone_number) ?? str(body.mobile);
-  const source =
-    str(body.source) ??
-    str(body.lead_source) ??
-    tenant.settings?.metaDefaultSource ??
-    "Webhook";
+  const source = str(body.source) ?? str(body.lead_source) ?? tenant.settings?.metaDefaultSource ?? "Webhook";
   const projectInterest = str(body.project) ?? str(body.property) ?? str(body.project_interest);
   const budgetRange = str(body.budget) ?? str(body.budget_range);
   const campaignName = str(body.campaign) ?? str(body.campaign_name);

@@ -72,7 +72,10 @@ export function AddStakeholderForm({
     return (
       <p className="rounded-md border border-dashed border-foreground/15 bg-foreground/[0.02] px-4 py-4 text-sm text-muted">
         No investor accounts yet. Invite someone from{" "}
-        <Link href={`/${tenantSlug}/team`} className="font-medium text-foreground underline underline-offset-2">
+        <Link
+          href={`/${tenantSlug}/team`}
+          className="font-medium text-foreground underline underline-offset-2"
+        >
           Team
         </Link>{" "}
         with the Investor or Listing owner role, then link them here.
@@ -126,7 +129,9 @@ export function AddStakeholderForm({
         {fieldErrors.investmentAmount ? (
           <FormFieldError id="stakeholder-allocation-error">{fieldErrors.investmentAmount}</FormFieldError>
         ) : (
-          <p className="mt-1 text-xs text-muted">Earnings split proportionally across all allocations on this project.</p>
+          <p className="mt-1 text-xs text-muted">
+            Earnings split proportionally across all allocations on this project.
+          </p>
         )}
       </div>
 

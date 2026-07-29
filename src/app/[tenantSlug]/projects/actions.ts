@@ -13,10 +13,7 @@ import {
   parseUpdatePricingPlanForm,
 } from "@/lib/validators/project";
 import { revalidatePath } from "next/cache";
-import {
-  createTenantUploadSignature,
-  type CloudinaryUploadSignature,
-} from "@/lib/cloudinary-upload-server";
+import { createTenantUploadSignature, type CloudinaryUploadSignature } from "@/lib/cloudinary-upload-server";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -333,8 +330,7 @@ export async function updateProjectListing(
   });
   if (!project) return { ok: false, error: "Project not found." };
 
-  const text = (field: string, max = 300) =>
-    (formData.get(field) as string)?.trim().slice(0, max) || null;
+  const text = (field: string, max = 300) => (formData.get(field) as string)?.trim().slice(0, max) || null;
 
   const isPublished = formData.get("isPublished") === "on";
   const galleryUrls = ((formData.get("galleryUrls") as string) ?? "")
@@ -534,7 +530,8 @@ export async function getListingImageUploadSignature(
     session.user.isPlatformAdmin,
   );
   if (!tenant) return { ok: false, error: "Tenant not found." };
-  if (!canManage) return { ok: false, error: "Only org admins and sales managers can upload listing images." };
+  if (!canManage)
+    return { ok: false, error: "Only org admins and sales managers can upload listing images." };
 
   const tenantRow = await prisma.tenant.findUnique({
     where: { id: tenant.id },
@@ -807,7 +804,8 @@ export async function unreserveUnit(
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { status: true },
   });
-  const canUnreserve = Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;
+  const canUnreserve =
+    Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;
   if (!canUnreserve) return { ok: false, error: "You do not have permission to unreserve units." };
 
   try {

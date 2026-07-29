@@ -102,13 +102,25 @@ export function ReportsWorkspace(props: Props) {
         >
           <label className="text-xs text-muted">
             From
-            <input type="date" name="from" defaultValue={props.from} className="mt-1 block rounded-md border px-2 py-1.5 text-sm" />
+            <input
+              type="date"
+              name="from"
+              defaultValue={props.from}
+              className="mt-1 block rounded-md border px-2 py-1.5 text-sm"
+            />
           </label>
           <label className="text-xs text-muted">
             To
-            <input type="date" name="to" defaultValue={props.to} className="mt-1 block rounded-md border px-2 py-1.5 text-sm" />
+            <input
+              type="date"
+              name="to"
+              defaultValue={props.to}
+              className="mt-1 block rounded-md border px-2 py-1.5 text-sm"
+            />
           </label>
-          <button type="submit" className="rounded-md border px-3 py-1.5 text-sm">Apply</button>
+          <button type="submit" className="rounded-md border px-3 py-1.5 text-sm">
+            Apply
+          </button>
         </form>
       </div>
 
@@ -174,7 +186,9 @@ export function ReportsWorkspace(props: Props) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">In-house guest list</h2>
-              <p className="mt-1 text-sm text-muted">Live list of all checked-in guests — print for security or front desk.</p>
+              <p className="mt-1 text-sm text-muted">
+                Live list of all checked-in guests — print for security or front desk.
+              </p>
             </div>
             <DataExportMenu
               filename="shortlets-in-house"
@@ -198,7 +212,8 @@ export function ReportsWorkspace(props: Props) {
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted">
-              End-of-day closes save a full night audit. Open any closed day to view or print the manager report — not raw data.
+              End-of-day closes save a full night audit. Open any closed day to view or print the manager
+              report — not raw data.
             </p>
             <DataExportMenu
               filename="shortlets-night-audit-history"
@@ -285,7 +300,9 @@ function TabBtn({ active, label, onClick }: { active: boolean; label: string; on
       onClick={onClick}
       className={[
         "border-b-2 px-3 py-2 text-sm transition-colors",
-        active ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted hover:text-foreground",
+        active
+          ? "border-foreground font-semibold text-foreground"
+          : "border-transparent text-muted hover:text-foreground",
       ].join(" ")}
     >
       {label}

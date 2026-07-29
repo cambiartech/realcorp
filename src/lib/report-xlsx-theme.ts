@@ -117,10 +117,7 @@ export function addKpiCards(sheet: ExcelJS.Worksheet, startRow: number, kpis: Kp
     labelCell.font = { bold: true, size: 9, color: { argb: REPORT_THEME.muted } };
     labelCell.alignment = { horizontal: "center", vertical: "bottom" };
 
-    const display =
-      typeof kpi.value === "number" && currency
-        ? kpi.value
-        : kpi.value;
+    const display = typeof kpi.value === "number" && currency ? kpi.value : kpi.value;
     valueCell.value = display;
     if (typeof kpi.value === "number" && currency) {
       valueCell.numFmt = moneyFormat(currency);
@@ -142,9 +139,13 @@ export function addKpiCards(sheet: ExcelJS.Worksheet, startRow: number, kpis: Kp
     valueCell.alignment = { horizontal: "center", vertical: "top" };
 
     for (let c = col; c < col + colWidth; c++) {
-      sheet.getCell(startRow, c).fill = solidFill(kpi.tone === "highlight" ? REPORT_THEME.goldLight : REPORT_THEME.white);
+      sheet.getCell(startRow, c).fill = solidFill(
+        kpi.tone === "highlight" ? REPORT_THEME.goldLight : REPORT_THEME.white,
+      );
       sheet.getCell(startRow, c).border = thinBorder(REPORT_THEME.goldBorder);
-      sheet.getCell(startRow + 1, c).fill = solidFill(kpi.tone === "highlight" ? REPORT_THEME.goldLight : REPORT_THEME.white);
+      sheet.getCell(startRow + 1, c).fill = solidFill(
+        kpi.tone === "highlight" ? REPORT_THEME.goldLight : REPORT_THEME.white,
+      );
       sheet.getCell(startRow + 1, c).border = thinBorder(REPORT_THEME.goldBorder);
     }
   });
@@ -184,19 +185,43 @@ export function addComparisonBars(
       secRow.getCell(1).font = { size: 10, color: { argb: REPORT_THEME.muted } };
       secRow.getCell(2).numFmt = moneyFormat(currency);
       secRow.getCell(2).font = { bold: true, color: { argb: REPORT_THEME.muted } };
-      paintBar(sheet, secRow.number, barStartCol, barCols, item.secondary / maxVal, REPORT_THEME.mutedLight, REPORT_THEME.goldBorder);
+      paintBar(
+        sheet,
+        secRow.number,
+        barStartCol,
+        barCols,
+        item.secondary / maxVal,
+        REPORT_THEME.mutedLight,
+        REPORT_THEME.goldBorder,
+      );
 
       const priRow = sheet.addRow([priLabel, item.primary]);
       priRow.getCell(1).font = { size: 10, color: { argb: REPORT_THEME.navy } };
       priRow.getCell(2).numFmt = moneyFormat(currency);
       priRow.getCell(2).font = { bold: true, color: { argb: REPORT_THEME.navy } };
-      paintBar(sheet, priRow.number, barStartCol, barCols, item.primary / maxVal, REPORT_THEME.navyMid, REPORT_THEME.navy);
+      paintBar(
+        sheet,
+        priRow.number,
+        barStartCol,
+        barCols,
+        item.primary / maxVal,
+        REPORT_THEME.navyMid,
+        REPORT_THEME.navy,
+      );
     } else {
       const row = sheet.addRow(["Total", item.primary]);
       row.getCell(1).font = { size: 10, color: { argb: REPORT_THEME.navy } };
       row.getCell(2).numFmt = moneyFormat(currency);
       row.getCell(2).font = { bold: true, color: { argb: REPORT_THEME.navy } };
-      paintBar(sheet, row.number, barStartCol, barCols, item.primary / maxVal, REPORT_THEME.orange, REPORT_THEME.gold);
+      paintBar(
+        sheet,
+        row.number,
+        barStartCol,
+        barCols,
+        item.primary / maxVal,
+        REPORT_THEME.orange,
+        REPORT_THEME.gold,
+      );
     }
 
     sheet.addRow([]);
@@ -218,7 +243,10 @@ function paintBar(
   for (let i = 0; i < width; i++) {
     const cell = sheet.getCell(rowNum, startCol + i);
     cell.fill = solidFill(i < filled ? fill : REPORT_THEME.white);
-    cell.border = { top: { style: "thin", color: { argb: border } }, bottom: { style: "thin", color: { argb: border } } };
+    cell.border = {
+      top: { style: "thin", color: { argb: border } },
+      bottom: { style: "thin", color: { argb: border } },
+    };
     if (i === 0) cell.border = { ...cell.border, left: { style: "thin", color: { argb: border } } };
     if (i === width - 1) cell.border = { ...cell.border, right: { style: "thin", color: { argb: border } } };
   }
@@ -244,12 +272,7 @@ export function addBreakdownTable(
   rows.forEach((row, idx) => {
     const share = row.share ?? (row.value / total) * 100;
     const dataRow = sheet.getRow(r);
-    dataRow.values = [
-      row.label,
-      row.value,
-      share / 100,
-      ...(withBars ? ["", ""] : []),
-    ];
+    dataRow.values = [row.label, row.value, share / 100, ...(withBars ? ["", ""] : [])];
     dataRow.getCell(2).numFmt = currency ? moneyFormat(currency) : "#,##0";
     dataRow.getCell(3).numFmt = "0.0%";
     dataRow.getCell(3).font = { color: { argb: REPORT_THEME.muted } };

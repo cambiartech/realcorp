@@ -42,7 +42,8 @@ export function GuestsWorkspace({ tenantSlug, canManage, guests }: Props) {
         <div>
           <h2 className="text-lg font-semibold">Short-let guests</h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
-            Reusable guest profiles for repeat bookings — separate from sales clients. Ready for future marketplace self-service bookings.
+            Reusable guest profiles for repeat bookings — separate from sales clients. Ready for future
+            marketplace self-service bookings.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -67,7 +68,9 @@ export function GuestsWorkspace({ tenantSlug, canManage, guests }: Props) {
       {guests.length === 0 ? (
         <div className="rounded-lg border border-foreground/10 p-8 text-center">
           <p className="font-medium">No guests yet</p>
-          <p className="mt-1 text-sm text-muted">Create guest profiles before booking — they can be reused across stays.</p>
+          <p className="mt-1 text-sm text-muted">
+            Create guest profiles before booking — they can be reused across stays.
+          </p>
           {canManage ? (
             <Link
               href={`/${tenantSlug}/shortlets/guests/new?returnTo=${bookingReturn}`}

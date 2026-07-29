@@ -45,8 +45,7 @@ export default async function InvestorProjectDetailPage({
     select: { role: true, status: true },
   });
 
-  const isAdminViewer =
-    Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";
+  const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";
   if (!isAdminViewer) {
     assertTenantNavAccess(session, membership, tenant.settings, "portal");
   }

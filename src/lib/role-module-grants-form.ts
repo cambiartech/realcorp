@@ -7,9 +7,9 @@ import { MembershipRole } from "@/generated/prisma";
 export const EXTRA_MODULE_GRANT_TOKENS = ["SALES", "MARKETING", "COMMUNITY", "FINANCE"] as const;
 export type ExtraModuleGrantToken = (typeof EXTRA_MODULE_GRANT_TOKENS)[number];
 
-export const MEMBERSHIP_ROLES_FOR_GRANT_MATRIX = (
-  Object.values(MembershipRole) as MembershipRole[]
-).filter((r) => r !== MembershipRole.ORG_ADMIN);
+export const MEMBERSHIP_ROLES_FOR_GRANT_MATRIX = (Object.values(MembershipRole) as MembershipRole[]).filter(
+  (r) => r !== MembershipRole.ORG_ADMIN,
+);
 
 export function grantFormFieldName(role: MembershipRole, token: ExtraModuleGrantToken) {
   return `grant_${role}_${token}`;
@@ -29,7 +29,9 @@ export function parseRoleModuleGrantsFromFormData(formData: FormData): Record<st
   return Object.keys(out).length ? out : null;
 }
 
-export function parseRoleGrantsJsonString(json: string): Partial<Record<MembershipRole, ExtraModuleGrantToken[]>> {
+export function parseRoleGrantsJsonString(
+  json: string,
+): Partial<Record<MembershipRole, ExtraModuleGrantToken[]>> {
   try {
     const o = JSON.parse(json) as Record<string, unknown>;
     if (typeof o !== "object" || o === null || Array.isArray(o)) return {};

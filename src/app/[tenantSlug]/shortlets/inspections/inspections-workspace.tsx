@@ -102,10 +102,13 @@ export function InspectionsWorkspace({ tenantSlug, canManage, awaiting, complete
       <section>
         <h2 className="font-semibold">Awaiting inspection</h2>
         <p className="mt-1 text-sm text-muted">
-          Created when a guest checks out. Inspect the room for damage, then stewards can clean and mark the room board clean.
+          Created when a guest checks out. Inspect the room for damage, then stewards can clean and mark the
+          room board clean.
         </p>
         {awaiting.length === 0 ? (
-          <p className="mt-4 rounded-lg border border-foreground/10 p-4 text-sm text-muted">No rooms waiting for checkout inspection.</p>
+          <p className="mt-4 rounded-lg border border-foreground/10 p-4 text-sm text-muted">
+            No rooms waiting for checkout inspection.
+          </p>
         ) : (
           <div className="mt-4 overflow-x-auto rounded-lg border border-foreground/10">
             <table className="min-w-full text-sm">
@@ -181,7 +184,11 @@ export function InspectionsWorkspace({ tenantSlug, canManage, awaiting, complete
       ) : null}
 
       {inspectId ? (
-        <ModalOverlay open={Boolean(inspectId)} onClose={() => setInspectId(null)} panelClassName={MODAL_PANEL_LG}>
+        <ModalOverlay
+          open={Boolean(inspectId)}
+          onClose={() => setInspectId(null)}
+          panelClassName={MODAL_PANEL_LG}
+        >
           <h2 className="text-lg font-bold">Complete checkout inspection</h2>
           <form
             className="mt-4 space-y-3"
@@ -203,7 +210,11 @@ export function InspectionsWorkspace({ tenantSlug, canManage, awaiting, complete
           >
             <label className="block text-sm text-muted">
               Result
-              <UiSelect className="mt-1" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as InspectForm["status"] }))}>
+              <UiSelect
+                className="mt-1"
+                value={form.status}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as InspectForm["status"] }))}
+              >
                 <option value="PASSED">Passed — room OK, send to cleaning</option>
                 <option value="FAILED">Failed — maintenance required</option>
                 <option value="WAIVED">Waived — skip to cleaning</option>
@@ -211,7 +222,13 @@ export function InspectionsWorkspace({ tenantSlug, canManage, awaiting, complete
             </label>
             <label className="block text-sm text-muted">
               Room condition
-              <UiSelect className="mt-1" value={form.condition} onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value as InspectForm["condition"] }))}>
+              <UiSelect
+                className="mt-1"
+                value={form.condition}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, condition: e.target.value as InspectForm["condition"] }))
+                }
+              >
                 <option value="GOOD">Good condition</option>
                 <option value="DAMAGES_FOUND">Damages found</option>
                 <option value="MAINTENANCE_REQUIRED">Maintenance required</option>
@@ -235,7 +252,9 @@ export function InspectionsWorkspace({ tenantSlug, canManage, awaiting, complete
 
             <div className="rounded-md border border-foreground/10 p-3">
               <p className="text-sm font-medium">Damage photos</p>
-              <p className="mt-0.5 text-xs text-muted">Optional — upload multiple images to document damages.</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Optional — upload multiple images to document damages.
+              </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <label className="cursor-pointer rounded-md border border-foreground/15 px-3 py-2 text-sm hover:bg-foreground/[0.03]">
                   {uploadingPhotos ? "Uploading…" : "Add photos"}
@@ -252,13 +271,18 @@ export function InspectionsWorkspace({ tenantSlug, canManage, awaiting, complete
                   />
                 </label>
                 {form.photoUrls.length > 0 ? (
-                  <span className="text-xs text-muted">{form.photoUrls.length} photo{form.photoUrls.length === 1 ? "" : "s"} attached</span>
+                  <span className="text-xs text-muted">
+                    {form.photoUrls.length} photo{form.photoUrls.length === 1 ? "" : "s"} attached
+                  </span>
                 ) : null}
               </div>
               {form.photoUrls.length > 0 ? (
                 <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {form.photoUrls.map((url) => (
-                    <li key={url} className="group relative aspect-square overflow-hidden rounded-md border border-foreground/10">
+                    <li
+                      key={url}
+                      className="group relative aspect-square overflow-hidden rounded-md border border-foreground/10"
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={url} alt="Damage evidence" className="h-full w-full object-cover" />
                       <button
@@ -275,8 +299,18 @@ export function InspectionsWorkspace({ tenantSlug, canManage, awaiting, complete
             </div>
 
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setInspectId(null)} className="rounded-md border px-3 py-2 text-sm">Cancel</button>
-              <button type="submit" disabled={isPending || uploadingPhotos} className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50">
+              <button
+                type="button"
+                onClick={() => setInspectId(null)}
+                className="rounded-md border px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isPending || uploadingPhotos}
+                className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background disabled:opacity-50"
+              >
                 Save inspection
               </button>
             </div>

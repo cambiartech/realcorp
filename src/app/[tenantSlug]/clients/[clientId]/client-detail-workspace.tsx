@@ -9,7 +9,10 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { ClientDocumentsWorkspace, type ClientDocumentItem } from "@/components/clients/client-documents-workspace";
+import {
+  ClientDocumentsWorkspace,
+  type ClientDocumentItem,
+} from "@/components/clients/client-documents-workspace";
 import {
   linkClientShortlet,
   linkClientUnit,
@@ -287,10 +290,18 @@ export function ClientDetailWorkspace({
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className={["relative py-2 text-sm font-medium capitalize", tab === key ? "text-foreground" : "text-muted"].join(" ")}
+              className={[
+                "relative py-2 text-sm font-medium capitalize",
+                tab === key ? "text-foreground" : "text-muted",
+              ].join(" ")}
             >
               {key}
-              <span className={["absolute -bottom-px left-0 h-0.5 w-full", tab === key ? "bg-foreground" : "bg-transparent"].join(" ")} />
+              <span
+                className={[
+                  "absolute -bottom-px left-0 h-0.5 w-full",
+                  tab === key ? "bg-foreground" : "bg-transparent",
+                ].join(" ")}
+              />
             </button>
           ))}
         </div>
@@ -318,7 +329,9 @@ export function ClientDetailWorkspace({
               <div>
                 <dt className="text-muted">Address</dt>
                 <dd>
-                  {[client.addressLine, client.city, client.state, client.country].filter(Boolean).join(", ") || "—"}
+                  {[client.addressLine, client.city, client.state, client.country]
+                    .filter(Boolean)
+                    .join(", ") || "—"}
                 </dd>
               </div>
             </dl>
@@ -354,7 +367,9 @@ export function ClientDetailWorkspace({
                   {unitLinks.map((link) => (
                     <tr key={`unit-${link.id}`}>
                       <td className="px-4 py-3">
-                        <span className="rounded bg-foreground/5 px-2 py-0.5 text-xs font-medium">Project</span>
+                        <span className="rounded bg-foreground/5 px-2 py-0.5 text-xs font-medium">
+                          Project
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-muted">{link.projectName}</td>
                       <td className="px-4 py-3 font-medium">{link.unitLabel}</td>
@@ -376,7 +391,7 @@ export function ClientDetailWorkspace({
                   {shortletLinks.map((link) => (
                     <tr key={`shortlet-${link.id}`}>
                       <td className="px-4 py-3">
-                        <span className="rounded bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">
+                        <span className="rounded bg-[var(--warn-wash)] px-2 py-0.5 text-xs font-medium text-[var(--warn)]">
                           Short-let
                         </span>
                       </td>
@@ -408,22 +423,51 @@ export function ClientDetailWorkspace({
         <h2 className="text-lg font-semibold">Edit client</h2>
         <form action={editAction} className="mt-4 space-y-3">
           {editState && !editState.ok ? <FormAlert>{editState.error}</FormAlert> : null}
-          <input name="fullName" defaultValue={client.fullName} required className="w-full border border-foreground/15 bg-field px-3 py-2" />
+          <input
+            name="fullName"
+            defaultValue={client.fullName}
+            required
+            className="w-full border border-foreground/15 bg-field px-3 py-2"
+          />
           <div className="grid gap-3 sm:grid-cols-2">
-            <input name="phone" defaultValue={client.phone} placeholder="Phone" className="w-full border border-foreground/15 bg-field px-3 py-2" />
-            <input name="email" type="email" defaultValue={client.email} placeholder="Email" className="w-full border border-foreground/15 bg-field px-3 py-2" />
+            <input
+              name="phone"
+              defaultValue={client.phone}
+              placeholder="Phone"
+              className="w-full border border-foreground/15 bg-field px-3 py-2"
+            />
+            <input
+              name="email"
+              type="email"
+              defaultValue={client.email}
+              placeholder="Email"
+              className="w-full border border-foreground/15 bg-field px-3 py-2"
+            />
           </div>
           <UiSelect name="status" defaultValue={client.statusValue}>
             <option value="PROSPECT">Prospect</option>
             <option value="ACTIVE">Active</option>
             <option value="FORMER">Former</option>
           </UiSelect>
-          <textarea name="notes" rows={3} defaultValue={client.notes} className="w-full border border-foreground/15 bg-field px-3 py-2" />
+          <textarea
+            name="notes"
+            rows={3}
+            defaultValue={client.notes}
+            className="w-full border border-foreground/15 bg-field px-3 py-2"
+          />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setIsEditOpen(false)} className="rounded-md border px-4 py-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setIsEditOpen(false)}
+              className="rounded-md border px-4 py-2 text-sm"
+            >
               Cancel
             </button>
-            <button type="submit" disabled={editPending} className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background">
+            <button
+              type="submit"
+              disabled={editPending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+            >
               {editPending ? <ButtonSpinner /> : null}
               Save
             </button>
@@ -454,7 +498,9 @@ export function ClientDetailWorkspace({
               onClick={() => setLinkKind("shortlet")}
               className={[
                 "rounded-md px-3 py-1.5 text-sm font-medium",
-                linkKind === "shortlet" ? "bg-foreground text-background" : "text-muted hover:text-foreground",
+                linkKind === "shortlet"
+                  ? "bg-foreground text-background"
+                  : "text-muted hover:text-foreground",
               ].join(" ")}
             >
               Short-let apartment
@@ -499,11 +545,7 @@ export function ClientDetailWorkspace({
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Unit</label>
-              <UiSelect
-                name="unitId"
-                value={linkUnitId}
-                onChange={(e) => setLinkUnitId(e.target.value)}
-              >
+              <UiSelect name="unitId" value={linkUnitId} onChange={(e) => setLinkUnitId(e.target.value)}>
                 {unitsForProject.length === 0 ? (
                   <option value="">No units available in this project</option>
                 ) : (
@@ -534,7 +576,11 @@ export function ClientDetailWorkspace({
               </UiSelect>
             </div>
             <div className="flex justify-end gap-2 border-t border-foreground/10 pt-4">
-              <button type="button" onClick={() => setIsLinkOpen(false)} className="rounded-md border px-4 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setIsLinkOpen(false)}
+                className="rounded-md border px-4 py-2 text-sm"
+              >
                 Cancel
               </button>
               <button
@@ -549,7 +595,9 @@ export function ClientDetailWorkspace({
           </form>
         ) : (
           <form action={shortletLinkAction} className="mt-5 space-y-4">
-            {shortletLinkState && !shortletLinkState.ok ? <FormAlert>{shortletLinkState.error}</FormAlert> : null}
+            {shortletLinkState && !shortletLinkState.ok ? (
+              <FormAlert>{shortletLinkState.error}</FormAlert>
+            ) : null}
             <div>
               <label className="mb-1 block text-sm text-muted">Search property / location</label>
               <input
@@ -621,7 +669,11 @@ export function ClientDetailWorkspace({
               </UiSelect>
             </div>
             <div className="flex justify-end gap-2 border-t border-foreground/10 pt-4">
-              <button type="button" onClick={() => setIsLinkOpen(false)} className="rounded-md border px-4 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setIsLinkOpen(false)}
+                className="rounded-md border px-4 py-2 text-sm"
+              >
                 Cancel
               </button>
               <button

@@ -275,7 +275,10 @@ export default async function HrQueuePage({
       take: 20,
     }),
     prisma.employeeProfile
-      .findUnique({ where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } }, select: { id: true } })
+      .findUnique({
+        where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
+        select: { id: true },
+      })
       .then((prof) =>
         prof
           ? prisma.hrDocument.findMany({
@@ -286,7 +289,10 @@ export default async function HrQueuePage({
           : [],
       ),
     prisma.employeeProfile
-      .findUnique({ where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } }, select: { id: true } })
+      .findUnique({
+        where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
+        select: { id: true },
+      })
       .then((prof) =>
         prof
           ? prisma.hrPerformanceGoal.findMany({
@@ -388,7 +394,18 @@ export default async function HrQueuePage({
   );
   const currentYear = new Date().getFullYear();
   const ytdByProfileId = new Map<string, PayslipYtdSummary>();
-  const slipsGrouped = new Map<string, Array<{ grossPay: number; payeeTax: number; pensionDeduction: number; otherDeductions: number; netPay: number; year: number; month: number }>>();
+  const slipsGrouped = new Map<
+    string,
+    Array<{
+      grossPay: number;
+      payeeTax: number;
+      pensionDeduction: number;
+      otherDeductions: number;
+      netPay: number;
+      year: number;
+      month: number;
+    }>
+  >();
   for (const s of ytdPayslips) {
     const list = slipsGrouped.get(s.employeeProfileId) ?? [];
     list.push({
@@ -406,17 +423,17 @@ export default async function HrQueuePage({
     ytdByProfileId.set(p.id, aggregatePayslipYtd(slipsGrouped.get(p.id) ?? [], currentYear));
   }
   const paygroups = [
-    ...new Set(
-      profiles
-        .map((p) => p.paygroupName?.trim())
-        .filter((g): g is string => Boolean(g)),
-    ),
+    ...new Set(profiles.map((p) => p.paygroupName?.trim()).filter((g): g is string => Boolean(g))),
   ].sort((a, b) => a.localeCompare(b));
   const draftPayslipRunCount = payslipRuns.filter((r) => r.status === "DRAFT").length;
   const payrollReadyByPaygroup = paygroups.map((name) => ({
     name,
     count: profiles.filter(
-      (p) => p.status === "ACTIVE" && p.paygroupName === name && p.grossMonthly != null && Number(p.grossMonthly) > 0,
+      (p) =>
+        p.status === "ACTIVE" &&
+        p.paygroupName === name &&
+        p.grossMonthly != null &&
+        Number(p.grossMonthly) > 0,
     ).length,
   }));
   const unassignedPayrollCount = profiles.filter(
@@ -473,7 +490,9 @@ export default async function HrQueuePage({
     description: g.description || "",
     progressPercent: g.progressPercent,
     status: g.status,
-    dueDateLabel: g.dueDate ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(g.dueDate) : "—",
+    dueDateLabel: g.dueDate
+      ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(g.dueDate)
+      : "—",
   }));
 
   const profileOptions = profiles
@@ -494,7 +513,9 @@ export default async function HrQueuePage({
       cycleId: c.id,
       periodLabel: c.periodLabel,
       status: formatEnumLabel(c.status),
-      dueDateLabel: c.dueDate ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(c.dueDate) : "—",
+      dueDateLabel: c.dueDate
+        ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(c.dueDate)
+        : "—",
       closedLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(c.updatedAt),
       appraisals: c.appraisals
         .filter((a) => a.status === "REVIEWED")
@@ -507,7 +528,9 @@ export default async function HrQueuePage({
           managerNotes: a.managerNotes || "",
           selfNotes: a.selfNotes || "",
           reviewedAtLabel: a.reviewedAt
-            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(a.reviewedAt)
+            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+                a.reviewedAt,
+              )
             : "—",
           reviewerLabel: a.reviewerLabel || "—",
         })),
@@ -640,7 +663,9 @@ export default async function HrQueuePage({
         status: c.status,
         statusValue: c.status,
         statusLabel: formatEnumLabel(c.status),
-        dueDateLabel: c.dueDate ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(c.dueDate) : "—",
+        dueDateLabel: c.dueDate
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(c.dueDate)
+          : "—",
         appraisals: c.appraisals.map((a) => ({
           id: a.id,
           employeeName: a.profile.fullName || "Unnamed",
@@ -650,7 +675,8 @@ export default async function HrQueuePage({
           overallRating: a.overallRating,
           managerNotes: a.managerNotes || "",
           selfNotes: a.selfNotes || "",
-          actionScores: (a.actionScores as Record<string, { rating?: number; completed?: boolean }> | null) ?? null,
+          actionScores:
+            (a.actionScores as Record<string, { rating?: number; completed?: boolean }> | null) ?? null,
         })),
       }))}
       payrollReadyCount={payrollReadyCount}
@@ -791,7 +817,8 @@ export default async function HrQueuePage({
           selfNotes: a.selfNotes || "",
           managerNotes: a.managerNotes || "",
           overallRating: a.overallRating,
-          actionScores: (a.actionScores as Record<string, { rating?: number; completed?: boolean }> | null) ?? null,
+          actionScores:
+            (a.actionScores as Record<string, { rating?: number; completed?: boolean }> | null) ?? null,
         })),
         documents: myDocuments.map((d) => ({
           id: d.id,
@@ -805,11 +832,15 @@ export default async function HrQueuePage({
           title: g.title,
           progressPercent: g.progressPercent,
           status: g.status,
-          dueDateLabel: g.dueDate ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(g.dueDate) : "—",
+          dueDateLabel: g.dueDate
+            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(g.dueDate)
+            : "—",
         })),
         pendingForms: (() => {
           const mapped = myPendingForms.map((f) => {
-            const expiresLabel = new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(f.expiresAt);
+            const expiresLabel = new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
+              f.expiresAt,
+            );
             if (f.kind === "bundle") {
               return {
                 id: f.bundleToken,
@@ -850,7 +881,9 @@ export default async function HrQueuePage({
                   masterUrl: myOnboardingSummary.masterUrl,
                 }
               : { state: "none" as const },
-        pendingOfferSignUrl: myPendingOffer?.token ? absoluteAppUrl(hrOfferSignPath(myPendingOffer.token)) : null,
+        pendingOfferSignUrl: myPendingOffer?.token
+          ? absoluteAppUrl(hrOfferSignPath(myPendingOffer.token))
+          : null,
         appraisalActions: appraisalActions
           .filter((a) => a.isActive)
           .map((a) => ({
@@ -873,7 +906,9 @@ export default async function HrQueuePage({
         statusValue: r.status,
         expiresLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(r.expiresAt),
         submittedAtLabel: r.submittedAt
-          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(r.submittedAt)
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+              r.submittedAt,
+            )
           : "—",
         hasFileUpload: Boolean(r.submittedFileUrl),
       }))}

@@ -42,7 +42,10 @@ export default async function FinanceDocumentsPage({ params }: { params: Promise
     where: { tenantId: tenant.id },
     orderBy: { createdAt: "desc" },
     take: 200,
-    include: { salesReceipt: { select: { receiptNumber: true } }, invoice: { select: { invoiceNumber: true } } },
+    include: {
+      salesReceipt: { select: { receiptNumber: true } },
+      invoice: { select: { invoiceNumber: true } },
+    },
   });
 
   return (

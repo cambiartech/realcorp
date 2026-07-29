@@ -61,10 +61,7 @@ export function OrgSetupCoach({
     setSkippedIds(readSkippedSteps(tenantSlug, userId));
   }, [tenantSlug, userId]);
 
-  const steps = useMemo(
-    () => applySkippedToSteps(serverSteps, skippedIds),
-    [serverSteps, skippedIds],
-  );
+  const steps = useMemo(() => applySkippedToSteps(serverSteps, skippedIds), [serverSteps, skippedIds]);
 
   const { percent } = useMemo(() => orgSetupProgress(steps), [steps]);
 
@@ -132,8 +129,8 @@ export function OrgSetupCoach({
         className={[
           "pointer-events-auto w-full max-w-lg rounded-xl border shadow-2xl transition-all",
           celebration || skipMessage
-            ? "border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950"
-            : "border-amber-500/35 bg-background",
+            ? "border-[var(--success-line)] bg-[var(--success-wash)] "
+            : "border-[var(--warn-line)] bg-background",
         ].join(" ")}
       >
         {collapsed ? (
@@ -150,8 +147,8 @@ export function OrgSetupCoach({
             <div className="flex items-start justify-between gap-2">
               <div>
                 {/* <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                  Setup coach · optional steps can be skipped
-                </p> */}
+ Setup coach · optional steps can be skipped
+ </p> */}
                 <p className="mt-0.5 text-sm font-semibold text-foreground">
                   {skipMessage
                     ? "Okay, moving on"
@@ -171,7 +168,7 @@ export function OrgSetupCoach({
             </div>
 
             {skipMessage ? (
-              <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">
+              <p className="mt-2 text-sm text-[var(--success)]">
                 {skipMessage}{" "}
                 {currentFocus ? (
                   <>
@@ -180,7 +177,7 @@ export function OrgSetupCoach({
                 ) : null}
               </p>
             ) : celebration && !skipMessage ? (
-              <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-100">
+              <p className="mt-2 text-sm text-[var(--success)]">
                 Nice work setting up {tenantName}.{" "}
                 {currentFocus ? (
                   <>
@@ -200,7 +197,10 @@ export function OrgSetupCoach({
             ) : null}
 
             <div className="mt-3 h-1 overflow-hidden rounded-full bg-foreground/10">
-              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${percent}%` }} />
+              <div
+                className="h-full rounded-full bg-[var(--warn)] transition-all"
+                style={{ width: `${percent}%` }}
+              />
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">

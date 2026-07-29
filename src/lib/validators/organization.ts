@@ -24,12 +24,7 @@ export const organizationOnboardingSchema = z.object({
   plan: z.enum(["STARTER", "GROWTH", "ENTERPRISE", "ANCHOR"]).optional(),
 });
 
-export type OnboardingFieldName =
-  | "organizationName"
-  | "slug"
-  | "adminEmail"
-  | "adminName"
-  | "plan";
+export type OnboardingFieldName = "organizationName" | "slug" | "adminEmail" | "adminName" | "plan";
 
 export function onboardingInputFromFormData(formData: FormData) {
   const adminRaw = formData.get("adminName");

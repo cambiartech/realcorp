@@ -2,9 +2,7 @@
 
 const WHATSAPP_API_VERSION = "v23.0";
 
-type WhatsAppSendResult =
-  | { ok: true; messageId: string }
-  | { ok: false; error: string };
+type WhatsAppSendResult = { ok: true; messageId: string } | { ok: false; error: string };
 
 /**
  * Normalize any stored phone format into the E.164-style digits the Cloud API

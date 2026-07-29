@@ -1,4 +1,5 @@
-export type CloudinaryArea = "finance" | "hr" | "hr-forms" | "branding" | "clients" | "listings" | "shortlets";
+export type CloudinaryArea =
+  "finance" | "hr" | "hr-forms" | "branding" | "clients" | "listings" | "shortlets";
 
 function readEnv(...keys: string[]) {
   for (const key of keys) {
@@ -21,13 +22,10 @@ function parseCloudinaryUrl(url: string) {
 /** Platform-wide Cloudinary (set in deployment env). Tenants do not supply keys. */
 export function getPlatformCloudinaryConfig() {
   const fromUrl = parseCloudinaryUrl(readEnv("CLOUDINARY_URL", "cloudinary_url") || "");
-  const cloudName =
-    readEnv("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud_name") || fromUrl?.cloudName;
+  const cloudName = readEnv("CLOUDINARY_CLOUD_NAME", "cloudinary_cloud_name") || fromUrl?.cloudName;
   const apiKey = readEnv("CLOUDINARY_API_KEY", "cloudinary_api_key") || fromUrl?.apiKey;
-  const apiSecret =
-    readEnv("CLOUDINARY_API_SECRET", "cloudinary_api_secret") || fromUrl?.apiSecret;
-  const baseFolder =
-    readEnv("CLOUDINARY_FOLDER", "cloudinary_folder")?.trim() || "realcorp";
+  const apiSecret = readEnv("CLOUDINARY_API_SECRET", "cloudinary_api_secret") || fromUrl?.apiSecret;
+  const baseFolder = readEnv("CLOUDINARY_FOLDER", "cloudinary_folder")?.trim() || "realcorp";
   if (!cloudName || !apiKey || !apiSecret) return null;
   return { cloudName, apiKey, apiSecret, baseFolder };
 }

@@ -58,7 +58,10 @@ export function TenantInvitesWorkspace({
       showSnackbar(result.error, "error");
       return;
     }
-    showSnackbar(result.emailSent ? `Email sent to ${invite.email}.` : `Link ready — email failed: ${result.emailError}`, result.emailSent ? "success" : "info");
+    showSnackbar(
+      result.emailSent ? `Email sent to ${invite.email}.` : `Link ready — email failed: ${result.emailError}`,
+      result.emailSent ? "success" : "info",
+    );
     if (result.inviteUrl) void copyLink(result.inviteUrl);
     router.refresh();
   }
@@ -112,14 +115,16 @@ export function TenantInvitesWorkspace({
             <strong className="text-foreground">Expired</strong> — links last 14 days; use Refresh token.
           </li>
           <li>
-            <strong className="text-foreground">Email never sent</strong> — Resend copies a fresh link; check RESEND_API_KEY in production.
+            <strong className="text-foreground">Email never sent</strong> — Resend copies a fresh link; check
+            RESEND_API_KEY in production.
           </li>
           <li>
             <strong className="text-foreground">Wrong URL</strong> — link must match{" "}
             <code className="text-xs">NEXT_PUBLIC_APP_URL</code> (currently used when generating invites).
           </li>
           <li>
-            <strong className="text-foreground">Already used</strong> — member already joined; they should sign in at /login.
+            <strong className="text-foreground">Already used</strong> — member already joined; they should
+            sign in at /login.
           </li>
         </ul>
         {hasActiveOrgAdmin ? (
@@ -153,9 +158,9 @@ export function TenantInvitesWorkspace({
                       className={[
                         "inline-block rounded px-2 py-0.5 text-xs font-medium",
                         invite.status === "valid"
-                          ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                          ? "bg-[var(--success-wash)] text-[var(--success)] "
                           : invite.status === "expired"
-                            ? "bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                            ? "bg-[var(--warn-wash)] text-[var(--warn)] "
                             : "bg-foreground/10 text-muted",
                       ].join(" ")}
                     >

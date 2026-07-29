@@ -44,7 +44,11 @@ export function SendFinanceEmailModal({
   }, [open, defaultEmail]);
 
   const title =
-    mode === "remind" ? "Send payment reminder" : mode === "resend" ? `Resend ${documentLabel}` : `Send ${documentLabel}`;
+    mode === "remind"
+      ? "Send payment reminder"
+      : mode === "resend"
+        ? `Resend ${documentLabel}`
+        : `Send ${documentLabel}`;
 
   const submitLabel =
     mode === "remind" ? "Send reminder" : mode === "resend" ? "Resend PDF" : `Send ${documentLabel}`;
@@ -65,7 +69,7 @@ export function SendFinanceEmailModal({
       </p>
 
       {!hasBankAccounts ? (
-        <div className="mt-3 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+        <div className="mt-3 rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-xs text-foreground">
           {FINANCE_SETTINGS_BANKS_HINT}{" "}
           <Link
             href={`/${tenantSlug}/finance/settings`}

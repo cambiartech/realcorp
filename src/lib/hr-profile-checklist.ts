@@ -18,7 +18,10 @@ export function checklistProgress(items: ProfileChecklistItem[]) {
   return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
 }
 
-export function buildProfileChecklist(profile: EmployeeProfile, documents: HrDocument[]): ProfileChecklistItem[] {
+export function buildProfileChecklist(
+  profile: EmployeeProfile,
+  documents: HrDocument[],
+): ProfileChecklistItem[] {
   const docCats = new Set(documents.map((d) => d.category));
   return [
     {

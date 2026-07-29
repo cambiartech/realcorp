@@ -63,8 +63,8 @@ export default async function PlatformHomePage() {
             {tenants.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-muted">
-                  No tenants yet. Use{" "}
-                  <strong className="text-foreground/90">Onboard new organization</strong>.
+                  No tenants yet. Use <strong className="text-foreground/90">Onboard new organization</strong>
+                  .
                 </td>
               </tr>
             ) : (
@@ -73,42 +73,45 @@ export default async function PlatformHomePage() {
                 const pendingValid = t.invitations.filter((i) => i.expiresAt > now).length;
                 const pendingExpired = t.invitations.length - pendingValid;
                 return (
-                <tr
-                  key={t.id}
-                  className="border-b border-foreground/5 transition-colors hover:bg-foreground/[0.02]"
-                >
-                  <td className="px-4 py-3 font-medium text-foreground">{t.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-foreground/90">
-                    <Link href={`/${t.slug}`} className="underline decoration-foreground/20 underline-offset-2">
-                      {t.slug}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-muted">{t.status}</td>
-                  <td className="px-4 py-3 text-muted">{t.plan}</td>
-                  <td className="px-4 py-3 text-muted">
-                    <PlatformModulesForm
-                      tenantId={t.id}
-                      tenantName={t.name}
-                      tenantSlug={t.slug}
-                      summary={tenantModuleSummary(t.settings)}
-                      initial={normalizeTenantModuleFlags(t.settings)}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-muted">{t.createdAt.toISOString().slice(0, 10)}</td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/platform/tenants/${t.slug}`}
-                      className="text-xs font-semibold text-foreground underline underline-offset-2"
-                    >
-                      {t.invitations.length === 0
-                        ? "Send invite"
-                        : pendingExpired > 0 && pendingValid === 0
-                          ? "Expired — fix"
-                          : `${pendingValid} pending`}
-                    </Link>
-                  </td>
-                </tr>
-              );
+                  <tr
+                    key={t.id}
+                    className="border-b border-foreground/5 transition-colors hover:bg-foreground/[0.02]"
+                  >
+                    <td className="px-4 py-3 font-medium text-foreground">{t.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-foreground/90">
+                      <Link
+                        href={`/${t.slug}`}
+                        className="underline decoration-foreground/20 underline-offset-2"
+                      >
+                        {t.slug}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-muted">{t.status}</td>
+                    <td className="px-4 py-3 text-muted">{t.plan}</td>
+                    <td className="px-4 py-3 text-muted">
+                      <PlatformModulesForm
+                        tenantId={t.id}
+                        tenantName={t.name}
+                        tenantSlug={t.slug}
+                        summary={tenantModuleSummary(t.settings)}
+                        initial={normalizeTenantModuleFlags(t.settings)}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-muted">{t.createdAt.toISOString().slice(0, 10)}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/platform/tenants/${t.slug}`}
+                        className="text-xs font-semibold text-foreground underline underline-offset-2"
+                      >
+                        {t.invitations.length === 0
+                          ? "Send invite"
+                          : pendingExpired > 0 && pendingValid === 0
+                            ? "Expired — fix"
+                            : `${pendingValid} pending`}
+                      </Link>
+                    </td>
+                  </tr>
+                );
               })
             )}
           </tbody>

@@ -1,0 +1,114 @@
+flowchart TB
+  subgraph INPUTS["📥 Inputs"]
+    WA["WhatsApp message<br/>(Meta Cloud API webhook)"]
+    META["Meta Lead Ads<br/>(webhook)"]
+    WEB["Web / Explore listings<br/>(public API + embed)"]
+    STAFF["Staff actions<br/>(CRM UI)"]
+  end
+
+  subgraph ORCH["🤖 Agent Orchestrator"]
+    ROUTE{"Intent router<br/>(LLM + rules)"}
+    SALES["Sales Agent<br/>qualify · match · book"]
+    TXN["Transaction Agent<br/>docs · milestones · notify"]
+    INV["Investor Agent<br/>portfolio · updates"]
+  end
+
+  subgraph HITL["👤 Human-in-the-loop"]
+    H1{"Hot lead /<br/>complex question?"}
+    H2{"Approve pricing /<br/>offer terms?"}
+    H3{"Confirm contract /<br/>reservation?"}
+    H4{"Approve invoice /<br/>payment post?"}
+    SALES_TEAM["Sales executive"]
+    FINANCE["Finance manager"]
+    LEGAL["Legal / org admin"]
+  end
+
+  subgraph DATA["🗄️ Data sources & APIs"]
+    PG[("PostgreSQL<br/>Realcorp ledger")]
+    LIST["Listings API<br/>loadPublicListings"]
+    CRM["CRM module<br/>leads · deals · activities"]
+    FIN["Finance module<br/>invoices · receipts · milestones"]
+    CLIENT["Clients module<br/>documents · unit links"]
+    PORTAL["Investor portal<br/>portfolio · shortlets"]
+    WAPI["Meta WhatsApp<br/>Graph API v23"]
+    EMAIL["Resend<br/>email API"]
+  end
+
+  subgraph OUTPUTS["📤 Outputs"]
+    O1["WhatsApp replies<br/>listings · buttons · confirmations"]
+    O2["CRM records<br/>lead created/updated · deal stage"]
+    O3["Staff tasks<br/>viewing · agent callback"]
+    O4["Milestone invoices<br/>& payment reminders"]
+    O5["Investor portal<br/>docs · portfolio · status"]
+    O6["Email notifications<br/>investors & staff"]
+    O7["Audit trail<br/>full workflow log"]
+  end
+
+  WA --> ROUTE
+  META --> CRM
+  WEB --> LIST
+  STAFF --> CRM
+
+  ROUTE -->|"buy/rent/listings"| SALES
+  ROUTE -->|"deal advanced"| TXN
+  ROUTE -->|"investor query"| INV
+
+  SALES --> LIST
+  SALES --> CRM
+  SALES --> H1
+  H1 -->|"yes"| SALES_TEAM
+  H1 -->|"no · auto"| WAPI
+  SALES --> WAPI
+
+  SALES -->|"book viewing"| O3
+  SALES --> O1
+  SALES --> O2
+
+  TXN --> CRM
+  TXN --> FIN
+  TXN --> CLIENT
+  TXN --> H2
+  H2 -->|"needs approval"| SALES_TEAM
+  H2 -->|"approved"| H3
+  H3 -->|"needs approval"| LEGAL
+  H3 -->|"approved"| H4
+  H4 -->|"needs approval"| FINANCE
+  H4 -->|"approved"| FIN
+
+  TXN --> O4
+  TXN --> O6
+  TXN --> INV
+
+  INV --> PORTAL
+  INV --> CLIENT
+  INV --> WAPI
+  INV --> EMAIL
+  INV --> O5
+  INV --> O6
+
+  LIST --> PG
+  CRM --> PG
+  FIN --> PG
+  CLIENT --> PG
+  PORTAL --> PG
+
+  SALES_TEAM --> CRM
+  FINANCE --> FIN
+  LEGAL --> CRM
+
+  CRM --> O7
+  FIN --> O7
+  WAPI --> O7
+
+  classDef input fill:#e8f4fd,stroke:#1a73e8,color:#111
+  classDef agent fill:#fef7e0,stroke:#f9ab00,color:#111
+  classDef hitl fill:#fce8e6,stroke:#d93025,color:#111
+  classDef data fill:#e6f4ea,stroke:#137333,color:#111
+  classDef output fill:#f3e8fd,stroke:#9334e6,color:#111
+  classDef decision fill:#fff,stroke:#5f6368,stroke-width:2px,color:#111
+
+  class WA,META,WEB,STAFF input
+  class ROUTE,SALES,TXN,INV agent
+  class H1,H2,H3,H4,SALES_TEAM,FINANCE,LEGAL hitl
+  class PG,LIST,CRM,FIN,CLIENT,PORTAL,WAPI,EMAIL data
+  class O1,O2,O3,O4,O5,O6,O7 output

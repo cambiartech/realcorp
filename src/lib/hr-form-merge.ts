@@ -1,6 +1,11 @@
 import type { HrFormType, Prisma } from "@/generated/prisma";
 import { biodataPayloadForMerge } from "@/lib/hr-biodata-normalize";
-import type { bankFormSchema, biodataFormSchema, guarantorFormSchema, healthFormSchema } from "@/lib/validators/hr-forms";
+import type {
+  bankFormSchema,
+  biodataFormSchema,
+  guarantorFormSchema,
+  healthFormSchema,
+} from "@/lib/validators/hr-forms";
 import type { z } from "zod";
 
 type Biodata = z.infer<typeof biodataFormSchema>;

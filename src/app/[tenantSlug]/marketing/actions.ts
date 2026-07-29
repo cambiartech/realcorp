@@ -10,11 +10,7 @@ import { revalidatePath } from "next/cache";
 type ActionResult = { ok: true } | { ok: false; error: string };
 
 function canManageMarketing(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
-  return (
-    isPlatformAdmin ||
-    role === MembershipRole.ORG_ADMIN ||
-    role === MembershipRole.MARKETING_MANAGER
-  );
+  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
 }
 
 export async function createCampaign(

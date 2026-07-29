@@ -3,20 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChevronRight,
-  File,
-  FileImage,
-  FileText,
-  Folder,
-  FolderOpen,
-  HardDrive,
-  Users,
-} from "lucide-react";
+import { ChevronRight, File, FileImage, FileText, Folder, FolderOpen, HardDrive, Users } from "lucide-react";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { addClientDocument, getClientUploadSignature, setClientDocumentPortalVisibility } from "@/app/[tenantSlug]/clients/actions";
+import {
+  addClientDocument,
+  getClientUploadSignature,
+  setClientDocumentPortalVisibility,
+} from "@/app/[tenantSlug]/clients/actions";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 
 const DOC_CATEGORIES = [
@@ -203,7 +198,11 @@ export function ClientDocumentsWorkspace({
           </button>
         </div>
         {canManage ? (
-          <button type="button" onClick={() => setShowUploadPanel((v) => !v)} className="text-xs font-semibold underline">
+          <button
+            type="button"
+            onClick={() => setShowUploadPanel((v) => !v)}
+            className="text-xs font-semibold underline"
+          >
             {showUploadPanel ? "Hide upload" : "Upload document"}
           </button>
         ) : null}
@@ -269,10 +268,12 @@ export function ClientDocumentsWorkspace({
                   onClick={() => setSelectedTypeFolder("ALL")}
                   className={[
                     "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm",
-                    selectedTypeFolder === "ALL" ? "bg-amber-500/15 font-semibold" : "hover:bg-foreground/[0.06]",
+                    selectedTypeFolder === "ALL"
+                      ? "bg-[var(--warn-wash)] font-semibold"
+                      : "hover:bg-foreground/[0.06]",
                   ].join(" ")}
                 >
-                  <FolderOpen className="h-5 w-5 text-amber-600" />
+                  <FolderOpen className="h-5 w-5 text-[var(--warn)]" />
                   <span className="flex-1 truncate">All documents</span>
                   <span className="text-[10px] text-muted">{documents.length}</span>
                 </button>
@@ -284,10 +285,12 @@ export function ClientDocumentsWorkspace({
                     onClick={() => setSelectedTypeFolder(cat.value)}
                     className={[
                       "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm",
-                      selectedTypeFolder === cat.value ? "bg-amber-500/15 font-semibold" : "hover:bg-foreground/[0.06]",
+                      selectedTypeFolder === cat.value
+                        ? "bg-[var(--warn-wash)] font-semibold"
+                        : "hover:bg-foreground/[0.06]",
                     ].join(" ")}
                   >
-                    <Folder className="h-5 w-5 text-amber-600" />
+                    <Folder className="h-5 w-5 text-[var(--warn)]" />
                     <span className="flex-1 truncate">{cat.label}</span>
                     <span className="text-[10px] text-muted">{countByCategory.get(cat.value) ?? 0}</span>
                   </button>
@@ -306,10 +309,12 @@ export function ClientDocumentsWorkspace({
                     }}
                     className={[
                       "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm",
-                      selectedClientId === c.id ? "bg-amber-500/15 font-semibold" : "hover:bg-foreground/[0.06]",
+                      selectedClientId === c.id
+                        ? "bg-[var(--warn-wash)] font-semibold"
+                        : "hover:bg-foreground/[0.06]",
                     ].join(" ")}
                   >
-                    <Folder className="h-5 w-5 text-amber-600" />
+                    <Folder className="h-5 w-5 text-[var(--warn)]" />
                     <span className="flex-1 truncate">{c.fullName}</span>
                     <span className="text-[10px] text-muted">{countByClient.get(c.id) ?? 0}</span>
                   </button>
@@ -320,15 +325,11 @@ export function ClientDocumentsWorkspace({
         </aside>
         <div className="min-w-0 flex-1">
           <div className="border-b border-foreground/10 px-3 py-2 text-xs text-muted">
-            {browseMode === "type" ? (
-              selectedTypeFolder === "ALL" ? (
-                "All client documents"
-              ) : (
-                DOC_CATEGORIES.find((c) => c.value === selectedTypeFolder)?.label
-              )
-            ) : (
-              selectedClient?.fullName ?? "All clients"
-            )}
+            {browseMode === "type"
+              ? selectedTypeFolder === "ALL"
+                ? "All client documents"
+                : DOC_CATEGORIES.find((c) => c.value === selectedTypeFolder)?.label
+              : (selectedClient?.fullName ?? "All clients")}
           </div>
           {visibleDocuments.length === 0 ? (
             <p className="p-6 text-sm text-muted">No documents in this folder yet.</p>
@@ -338,7 +339,12 @@ export function ClientDocumentsWorkspace({
                 <li key={doc.id} className="flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.02]">
                   <FileIcon fileName={doc.fileName} className="h-8 w-8 text-muted" />
                   <div className="min-w-0 flex-1">
-                    <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="font-medium text-foreground hover:underline">
+                    <a
+                      href={doc.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-foreground hover:underline"
+                    >
                       {doc.title}
                     </a>
                     <p className="text-xs text-muted">
@@ -348,7 +354,7 @@ export function ClientDocumentsWorkspace({
                       {" · "}
                       {doc.category} · {doc.uploadedAtLabel}
                       {doc.visibleInPortal ? (
-                        <span className="ml-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-800 dark:text-sky-300">
+                        <span className="ml-1 rounded bg-[var(--info-wash)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--info)]">
                           In portal
                         </span>
                       ) : null}
@@ -362,7 +368,7 @@ export function ClientDocumentsWorkspace({
                       className={[
                         "shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold",
                         doc.visibleInPortal
-                          ? "border-sky-500/30 text-sky-800 dark:text-sky-300"
+                          ? "border-[var(--info-line)] text-[var(--info)] "
                           : "border-foreground/15 text-muted",
                       ].join(" ")}
                     >

@@ -25,17 +25,20 @@ function normalizeHex(color: string | null | undefined, fallback: string) {
 
 export function brandingFromSettings(
   companyName: string,
-  settings: {
-    logoUrl?: string | null;
-    primaryColor?: string | null;
-    accentColor?: string | null;
-    orgEmail?: string | null;
-    orgPhone?: string | null;
-    orgAddressLine?: string | null;
-    orgCity?: string | null;
-    orgState?: string | null;
-    orgCountry?: string | null;
-  } | null | undefined,
+  settings:
+    | {
+        logoUrl?: string | null;
+        primaryColor?: string | null;
+        accentColor?: string | null;
+        orgEmail?: string | null;
+        orgPhone?: string | null;
+        orgAddressLine?: string | null;
+        orgCity?: string | null;
+        orgState?: string | null;
+        orgCountry?: string | null;
+      }
+    | null
+    | undefined,
 ): TenantBranding {
   return {
     companyName,

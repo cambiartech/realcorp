@@ -72,13 +72,11 @@ export type ScoreBreakdown = {
 export function computeLeadScore(input: LeadScoreInput): ScoreBreakdown {
   const contact = (input.email ? 10 : 0) + (input.phone ? 10 : 0);
   const profile = (input.projectInterest ? 10 : 0) + (input.budgetRange ? 10 : 0);
-  const source =
-    input.source
-      ? (SOURCE_SCORE[input.source] ?? 6) // unknown source gets 6
-      : 0;
+  const source = input.source
+    ? (SOURCE_SCORE[input.source] ?? 6) // unknown source gets 6
+    : 0;
   const recency = recencyScore(input.lastActivityAt);
-  const dealProgress =
-    input.bestDealStage !== null ? (DEAL_STAGE_SCORE[input.bestDealStage] ?? 0) : 0;
+  const dealProgress = input.bestDealStage !== null ? (DEAL_STAGE_SCORE[input.bestDealStage] ?? 0) : 0;
 
   const total = Math.min(100, contact + profile + source + recency + dealProgress);
   return { contact, profile, source, recency, dealProgress, total };

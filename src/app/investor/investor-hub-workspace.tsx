@@ -7,7 +7,9 @@ import { RealcorpHeroLogo } from "@/components/realcorp-brand";
 
 function formatMoney(value: number, currency: string) {
   try {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+    return new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }).format(
+      value,
+    );
   } catch {
     return `${currency} ${value.toLocaleString()}`;
   }
@@ -54,9 +56,11 @@ export function InvestorHubWorkspace({
               <p className="text-xs text-muted">Projects</p>
               <p className="mt-1 text-xl font-semibold">{totalProjects}</p>
             </div>
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
+            <div className="rounded-xl border border-[var(--success-line)] bg-[var(--success)]/[0.06] px-4 py-3">
               <p className="text-xs text-muted">Total earnings</p>
-              <p className="mt-1 text-xl font-semibold text-emerald-600">{formatMoney(totalEarnings, primaryCurrency)}</p>
+              <p className="mt-1 text-xl font-semibold text-[var(--success)]">
+                {formatMoney(totalEarnings, primaryCurrency)}
+              </p>
             </div>
           </div>
         ) : null}

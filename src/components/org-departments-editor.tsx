@@ -30,8 +30,8 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
     <div id="org-departments" className="scroll-mt-6">
       <h3 className="text-sm font-semibold text-foreground">Departments</h3>
       <p className="mt-1 text-xs text-muted">
-        One shared list for Finance, HR, reporting, and anywhere you tag work by department. Defaults match your
-        enabled modules; add custom names for Operations, Legal, and so on.
+        One shared list for Finance, HR, reporting, and anywhere you tag work by department. Defaults match
+        your enabled modules; add custom names for Operations, Legal, and so on.
       </p>
 
       <input type="hidden" name="orgDepartmentsCsv" value={customDepartments.join("\n")} />

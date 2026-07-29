@@ -23,7 +23,13 @@ export const CAPTURE_FORM_TEMPLATES: Array<{
       { key: "name", type: "name", label: "Full name", required: true },
       { key: "email", type: "email", label: "Email", required: true, halfWidth: true },
       { key: "phone", type: "phone", label: "Phone / WhatsApp", halfWidth: true },
-      { key: "message", type: "textarea", label: "How can we help?", required: true, placeholder: "Tell us what you're looking for…" },
+      {
+        key: "message",
+        type: "textarea",
+        label: "How can we help?",
+        required: true,
+        placeholder: "Tell us what you're looking for…",
+      },
     ],
   },
   {

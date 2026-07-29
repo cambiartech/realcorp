@@ -77,10 +77,7 @@ async function buildPortalClientFilter(tenantId: string, userId: string): Promis
   const email = user?.email?.trim().toLowerCase();
   return {
     tenantId,
-    OR: [
-      { userId },
-      ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
-    ],
+    OR: [{ userId }, ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : [])],
   };
 }
 
@@ -280,10 +277,7 @@ export async function loadStakeholderPortfolio(
   for (const row of allProjectStakes) {
     const amount = row.investmentAmount != null ? Number(row.investmentAmount) : 0;
     if (amount <= 0) continue;
-    totalAllocationByProject.set(
-      row.projectId,
-      (totalAllocationByProject.get(row.projectId) ?? 0) + amount,
-    );
+    totalAllocationByProject.set(row.projectId, (totalAllocationByProject.get(row.projectId) ?? 0) + amount);
   }
 
   // Collect all deal ids across the stakeholder's projects, keep project mapping
@@ -354,18 +348,14 @@ export async function loadStakeholderPortfolio(
     if (!receipt.dealId) continue;
     const projectId = dealToProject.get(receipt.dealId);
     if (!projectId) continue;
-    collectedByProject.set(
-      projectId,
-      (collectedByProject.get(projectId) ?? 0) + Number(receipt.amount),
-    );
+    collectedByProject.set(projectId, (collectedByProject.get(projectId) ?? 0) + Number(receipt.amount));
   }
 
   const projectName = new Map(stakes.map((s) => [s.project.id, s.project.name]));
 
   const projects: PortfolioProject[] = stakes.map((stake) => {
     const p = stake.project;
-    const allocationAmount =
-      stake.investmentAmount != null ? Number(stake.investmentAmount) : 0;
+    const allocationAmount = stake.investmentAmount != null ? Number(stake.investmentAmount) : 0;
     const totalProjectAllocation = totalAllocationByProject.get(p.id) ?? 0;
     const totalInvoiced = invoicedByProject.get(p.id) ?? 0;
     const totalCollected = collectedByProject.get(p.id) ?? 0;
@@ -571,28 +561,30 @@ export async function loadInvestorProjectDetail(
 
   if (!stake && clientUnitLinks.length === 0) return null;
 
-  const p = stake?.project ?? (await prisma.project.findFirst({
-    where: { id: projectId, tenantId },
-    select: {
-      id: true,
-      name: true,
-      currency: true,
-      coverImageUrl: true,
-      locationCity: true,
-      locationState: true,
-      locationAddress: true,
-      listingDescription: true,
-      galleryUrls: true,
-      amenities: true,
-      isPublished: true,
-      units: {
-        select: {
-          status: true,
-          deal: { select: { id: true } },
+  const p =
+    stake?.project ??
+    (await prisma.project.findFirst({
+      where: { id: projectId, tenantId },
+      select: {
+        id: true,
+        name: true,
+        currency: true,
+        coverImageUrl: true,
+        locationCity: true,
+        locationState: true,
+        locationAddress: true,
+        listingDescription: true,
+        galleryUrls: true,
+        amenities: true,
+        isPublished: true,
+        units: {
+          select: {
+            status: true,
+            deal: { select: { id: true } },
+          },
         },
       },
-    },
-  }));
+    }));
   if (!p) return null;
 
   const linkedUnits = clientUnitLinks.map((l) => l.unit);
@@ -910,10 +902,7 @@ export async function loadInvestorShortletPortfolio(
   for (const row of allProjectStakes) {
     const amount = row.investmentAmount != null ? Number(row.investmentAmount) : 0;
     if (amount <= 0) continue;
-    totalAllocationByProject.set(
-      row.projectId,
-      (totalAllocationByProject.get(row.projectId) ?? 0) + amount,
-    );
+    totalAllocationByProject.set(row.projectId, (totalAllocationByProject.get(row.projectId) ?? 0) + amount);
   }
 
   const shortletUnits = await prisma.shortletUnit.findMany({

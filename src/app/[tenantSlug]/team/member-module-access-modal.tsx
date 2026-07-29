@@ -49,9 +49,15 @@ export function MemberModuleAccessModal({
     return (
       <ModalOverlay open onClose={onClose} panelClassName={MODAL_PANEL_LG}>
         <h2 className="text-lg font-semibold text-foreground">Module access</h2>
-        <p className="mt-2 text-sm text-muted">Organization admins always have full access to every module on your plan.</p>
+        <p className="mt-2 text-sm text-muted">
+          Organization admins always have full access to every module on your plan.
+        </p>
         <div className="mt-4 flex justify-end">
-          <button type="button" onClick={onClose} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+          >
             Close
           </button>
         </div>
@@ -65,7 +71,9 @@ export function MemberModuleAccessModal({
         <div>
           <h2 className="text-lg font-semibold text-foreground">Module access</h2>
           <p className="mt-1 text-sm text-muted">{memberName}</p>
-          <p className="mt-0.5 text-xs text-muted">Overrides apply on top of job role — only modules on your plan are listed.</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Overrides apply on top of job role — only modules on your plan are listed.
+          </p>
         </div>
         <button
           type="button"
@@ -79,7 +87,9 @@ export function MemberModuleAccessModal({
       </div>
 
       {entitledModules.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">No modules are enabled on this organization&apos;s plan yet.</p>
+        <p className="mt-4 text-sm text-muted">
+          No modules are enabled on this organization&apos;s plan yet.
+        </p>
       ) : (
         <form
           className="mt-4 space-y-3"
@@ -130,10 +140,15 @@ export function MemberModuleAccessModal({
             ))}
           </ul>
 
-          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+          {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} disabled={pending} className="rounded-md border px-4 py-2 text-sm">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={pending}
+              className="rounded-md border px-4 py-2 text-sm"
+            >
               Cancel
             </button>
             <button

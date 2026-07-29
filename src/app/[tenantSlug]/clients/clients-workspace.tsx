@@ -4,12 +4,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { ClientDocumentsWorkspace, type ClientDocumentItem } from "@/components/clients/client-documents-workspace";
+import {
+  ClientDocumentsWorkspace,
+  type ClientDocumentItem,
+} from "@/components/clients/client-documents-workspace";
 import type { ClientPortalStatus } from "@/lib/client-portal-invite";
 import { createPropertyClient, sendClientPortalInvite } from "./actions";
 
@@ -47,16 +57,16 @@ function portalStatusLabel(status: ClientPortalStatus) {
 }
 
 function portalStatusBadgeClass(status: ClientPortalStatus) {
-  if (status === "active") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-  if (status === "invited") return "bg-sky-500/10 text-sky-800 dark:text-sky-300";
+  if (status === "active") return "bg-[var(--success-wash)] text-[var(--success)] ";
+  if (status === "invited") return "bg-[var(--info-wash)] text-[var(--info)] ";
   if (status === "no_email") return "bg-foreground/10 text-muted";
-  return "bg-amber-500/10 text-amber-800 dark:text-amber-300";
+  return "bg-[var(--warn-wash)] text-[var(--warn)] ";
 }
 
 function statusBadgeClass(status: string) {
-  if (status === "ACTIVE") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+  if (status === "ACTIVE") return "bg-[var(--success-wash)] text-[var(--success)] ";
   if (status === "FORMER") return "bg-foreground/10 text-muted";
-  return "bg-amber-500/10 text-amber-800 dark:text-amber-300";
+  return "bg-[var(--warn-wash)] text-[var(--warn)] ";
 }
 
 export function ClientsWorkspace({
@@ -181,11 +191,17 @@ export function ClientsWorkspace({
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className={["relative py-2 text-sm font-medium capitalize", tab === key ? "text-foreground" : "text-muted"].join(" ")}
+              className={[
+                "relative py-2 text-sm font-medium capitalize",
+                tab === key ? "text-foreground" : "text-muted",
+              ].join(" ")}
             >
               {key === "clients" ? "All clients" : "Client documents"}
               <span
-                className={["absolute -bottom-px left-0 h-0.5 w-full", tab === key ? "bg-foreground" : "bg-transparent"].join(" ")}
+                className={[
+                  "absolute -bottom-px left-0 h-0.5 w-full",
+                  tab === key ? "bg-foreground" : "bg-transparent",
+                ].join(" ")}
               />
             </button>
           ))}
@@ -223,7 +239,10 @@ export function ClientsWorkspace({
                     No clients yet.{" "}
                     {canManage ? (
                       <>
-                        <Link href={`/${tenantSlug}/clients/import`} className="font-semibold text-foreground underline">
+                        <Link
+                          href={`/${tenantSlug}/clients/import`}
+                          className="font-semibold text-foreground underline"
+                        >
                           Import from CSV
                         </Link>{" "}
                         or add one manually.
@@ -249,12 +268,16 @@ export function ClientsWorkspace({
                       <div className="text-xs">{client.email || ""}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(client.statusValue)}`}>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(client.statusValue)}`}
+                      >
                         {client.status}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${portalStatusBadgeClass(client.portalStatus)}`}>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${portalStatusBadgeClass(client.portalStatus)}`}
+                      >
                         {portalStatusLabel(client.portalStatus)}
                       </span>
                     </td>
@@ -270,7 +293,11 @@ export function ClientsWorkspace({
                             disabled={invitingClientId === client.id}
                             className="text-xs font-semibold text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60 disabled:opacity-50"
                           >
-                            {invitingClientId === client.id ? "Sending…" : client.portalStatus === "invited" ? "Resend invite" : "Send invite"}
+                            {invitingClientId === client.id
+                              ? "Sending…"
+                              : client.portalStatus === "invited"
+                                ? "Resend invite"
+                                : "Send invite"}
                           </button>
                         ) : null}
                       </td>
@@ -283,103 +310,121 @@ export function ClientsWorkspace({
         </div>
       )}
 
-      <ModalOverlay open={isCreateOpen} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_XL}>
-          <div className="flex items-start justify-between gap-3">
+      <ModalOverlay
+        open={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        panelClassName={MODAL_PANEL_XL}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Add client</h2>
+            <p className="mt-0.5 text-xs text-muted">Property owner, co-owner, or investor.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <form ref={formRef} action={formAction} className="mt-4 space-y-4">
+          {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
+          <div>
+            <label htmlFor="client-name" className="mb-1 block text-sm text-muted">
+              Full name
+            </label>
+            <input
+              id="client-name"
+              name="fullName"
+              required
+              placeholder="e.g. Adebayo Okonkwo"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Add client</h2>
-              <p className="mt-0.5 text-xs text-muted">Property owner, co-owner, or investor.</p>
+              <label htmlFor="client-phone" className="mb-1 block text-sm text-muted">
+                Phone
+              </label>
+              <input
+                id="client-phone"
+                name="phone"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
             </div>
+            <div>
+              <label htmlFor="client-email" className="mb-1 block text-sm text-muted">
+                Email
+              </label>
+              <input
+                id="client-email"
+                name="email"
+                type="email"
+                value={createEmail}
+                onChange={(e) => setCreateEmail(e.target.value)}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+          </div>
+          <label className="flex items-start gap-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-3">
+            <input
+              type="checkbox"
+              name="sendPortalInvite"
+              checked={sendPortalInvite && Boolean(createEmail.trim())}
+              disabled={!createEmail.trim()}
+              onChange={(e) => setSendPortalInvite(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="block text-sm font-medium text-foreground">Send portal invitation</span>
+              <span className="mt-0.5 block text-xs text-muted">
+                Email them a link to sign in and view their units at /portal. Existing Realcorp users are
+                linked to this organization automatically.
+              </span>
+            </span>
+          </label>
+          <div>
+            <label htmlFor="client-status" className="mb-1 block text-sm text-muted">
+              Status
+            </label>
+            <UiSelect id="client-status" name="status" defaultValue="PROSPECT">
+              <option value="PROSPECT">Prospect</option>
+              <option value="ACTIVE">Active</option>
+              <option value="FORMER">Former</option>
+            </UiSelect>
+          </div>
+          <div>
+            <label htmlFor="client-notes" className="mb-1 block text-sm text-muted">
+              Notes (optional)
+            </label>
+            <textarea
+              id="client-notes"
+              name="notes"
+              rows={3}
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsCreateOpen(false)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
-              aria-label="Close"
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm"
             >
-              ×
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Saving..." : "Add client"}
             </button>
           </div>
-          <form ref={formRef} action={formAction} className="mt-4 space-y-4">
-            {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
-            <div>
-              <label htmlFor="client-name" className="mb-1 block text-sm text-muted">
-                Full name
-              </label>
-              <input
-                id="client-name"
-                name="fullName"
-                required
-                placeholder="e.g. Adebayo Okonkwo"
-                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="client-phone" className="mb-1 block text-sm text-muted">
-                  Phone
-                </label>
-                <input id="client-phone" name="phone" className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-              </div>
-              <div>
-                <label htmlFor="client-email" className="mb-1 block text-sm text-muted">
-                  Email
-                </label>
-                <input
-                  id="client-email"
-                  name="email"
-                  type="email"
-                  value={createEmail}
-                  onChange={(e) => setCreateEmail(e.target.value)}
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
-                />
-              </div>
-            </div>
-            <label className="flex items-start gap-3 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-3">
-              <input
-                type="checkbox"
-                name="sendPortalInvite"
-                checked={sendPortalInvite && Boolean(createEmail.trim())}
-                disabled={!createEmail.trim()}
-                onChange={(e) => setSendPortalInvite(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="block text-sm font-medium text-foreground">Send portal invitation</span>
-                <span className="mt-0.5 block text-xs text-muted">
-                  Email them a link to sign in and view their units at /portal. Existing Realcorp users are linked to this organization automatically.
-                </span>
-              </span>
-            </label>
-            <div>
-              <label htmlFor="client-status" className="mb-1 block text-sm text-muted">
-                Status
-              </label>
-              <UiSelect id="client-status" name="status" defaultValue="PROSPECT">
-                <option value="PROSPECT">Prospect</option>
-                <option value="ACTIVE">Active</option>
-                <option value="FORMER">Former</option>
-              </UiSelect>
-            </div>
-            <div>
-              <label htmlFor="client-notes" className="mb-1 block text-sm text-muted">
-                Notes (optional)
-              </label>
-              <textarea id="client-notes" name="notes" rows={3} className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground" />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setIsCreateOpen(false)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm">
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={pending}
-                aria-busy={pending}
-                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-              >
-                {pending ? <ButtonSpinner /> : null}
-                {pending ? "Saving..." : "Add client"}
-              </button>
-            </div>
-          </form>
+        </form>
       </ModalOverlay>
     </div>
   );

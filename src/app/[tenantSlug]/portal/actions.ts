@@ -62,11 +62,7 @@ export async function submitInvestorInterest(
 
   const name = client?.fullName || session.user.name || session.user.email || "Investor";
   const email = session.user.email || client?.email || null;
-  const phone =
-    parsed.data.phone?.trim() ||
-    client?.phone ||
-    client?.alternatePhone ||
-    null;
+  const phone = parsed.data.phone?.trim() || client?.phone || client?.alternatePhone || null;
 
   if (!phone) {
     return { ok: false, error: "Add a phone number so the team can reach you." };
@@ -84,8 +80,7 @@ export async function submitInvestorInterest(
   });
   if (recent) return { ok: true };
 
-  const roleLabel =
-    membership?.role === MembershipRole.LISTING_OWNER ? "Listing owner" : "Investor";
+  const roleLabel = membership?.role === MembershipRole.LISTING_OWNER ? "Listing owner" : "Investor";
 
   await prisma.lead.create({
     data: {

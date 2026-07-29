@@ -16,13 +16,13 @@ function toCsv(rows: Array<Record<string, string | number>>) {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
   const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-  return [headers.map(esc).join(","), ...rows.map((row) => headers.map((h) => esc(row[h] ?? "")).join(","))].join("\n");
+  return [
+    headers.map(esc).join(","),
+    ...rows.map((row) => headers.map((h) => esc(row[h] ?? "")).join(",")),
+  ].join("\n");
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

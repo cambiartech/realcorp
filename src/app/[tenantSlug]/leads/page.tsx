@@ -79,7 +79,10 @@ export default async function TenantLeadsPage({
       take: 300,
     }),
     prisma.campaign.findMany({
-      where: { tenantId: tenant.id, status: { in: [CampaignStatus.ACTIVE, CampaignStatus.DRAFT, CampaignStatus.PAUSED] } },
+      where: {
+        tenantId: tenant.id,
+        status: { in: [CampaignStatus.ACTIVE, CampaignStatus.DRAFT, CampaignStatus.PAUSED] },
+      },
       orderBy: { name: "asc" },
       select: { id: true, name: true, code: true },
       take: 200,
@@ -126,36 +129,40 @@ export default async function TenantLeadsPage({
   }
 
   return (
-    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-sm text-muted">Loading leads…</div>}>
-    <LeadsWorkspace
-      tenantSlug={tenant.slug}
-      tenantName={tenant.name}
-      canCreate={canCreate}
-      activeFilterChips={activeFilterChips}
-      projectOptions={projects.map((project) => ({ id: project.id, name: project.name }))}
-      campaignOptions={campaigns.map((c) => ({ id: c.id, label: `${c.name} (${c.code})` }))}
-      sourceOptions={sourceOptions}
-      leads={leads.map((lead) => ({
-        id: lead.id,
-        name: lead.name ?? "Unnamed lead",
-        email: lead.email ?? "—",
-        phone: lead.phone ?? "—",
-        source: lead.source ?? "—",
-        attribution:
-          [lead.campaign?.name, lead.realtorPartner ? `Partner: ${lead.realtorPartner.displayName}` : null]
-            .filter(Boolean)
-            .join(" · ") || "—",
-        quality: formatEnumLabel(lead.quality),
-        score: lead.score,
-        lastActivityAt: lead.lastActivityAt ? lead.lastActivityAt.toISOString().slice(0, 10) : null,
-        owner: lead.assignedUserId ? userMap.get(lead.assignedUserId)?.name || userMap.get(lead.assignedUserId)?.email || "Unknown" : "Unassigned",
-        createdAt: lead.createdAt.toISOString().slice(0, 10),
-      }))}
-      users={users.map((membershipItem) => ({
-        id: membershipItem.user.id,
-        label: membershipItem.user.name || membershipItem.user.email || membershipItem.user.id,
-      }))}
-    />
+    <Suspense
+      fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-sm text-muted">Loading leads…</div>}
+    >
+      <LeadsWorkspace
+        tenantSlug={tenant.slug}
+        tenantName={tenant.name}
+        canCreate={canCreate}
+        activeFilterChips={activeFilterChips}
+        projectOptions={projects.map((project) => ({ id: project.id, name: project.name }))}
+        campaignOptions={campaigns.map((c) => ({ id: c.id, label: `${c.name} (${c.code})` }))}
+        sourceOptions={sourceOptions}
+        leads={leads.map((lead) => ({
+          id: lead.id,
+          name: lead.name ?? "Unnamed lead",
+          email: lead.email ?? "—",
+          phone: lead.phone ?? "—",
+          source: lead.source ?? "—",
+          attribution:
+            [lead.campaign?.name, lead.realtorPartner ? `Partner: ${lead.realtorPartner.displayName}` : null]
+              .filter(Boolean)
+              .join(" · ") || "—",
+          quality: formatEnumLabel(lead.quality),
+          score: lead.score,
+          lastActivityAt: lead.lastActivityAt ? lead.lastActivityAt.toISOString().slice(0, 10) : null,
+          owner: lead.assignedUserId
+            ? userMap.get(lead.assignedUserId)?.name || userMap.get(lead.assignedUserId)?.email || "Unknown"
+            : "Unassigned",
+          createdAt: lead.createdAt.toISOString().slice(0, 10),
+        }))}
+        users={users.map((membershipItem) => ({
+          id: membershipItem.user.id,
+          label: membershipItem.user.name || membershipItem.user.email || membershipItem.user.id,
+        }))}
+      />
     </Suspense>
   );
 }

@@ -79,7 +79,12 @@ export async function drawFinanceDocumentHeader(input: {
   });
 
   const headerBottom = Math.min(y, height - margin - 48) - 16;
-  page.drawLine({ start: { x: margin, y: headerBottom }, end: { x: width - margin, y: headerBottom }, thickness: 1, color: border });
+  page.drawLine({
+    start: { x: margin, y: headerBottom },
+    end: { x: width - margin, y: headerBottom },
+    thickness: 1,
+    color: border,
+  });
   return headerBottom - 20;
 }
 
@@ -168,8 +173,20 @@ export function drawFinanceKeyValueRows(input: {
 }): number {
   let { y } = input;
   for (const [label, value] of input.rows) {
-    input.page.drawText(label.toUpperCase(), { x: input.margin, y, size: 8, font: input.fontBold, color: muted });
-    input.page.drawText(value.slice(0, 70), { x: input.margin + 120, y, size: 10, font: input.font, color: text });
+    input.page.drawText(label.toUpperCase(), {
+      x: input.margin,
+      y,
+      size: 8,
+      font: input.fontBold,
+      color: muted,
+    });
+    input.page.drawText(value.slice(0, 70), {
+      x: input.margin + 120,
+      y,
+      size: 10,
+      font: input.font,
+      color: text,
+    });
     y -= 18;
   }
   return y;

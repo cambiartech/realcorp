@@ -6,7 +6,11 @@ import { FormAlert, FormFieldError } from "@/components/form-message";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { UiSelect } from "@/components/ui-select";
 import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
-import { parseTeamInviteForm, zodTeamInviteIssuesToFieldRecord, type TeamInviteFieldName } from "@/lib/validators/team-invite";
+import {
+  parseTeamInviteForm,
+  zodTeamInviteIssuesToFieldRecord,
+  type TeamInviteFieldName,
+} from "@/lib/validators/team-invite";
 import { inviteTenantMember, type TeamInviteResult } from "./actions";
 
 const initial: TeamInviteResult | null = null;
@@ -53,7 +57,7 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
               : "Invite created, but email failed. Share this link manually:"}
           </p>
           {!state.emailSent ? (
-            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+            <p className="rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-xs text-foreground">
               Email delivery failed: {state.emailError || "unknown error"}.
             </p>
           ) : null}
@@ -78,7 +82,9 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
           aria-invalid={Boolean(fieldErrors.email)}
           aria-describedby={fieldErrors.email ? "team-invite-email-error" : undefined}
         />
-        {fieldErrors.email ? <FormFieldError id="team-invite-email-error">{fieldErrors.email}</FormFieldError> : null}
+        {fieldErrors.email ? (
+          <FormFieldError id="team-invite-email-error">{fieldErrors.email}</FormFieldError>
+        ) : null}
       </div>
 
       <div>
@@ -99,7 +105,9 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
             </option>
           ))}
         </UiSelect>
-        {fieldErrors.role ? <FormFieldError id="team-invite-role-error">{fieldErrors.role}</FormFieldError> : null}
+        {fieldErrors.role ? (
+          <FormFieldError id="team-invite-role-error">{fieldErrors.role}</FormFieldError>
+        ) : null}
       </div>
 
       <button

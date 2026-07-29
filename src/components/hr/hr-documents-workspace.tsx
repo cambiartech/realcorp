@@ -3,16 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChevronRight,
-  File,
-  FileImage,
-  FileText,
-  Folder,
-  FolderOpen,
-  HardDrive,
-  Users,
-} from "lucide-react";
+import { ChevronRight, File, FileImage, FileText, Folder, FolderOpen, HardDrive, Users } from "lucide-react";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -129,7 +120,8 @@ export function HrDocumentsWorkspace({
   }, [documents]);
 
   const selectedEmployee = useMemo(
-    () => (selectedEmployeeKey ? employees.find((e) => employeeOptionValue(e) === selectedEmployeeKey) : null),
+    () =>
+      selectedEmployeeKey ? employees.find((e) => employeeOptionValue(e) === selectedEmployeeKey) : null,
     [selectedEmployeeKey, employees],
   );
 
@@ -145,7 +137,10 @@ export function HrDocumentsWorkspace({
   const breadcrumb = useMemo(() => {
     if (browseMode === "type") {
       if (selectedTypeFolder === "ALL") return ["All documents"];
-      return ["All documents", DOC_CATEGORIES.find((c) => c.value === selectedTypeFolder)?.label ?? selectedTypeFolder];
+      return [
+        "All documents",
+        DOC_CATEGORIES.find((c) => c.value === selectedTypeFolder)?.label ?? selectedTypeFolder,
+      ];
     }
     if (!selectedEmployee) return ["Employees"];
     return ["Employees", selectedEmployee.fullName];
@@ -200,13 +195,13 @@ export function HrDocumentsWorkspace({
   return (
     <div className="space-y-4">
       {returnOnboardUserId ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-500/25 bg-violet-500/5 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--accent-line)] bg-[var(--accent-wash)] px-4 py-3">
           <p className="text-sm text-foreground">
             Upload documents for this employee, then return to onboarding.
           </p>
           <Link
             href={`/${tenantSlug}/hr/people?onboard=${encodeURIComponent(returnOnboardUserId)}`}
-            className="text-xs font-semibold text-violet-800 underline"
+            className="text-xs font-semibold text-[var(--accent)] underline"
           >
             ← Back to onboarding (Forms & documents)
           </Link>
@@ -256,15 +251,16 @@ export function HrDocumentsWorkspace({
         <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm">
           <p className="mb-3 text-sm font-semibold text-foreground">Upload & map to employee</p>
           <div className="grid gap-4 lg:grid-cols-[1fr_minmax(220px,280px)]">
-            <FileDropZone onFile={uploadFile} uploading={uploading} disabled={!uploadEmployeeId && !employees.length} />
+            <FileDropZone
+              onFile={uploadFile}
+              uploading={uploading}
+              disabled={!uploadEmployeeId && !employees.length}
+            />
             <div className="flex flex-col gap-3">
               <label className="text-xs font-medium text-muted">
-                Employee <span className="text-red-600">*</span>
+                Employee <span className="text-[var(--danger)]">*</span>
               </label>
-              <UiSelect
-                value={uploadEmployeeId}
-                onChange={(e) => setUploadEmployeeId(e.target.value)}
-              >
+              <UiSelect value={uploadEmployeeId} onChange={(e) => setUploadEmployeeId(e.target.value)}>
                 <option value="">Select employee…</option>
                 {employees.map((e) => (
                   <option key={e.userId} value={employeeOptionValue(e)}>
@@ -305,13 +301,23 @@ export function HrDocumentsWorkspace({
                   onClick={() => selectTypeFolder("ALL")}
                   className={[
                     "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                    selectedTypeFolder === "ALL" ? "bg-amber-500/15 font-semibold text-foreground" : "hover:bg-foreground/[0.06]",
+                    selectedTypeFolder === "ALL"
+                      ? "bg-[var(--warn-wash)] font-semibold text-foreground"
+                      : "hover:bg-foreground/[0.06]",
                   ].join(" ")}
                 >
                   {selectedTypeFolder === "ALL" ? (
-                    <FolderOpen className="h-5 w-5 shrink-0 text-amber-600" fill="currentColor" fillOpacity={0.2} />
+                    <FolderOpen
+                      className="h-5 w-5 shrink-0 text-[var(--warn)]"
+                      fill="currentColor"
+                      fillOpacity={0.2}
+                    />
                   ) : (
-                    <Folder className="h-5 w-5 shrink-0 text-amber-600" fill="currentColor" fillOpacity={0.15} />
+                    <Folder
+                      className="h-5 w-5 shrink-0 text-[var(--warn)]"
+                      fill="currentColor"
+                      fillOpacity={0.15}
+                    />
                   )}
                   <span className="min-w-0 flex-1 truncate">All documents</span>
                   <span className="text-[10px] text-muted">{documents.length}</span>
@@ -327,13 +333,23 @@ export function HrDocumentsWorkspace({
                       onClick={() => selectTypeFolder(cat.value)}
                       className={[
                         "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                        active ? "bg-amber-500/15 font-semibold text-foreground" : "hover:bg-foreground/[0.06]",
+                        active
+                          ? "bg-[var(--warn-wash)] font-semibold text-foreground"
+                          : "hover:bg-foreground/[0.06]",
                       ].join(" ")}
                     >
                       {active ? (
-                        <FolderOpen className="h-5 w-5 shrink-0 text-amber-600" fill="currentColor" fillOpacity={0.2} />
+                        <FolderOpen
+                          className="h-5 w-5 shrink-0 text-[var(--warn)]"
+                          fill="currentColor"
+                          fillOpacity={0.2}
+                        />
                       ) : (
-                        <Folder className="h-5 w-5 shrink-0 text-amber-600" fill="currentColor" fillOpacity={0.15} />
+                        <Folder
+                          className="h-5 w-5 shrink-0 text-[var(--warn)]"
+                          fill="currentColor"
+                          fillOpacity={0.15}
+                        />
                       )}
                       <span className="min-w-0 flex-1 truncate">{cat.label}</span>
                       <span className="text-[10px] text-muted">{count}</span>
@@ -350,7 +366,9 @@ export function HrDocumentsWorkspace({
                   onClick={() => setSelectedEmployeeKey(null)}
                   className={[
                     "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm",
-                    !selectedEmployeeKey ? "bg-amber-500/15 font-semibold" : "hover:bg-foreground/[0.06]",
+                    !selectedEmployeeKey
+                      ? "bg-[var(--warn-wash)] font-semibold"
+                      : "hover:bg-foreground/[0.06]",
                   ].join(" ")}
                 >
                   <Users className="h-5 w-5 text-muted" />
@@ -367,13 +385,23 @@ export function HrDocumentsWorkspace({
                       onClick={() => selectEmployee(e)}
                       className={[
                         "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                        active ? "bg-amber-500/15 font-semibold text-foreground" : "hover:bg-foreground/[0.06]",
+                        active
+                          ? "bg-[var(--warn-wash)] font-semibold text-foreground"
+                          : "hover:bg-foreground/[0.06]",
                       ].join(" ")}
                     >
                       {active ? (
-                        <FolderOpen className="h-5 w-5 shrink-0 text-amber-600" fill="currentColor" fillOpacity={0.2} />
+                        <FolderOpen
+                          className="h-5 w-5 shrink-0 text-[var(--warn)]"
+                          fill="currentColor"
+                          fillOpacity={0.2}
+                        />
                       ) : (
-                        <Folder className="h-5 w-5 shrink-0 text-amber-600" fill="currentColor" fillOpacity={0.15} />
+                        <Folder
+                          className="h-5 w-5 shrink-0 text-[var(--warn)]"
+                          fill="currentColor"
+                          fillOpacity={0.15}
+                        />
                       )}
                       <span className="min-w-0 flex-1 truncate">{e.fullName}</span>
                       <span className="text-[10px] text-muted">{count}</span>
@@ -391,7 +419,9 @@ export function HrDocumentsWorkspace({
             {breadcrumb.map((part, i) => (
               <span key={part} className="inline-flex items-center gap-1">
                 {i > 0 ? <ChevronRight className="h-3 w-3 text-muted" /> : null}
-                <span className={i === breadcrumb.length - 1 ? "font-semibold text-foreground" : "text-muted"}>
+                <span
+                  className={i === breadcrumb.length - 1 ? "font-semibold text-foreground" : "text-muted"}
+                >
                   {part}
                 </span>
               </span>
@@ -408,11 +438,20 @@ export function HrDocumentsWorkspace({
                       key={cat.value}
                       type="button"
                       onClick={() => selectTypeFolder(cat.value)}
-                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 text-center transition hover:border-amber-500/40 hover:bg-amber-500/5"
+                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 text-center transition hover:border-[var(--warn-line)] hover:bg-[var(--warn-wash)]"
                     >
-                      <Folder className="h-12 w-12 text-amber-600" fill="currentColor" fillOpacity={0.18} strokeWidth={1} />
-                      <span className="mt-2 line-clamp-2 text-xs font-semibold text-foreground">{cat.label}</span>
-                      <span className="mt-0.5 text-[10px] text-muted">{count} file{count === 1 ? "" : "s"}</span>
+                      <Folder
+                        className="h-12 w-12 text-[var(--warn)]"
+                        fill="currentColor"
+                        fillOpacity={0.18}
+                        strokeWidth={1}
+                      />
+                      <span className="mt-2 line-clamp-2 text-xs font-semibold text-foreground">
+                        {cat.label}
+                      </span>
+                      <span className="mt-0.5 text-[10px] text-muted">
+                        {count} file{count === 1 ? "" : "s"}
+                      </span>
                     </button>
                   );
                 })}
@@ -428,11 +467,19 @@ export function HrDocumentsWorkspace({
                       key={e.userId}
                       type="button"
                       onClick={() => selectEmployee(e)}
-                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition hover:border-amber-500/40 hover:bg-amber-500/5"
+                      className="flex flex-col items-center rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition hover:border-[var(--warn-line)] hover:bg-[var(--warn-wash)]"
                     >
-                      <Folder className="h-12 w-12 text-amber-600" fill="currentColor" fillOpacity={0.18} />
-                      <span className="mt-2 line-clamp-2 text-center text-xs font-semibold">{e.fullName}</span>
-                      <span className="text-[10px] text-muted">{count} file{count === 1 ? "" : "s"}</span>
+                      <Folder
+                        className="h-12 w-12 text-[var(--warn)]"
+                        fill="currentColor"
+                        fillOpacity={0.18}
+                      />
+                      <span className="mt-2 line-clamp-2 text-center text-xs font-semibold">
+                        {e.fullName}
+                      </span>
+                      <span className="text-[10px] text-muted">
+                        {count} file{count === 1 ? "" : "s"}
+                      </span>
                     </button>
                   );
                 })}
@@ -443,7 +490,7 @@ export function HrDocumentsWorkspace({
             (browseMode === "employee" && selectedEmployeeKey) ? (
               visibleDocuments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Folder className="h-16 w-16 text-amber-600/40" fill="currentColor" fillOpacity={0.12} />
+                  <Folder className="h-16 w-16 text-[var(--warn)]" fill="currentColor" fillOpacity={0.12} />
                   <p className="mt-3 text-sm font-medium text-foreground">This folder is empty</p>
                   <p className="mt-1 text-xs text-muted">
                     {selectedEmployee && !selectedEmployee.profileId
@@ -471,9 +518,9 @@ export function HrDocumentsWorkspace({
                         className={[
                           "flex h-12 w-12 shrink-0 items-center justify-center rounded-lg",
                           fileKind(d.fileName) === "pdf"
-                            ? "bg-red-500/10 text-red-700"
+                            ? "bg-[var(--danger-wash)] text-[var(--danger)]"
                             : fileKind(d.fileName) === "image"
-                              ? "bg-sky-500/10 text-sky-700"
+                              ? "bg-[var(--info-wash)] text-[var(--info)]"
                               : "bg-foreground/10 text-foreground",
                         ].join(" ")}
                       >
@@ -525,7 +572,11 @@ export function HrDocumentsWorkspace({
                     >
                       <FileIcon fileName={d.fileName} className="h-4 w-4 shrink-0 text-muted" />
                       <span className="min-w-0 flex-1 truncate">{d.title}</span>
-                      <Link href={d.fileUrl} target="_blank" className="shrink-0 text-xs font-semibold underline">
+                      <Link
+                        href={d.fileUrl}
+                        target="_blank"
+                        className="shrink-0 text-xs font-semibold underline"
+                      >
                         Open
                       </Link>
                     </div>

@@ -46,17 +46,35 @@ export function NightAuditReport({ tenantName, audit, showPrintButton = true }: 
         <div className="rounded-lg border border-foreground/10 p-4">
           <h2 className="font-semibold">Housekeeping status</h2>
           <ul className="mt-3 space-y-2 text-sm">
-            <li className="flex justify-between"><span>Clean & vacant</span><strong>{audit.housekeeping.vacantClean}</strong></li>
-            <li className="flex justify-between"><span>Dirty & vacant</span><strong>{audit.housekeeping.vacantDirty}</strong></li>
-            <li className="flex justify-between"><span>Occupied</span><strong>{audit.housekeeping.occupied}</strong></li>
-            <li className="flex justify-between"><span>Out of order</span><strong>{audit.housekeeping.outOfOrder}</strong></li>
+            <li className="flex justify-between">
+              <span>Clean & vacant</span>
+              <strong>{audit.housekeeping.vacantClean}</strong>
+            </li>
+            <li className="flex justify-between">
+              <span>Dirty & vacant</span>
+              <strong>{audit.housekeeping.vacantDirty}</strong>
+            </li>
+            <li className="flex justify-between">
+              <span>Occupied</span>
+              <strong>{audit.housekeeping.occupied}</strong>
+            </li>
+            <li className="flex justify-between">
+              <span>Out of order</span>
+              <strong>{audit.housekeeping.outOfOrder}</strong>
+            </li>
           </ul>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
           <h2 className="font-semibold">Tomorrow</h2>
           <ul className="mt-3 space-y-2 text-sm">
-            <li className="flex justify-between"><span>Expected arrivals</span><strong>{audit.summary.arrivalsTomorrow}</strong></li>
-            <li className="flex justify-between"><span>Expected departures</span><strong>{audit.summary.departuresTomorrow}</strong></li>
+            <li className="flex justify-between">
+              <span>Expected arrivals</span>
+              <strong>{audit.summary.arrivalsTomorrow}</strong>
+            </li>
+            <li className="flex justify-between">
+              <span>Expected departures</span>
+              <strong>{audit.summary.departuresTomorrow}</strong>
+            </li>
           </ul>
         </div>
       </section>
@@ -64,9 +82,18 @@ export function NightAuditReport({ tenantName, audit, showPrintButton = true }: 
       <section className="rounded-lg border border-foreground/10 p-4">
         <h2 className="font-semibold">Revenue summary</h2>
         <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-          <li><span className="text-muted">Payments collected</span><p className="font-semibold">{audit.revenue.paymentsCollectedLabel}</p></li>
-          <li><span className="text-muted">Folio charges posted</span><p className="font-semibold">{audit.revenue.folioChargesLabel}</p></li>
-          <li><span className="text-muted">Outstanding balances</span><p className="font-semibold">{audit.revenue.outstandingLabel}</p></li>
+          <li>
+            <span className="text-muted">Payments collected</span>
+            <p className="font-semibold">{audit.revenue.paymentsCollectedLabel}</p>
+          </li>
+          <li>
+            <span className="text-muted">Folio charges posted</span>
+            <p className="font-semibold">{audit.revenue.folioChargesLabel}</p>
+          </li>
+          <li>
+            <span className="text-muted">Outstanding balances</span>
+            <p className="font-semibold">{audit.revenue.outstandingLabel}</p>
+          </li>
         </ul>
         {audit.revenue.byDepartment.length > 0 ? (
           <div className="mt-4">

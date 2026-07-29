@@ -38,7 +38,14 @@ export default async function RoomsPage({ params }: { params: Promise<{ tenantSl
     let alertLevel: "normal" | "due-soon" | "overdue" | null = null;
     if (res?.status === "CHECKED_IN") {
       const overdue = isCheckoutOverdue(res.checkOut, ctx.pmsSettings.checkOutTime, now);
-      const dueSoon = !overdue && isCheckoutDueSoon(res.checkOut, ctx.pmsSettings.checkOutTime, ctx.pmsSettings.checkoutAlertHours, now);
+      const dueSoon =
+        !overdue &&
+        isCheckoutDueSoon(
+          res.checkOut,
+          ctx.pmsSettings.checkOutTime,
+          ctx.pmsSettings.checkoutAlertHours,
+          now,
+        );
       alertLevel = overdue ? "overdue" : dueSoon ? "due-soon" : "normal";
     }
     return {

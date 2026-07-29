@@ -4,7 +4,10 @@ import prisma from "@/lib/db";
 type Db = Prisma.TransactionClient | typeof prisma;
 
 function tenantPrefix(slug: string): string {
-  const letters = slug.replace(/[^a-z0-9]/gi, "").slice(0, 4).toUpperCase();
+  const letters = slug
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 4)
+    .toUpperCase();
   return letters || "EMP";
 }
 

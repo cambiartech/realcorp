@@ -16,7 +16,12 @@ const createActivitySchema = z.object({
   entityId: z.string().trim().min(1),
   type: z.nativeEnum(ActivityType),
   title: z.string().trim().min(1, "Title is required.").max(200, "Title too long."),
-  body: z.string().trim().max(2000).optional().transform((v) => (v && v !== "" ? v : undefined)),
+  body: z
+    .string()
+    .trim()
+    .max(2000)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
   dueAt: z
     .string()
     .trim()
@@ -118,10 +123,7 @@ export async function createActivity(
   return { ok: true };
 }
 
-export async function deleteActivity(
-  tenantSlug: string,
-  activityId: string,
-): Promise<ActionResult> {
+export async function deleteActivity(tenantSlug: string, activityId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
@@ -161,10 +163,7 @@ export async function deleteActivity(
   return { ok: true };
 }
 
-export async function completeActivity(
-  tenantSlug: string,
-  activityId: string,
-): Promise<ActionResult> {
+export async function completeActivity(tenantSlug: string, activityId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
@@ -245,7 +244,10 @@ export async function replyWhatsApp(
   if (tenantWithSettings?.settings?.moduleWhatsApp === false) {
     return { ok: false, error: "WhatsApp is not enabled on your plan. Contact your platform admin." };
   }
-  if (!tenantWithSettings?.settings?.whatsappAccessToken || !tenantWithSettings.settings.whatsappPhoneNumberId) {
+  if (
+    !tenantWithSettings?.settings?.whatsappAccessToken ||
+    !tenantWithSettings.settings.whatsappPhoneNumberId
+  ) {
     return { ok: false, error: "WhatsApp API is not configured." };
   }
 

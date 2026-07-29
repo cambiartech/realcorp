@@ -53,10 +53,15 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
     y,
     width,
     rows: [
-      { label: "Issue date", value: new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(input.issuedAt) },
+      {
+        label: "Issue date",
+        value: new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(input.issuedAt),
+      },
       {
         label: "Due date",
-        value: input.dueDate ? new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(input.dueDate) : "On receipt",
+        value: input.dueDate
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(input.dueDate)
+          : "On receipt",
       },
       { label: "From", value: input.brand.companyName },
       { label: "Bill to", value: input.customerName || "—" },
@@ -71,23 +76,58 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
     { label: "TOTAL", x: margin + 400, w: 100 },
   ];
   for (const col of cols) {
-    page.drawText(col.label, { x: col.x, y: tableTop, size: 8, font: fontBold, color: rgb(0.45, 0.45, 0.45) });
+    page.drawText(col.label, {
+      x: col.x,
+      y: tableTop,
+      size: 8,
+      font: fontBold,
+      color: rgb(0.45, 0.45, 0.45),
+    });
   }
   y = tableTop - 16;
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.82, 0.82, 0.82) });
+  page.drawLine({
+    start: { x: margin, y },
+    end: { x: width - margin, y },
+    thickness: 1,
+    color: rgb(0.82, 0.82, 0.82),
+  });
   y -= 16;
   page.drawText(input.title.slice(0, 45), { x: margin, y, size: 10, font, color: rgb(0.12, 0.12, 0.12) });
   page.drawText("1", { x: margin + 250, y, size: 10, font, color: rgb(0.12, 0.12, 0.12) });
-  page.drawText(money(input.currency, input.amount), { x: margin + 300, y, size: 10, font, color: rgb(0.12, 0.12, 0.12) });
-  page.drawText(money(input.currency, input.amount), { x: margin + 400, y, size: 10, font, color: rgb(0.12, 0.12, 0.12) });
+  page.drawText(money(input.currency, input.amount), {
+    x: margin + 300,
+    y,
+    size: 10,
+    font,
+    color: rgb(0.12, 0.12, 0.12),
+  });
+  page.drawText(money(input.currency, input.amount), {
+    x: margin + 400,
+    y,
+    size: 10,
+    font,
+    color: rgb(0.12, 0.12, 0.12),
+  });
   y -= 28;
 
   const totalsX = width - margin - 160;
   page.drawText("Subtotal", { x: totalsX, y, size: 10, font, color: rgb(0.45, 0.45, 0.45) });
-  page.drawText(money(input.currency, input.amount), { x: totalsX + 80, y, size: 10, font, color: rgb(0.12, 0.12, 0.12) });
+  page.drawText(money(input.currency, input.amount), {
+    x: totalsX + 80,
+    y,
+    size: 10,
+    font,
+    color: rgb(0.12, 0.12, 0.12),
+  });
   y -= 18;
   page.drawText("Balance due", { x: totalsX, y, size: 11, font: fontBold, color: rgb(0.12, 0.12, 0.12) });
-  page.drawText(money(input.currency, input.balanceDue), { x: totalsX + 80, y, size: 11, font: fontBold, color: rgb(0.12, 0.12, 0.12) });
+  page.drawText(money(input.currency, input.balanceDue), {
+    x: totalsX + 80,
+    y,
+    size: 11,
+    font: fontBold,
+    color: rgb(0.12, 0.12, 0.12),
+  });
   y -= 28;
 
   if (input.department) {
@@ -111,7 +151,13 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
       y -= 12;
     }
   } else {
-    page.drawText("Contact us for payment instructions.", { x: margin, y, size: 9, font, color: rgb(0.45, 0.45, 0.45) });
+    page.drawText("Contact us for payment instructions.", {
+      x: margin,
+      y,
+      size: 9,
+      font,
+      color: rgb(0.45, 0.45, 0.45),
+    });
   }
 
   if (input.isReminder) {

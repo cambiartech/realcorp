@@ -18,10 +18,7 @@ export function CurrencySelect({
   id,
   ...rest
 }: CurrencySelectProps) {
-  const options =
-    currencies.length > 0
-      ? currencies
-      : [defaultCurrency.trim().toUpperCase() || "NGN"];
+  const options = currencies.length > 0 ? currencies : [defaultCurrency.trim().toUpperCase() || "NGN"];
   const resolvedDefault = String(defaultValue || options[0] || defaultCurrency)
     .trim()
     .toUpperCase();

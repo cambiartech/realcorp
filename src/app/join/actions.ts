@@ -6,9 +6,7 @@ import { MembershipStatus } from "@/generated/prisma";
 import { classifyInvite } from "@/lib/invitation-utils";
 import { parseJoinForm } from "@/lib/validators/join";
 
-export type AcceptInviteResult =
-  | { ok: true; redirectTo: string }
-  | { ok: false; error: string };
+export type AcceptInviteResult = { ok: true; redirectTo: string } | { ok: false; error: string };
 
 export async function acceptInvite(
   token: string,

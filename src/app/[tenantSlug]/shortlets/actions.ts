@@ -80,11 +80,16 @@ async function getTenantAndMembership(tenantSlug: string, userId: string) {
   return { tenant, membership };
 }
 
-function financeSyncEnabled(tenant: { settings: { shortletFinanceSync?: boolean | null; moduleFinance?: boolean | null } | null }) {
+function financeSyncEnabled(tenant: {
+  settings: { shortletFinanceSync?: boolean | null; moduleFinance?: boolean | null } | null;
+}) {
   return Boolean(tenant.settings?.moduleFinance && tenant.settings?.shortletFinanceSync);
 }
 
-function accessCtx(isPlatformAdmin: boolean, membership: { status: MembershipStatus; role: MembershipRole } | null): ShortletsAccessContext {
+function accessCtx(
+  isPlatformAdmin: boolean,
+  membership: { status: MembershipStatus; role: MembershipRole } | null,
+): ShortletsAccessContext {
   return { isPlatformAdmin, membership };
 }
 
@@ -129,7 +134,8 @@ export async function createShortletUnit(
     return { ok: false, error: "No permission to manage short lets." };
   }
 
-  let projectUnitMeta: { id: string; label: string; unitType: string | null; projectName: string } | null = null;
+  let projectUnitMeta: { id: string; label: string; unitType: string | null; projectName: string } | null =
+    null;
   if (parsed.data.source === "PROJECT_UNIT") {
     if (!parsed.data.projectUnitId) return { ok: false, error: "Select a project unit to link." };
     const projectUnit = await prisma.unit.findFirst({
@@ -143,16 +149,24 @@ export async function createShortletUnit(
       },
     });
     if (!projectUnit) return { ok: false, error: "Project unit not found." };
-    if (projectUnit.shortletUnit) return { ok: false, error: "Project unit already linked to a short let unit." };
-    projectUnitMeta = { id: projectUnit.id, label: projectUnit.label, unitType: projectUnit.unitType, projectName: projectUnit.project.name };
+    if (projectUnit.shortletUnit)
+      return { ok: false, error: "Project unit already linked to a short let unit." };
+    projectUnitMeta = {
+      id: projectUnit.id,
+      label: projectUnit.label,
+      unitType: projectUnit.unitType,
+      projectName: projectUnit.project.name,
+    };
   }
 
-  const name = parsed.data.source === "PROJECT_UNIT" && projectUnitMeta
-    ? `${projectUnitMeta.projectName} · ${projectUnitMeta.label}`
-    : (parsed.data.name || "").trim();
-  const location = parsed.data.source === "PROJECT_UNIT" && projectUnitMeta
-    ? projectUnitMeta.projectName
-    : parsed.data.location || null;
+  const name =
+    parsed.data.source === "PROJECT_UNIT" && projectUnitMeta
+      ? `${projectUnitMeta.projectName} · ${projectUnitMeta.label}`
+      : (parsed.data.name || "").trim();
+  const location =
+    parsed.data.source === "PROJECT_UNIT" && projectUnitMeta
+      ? projectUnitMeta.projectName
+      : parsed.data.location || null;
 
   await prisma.shortletUnit.create({
     data: {
@@ -378,7 +392,19 @@ export async function listAvailableShortletApartments(
   tenantSlug: string,
   input: Record<string, unknown>,
 ): Promise<
-  | { ok: true; apartments: Array<{ id: string; label: string; propertyId: string | null; propertyName: string; nightlyRate: number; cleaningFee: number; cautionFee: number | null; currency: string }> }
+  | {
+      ok: true;
+      apartments: Array<{
+        id: string;
+        label: string;
+        propertyId: string | null;
+        propertyName: string;
+        nightlyRate: number;
+        cleaningFee: number;
+        cautionFee: number | null;
+        currency: string;
+      }>;
+    }
   | { ok: false; error: string }
 > {
   const session = await auth();
@@ -533,7 +559,15 @@ export async function createShortletReservation(
   if (unitId) {
     unit = await prisma.shortletUnit.findFirst({
       where: { id: unitId, tenantId: tenant.id },
-      select: { id: true, name: true, nightlyRate: true, cleaningFee: true, cautionFee: true, currency: true, housekeepingStatus: true },
+      select: {
+        id: true,
+        name: true,
+        nightlyRate: true,
+        cleaningFee: true,
+        cautionFee: true,
+        currency: true,
+        housekeepingStatus: true,
+      },
     });
     if (!unit) return { ok: false, error: "Apartment not found." };
 
@@ -551,7 +585,8 @@ export async function createShortletReservation(
       },
       select: { id: true },
     });
-    if (overlap) return { ok: false, error: "Selected dates overlap an existing reservation on this apartment." };
+    if (overlap)
+      return { ok: false, error: "Selected dates overlap an existing reservation on this apartment." };
   }
 
   if (propertyId && !unit) {
@@ -576,7 +611,8 @@ export async function createShortletReservation(
   const cautionFeePaid = parsed.data.collectPaymentNow ? Number(parsed.data.cautionFeePaid || 0) : 0;
   if (initialPayment < 0) return { ok: false, error: "Initial payment cannot be negative." };
   if (cautionFeePaid < 0) return { ok: false, error: "Caution fee paid cannot be negative." };
-  if (initialPayment > totalAmount) return { ok: false, error: "Booking payment cannot exceed reservation total." };
+  if (initialPayment > totalAmount)
+    return { ok: false, error: "Booking payment cannot exceed reservation total." };
   if (cautionFee != null && cautionFeePaid > cautionFee) {
     return { ok: false, error: "Caution fee paid cannot exceed the caution fee." };
   }
@@ -584,9 +620,7 @@ export async function createShortletReservation(
     return { ok: false, error: "Walk-in policy: collect the full booking amount before check-in." };
   }
   const initialPaidAt =
-    parsed.data.collectPaymentNow && initialPayment > 0
-      ? new Date(parsed.data.paymentPaidAt || "")
-      : null;
+    parsed.data.collectPaymentNow && initialPayment > 0 ? new Date(parsed.data.paymentPaidAt || "") : null;
   if (initialPaidAt && Number.isNaN(initialPaidAt.getTime())) {
     return { ok: false, error: "Invalid initial payment date." };
   }
@@ -728,7 +762,15 @@ export async function createShortletBookings(
   let grandTotal = 0;
   let grandCaution = 0;
   const stayCalcs: Array<{
-    unit: { id: string; name: string; nightlyRate: unknown; cleaningFee: unknown; cautionFee: unknown; currency: string; housekeepingStatus: ShortletHousekeepingStatus } | null;
+    unit: {
+      id: string;
+      name: string;
+      nightlyRate: unknown;
+      cleaningFee: unknown;
+      cautionFee: unknown;
+      currency: string;
+      housekeepingStatus: ShortletHousekeepingStatus;
+    } | null;
     propertyId: string | null;
     checkIn: Date;
     checkOut: Date;
@@ -753,7 +795,15 @@ export async function createShortletBookings(
     if (unitId) {
       unit = await prisma.shortletUnit.findFirst({
         where: { id: unitId, tenantId: tenant.id },
-        select: { id: true, name: true, nightlyRate: true, cleaningFee: true, cautionFee: true, currency: true, housekeepingStatus: true },
+        select: {
+          id: true,
+          name: true,
+          nightlyRate: true,
+          cleaningFee: true,
+          cautionFee: true,
+          currency: true,
+          housekeepingStatus: true,
+        },
       });
       if (!unit) return { ok: false, error: "Apartment not found." };
       if (isWalkIn && unit.housekeepingStatus !== ShortletHousekeepingStatus.VACANT_CLEAN) {
@@ -794,14 +844,18 @@ export async function createShortletBookings(
     return { ok: false, error: "Walk-in policy: collect the full booking amount before check-in." };
   }
   if (initialPayment > grandTotal) return { ok: false, error: "Payment exceeds booking total." };
-  if (cautionFeePaid > grandCaution) return { ok: false, error: "Caution fee paid exceeds total caution fee." };
+  if (cautionFeePaid > grandCaution)
+    return { ok: false, error: "Caution fee paid exceeds total caution fee." };
 
   const noteLines: string[] = [];
-  if (parsed.data.guestCount && parsed.data.guestCount > 1) noteLines.push(`Guests: ${parsed.data.guestCount}`);
+  if (parsed.data.guestCount && parsed.data.guestCount > 1)
+    noteLines.push(`Guests: ${parsed.data.guestCount}`);
   if (parsed.data.notes?.trim()) noteLines.push(parsed.data.notes.trim());
   const combinedNotes = noteLines.length > 0 ? noteLines.join("\n") : null;
 
-  const reservationStatus = isWalkIn ? ShortletReservationStatus.CHECKED_IN : ShortletReservationStatus.CONFIRMED;
+  const reservationStatus = isWalkIn
+    ? ShortletReservationStatus.CHECKED_IN
+    : ShortletReservationStatus.CONFIRMED;
   const source = isWalkIn ? ShortletReservationSource.WALK_IN : ShortletReservationSource.DIRECT;
   const initialPaidAt =
     parsed.data.collectPaymentNow && initialPayment > 0 ? new Date(parsed.data.paymentPaidAt || "") : null;
@@ -933,13 +987,24 @@ export async function assignShortletReservationApartment(
   });
   if (!reservation) return { ok: false, error: "Reservation not found." };
   if (reservation.unitId) return { ok: false, error: "This reservation already has an apartment assigned." };
-  if (reservation.status === ShortletReservationStatus.CHECKED_OUT || reservation.status === ShortletReservationStatus.CANCELLED) {
+  if (
+    reservation.status === ShortletReservationStatus.CHECKED_OUT ||
+    reservation.status === ShortletReservationStatus.CANCELLED
+  ) {
     return { ok: false, error: "Cannot assign an apartment to a closed reservation." };
   }
 
   const unit = await prisma.shortletUnit.findFirst({
     where: { id: parsed.data.unitId, tenantId: tenant.id },
-    select: { id: true, name: true, nightlyRate: true, cleaningFee: true, cautionFee: true, currency: true, propertyId: true },
+    select: {
+      id: true,
+      name: true,
+      nightlyRate: true,
+      cleaningFee: true,
+      cautionFee: true,
+      currency: true,
+      propertyId: true,
+    },
   });
   if (!unit) return { ok: false, error: "Apartment not found." };
 
@@ -958,7 +1023,12 @@ export async function assignShortletReservationApartment(
 
   const totalAmount = Number(unit.nightlyRate) * reservation.nights + Number(unit.cleaningFee || 0);
   const amountPaid = Number(reservation.amountPaid);
-  const cautionFee = reservation.cautionFee != null ? Number(reservation.cautionFee) : unit.cautionFee != null ? Number(unit.cautionFee) : null;
+  const cautionFee =
+    reservation.cautionFee != null
+      ? Number(reservation.cautionFee)
+      : unit.cautionFee != null
+        ? Number(unit.cautionFee)
+        : null;
 
   await prisma.shortletReservation.update({
     where: { id: reservation.id },
@@ -1090,7 +1160,8 @@ export async function updateShortletReservationStatus(
         },
       });
     } else if (
-      (nextStatus === ShortletReservationStatus.CANCELLED || nextStatus === ShortletReservationStatus.NO_SHOW) &&
+      (nextStatus === ShortletReservationStatus.CANCELLED ||
+        nextStatus === ShortletReservationStatus.NO_SHOW) &&
       reservation.unitId
     ) {
       await tx.shortletUnit.update({
@@ -1235,7 +1306,10 @@ export async function updateHousekeepingStatus(
 
   const actorLabel = session.user.name || session.user.email || "Unknown";
 
-  if (next === ShortletHousekeepingStatus.VACANT_CLEAN && unit.housekeepingStatus === ShortletHousekeepingStatus.VACANT_DIRTY) {
+  if (
+    next === ShortletHousekeepingStatus.VACANT_CLEAN &&
+    unit.housekeepingStatus === ShortletHousekeepingStatus.VACANT_DIRTY
+  ) {
     const pendingInspection = await prisma.shortletCheckoutInspection.findFirst({
       where: {
         tenantId: tenant.id,
@@ -1884,7 +1958,15 @@ export async function importChannelLeadAsReservation(
   if (unitId) {
     unit = await prisma.shortletUnit.findFirst({
       where: { id: unitId, tenantId: tenant.id },
-      select: { id: true, name: true, nightlyRate: true, cleaningFee: true, cautionFee: true, currency: true, propertyId: true },
+      select: {
+        id: true,
+        name: true,
+        nightlyRate: true,
+        cleaningFee: true,
+        cautionFee: true,
+        currency: true,
+        propertyId: true,
+      },
     });
     if (!unit) return { ok: false, error: "Apartment not found." };
 
@@ -1898,7 +1980,8 @@ export async function importChannelLeadAsReservation(
       },
       select: { id: true },
     });
-    if (overlap) return { ok: false, error: "Selected dates overlap an existing reservation on this apartment." };
+    if (overlap)
+      return { ok: false, error: "Selected dates overlap an existing reservation on this apartment." };
   }
 
   if (propertyId && !unit) {
@@ -1912,10 +1995,9 @@ export async function importChannelLeadAsReservation(
   const totalAmount = unit ? Number(unit.nightlyRate) * nights + Number(unit.cleaningFee || 0) : 0;
   const cautionFee = unit?.cautionFee != null ? Number(unit.cautionFee) : null;
   const currency = unit?.currency || tenant.defaultCurrency;
-  const source =
-    lead.source?.toLowerCase().includes("explore")
-      ? ShortletReservationSource.EXPLORE
-      : ShortletReservationSource.OTA;
+  const source = lead.source?.toLowerCase().includes("explore")
+    ? ShortletReservationSource.EXPLORE
+    : ShortletReservationSource.OTA;
 
   await prisma.$transaction(async (tx) => {
     const guestId = await findOrCreateShortletGuest(tx, {

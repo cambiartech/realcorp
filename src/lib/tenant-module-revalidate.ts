@@ -1,7 +1,10 @@
 import type { TenantModuleField } from "@/lib/tenant-module-definitions";
 
 /** Paths to revalidate when platform admin changes module entitlements. */
-export function tenantModuleRevalidatePaths(tenantSlug: string, changed?: Partial<Record<TenantModuleField, boolean>>) {
+export function tenantModuleRevalidatePaths(
+  tenantSlug: string,
+  changed?: Partial<Record<TenantModuleField, boolean>>,
+) {
   const base = `/${tenantSlug}`;
   const all = [
     base,

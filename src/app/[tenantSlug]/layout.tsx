@@ -119,7 +119,9 @@ export default async function TenantLayout({
       </header>
       <div className="flex min-h-0 flex-1 w-full items-stretch overflow-hidden">
         <TenantSidebar {...navProps} />
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pb-28 md:pb-24">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pb-28 md:pb-24">
+          {children}
+        </main>
       </div>
       {orgSetup.canManageOrgSetup && !orgSetup.allComplete ? (
         <OrgSetupCoachBoundary

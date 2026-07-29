@@ -94,8 +94,16 @@ function addFinanceSummarySheet(
     [
       { label: "Total collected", value: kpis.totalCollected, tone: "highlight" },
       { label: "Total expenses", value: kpis.totalExpenses, tone: "default" },
-      { label: "Net cash flow", value: kpis.netCashflow, tone: kpis.netCashflow >= 0 ? "positive" : "negative" },
-      { label: "Outstanding receivables", value: kpis.receivables, tone: kpis.receivables > 0 ? "negative" : "default" },
+      {
+        label: "Net cash flow",
+        value: kpis.netCashflow,
+        tone: kpis.netCashflow >= 0 ? "positive" : "negative",
+      },
+      {
+        label: "Outstanding receivables",
+        value: kpis.receivables,
+        tone: kpis.receivables > 0 ? "negative" : "default",
+      },
     ],
     meta.currency,
   );
@@ -197,7 +205,13 @@ function addCashflowSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows
 
 function addExpensesSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows: ExpenseRow[]) {
   addReportBanner(sheet, metaToReport(meta, "Expense Analysis"), 6);
-  addBreakdownTable(sheet, 5, "Category breakdown", rows.map((r) => ({ label: r.category, value: r.total })), meta.currency);
+  addBreakdownTable(
+    sheet,
+    5,
+    "Category breakdown",
+    rows.map((r) => ({ label: r.category, value: r.total })),
+    meta.currency,
+  );
   const headerRow = (sheet.lastRow?.number ?? 10) + 2;
   const header = sheet.getRow(headerRow);
   header.values = ["Category", "Transactions", "Total"];
@@ -206,7 +220,10 @@ function addExpensesSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows
     const excelRow = sheet.getRow(headerRow + 1 + idx);
     excelRow.values = [row.category, row.count, row.total];
     excelRow.getCell(3).numFmt = moneyFormat(meta.currency);
-    if (idx % 2 === 1) excelRow.eachCell((c) => { c.fill = solidFill(REPORT_THEME.stripe); });
+    if (idx % 2 === 1)
+      excelRow.eachCell((c) => {
+        c.fill = solidFill(REPORT_THEME.stripe);
+      });
   });
   autoWidth(sheet);
 }
@@ -347,16 +364,14 @@ export async function downloadFinanceReportPackXlsx(
   await downloadWorkbook(workbook, `finance-report-pack-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-export function buildBalanceExportLines(
-  sections: {
-    assets: Array<{ label: string; amount: number; sub?: boolean }>;
-    liabilities: Array<{ label: string; amount: number }>;
-    equity: Array<{ label: string; amount: number }>;
-    assetsTotal: number;
-    liabilitiesTotal: number;
-    equityTotal: number;
-  },
-): BalanceLine[] {
+export function buildBalanceExportLines(sections: {
+  assets: Array<{ label: string; amount: number; sub?: boolean }>;
+  liabilities: Array<{ label: string; amount: number }>;
+  equity: Array<{ label: string; amount: number }>;
+  assetsTotal: number;
+  liabilitiesTotal: number;
+  equityTotal: number;
+}): BalanceLine[] {
   const lines: BalanceLine[] = [];
   for (const line of sections.assets) {
     lines.push({
@@ -374,7 +389,12 @@ export function buildBalanceExportLines(
   for (const line of sections.equity) {
     lines.push({ section: "Owner position", label: line.label, amount: line.amount, tone: "equity" });
   }
-  lines.push({ section: "Owner position", label: "Total equity", amount: sections.equityTotal, tone: "equity" });
+  lines.push({
+    section: "Owner position",
+    label: "Total equity",
+    amount: sections.equityTotal,
+    tone: "equity",
+  });
   return lines;
 }
 

@@ -3,7 +3,16 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Banknote, Calendar, CheckCircle2, CircleDashed, FileText, Layers, Printer, RefreshCw } from "lucide-react";
+import {
+  Banknote,
+  Calendar,
+  CheckCircle2,
+  CircleDashed,
+  FileText,
+  Layers,
+  Printer,
+  RefreshCw,
+} from "lucide-react";
 import { PayrollWorkflowGuide } from "@/components/hr/payroll-workflow-guide";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
 import { useSnackbar } from "@/components/snackbar";
@@ -207,7 +216,11 @@ export function HrPayslipsWorkspace({
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
   const generatePaygroupParam =
-    generatePaygroup === "ALL" ? undefined : generatePaygroup === "__UNASSIGNED__" ? "__UNASSIGNED__" : generatePaygroup;
+    generatePaygroup === "ALL"
+      ? undefined
+      : generatePaygroup === "__UNASSIGNED__"
+        ? "__UNASSIGNED__"
+        : generatePaygroup;
 
   return (
     <div className="space-y-5">
@@ -231,9 +244,11 @@ export function HrPayslipsWorkspace({
             </Link>
           ) : null}
         </div>
-        <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-4">
-          <p className="text-xs font-medium text-muted">{MONTHS[month - 1]} {year}</p>
-          <p className="mt-1 text-2xl font-bold text-violet-900">
+        <div className="rounded-lg border border-[var(--accent-line)] bg-[var(--accent-wash)] p-4">
+          <p className="text-xs font-medium text-muted">
+            {MONTHS[month - 1]} {year}
+          </p>
+          <p className="mt-1 text-2xl font-bold text-[var(--accent)]">
             {generatePeriodRun ? generatePeriodRun.payslipCount : "—"}
           </p>
           <p className="text-[11px] text-muted">
@@ -246,7 +261,7 @@ export function HrPayslipsWorkspace({
         </div>
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs font-medium text-muted">Missing gross</p>
-          <p className="mt-1 text-2xl font-bold text-amber-700">{missingGrossCount}</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--warn)]">{missingGrossCount}</p>
           <p className="text-[11px] text-muted">People → Job tab</p>
         </div>
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
@@ -265,7 +280,7 @@ export function HrPayslipsWorkspace({
                   `Published ${draftPayslipRunCount} draft payroll run${draftPayslipRunCount === 1 ? "" : "s"}.`,
                 )
               }
-              className="mt-1 text-[11px] font-semibold text-emerald-700 underline disabled:opacity-50"
+              className="mt-1 text-[11px] font-semibold text-[var(--success)] underline disabled:opacity-50"
             >
               Publish all drafts
             </button>
@@ -296,7 +311,7 @@ export function HrPayslipsWorkspace({
             </span>
           ))}
           {unassignedPayrollCount > 0 ? (
-            <span className="rounded-full border border-amber-500/30 bg-amber-500/5 px-2.5 py-1 text-[11px] text-amber-900">
+            <span className="rounded-full border border-[var(--warn-line)] bg-[var(--warn-wash)] px-2.5 py-1 text-[11px] text-[var(--warn)]">
               Unassigned: {unassignedPayrollCount}
             </span>
           ) : null}
@@ -311,7 +326,8 @@ export function HrPayslipsWorkspace({
               Generate monthly payslips
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Bo split: Basic 30%, Housing 20%, Transport 15%, Other 35%, Pension 8% of BHT, Payee per employee.
+              Bo split: Basic 30%, Housing 20%, Transport 15%, Other 35%, Pension 8% of BHT, Payee per
+              employee.
             </p>
           </div>
           <form
@@ -333,8 +349,14 @@ export function HrPayslipsWorkspace({
             }}
           >
             <div>
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted">Pay group</label>
-              <UiSelect value={generatePaygroup} onChange={(e) => setGeneratePaygroup(e.target.value)} className="min-w-[120px]">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted">
+                Pay group
+              </label>
+              <UiSelect
+                value={generatePaygroup}
+                onChange={(e) => setGeneratePaygroup(e.target.value)}
+                className="min-w-[120px]"
+              >
                 <option value="ALL">All groups</option>
                 {paygroups.map((g) => (
                   <option key={g} value={g}>
@@ -345,8 +367,14 @@ export function HrPayslipsWorkspace({
               </UiSelect>
             </div>
             <div>
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted">Month</label>
-              <UiSelect value={String(month)} onChange={(e) => setMonth(Number(e.target.value))} className="min-w-[130px]">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted">
+                Month
+              </label>
+              <UiSelect
+                value={String(month)}
+                onChange={(e) => setMonth(Number(e.target.value))}
+                className="min-w-[130px]"
+              >
                 {MONTHS.map((m, i) => (
                   <option key={m} value={i + 1}>
                     {m}
@@ -355,8 +383,14 @@ export function HrPayslipsWorkspace({
               </UiSelect>
             </div>
             <div>
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted">Year</label>
-              <UiSelect value={String(year)} onChange={(e) => setYear(Number(e.target.value))} className="w-24">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted">
+                Year
+              </label>
+              <UiSelect
+                value={String(year)}
+                onChange={(e) => setYear(Number(e.target.value))}
+                className="w-24"
+              >
                 {years.map((y) => (
                   <option key={y} value={y}>
                     {y}
@@ -430,7 +464,11 @@ export function HrPayslipsWorkspace({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <UiSelect value={filterPaygroup} onChange={(e) => setFilterPaygroup(e.target.value)} className="min-w-[120px] text-xs">
+                  <UiSelect
+                    value={filterPaygroup}
+                    onChange={(e) => setFilterPaygroup(e.target.value)}
+                    className="min-w-[120px] text-xs"
+                  >
                     <option value="ALL">All groups</option>
                     {paygroups.map((g) => (
                       <option key={g} value={g}>
@@ -449,13 +487,13 @@ export function HrPayslipsWorkspace({
                           "Payslips published — employees can view in My dashboard. Mark Paid after bank transfer.",
                         )
                       }
-                      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--success-line)] bg-[var(--success)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Publish month
                     </button>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--success)]">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Published
                     </span>
@@ -490,7 +528,7 @@ export function HrPayslipsWorkspace({
                         "PAID",
                       )
                     }
-                    className="inline-flex items-center gap-1 rounded-md border border-emerald-600/40 bg-emerald-600/10 px-2.5 py-1 text-xs font-semibold text-emerald-900 disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] px-2.5 py-1 text-xs font-semibold text-[var(--success)] disabled:opacity-50"
                   >
                     Mark all {filteredPaymentStats.pending} pending paid
                   </button>
@@ -508,8 +546,8 @@ export function HrPayslipsWorkspace({
                       <p className="mt-2">
                         {payrollReadyCount > 0 ? (
                           <>
-                            You have {payrollReadyCount} eligible employee{payrollReadyCount === 1 ? "" : "s"} — use{" "}
-                            <strong>Generate / refresh</strong> for {selectedRun.label}.
+                            You have {payrollReadyCount} eligible employee{payrollReadyCount === 1 ? "" : "s"}{" "}
+                            — use <strong>Generate / refresh</strong> for {selectedRun.label}.
                           </>
                         ) : (
                           <>
@@ -546,7 +584,10 @@ export function HrPayslipsWorkspace({
                       </thead>
                       <tbody>
                         {filteredPayslips.map((p) => (
-                          <tr key={p.id} className="border-b border-foreground/10 last:border-0 hover:bg-foreground/[0.02]">
+                          <tr
+                            key={p.id}
+                            className="border-b border-foreground/10 last:border-0 hover:bg-foreground/[0.02]"
+                          >
                             {selectedRun.statusValue === "FINALIZED" ? (
                               <td className="px-2 py-3">
                                 <input
@@ -562,7 +603,9 @@ export function HrPayslipsWorkspace({
                               <p className="text-xs text-muted">{p.jobRole || "—"}</p>
                             </td>
                             <td className="px-4 py-3 text-muted">{p.paygroup || "—"}</td>
-                            <td className="px-4 py-3 text-right tabular-nums">{currency} {p.grossPay.toLocaleString("en-NG")}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">
+                              {currency} {p.grossPay.toLocaleString("en-NG")}
+                            </td>
                             <td className="px-4 py-3 text-right tabular-nums text-muted">
                               {currency} {p.calc.payeeTax.toLocaleString("en-NG")}
                             </td>
@@ -576,14 +619,14 @@ export function HrPayslipsWorkspace({
                               {selectedRun.statusValue === "FINALIZED" ? (
                                 p.paymentStatusValue === "PAID" ? (
                                   <span className="inline-flex flex-col gap-0.5">
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--success-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--success)]">
                                       <CheckCircle2 className="h-3 w-3" />
                                       Paid
                                     </span>
                                     <span className="text-[10px] text-muted">{p.paidAtLabel}</span>
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warn)]">
                                     <CircleDashed className="h-3 w-3" />
                                     Pending
                                   </span>
@@ -609,7 +652,7 @@ export function HrPayslipsWorkspace({
                                       type="button"
                                       disabled={pending}
                                       onClick={() => void markPayments([p.id], "PAID")}
-                                      className="inline-flex items-center gap-1 rounded-md border border-emerald-600/30 px-2 py-1 text-[10px] font-semibold text-emerald-800"
+                                      className="inline-flex items-center gap-1 rounded-md border border-[var(--success-line)] px-2 py-1 text-[10px] font-semibold text-[var(--success)]"
                                     >
                                       <Banknote className="h-3 w-3" />
                                       Mark paid

@@ -13,7 +13,13 @@ export function PayslipYtdCard({
 }) {
   if (!ytd || ytd.monthsPaid === 0) {
     return (
-      <div className={compact ? "text-xs text-muted" : "rounded-lg border border-dashed border-foreground/15 p-4 text-sm text-muted"}>
+      <div
+        className={
+          compact
+            ? "text-xs text-muted"
+            : "rounded-lg border border-dashed border-foreground/15 p-4 text-sm text-muted"
+        }
+      >
         No finalized payslips for {new Date().getFullYear()} yet.
       </div>
     );
@@ -54,11 +60,16 @@ export function PayslipYtdCard({
             key={r.label}
             className={[
               "rounded-md border border-foreground/10 px-3 py-2",
-              r.highlight ? "border-emerald-500/30 bg-emerald-500/5 sm:col-span-2" : "",
+              r.highlight ? "border-[var(--success-line)] bg-[var(--success-wash)] sm:col-span-2" : "",
             ].join(" ")}
           >
             <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">{r.label}</dt>
-            <dd className={["mt-0.5 tabular-nums", r.highlight ? "text-lg font-bold text-foreground" : "text-sm font-semibold"].join(" ")}>
+            <dd
+              className={[
+                "mt-0.5 tabular-nums",
+                r.highlight ? "text-lg font-bold text-foreground" : "text-sm font-semibold",
+              ].join(" ")}
+            >
               {r.value}
             </dd>
           </div>

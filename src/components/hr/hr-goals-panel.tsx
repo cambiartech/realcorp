@@ -66,17 +66,14 @@ export function HrGoalsPanel({
           <p className="text-xs text-muted">Departments with goals</p>
           <p className="text-2xl font-bold">{summaries.length}</p>
         </div>
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+        <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4">
           <p className="text-xs text-muted">Total goals</p>
-          <p className="text-2xl font-bold text-emerald-800">{goals.length}</p>
+          <p className="text-2xl font-bold text-[var(--success)]">{goals.length}</p>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs text-muted">Avg progress (all)</p>
           <p className="text-2xl font-bold">
-            {goals.length
-              ? Math.round(goals.reduce((s, g) => s + g.progressPercent, 0) / goals.length)
-              : 0}
-            %
+            {goals.length ? Math.round(goals.reduce((s, g) => s + g.progressPercent, 0) / goals.length) : 0}%
           </p>
         </div>
       </div>
@@ -126,7 +123,11 @@ export function HrGoalsPanel({
         </div>
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase text-muted">Due date</label>
-          <input name="dueDate" type="date" className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm" />
+          <input
+            name="dueDate"
+            type="date"
+            className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+          />
         </div>
         <input
           name="description"
@@ -193,14 +194,14 @@ export function HrGoalsPanel({
                   <span>{dept.goalCount} goals</span>
                   <span>{dept.employeeCount} people</span>
                   <span>Avg {dept.avgProgress}%</span>
-                  <span className="text-emerald-700">{dept.completedCount} done</span>
+                  <span className="text-[var(--success)]">{dept.completedCount} done</span>
                 </div>
               </button>
               {expandedDept === dept.department ? (
                 <div className="border-t border-foreground/10 p-3">
                   <div className="mb-2 h-2 overflow-hidden rounded-full bg-foreground/10">
                     <div
-                      className="h-full rounded-full bg-emerald-600 transition-all"
+                      className="h-full rounded-full bg-[var(--success)] transition-all"
                       style={{ width: `${dept.avgProgress}%` }}
                     />
                   </div>
@@ -238,7 +239,9 @@ export function HrGoalsPanel({
                               );
                             }}
                           />
-                          <span className="w-10 text-right text-xs font-semibold tabular-nums">{g.progressPercent}%</span>
+                          <span className="w-10 text-right text-xs font-semibold tabular-nums">
+                            {g.progressPercent}%
+                          </span>
                         </div>
                       </li>
                     ))}

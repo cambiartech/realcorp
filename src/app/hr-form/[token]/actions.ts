@@ -55,8 +55,7 @@ export async function submitHrFormOnline(token: string, raw: Record<string, unkn
   if (!check.loaded) return { ok: false, error: check.error! };
 
   const schema = schemaForType(check.loaded.formType);
-  const prepared =
-    check.loaded.formType === "BIODATA" ? normalizeBiodataSubmission(raw) : raw;
+  const prepared = check.loaded.formType === "BIODATA" ? normalizeBiodataSubmission(raw) : raw;
   const parsed = schema.safeParse(prepared);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
@@ -139,7 +138,15 @@ export async function getHrFormUploadSignature(
   token: string,
   input?: { fileName?: string },
 ): Promise<
-  | { ok: true; cloudName: string; apiKey: string; folder: string; timestamp: number; publicId: string; signature: string }
+  | {
+      ok: true;
+      cloudName: string;
+      apiKey: string;
+      folder: string;
+      timestamp: number;
+      publicId: string;
+      signature: string;
+    }
   | { ok: false; error: string }
 > {
   const check = await assertWritableRequest(token);

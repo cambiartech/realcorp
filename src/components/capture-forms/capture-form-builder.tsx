@@ -1,10 +1,7 @@
 "use client";
 
 import type { CaptureFormField, CaptureFormFieldType } from "@/lib/capture-form-types";
-import {
-  CAPTURE_FIELD_TYPE_LABELS,
-  slugifyFieldKey,
-} from "@/lib/capture-form-templates";
+import { CAPTURE_FIELD_TYPE_LABELS, slugifyFieldKey } from "@/lib/capture-form-templates";
 import { UiSelect } from "@/components/ui-select";
 import { TagsInput } from "@/components/tags-input";
 
@@ -111,7 +108,12 @@ export function CaptureFormBuilder({
                 </span>
                 {!readOnly ? (
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="text-xs underline disabled:opacity-30">
+                    <button
+                      type="button"
+                      onClick={() => move(index, -1)}
+                      disabled={index === 0}
+                      className="text-xs underline disabled:opacity-30"
+                    >
                       ↑
                     </button>
                     <button
@@ -122,7 +124,11 @@ export function CaptureFormBuilder({
                     >
                       ↓
                     </button>
-                    <button type="button" onClick={() => remove(index)} className="text-xs text-red-600 underline">
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="text-xs text-[var(--danger)] underline"
+                    >
                       Remove
                     </button>
                   </div>
@@ -137,7 +143,10 @@ export function CaptureFormBuilder({
                     onChange={(e) => {
                       const label = e.target.value;
                       const patch: Partial<CaptureFormField> = { label };
-                      if (!readOnly && !["name", "email", "phone", "project_interest", "budget_range"].includes(field.type)) {
+                      if (
+                        !readOnly &&
+                        !["name", "email", "phone", "project_interest", "budget_range"].includes(field.type)
+                      ) {
                         patch.key = slugifyFieldKey(label, index);
                       }
                       update(index, patch);
@@ -150,7 +159,9 @@ export function CaptureFormBuilder({
                   <input
                     value={field.key}
                     disabled={readOnly || field.type === "name" || field.type === "email"}
-                    onChange={(e) => update(index, { key: e.target.value.replace(/\s+/g, "_").toLowerCase() })}
+                    onChange={(e) =>
+                      update(index, { key: e.target.value.replace(/\s+/g, "_").toLowerCase() })
+                    }
                     className="w-full border border-foreground/15 bg-field px-3 py-2 font-mono text-sm"
                   />
                 </div>
@@ -206,7 +217,10 @@ export function CaptureFormBuilder({
         <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm">
           {title ? <p className="text-base font-bold text-foreground">{title}</p> : null}
           {description ? (
-            <p className="mt-1 line-clamp-3 text-xs text-muted" dangerouslySetInnerHTML={{ __html: description }} />
+            <p
+              className="mt-1 line-clamp-3 text-xs text-muted"
+              dangerouslySetInnerHTML={{ __html: description }}
+            />
           ) : null}
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {fields.map((field) => (
@@ -234,7 +248,9 @@ export function CaptureFormBuilder({
             ))}
           </div>
           {fields.length > 0 ? (
-            <div className="mt-4 rounded-md bg-foreground py-2 text-center text-xs font-semibold text-background">Submit</div>
+            <div className="mt-4 rounded-md bg-foreground py-2 text-center text-xs font-semibold text-background">
+              Submit
+            </div>
           ) : null}
         </div>
       </div>

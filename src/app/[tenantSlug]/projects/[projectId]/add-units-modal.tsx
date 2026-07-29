@@ -82,7 +82,16 @@ export function AddUnitsModal({
       pricingPlanName: !baseLabel.trim() ? selectedPlan?.name : undefined,
       projectName,
     });
-  }, [namingMode, customLabels, quantity, baseLabel, existingLabels, selectedPlan?.name, projectName, suggestedLabels]);
+  }, [
+    namingMode,
+    customLabels,
+    quantity,
+    baseLabel,
+    existingLabels,
+    selectedPlan?.name,
+    projectName,
+    suggestedLabels,
+  ]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -100,7 +109,8 @@ export function AddUnitsModal({
       return;
     }
 
-    const labels = namingMode === "custom" ? customLabels.map((l) => l.trim()).filter(Boolean) : previewLabels;
+    const labels =
+      namingMode === "custom" ? customLabels.map((l) => l.trim()).filter(Boolean) : previewLabels;
     if (labels.length === 0) return;
     fd.set("labels", JSON.stringify(labels));
     onSubmit(fd);
@@ -114,7 +124,9 @@ export function AddUnitsModal({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">{quantity > 1 ? "Add units" : "Add unit"}</h2>
-          <p className="mt-0.5 text-xs text-muted">Add one or many units with the same purpose, status, and pricing plan.</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Add one or many units with the same purpose, status, and pricing plan.
+          </p>
         </div>
         <button
           type="button"
@@ -144,7 +156,11 @@ export function AddUnitsModal({
           {quantity > 1 ? (
             <label className="text-sm text-muted">
               Naming
-              <UiSelect className="mt-1" value={namingMode} onChange={(e) => setNamingMode(e.target.value as "sequential" | "custom")}>
+              <UiSelect
+                className="mt-1"
+                value={namingMode}
+                onChange={(e) => setNamingMode(e.target.value as "sequential" | "custom")}
+              >
                 <option value="sequential">Auto sequential names</option>
                 <option value="custom">Enter each name</option>
               </UiSelect>
@@ -179,7 +195,8 @@ export function AddUnitsModal({
             ) : null}
             {quantity > 1 ? (
               <p className="mt-2 text-xs text-muted">
-                Leave blank to use the pricing plan name, or enter a prefix like &quot;One bedroom&quot; → One bedroom 01, 02, 03…
+                Leave blank to use the pricing plan name, or enter a prefix like &quot;One bedroom&quot; → One
+                bedroom 01, 02, 03…
               </p>
             ) : null}
           </div>
@@ -211,7 +228,11 @@ export function AddUnitsModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm text-muted">
             Purpose
-            <UiSelect className="mt-1" value={purpose} onChange={(e) => setPurpose(e.target.value as UnitPurpose)}>
+            <UiSelect
+              className="mt-1"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value as UnitPurpose)}
+            >
               <option value={UnitPurpose.SALE}>For sale</option>
               <option value={UnitPurpose.SHORT_LET}>Short let</option>
               <option value={UnitPurpose.RENTAL}>Rental</option>
@@ -220,7 +241,11 @@ export function AddUnitsModal({
           </label>
           <label className="text-sm text-muted">
             Status
-            <UiSelect className="mt-1" value={status} onChange={(e) => setStatus(e.target.value as UnitStatus)}>
+            <UiSelect
+              className="mt-1"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as UnitStatus)}
+            >
               <option value={UnitStatus.AVAILABLE}>Available</option>
               <option value={UnitStatus.UNDER_CONSTRUCTION}>Under Construction</option>
               <option value={UnitStatus.RESERVED}>Reserved</option>
@@ -241,7 +266,11 @@ export function AddUnitsModal({
           </label>
           <label className="text-sm text-muted">
             Pricing plan (optional)
-            <UiSelect className="mt-1" value={pricingPlanId} onChange={(e) => setPricingPlanId(e.target.value)}>
+            <UiSelect
+              className="mt-1"
+              value={pricingPlanId}
+              onChange={(e) => setPricingPlanId(e.target.value)}
+            >
               <option value="">No plan</option>
               {pricingPlans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
@@ -253,7 +282,11 @@ export function AddUnitsModal({
         </div>
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-md border border-foreground/15 px-4 py-2 text-sm">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-foreground/15 px-4 py-2 text-sm"
+          >
             Cancel
           </button>
           <button
@@ -262,11 +295,7 @@ export function AddUnitsModal({
             className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
           >
             {pending ? <ButtonSpinner /> : null}
-            {pending
-              ? "Adding…"
-              : isBulk
-                ? `Add ${previewLabels.length} units`
-                : "Add unit"}
+            {pending ? "Adding…" : isBulk ? `Add ${previewLabels.length} units` : "Add unit"}
           </button>
         </div>
       </form>

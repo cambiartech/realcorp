@@ -66,11 +66,7 @@ export function ModalOverlay({
       aria-labelledby={ariaLabelledby}
       onClick={onClose}
     >
-      <div
-        className={panelClass}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <div className={panelClass} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

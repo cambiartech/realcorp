@@ -1,8 +1,7 @@
 import prisma from "@/lib/db";
 
 /** Open dataset: all 37 states + 774 LGAs (official local government areas). */
-export const NIGERIA_LGAS_SOURCE_URL =
-  "https://temikeezy.github.io/nigeria-geojson-data/data/lgas.json";
+export const NIGERIA_LGAS_SOURCE_URL = "https://temikeezy.github.io/nigeria-geojson-data/data/lgas.json";
 
 function slugify(value: string): string {
   return value
@@ -75,8 +74,8 @@ export async function syncNigeriaLocationsFromSource(force = false): Promise<{
     }
 
     for (const stateName of stateNames) {
-      const lgas = [...new Set((payload[stateName] ?? []).map((n) => n.trim()).filter(Boolean))].sort((a, b) =>
-        a.localeCompare(b),
+      const lgas = [...new Set((payload[stateName] ?? []).map((n) => n.trim()).filter(Boolean))].sort(
+        (a, b) => a.localeCompare(b),
       );
       totalLgas += lgas.length;
 
@@ -122,7 +121,10 @@ export async function listNigeriaStatesFromDb(): Promise<string[]> {
   return rows.map((r) => displayStateName(r.name));
 }
 
-export async function listNigeriaLgasFromDb(stateInput: string, query?: string): Promise<{
+export async function listNigeriaLgasFromDb(
+  stateInput: string,
+  query?: string,
+): Promise<{
   state: string;
   cities: string[];
   total: number;

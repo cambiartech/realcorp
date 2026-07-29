@@ -1,3 +1,9 @@
+# Future Caribbean — Track alignment notes
+
+> **Application copy:** [future-caribbean-application.md](./future-caribbean-application.md)
+
+---
+
 A. AI Infrastructure for Real Estate Agents
 Build systems that help agents operate autonomously at scale.
 

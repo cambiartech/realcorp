@@ -35,8 +35,8 @@ export default async function RealtorPortalPage({
         <div className="rounded-2xl border border-stone-300 bg-white/90 p-8 shadow-lg dark:border-stone-700 dark:bg-stone-900/90">
           <h1 className="text-xl font-bold text-stone-900 dark:text-stone-50">Portal unavailable</h1>
           <p className="mt-3 text-sm text-stone-600 dark:text-stone-300">
-            This link is invalid, expired, or the partner account is inactive. Contact your developer representative for a
-            new portal URL.
+            This link is invalid, expired, or the partner account is inactive. Contact your developer
+            representative for a new portal URL.
           </p>
         </div>
       </div>
@@ -70,7 +70,9 @@ export default async function RealtorPortalPage({
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
       <header className="text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Community portal</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">
+          Community portal
+        </p>
         <h1 className="mt-2 text-2xl font-bold text-stone-900 dark:text-stone-50">{tenant.name}</h1>
         <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">Signed in as {partner.displayName}</p>
       </header>
@@ -89,7 +91,9 @@ export default async function RealtorPortalPage({
       </section>
 
       <section className="mt-10">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400">Your recent submissions</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400">
+          Your recent submissions
+        </h2>
         <div className="mt-3 overflow-hidden rounded-xl border border-stone-200 bg-white/90 dark:border-stone-700 dark:bg-stone-900/80">
           <table className="w-full text-left text-sm">
             <thead className="bg-stone-100/80 text-xs uppercase text-stone-500 dark:bg-stone-800 dark:text-stone-400">
@@ -112,11 +116,19 @@ export default async function RealtorPortalPage({
                   <tr key={lead.id}>
                     <td className="px-3 py-2 font-medium text-stone-900 dark:text-stone-100">
                       {lead.name ?? "—"}
-                      <div className="text-xs font-normal text-stone-500">{lead.email ?? lead.phone ?? ""}</div>
+                      <div className="text-xs font-normal text-stone-500">
+                        {lead.email ?? lead.phone ?? ""}
+                      </div>
                     </td>
-                    <td className="px-3 py-2 text-stone-600 dark:text-stone-300">{lead.projectInterest ?? "—"}</td>
-                    <td className="px-3 py-2 text-stone-600 dark:text-stone-300">{lead.campaignName ?? "—"}</td>
-                    <td className="px-3 py-2 text-xs text-stone-500">{lead.createdAt.toISOString().slice(0, 10)}</td>
+                    <td className="px-3 py-2 text-stone-600 dark:text-stone-300">
+                      {lead.projectInterest ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-stone-600 dark:text-stone-300">
+                      {lead.campaignName ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-stone-500">
+                      {lead.createdAt.toISOString().slice(0, 10)}
+                    </td>
                   </tr>
                 ))
               )}

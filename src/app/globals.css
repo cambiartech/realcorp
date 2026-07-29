@@ -1,41 +1,146 @@
 @import "tailwindcss";
 
 /*
- * Realcorp design tokens (single source of truth)
- * — background / foreground / muted / field: base UI
- * — error: validation & destructive messages (always use text-error + FormAlert/FormFieldError)
+ * ═══════════════════════════════════════════════════════════════════════
+ * Realcorp design tokens — single source of truth
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * Rules of the road:
+ *
+ *  1. Never hard-code a Tailwind palette colour (bg-violet-500, text-cyan-700).
+ *     Use the semantic tokens below. A metric is not "indigo", it is "info".
+ *     That is what keeps 60 screens looking like one product.
+ *
+ *  2. Accent is copper, and it is scarce. One accented element per view.
+ *     If everything is emphasised, nothing is.
+ *
+ *  3. Status colours carry meaning: success = money in, warn = needs
+ *     attention, danger = overdue or destructive, info = neutral context.
+ *     Do not use them decoratively.
+ *
+ *  4. Reach for the component classes at the bottom (.rc-card, .rc-btn,
+ *     .rc-table, .rc-metric …) before writing new utility soup.
  */
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --muted: #737373;
-  --border-subtle: rgba(0, 0, 0, 0.12);
-  --field: #f4f4f5;
-  /* Form / validation errors — use text-error, FormAlert, FormFieldError only */
-  --error: #b91c1c;
-  --error-bg: rgba(185, 28, 28, 0.08);
-  --error-border: rgba(185, 28, 28, 0.38);
+  /* ── Surfaces ──────────────────────────────────────────────────────── */
+  --background:    #ffffff;
+  --surface:       #fafaf9;   /* page-level recess: table headers, toolbars */
+  --elevated:      #ffffff;   /* cards sitting above the page             */
+  --field:         #f5f5f4;   /* inputs                                   */
+
+  /* ── Text ──────────────────────────────────────────────────────────── */
+  --foreground:    #16150f;   /* warm near-black, matches the brand mark  */
+  --muted:         #6b6862;   /* secondary copy — passes AA on --background */
+  --faint:         #9c988f;   /* captions, disabled, table meta           */
+
+  /* ── Lines ─────────────────────────────────────────────────────────── */
+  --border-subtle: rgba(22, 21, 15, 0.09);
+  --border-strong: rgba(22, 21, 15, 0.16);
+
+  /* ── Brand accent — copper. Use sparingly. ─────────────────────────── */
+  --accent:        #a8663c;
+  --accent-hover:  #8a5230;
+  --accent-fg:     #ffffff;
+  --accent-wash:   rgba(168, 102, 60, 0.10);
+  --accent-line:   rgba(168, 102, 60, 0.28);
+
+  /* ── Status ────────────────────────────────────────────────────────── */
+  --success:       #15803d;
+  --success-wash:  rgba(21, 128, 61, 0.10);
+  --success-line:  rgba(21, 128, 61, 0.24);
+
+  --warn:          #b45309;
+  --warn-wash:     rgba(180, 83, 9, 0.10);
+  --warn-line:     rgba(180, 83, 9, 0.24);
+
+  --danger:        #b91c1c;
+  --danger-wash:   rgba(185, 28, 28, 0.08);
+  --danger-line:   rgba(185, 28, 28, 0.26);
+
+  --info:          #3f5c76;
+  --info-wash:     rgba(63, 92, 118, 0.09);
+  --info-line:     rgba(63, 92, 118, 0.22);
+
+  /* Legacy aliases — existing form components read these. Keep them. */
+  --error:         var(--danger);
+  --error-bg:      var(--danger-wash);
+  --error-border:  rgba(185, 28, 28, 0.38);
+
+  /* ── Elevation ─────────────────────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(22, 21, 15, 0.05);
+  --shadow-sm: 0 1px 2px rgba(22, 21, 15, 0.04), 0 2px 8px rgba(22, 21, 15, 0.04);
+  --shadow-md: 0 2px 4px rgba(22, 21, 15, 0.04), 0 8px 24px rgba(22, 21, 15, 0.06);
+  --shadow-lg: 0 4px 8px rgba(22, 21, 15, 0.05), 0 24px 48px rgba(22, 21, 15, 0.09);
+
+  /* ── Radii ─────────────────────────────────────────────────────────── */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
 }
 
 .dark {
-  --background: #000000;
-  --foreground: #fafafa;
-  --muted: #a3a3a3;
-  --border-subtle: rgba(255, 255, 255, 0.14);
-  --field: #0a0a0a;
-  --error: #f87171;
-  --error-bg: rgba(248, 113, 113, 0.12);
-  --error-border: rgba(248, 113, 113, 0.42);
+  --background:    #0c0c0a;
+  --surface:       #131310;
+  --elevated:      #1a1a16;
+  --field:         #131310;
+
+  --foreground:    #f5f4f0;
+  --muted:         #a5a096;
+  --faint:         #6f6b62;
+
+  --border-subtle: rgba(245, 244, 240, 0.10);
+  --border-strong: rgba(245, 244, 240, 0.18);
+
+  --accent:        #c98a55;
+  --accent-hover:  #d99b66;
+  --accent-fg:     #16150f;
+  --accent-wash:   rgba(201, 138, 85, 0.14);
+  --accent-line:   rgba(201, 138, 85, 0.32);
+
+  --success:       #4ade80;
+  --success-wash:  rgba(74, 222, 128, 0.12);
+  --success-line:  rgba(74, 222, 128, 0.26);
+
+  --warn:          #fbbf24;
+  --warn-wash:     rgba(251, 191, 36, 0.12);
+  --warn-line:     rgba(251, 191, 36, 0.26);
+
+  --danger:        #f87171;
+  --danger-wash:   rgba(248, 113, 113, 0.12);
+  --danger-line:   rgba(248, 113, 113, 0.28);
+
+  --info:          #8fb0cc;
+  --info-wash:     rgba(143, 176, 204, 0.12);
+  --info-line:     rgba(143, 176, 204, 0.26);
+
+  --error:         var(--danger);
+  --error-bg:      var(--danger-wash);
+  --error-border:  rgba(248, 113, 113, 0.42);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.45), 0 24px 48px rgba(0, 0, 0, 0.45);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface:    var(--surface);
+  --color-elevated:   var(--elevated);
   --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-field: var(--field);
-  --color-error: var(--error);
+  --color-muted:      var(--muted);
+  --color-faint:      var(--faint);
+  --color-field:      var(--field);
+  --color-accent:     var(--accent);
+  --color-success:    var(--success);
+  --color-warn:       var(--warn);
+  --color-danger:     var(--danger);
+  --color-info:       var(--info);
+  --color-error:      var(--error);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -49,26 +154,248 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11";
 }
 
+/* Numbers in tables and metrics must line up. Non-negotiable in finance UI. */
+.tabular,
+.rc-metric-value,
+table td,
+table th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* One focus ring for the whole product. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Component classes
+   Use these instead of re-deriving the same utility strings per screen.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Surfaces ──────────────────────────────────────────────────────── */
+.rc-card {
+  background: var(--elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+}
+.rc-card-flat {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+}
+.rc-card-interactive {
+  background: var(--elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+  text-align: left;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.rc-card-interactive:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+/* ── Section heading ───────────────────────────────────────────────── */
+.rc-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* ── Metric card ───────────────────────────────────────────────────── */
+.rc-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rc-metric-value {
+  font-size: 30px;
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--foreground);
+  margin-top: 8px;
+}
+/* A zero should read as "nothing yet", not as a failed render. */
+.rc-metric-value[data-zero="true"] {
+  color: var(--faint);
+  font-weight: 500;
+}
+.rc-metric-hint {
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+/* ── Status pills ──────────────────────────────────────────────────── */
+.rc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding-inline: 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.rc-pill-neutral { background: var(--field);        color: var(--muted);   border-color: var(--border-subtle); }
+.rc-pill-success { background: var(--success-wash); color: var(--success); border-color: var(--success-line); }
+.rc-pill-warn    { background: var(--warn-wash);    color: var(--warn);    border-color: var(--warn-line); }
+.rc-pill-danger  { background: var(--danger-wash);  color: var(--danger);  border-color: var(--danger-line); }
+.rc-pill-info    { background: var(--info-wash);    color: var(--info);    border-color: var(--info-line); }
+.rc-pill-accent  { background: var(--accent-wash);  color: var(--accent);  border-color: var(--accent-line); }
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+.rc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding-inline: 14px;
+  border-radius: var(--r-sm);
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.008em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background-color .15s ease, border-color .15s ease,
+              color .15s ease, box-shadow .15s ease;
+}
+.rc-btn:disabled { opacity: .5; cursor: not-allowed; }
+.rc-btn-primary   { background: var(--foreground); color: var(--background); box-shadow: var(--shadow-xs); }
+.rc-btn-primary:hover:not(:disabled)   { background: var(--accent); }
+.rc-btn-secondary { background: var(--elevated); color: var(--foreground); border-color: var(--border-strong); }
+.rc-btn-secondary:hover:not(:disabled) { background: var(--field); }
+.rc-btn-ghost     { background: transparent; color: var(--muted); }
+.rc-btn-ghost:hover:not(:disabled)     { background: var(--field); color: var(--foreground); }
+.rc-btn-danger    { background: transparent; color: var(--danger); border-color: var(--danger-line); }
+.rc-btn-danger:hover:not(:disabled)    { background: var(--danger-wash); }
+.rc-btn-sm { height: 30px; padding-inline: 10px; font-size: 12.5px; }
+
+/* ── Tables ────────────────────────────────────────────────────────── */
+.rc-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+.rc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.rc-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--foreground);
+  vertical-align: middle;
+}
+.rc-table tbody tr:last-child td { border-bottom: 0; }
+.rc-table tbody tr { transition: background-color .12s ease; }
+.rc-table tbody tr:hover { background: var(--surface); }
+.rc-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* An em dash for "no value" should recede, not read as content. */
+.rc-table .nil { color: var(--faint); }
+
+/* Row actions stay quiet until you're on the row. */
+.rc-row-actions { display: inline-flex; align-items: center; gap: 2px; }
+.rc-row-actions .rc-btn { opacity: .62; }
+tr:hover .rc-row-actions .rc-btn,
+.rc-row-actions .rc-btn:focus-visible { opacity: 1; }
+
+/* ── Empty states ──────────────────────────────────────────────────── */
+.rc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.rc-empty-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--field);
+  color: var(--faint);
+}
+.rc-empty-title { font-size: 14.5px; font-weight: 600; color: var(--foreground); }
+.rc-empty-body  { font-size: 13px; color: var(--muted); max-width: 46ch; }
+
+/* Image placeholder — a labelled slot, not a grey void. */
+.rc-image-empty {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  background:
+    repeating-linear-gradient(45deg,
+      var(--surface) 0 10px,
+      var(--field)   10px 20px);
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* ── Progress ──────────────────────────────────────────────────────── */
+.rc-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--field);
+  overflow: hidden;
+}
+.rc-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width .5s cubic-bezier(.2,.7,.3,1);
+}
+.rc-progress[data-tone="success"] > span { background: var(--success); }
+.rc-progress[data-tone="warn"]    > span { background: var(--warn); }
+.rc-progress[data-tone="danger"]  > span { background: var(--danger); }
+
+/* ── Toasts ────────────────────────────────────────────────────────── */
 @keyframes rc-toast-in {
-  from {
-    opacity: 0;
-    transform: translate3d(18px, 0, 0) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
+  from { opacity: 0; transform: translate3d(18px, 0, 0) scale(0.98); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 @keyframes rc-toast-out {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translate3d(18px, 0, 0) scale(0.98);
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to   { opacity: 0; transform: translate3d(18px, 0, 0) scale(0.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
   }
 }

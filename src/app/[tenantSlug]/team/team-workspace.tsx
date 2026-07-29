@@ -10,9 +10,16 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_MD } from "@/lib/modal-panel";
 import { TEAM_MEMBERSHIP_ROLE_OPTIONS } from "@/lib/team-membership-roles";
-import type { AssignableMemberModule, MembershipModulePermissions } from "@/lib/membership-module-permissions";
+import type {
+  AssignableMemberModule,
+  MembershipModulePermissions,
+} from "@/lib/membership-module-permissions";
 import { MemberModuleAccessModal } from "./member-module-access-modal";
-import { parseTeamInviteForm, zodTeamInviteIssuesToFieldRecord, type TeamInviteFieldName } from "@/lib/validators/team-invite";
+import {
+  parseTeamInviteForm,
+  zodTeamInviteIssuesToFieldRecord,
+  type TeamInviteFieldName,
+} from "@/lib/validators/team-invite";
 import {
   deleteInvitation,
   inviteTenantMember,
@@ -204,7 +211,12 @@ function MembersTable({
   }
 
   if (members.length === 0) {
-    return <EmptyState title="No team members yet." hint="Use Invite team member to onboard your first teammate." />;
+    return (
+      <EmptyState
+        title="No team members yet."
+        hint="Use Invite team member to onboard your first teammate."
+      />
+    );
   }
 
   return (
@@ -255,7 +267,9 @@ function MembersTable({
                   </button>
                 </td>
               ) : null}
-              <td className="px-4 py-3 text-foreground/90">{member.status === MembershipStatus.ACTIVE ? "Active" : "Disabled"}</td>
+              <td className="px-4 py-3 text-foreground/90">
+                {member.status === MembershipStatus.ACTIVE ? "Active" : "Disabled"}
+              </td>
               {canManageRoles ? (
                 <td className="px-4 py-3">
                   <button
@@ -263,7 +277,9 @@ function MembersTable({
                     disabled={pendingId === member.id || member.userId === currentUserId}
                     onClick={() => void handleStatusChange(member)}
                     className="rounded border border-foreground/20 px-2 py-1 text-xs hover:bg-foreground/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
-                    title={member.userId === currentUserId ? "You cannot disable your own account." : undefined}
+                    title={
+                      member.userId === currentUserId ? "You cannot disable your own account." : undefined
+                    }
                   >
                     {member.status === MembershipStatus.ACTIVE ? "Disable user" : "Enable user"}
                   </button>
@@ -276,7 +292,8 @@ function MembersTable({
       {canManageRoles ? (
         <p className="border-t border-foreground/10 bg-foreground/[0.02] px-4 py-2 text-xs text-muted">
           <strong className="font-medium text-foreground/80">Job role</strong> sets the default sidebar. Use{" "}
-          <strong className="font-medium text-foreground/80">Assign modules</strong> to grant or restrict access per person — read only, view &amp; edit, or full — for any module on your plan.
+          <strong className="font-medium text-foreground/80">Assign modules</strong> to grant or restrict
+          access per person — read only, view &amp; edit, or full — for any module on your plan.
         </p>
       ) : null}
 
@@ -340,7 +357,9 @@ function InvitesTable({
   }
 
   if (invites.length === 0) {
-    return <EmptyState title="No pending invites." hint="New invites will appear here until they are accepted." />;
+    return (
+      <EmptyState title="No pending invites." hint="New invites will appear here until they are accepted." />
+    );
   }
 
   return (
@@ -383,7 +402,7 @@ function InvitesTable({
                       type="button"
                       onClick={() => void handleDelete(invite)}
                       disabled={pendingInviteId === invite.id}
-                      className="rounded border border-foreground/20 px-2 py-1 text-xs text-rose-600 hover:bg-rose-500/10 disabled:opacity-50"
+                      className="rounded border border-foreground/20 px-2 py-1 text-xs text-[var(--danger)] hover:bg-[var(--danger-wash)] disabled:opacity-50"
                     >
                       Delete
                     </button>
@@ -418,7 +437,9 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
 
   useEffect(() => {
     if (!state) return;
-    const key = state.ok ? `ok:${state.inviteUrl}:${state.emailSent ? "sent" : "failed"}` : `err:${state.error}`;
+    const key = state.ok
+      ? `ok:${state.inviteUrl}:${state.emailSent ? "sent" : "failed"}`
+      : `err:${state.error}`;
     if (seenStateRef.current === key) return;
     seenStateRef.current = key;
     if (state.ok) {
@@ -427,8 +448,7 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
       } else {
         showSnackbar("Invite created, but email failed. Share the link manually.", "error");
       }
-    }
-    else showSnackbar(state.error, "error");
+    } else showSnackbar(state.error, "error");
   }, [showSnackbar, state]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -446,111 +466,115 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
 
   return (
     <ModalOverlay open onClose={onClose} panelClassName={MODAL_PANEL_MD}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Invite team member</h2>
-            <p className="mt-1 text-sm text-muted">Send a role-based invitation link.</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
-            aria-label="Close modal"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Invite team member</h2>
+          <p className="mt-1 text-sm text-muted">Send a role-based invitation link.</p>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+          aria-label="Close modal"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
 
-        {hasSuccess ? (
-          <div className="mt-4 space-y-3">
-            <p className="text-sm text-muted">
-              {state?.ok && state.emailSent
-                ? "Invite created and email sent. You can also share this link:"
-                : "Invite created, but email was not sent. Share this link manually:"}
+      {hasSuccess ? (
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-muted">
+            {state?.ok && state.emailSent
+              ? "Invite created and email sent. You can also share this link:"
+              : "Invite created, but email was not sent. Share this link manually:"}
+          </p>
+          {state?.ok && !state.emailSent ? (
+            <p className="rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-xs text-foreground">
+              Email delivery failed: {state.emailError || "unknown error"}.
             </p>
-            {state?.ok && !state.emailSent ? (
-              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
-                Email delivery failed: {state.emailError || "unknown error"}.
-              </p>
-            ) : null}
-            <p className="break-all rounded-md border border-foreground/10 bg-field p-3 font-mono text-xs text-foreground">
-              {successUrl}
-            </p>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
-              >
-                Done
-              </button>
-            </div>
+          ) : null}
+          <p className="break-all rounded-md border border-foreground/10 bg-field p-3 font-mono text-xs text-foreground">
+            {successUrl}
+          </p>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+            >
+              Done
+            </button>
           </div>
-        ) : (
-          <form noValidate onSubmit={handleSubmit} className="mt-4 space-y-4">
-            {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
+        </div>
+      ) : (
+        <form noValidate onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
 
-            <div>
-              <label htmlFor="team-modal-email" className="mb-1 block text-sm text-muted">
-                Email
-              </label>
-              <input
-                id="team-modal-email"
-                name="email"
-                type="text"
-                inputMode="email"
-                autoComplete="email"
-                placeholder="user@company.com"
-                className={fieldClass(Boolean(fieldErrors.email))}
-                aria-invalid={Boolean(fieldErrors.email)}
-                aria-describedby={fieldErrors.email ? "team-modal-email-error" : undefined}
-              />
-              {fieldErrors.email ? <FormFieldError id="team-modal-email-error">{fieldErrors.email}</FormFieldError> : null}
-            </div>
+          <div>
+            <label htmlFor="team-modal-email" className="mb-1 block text-sm text-muted">
+              Email
+            </label>
+            <input
+              id="team-modal-email"
+              name="email"
+              type="text"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="user@company.com"
+              className={fieldClass(Boolean(fieldErrors.email))}
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? "team-modal-email-error" : undefined}
+            />
+            {fieldErrors.email ? (
+              <FormFieldError id="team-modal-email-error">{fieldErrors.email}</FormFieldError>
+            ) : null}
+          </div>
 
-            <div>
-              <label htmlFor="team-modal-role" className="mb-1 block text-sm text-muted">
-                Role
-              </label>
-              <UiSelect
-                id="team-modal-role"
-                name="role"
-                defaultValue={MembershipRole.SALES_EXECUTIVE}
-                aria-invalid={Boolean(fieldErrors.role)}
-                aria-describedby={fieldErrors.role ? "team-modal-role-error" : undefined}
-                invalid={Boolean(fieldErrors.role)}
-              >
-                {TEAM_MEMBERSHIP_ROLE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </UiSelect>
-              {fieldErrors.role ? <FormFieldError id="team-modal-role-error">{fieldErrors.role}</FormFieldError> : null}
-            </div>
+          <div>
+            <label htmlFor="team-modal-role" className="mb-1 block text-sm text-muted">
+              Role
+            </label>
+            <UiSelect
+              id="team-modal-role"
+              name="role"
+              defaultValue={MembershipRole.SALES_EXECUTIVE}
+              aria-invalid={Boolean(fieldErrors.role)}
+              aria-describedby={fieldErrors.role ? "team-modal-role-error" : undefined}
+              invalid={Boolean(fieldErrors.role)}
+            >
+              {TEAM_MEMBERSHIP_ROLE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </UiSelect>
+            {fieldErrors.role ? (
+              <FormFieldError id="team-modal-role-error">{fieldErrors.role}</FormFieldError>
+            ) : null}
+          </div>
 
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={pending}
-                aria-busy={pending}
-                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {pending ? <ButtonSpinner /> : null}
-                {pending ? "Creating invite…" : "Create invite"}
-              </button>
-            </div>
-          </form>
-        )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Creating invite…" : "Create invite"}
+            </button>
+          </div>
+        </form>
+      )}
     </ModalOverlay>
   );
 }

@@ -69,10 +69,7 @@ export function CaptureFormNewWorkspace({
     router.push(`/${tenantSlug}/marketing/forms/${result.id}?tab=builder`);
   }
 
-  const templateMeta = useMemo(
-    () => CAPTURE_FORM_TEMPLATES.find((t) => t.id === templateId),
-    [templateId],
-  );
+  const templateMeta = useMemo(() => CAPTURE_FORM_TEMPLATES.find((t) => t.id === templateId), [templateId]);
 
   return (
     <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
@@ -113,7 +110,9 @@ export function CaptureFormNewWorkspace({
                 className="w-full border border-foreground/15 bg-field px-3 py-2 font-mono text-sm"
                 placeholder={slugPreview}
               />
-              <p className="mt-1 text-xs text-muted">/f/{tenantSlug}/{slugPreview}</p>
+              <p className="mt-1 text-xs text-muted">
+                /f/{tenantSlug}/{slugPreview}
+              </p>
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm text-muted">Public headline</label>
@@ -158,7 +157,11 @@ export function CaptureFormNewWorkspace({
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Lead source label</label>
-              <input name="defaultSource" defaultValue="Lead Form" className="w-full border border-foreground/15 bg-field px-3 py-2" />
+              <input
+                name="defaultSource"
+                defaultValue="Lead Form"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Status</label>
@@ -171,7 +174,9 @@ export function CaptureFormNewWorkspace({
         </section>
 
         <section className="rounded-xl border border-foreground/10 p-5 sm:p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">2 · Start from a template</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+            2 · Start from a template
+          </h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {CAPTURE_FORM_TEMPLATES.map((t) => (
               <button

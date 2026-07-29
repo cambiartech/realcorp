@@ -165,7 +165,11 @@ function LoginFormInner() {
             className="absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center text-muted hover:text-foreground"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
-            {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" aria-hidden />
+            ) : (
+              <Eye className="h-4 w-4" aria-hidden />
+            )}
           </button>
         </div>
         {fieldErrors.password ? (

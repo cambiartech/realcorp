@@ -7,7 +7,11 @@ import { HrFormField, HrFormLockedField, HrFormSelect } from "@/components/hr/hr
 import { HrTagsInput } from "@/components/hr/hr-tags-input";
 import { HrLocationFields } from "@/components/hr/hr-location-fields";
 import { BrandedDocumentShell } from "@/components/hr/branded-document-shell";
-import { getHrFormUploadSignature, submitHrFormOnline, submitHrFormUpload } from "@/app/hr-form/[token]/actions";
+import {
+  getHrFormUploadSignature,
+  submitHrFormOnline,
+  submitHrFormUpload,
+} from "@/app/hr-form/[token]/actions";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 import type { HrFormDeliveryMode, HrFormRequestStatus, HrFormType } from "@/generated/prisma";
 import { HR_FORM_DELIVERY_LABELS, HR_FORM_TYPE_LABELS } from "@/lib/hr-form-types";
@@ -108,7 +112,9 @@ export function HrPublicFormClient({
 
   if (status === "EXPIRED" || status === "CANCELLED") {
     const unavailable = (
-      <p className="text-sm text-slate-600">This link is no longer active. Contact your HR team for a new link.</p>
+      <p className="text-sm text-slate-600">
+        This link is no longer active. Contact your HR team for a new link.
+      </p>
     );
     if (embedded) return <div className="rounded-xl border border-slate-200 bg-white p-4">{unavailable}</div>;
     return (
@@ -160,9 +166,9 @@ export function HrPublicFormClient({
 
     if (embedded) {
       return (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <div className="rounded-xl border border-[var(--success-line)] bg-[var(--success-wash)] p-4 text-sm text-[var(--success)]">
           <p className="font-semibold">{HR_FORM_TYPE_LABELS[formType]} submitted</p>
-          <p className="mt-1 text-emerald-800">Choose another section in the bar above to continue.</p>
+          <p className="mt-1 text-[var(--success)]">Choose another section in the bar above to continue.</p>
           {dashboardLink}
         </div>
       );
@@ -170,7 +176,8 @@ export function HrPublicFormClient({
     return (
       <PublicShell brand={brand} title="Thank you">
         <p className="text-sm text-slate-700">
-          Your {HR_FORM_TYPE_LABELS[formType].toLowerCase()} has been received. HR will review and update your record.
+          Your {HR_FORM_TYPE_LABELS[formType].toLowerCase()} has been received. HR will review and update your
+          record.
         </p>
         {backControl}
         {dashboardLink}
@@ -189,7 +196,10 @@ export function HrPublicFormClient({
           ← Back to all forms
         </button>
       ) : onboardingHref ? (
-        <Link href={onboardingHref} className="mb-3 inline-block text-sm font-semibold text-slate-600 underline hover:text-slate-900">
+        <Link
+          href={onboardingHref}
+          className="mb-3 inline-block text-sm font-semibold text-slate-600 underline hover:text-slate-900"
+        >
           ← Back to all forms
         </Link>
       ) : null
@@ -197,86 +207,96 @@ export function HrPublicFormClient({
 
   const formBody = (
     <>
-          {hrNote && !embedded ? <p className="mb-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{hrNote}</p> : null}
+      {hrNote && !embedded ? (
+        <p className="mb-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{hrNote}</p>
+      ) : null}
 
-          {canFillOnline && canUpload ? (
-            <div className="mb-4 flex gap-2 rounded-lg bg-slate-100 p-1 text-sm">
-              <button
-                type="button"
-                onClick={() => setMode("online")}
-                className={`flex-1 rounded-md py-2 font-medium ${mode === "online" ? "bg-white shadow text-slate-900" : "text-slate-600"}`}
-              >
-                Fill online
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("upload")}
-                className={`flex-1 rounded-md py-2 font-medium ${mode === "upload" ? "bg-white shadow text-slate-900" : "text-slate-600"}`}
-              >
-                Upload signed PDF
-              </button>
-            </div>
-          ) : (
-            <p className="mb-4 text-xs text-slate-500">{HR_FORM_DELIVERY_LABELS[deliveryMode]}</p>
-          )}
+      {canFillOnline && canUpload ? (
+        <div className="mb-4 flex gap-2 rounded-lg bg-slate-100 p-1 text-sm">
+          <button
+            type="button"
+            onClick={() => setMode("online")}
+            className={`flex-1 rounded-md py-2 font-medium ${mode === "online" ? "bg-white shadow text-slate-900" : "text-slate-600"}`}
+          >
+            Fill online
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("upload")}
+            className={`flex-1 rounded-md py-2 font-medium ${mode === "upload" ? "bg-white shadow text-slate-900" : "text-slate-600"}`}
+          >
+            Upload signed PDF
+          </button>
+        </div>
+      ) : (
+        <p className="mb-4 text-xs text-slate-500">{HR_FORM_DELIVERY_LABELS[deliveryMode]}</p>
+      )}
 
-          {error ? <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
+      {error ? (
+        <p className="mb-3 rounded-md bg-[var(--danger-wash)] px-3 py-2 text-sm text-[var(--danger)]">
+          {error}
+        </p>
+      ) : null}
 
-          {mode === "online" && canFillOnline ? (
-            <form onSubmit={handleOnlineSubmit} className="space-y-4">
-              {formType === "BIODATA" ? <BiodataFormFields v={initialValues} /> : null}
-              {formType === "BANK_FORM" ? <BankFields v={initialValues} /> : null}
-              {formType === "GUARANTOR" ? <GuarantorFields v={initialValues} /> : null}
-              {formType === "HEALTH" ? <HealthFields initialValues={initialValues} /> : null}
-              <button
-                type="submit"
-                disabled={pending}
-                aria-busy={pending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: "var(--hr-brand-primary)" }}
-              >
-                {pending ? <ButtonSpinner /> : null}
-                {pending ? "Submitting…" : "Submit form"}
-              </button>
-            </form>
-          ) : null}
+      {mode === "online" && canFillOnline ? (
+        <form onSubmit={handleOnlineSubmit} className="space-y-4">
+          {formType === "BIODATA" ? <BiodataFormFields v={initialValues} /> : null}
+          {formType === "BANK_FORM" ? <BankFields v={initialValues} /> : null}
+          {formType === "GUARANTOR" ? <GuarantorFields v={initialValues} /> : null}
+          {formType === "HEALTH" ? <HealthFields initialValues={initialValues} /> : null}
+          <button
+            type="submit"
+            disabled={pending}
+            aria-busy={pending}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
+            style={{ background: "var(--hr-brand-primary)" }}
+          >
+            {pending ? <ButtonSpinner /> : null}
+            {pending ? "Submitting…" : "Submit form"}
+          </button>
+        </form>
+      ) : null}
 
-          {mode === "upload" && canUpload ? (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                Download the blank form, fill and sign it, then upload a photo or PDF from your phone or computer.
-              </p>
-              <Link
-                href={printPath}
-                target="_blank"
-                className="inline-flex w-full items-center justify-center rounded-lg border-2 py-2.5 text-sm font-semibold"
-                style={{ borderColor: "var(--hr-brand-primary)", color: "var(--hr-brand-primary)" }}
-              >
-                Download / print blank form
-              </Link>
-              <label className="flex cursor-pointer flex-col items-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600 hover:bg-slate-100">
-                <span className="font-semibold text-slate-800">{pending ? "Uploading…" : "Tap to upload signed form"}</span>
-                <span className="mt-1 text-xs">PDF, JPG, or PNG</span>
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="hidden"
-                  disabled={pending}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void handleUpload(f);
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
-            </div>
-          ) : null}
+      {mode === "upload" && canUpload ? (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Download the blank form, fill and sign it, then upload a photo or PDF from your phone or computer.
+          </p>
+          <Link
+            href={printPath}
+            target="_blank"
+            className="inline-flex w-full items-center justify-center rounded-lg border-2 py-2.5 text-sm font-semibold"
+            style={{ borderColor: "var(--hr-brand-primary)", color: "var(--hr-brand-primary)" }}
+          >
+            Download / print blank form
+          </Link>
+          <label className="flex cursor-pointer flex-col items-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600 hover:bg-slate-100">
+            <span className="font-semibold text-slate-800">
+              {pending ? "Uploading…" : "Tap to upload signed form"}
+            </span>
+            <span className="mt-1 text-xs">PDF, JPG, or PNG</span>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              disabled={pending}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleUpload(f);
+                e.currentTarget.value = "";
+              }}
+            />
+          </label>
+        </div>
+      ) : null}
 
-          {canFillOnline && mode === "upload" ? null : canUpload && mode === "online" && deliveryMode === "BOTH" ? (
-            <p className="mt-4 text-center text-xs text-slate-500">
-              Prefer paper? Switch to &quot;Upload signed PDF&quot; above.
-            </p>
-          ) : null}
+      {canFillOnline && mode === "upload" ? null : canUpload &&
+        mode === "online" &&
+        deliveryMode === "BOTH" ? (
+        <p className="mt-4 text-center text-xs text-slate-500">
+          Prefer paper? Switch to &quot;Upload signed PDF&quot; above.
+        </p>
+      ) : null}
     </>
   );
 
@@ -298,7 +318,11 @@ export function HrPublicFormClient({
   return (
     <div className="min-h-screen bg-slate-50 py-6 px-4" style={brandingCssVars(brand)}>
       <div className="mx-auto max-w-lg">
-        <BrandedDocumentShell brand={brand} title={HR_FORM_TYPE_LABELS[formType]} subtitle={`Hello${employeeName ? `, ${employeeName}` : ""}`}>
+        <BrandedDocumentShell
+          brand={brand}
+          title={HR_FORM_TYPE_LABELS[formType]}
+          subtitle={`Hello${employeeName ? `, ${employeeName}` : ""}`}
+        >
           {formBody}
         </BrandedDocumentShell>
       </div>
@@ -306,7 +330,15 @@ export function HrPublicFormClient({
   );
 }
 
-function PublicShell({ brand, title, children }: { brand: TenantBranding; title: string; children: React.ReactNode }) {
+function PublicShell({
+  brand,
+  title,
+  children,
+}: {
+  brand: TenantBranding;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4" style={brandingCssVars(brand)}>
       <div className="mx-auto max-w-md">
@@ -326,7 +358,12 @@ function BankFields({ v }: { v: InitialValues }) {
       {lockHolder ? (
         <HrFormLockedField label="Account holder name" name="accountHolderName" value={holder} />
       ) : (
-        <HrFormField label="Account holder name" name="accountHolderName" required defaultValue={v.accountHolderName} />
+        <HrFormField
+          label="Account holder name"
+          name="accountHolderName"
+          required
+          defaultValue={v.accountHolderName}
+        />
       )}
       <HrFormField label="Bank name" name="bankName" required defaultValue={v.bankName} />
       <HrFormField label="Bank address" name="bankAddress" defaultValue={v.bankAddress} />
@@ -367,17 +404,32 @@ function GuarantorFields({ v }: { v: InitialValues }) {
       {v.employeeFullName?.trim() ? (
         <HrFormLockedField label="Employee full name" name="employeeFullName" value={v.employeeFullName} />
       ) : (
-        <HrFormField label="Employee full name" name="employeeFullName" required defaultValue={v.employeeFullName} />
+        <HrFormField
+          label="Employee full name"
+          name="employeeFullName"
+          required
+          defaultValue={v.employeeFullName}
+        />
       )}
       {v.employeeJobTitle?.trim() ? (
         <HrFormLockedField label="Job title" name="employeeJobTitle" value={v.employeeJobTitle} />
       ) : (
         <HrFormField label="Job title" name="employeeJobTitle" defaultValue={v.employeeJobTitle} />
       )}
-      <HrFormField label="Guarantor full name" name="guarantorFullName" required defaultValue={v.guarantorFullName} />
+      <HrFormField
+        label="Guarantor full name"
+        name="guarantorFullName"
+        required
+        defaultValue={v.guarantorFullName}
+      />
       <HrFormField label="Relationship" name="guarantorRelationship" defaultValue={v.guarantorRelationship} />
       <HrFormField label="Guarantor phone" name="guarantorPhone" type="tel" defaultValue={v.guarantorPhone} />
-      <HrFormField label="Guarantor email" name="guarantorEmail" type="email" defaultValue={v.guarantorEmail} />
+      <HrFormField
+        label="Guarantor email"
+        name="guarantorEmail"
+        type="email"
+        defaultValue={v.guarantorEmail}
+      />
       <HrFormField label="Known employee for (years)" name="knownYears" defaultValue={v.knownYears} />
       <label className="flex items-start gap-2 text-sm text-slate-700">
         <input type="checkbox" name="declarationAccepted" value="yes" required className="mt-1" />
@@ -405,7 +457,12 @@ function HealthFields({ initialValues }: { initialValues?: InitialValues }) {
         onChange={(e) => setHasMedical(e.target.value === "yes")}
       />
       {hasMedical ? (
-        <HrFormField label="If yes, please specify" name="medicalDetails" required defaultValue={initialValues?.medicalDetails} />
+        <HrFormField
+          label="If yes, please specify"
+          name="medicalDetails"
+          required
+          defaultValue={initialValues?.medicalDetails}
+        />
       ) : (
         <input type="hidden" name="medicalDetails" value="" />
       )}

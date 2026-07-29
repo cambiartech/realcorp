@@ -124,8 +124,7 @@ export function buildOrgSetupSteps(input: OrgSetupInput): OrgSetupStep[] {
         title: "Add bank / cash accounts",
         description:
           "When you're ready, add accounts you receive payments into. You can skip and do this later — nothing is blocked.",
-        onPageHint:
-          "Add bank details when you want, then Save finance settings — or tap Skip for now below.",
+        onPageHint: "Add bank details when you want, then Save finance settings — or tap Skip for now below.",
         href: `/${input.tenantSlug}/finance/settings`,
         done: bankDone,
         critical: false,
@@ -173,9 +172,7 @@ export function buildOrgSetupSteps(input: OrgSetupInput): OrgSetupStep[] {
 /** Treat skipped steps as complete for coach progression (client-side). */
 export function applySkippedToSteps(steps: OrgSetupStep[], skippedIds: OrgSetupStepId[]): OrgSetupStep[] {
   const skip = new Set(skippedIds);
-  return steps.map((s) =>
-    skip.has(s.id) ? { ...s, done: true, skipped: true } : s,
-  );
+  return steps.map((s) => (skip.has(s.id) ? { ...s, done: true, skipped: true } : s));
 }
 
 export function orgSetupProgress(steps: OrgSetupStep[]) {

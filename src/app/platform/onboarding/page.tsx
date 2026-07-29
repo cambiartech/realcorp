@@ -13,10 +13,7 @@ export default function PlatformOnboardingPage() {
       <p className="mt-2 text-sm text-muted">
         Creates a tenant, default settings, and a 14-day invite for the first{" "}
         <strong className="text-foreground/90">Org Admin</strong>. They complete signup at{" "}
-        <code className="border border-foreground/10 bg-field px-1.5 py-0.5 font-mono text-xs">
-          /join
-        </code>
-        .
+        <code className="border border-foreground/10 bg-field px-1.5 py-0.5 font-mono text-xs">/join</code>.
       </p>
       <div className="mt-8">
         <OnboardingForm />

@@ -5,10 +5,10 @@
 export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
 
 const TONE_CLASSES: Record<StatusTone, string> = {
-  success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  warning: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  danger: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
-  info: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  success: "border-[var(--success-line)] bg-[var(--success-wash)] text-[var(--success)] ",
+  warning: "border-[var(--warn-line)] bg-[var(--warn-wash)] text-[var(--warn)] ",
+  danger: "border-[var(--danger-line)] bg-[var(--danger-wash)] text-[var(--danger)] ",
+  info: "border-[var(--info-line)] bg-[var(--info-wash)] text-[var(--info)] ",
   neutral: "border-foreground/15 bg-foreground/[0.06] text-foreground",
 };
 

@@ -55,7 +55,9 @@ export default async function FolioPage({ params }: { params: Promise<{ tenantSl
         department: formatEnumLabel(l.department),
         description: l.description,
         amountLabel: `${l.currency} ${Number(l.amount).toLocaleString()}`,
-        postedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(l.postedAt),
+        postedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
+          l.postedAt,
+        ),
       }))}
     />
   );

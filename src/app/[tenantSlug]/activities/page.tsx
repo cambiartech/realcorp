@@ -19,9 +19,9 @@ const TYPE_ICONS: Record<ActivityType, string> = {
 };
 
 const STATUS_STYLE: Record<ActivityStatus, string> = {
-  DONE: "bg-green-500/10 text-green-700 border border-green-500/20",
-  PENDING: "bg-amber-500/10 text-amber-700 border border-amber-500/20",
-  OVERDUE: "bg-red-500/10 text-red-700 border border-red-500/20",
+  DONE: "bg-[var(--success-wash)] text-[var(--success)] border border-[var(--success-line)]",
+  PENDING: "bg-[var(--warn-wash)] text-[var(--warn)] border border-[var(--warn-line)]",
+  OVERDUE: "bg-[var(--danger-wash)] text-[var(--danger)] border border-[var(--danger-line)]",
 };
 
 export default async function ActivitiesPage({
@@ -66,8 +66,7 @@ export default async function ActivitiesPage({
   const validStatus = Object.values(ActivityStatus).includes(statusParam as ActivityStatus)
     ? (statusParam as ActivityStatus)
     : undefined;
-  const validChannel =
-    channelParam === "WHATSAPP" || channelParam === "ACTIVITY" ? channelParam : "ALL";
+  const validChannel = channelParam === "WHATSAPP" || channelParam === "ACTIVITY" ? channelParam : "ALL";
 
   const [activities, users, whatsappMessages] = await Promise.all([
     prisma.activity.findMany({
@@ -127,43 +126,76 @@ export default async function ActivitiesPage({
           <p className="text-xs uppercase tracking-[0.2em] text-muted">Sales</p>
           <h1 className="mt-1 text-2xl font-bold text-foreground">Activities</h1>
           <p className="mt-0.5 text-sm text-muted">
-            Team inbox — {pendingCount} open task{pendingCount !== 1 ? "s" : ""} · {whatsappCount} WhatsApp message{whatsappCount !== 1 ? "s" : ""}.
+            Team inbox — {pendingCount} open task{pendingCount !== 1 ? "s" : ""} · {whatsappCount} WhatsApp
+            message{whatsappCount !== 1 ? "s" : ""}.
           </p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs">
-        <Link href={buildHref({ type: validType, status: validStatus, channel: validChannel })} className={`rounded-md border px-2.5 py-1.5 font-medium ${!assignee ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({ type: validType, status: validStatus, channel: validChannel })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${!assignee ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           All owners
         </Link>
-        <Link href={buildHref({ assignee: session.user.id, type: validType, status: validStatus, channel: validChannel })} className={`rounded-md border px-2.5 py-1.5 font-medium ${assignee === session.user.id ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({
+            assignee: session.user.id,
+            type: validType,
+            status: validStatus,
+            channel: validChannel,
+          })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${assignee === session.user.id ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           Mine
         </Link>
         <span className="mx-1 text-foreground/20">|</span>
-        <Link href={buildHref({ assignee, status: "PENDING", channel: validChannel })} className={`rounded-md border px-2.5 py-1.5 font-medium ${validStatus === "PENDING" ? "border-amber-500 bg-amber-500/10 text-amber-700" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({ assignee, status: "PENDING", channel: validChannel })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${validStatus === "PENDING" ? "border-[var(--warn-line)] bg-[var(--warn-wash)] text-[var(--warn)]" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           Pending
         </Link>
-        <Link href={buildHref({ assignee, status: "OVERDUE", channel: validChannel })} className={`rounded-md border px-2.5 py-1.5 font-medium ${validStatus === "OVERDUE" ? "border-red-500 bg-red-500/10 text-red-700" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({ assignee, status: "OVERDUE", channel: validChannel })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${validStatus === "OVERDUE" ? "border-[var(--danger-line)] bg-[var(--danger-wash)] text-[var(--danger)]" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           Overdue
         </Link>
-        <Link href={buildHref({ assignee, status: "DONE", channel: validChannel })} className={`rounded-md border px-2.5 py-1.5 font-medium ${validStatus === "DONE" ? "border-green-600 bg-green-500/10 text-green-700" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({ assignee, status: "DONE", channel: validChannel })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${validStatus === "DONE" ? "border-[var(--success-line)] bg-[var(--success-wash)] text-[var(--success)]" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           Done
         </Link>
         <span className="mx-1 text-foreground/20">|</span>
-        <Link href={buildHref({ assignee, type: validType, status: validStatus, channel: "ALL" })} className={`rounded-md border px-2.5 py-1.5 font-medium ${validChannel === "ALL" ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({ assignee, type: validType, status: validStatus, channel: "ALL" })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${validChannel === "ALL" ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           All channels
         </Link>
-        <Link href={buildHref({ assignee, type: validType, status: validStatus, channel: "ACTIVITY" })} className={`rounded-md border px-2.5 py-1.5 font-medium ${validChannel === "ACTIVITY" ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({ assignee, type: validType, status: validStatus, channel: "ACTIVITY" })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${validChannel === "ACTIVITY" ? "border-foreground bg-foreground text-background" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           Activities
         </Link>
-        <Link href={buildHref({ assignee, type: validType, status: validStatus, channel: "WHATSAPP" })} className={`rounded-md border px-2.5 py-1.5 font-medium ${validChannel === "WHATSAPP" ? "border-emerald-500 bg-emerald-500/10 text-emerald-700" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <Link
+          href={buildHref({ assignee, type: validType, status: validStatus, channel: "WHATSAPP" })}
+          className={`rounded-md border px-2.5 py-1.5 font-medium ${validChannel === "WHATSAPP" ? "border-[var(--success-line)] bg-[var(--success-wash)] text-[var(--success)]" : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"}`}
+        >
           WhatsApp
         </Link>
-        {(assignee || validType || validStatus || validChannel !== "ALL") ? (
+        {assignee || validType || validStatus || validChannel !== "ALL" ? (
           <>
             <span className="mx-1 text-foreground/20">|</span>
-            <Link href={`/${tenantSlug}/activities`} className="font-semibold text-foreground underline decoration-foreground/30 underline-offset-2">
+            <Link
+              href={`/${tenantSlug}/activities`}
+              className="font-semibold text-foreground underline decoration-foreground/30 underline-offset-2"
+            >
               Clear filters
             </Link>
           </>
@@ -183,7 +215,10 @@ export default async function ActivitiesPage({
               const inbound = m.direction === "INBOUND";
               const leadHref = m.leadId ? `/${tenantSlug}/leads/${m.leadId}` : null;
               return (
-                <div key={`wa-${m.id}`} className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] px-4 py-3">
+                <div
+                  key={`wa-${m.id}`}
+                  className="rounded-lg border border-[var(--success-line)] bg-[var(--success)]/[0.04] px-4 py-3"
+                >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5">
                       <span className="mt-0.5 shrink-0 text-base">💬</span>
@@ -192,16 +227,18 @@ export default async function ActivitiesPage({
                           <p className="text-sm font-medium text-foreground">
                             WhatsApp {inbound ? "inbound" : "outbound"}
                           </p>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${inbound ? "bg-emerald-600/15 text-emerald-700" : "bg-blue-600/15 text-blue-700"}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${inbound ? "bg-[var(--success-wash)] text-[var(--success)]" : "bg-[var(--info-wash)] text-[var(--info)]"}`}
+                          >
                             {m.direction}
                           </span>
                           {!inbound && m.status ? (
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 m.status === "failed"
-                                  ? "bg-red-600/15 text-red-700"
+                                  ? "bg-[var(--danger-wash)] text-[var(--danger)]"
                                   : m.status === "read"
-                                    ? "bg-sky-600/15 text-sky-700"
+                                    ? "bg-[var(--info-wash)] text-[var(--info)]"
                                     : "bg-foreground/[0.08] text-muted"
                               }`}
                             >
@@ -218,7 +255,10 @@ export default async function ActivitiesPage({
                           {leadHref ? (
                             <>
                               {" · "}
-                              <Link href={leadHref} className="underline decoration-foreground/20 hover:text-foreground">
+                              <Link
+                                href={leadHref}
+                                className="underline decoration-foreground/20 hover:text-foreground"
+                              >
                                 Lead
                               </Link>
                             </>
@@ -244,7 +284,8 @@ export default async function ActivitiesPage({
             const actor = userMap.get(activity.createdByUserId);
             const assigned = activity.assignedUserId ? userMap.get(activity.assignedUserId) : null;
             const isTask = activity.type === ActivityType.TASK;
-            const isPending = activity.status === ActivityStatus.PENDING || activity.status === ActivityStatus.OVERDUE;
+            const isPending =
+              activity.status === ActivityStatus.PENDING || activity.status === ActivityStatus.OVERDUE;
             const entityHref =
               activity.entityType === "LEAD"
                 ? `/${tenantSlug}/leads/${activity.entityId}`
@@ -252,7 +293,10 @@ export default async function ActivitiesPage({
             const entityLabel = activity.entityType === "LEAD" ? "Lead" : "Deal";
 
             return (
-              <div key={activity.id} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
+              <div
+                key={activity.id}
+                className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="flex items-start gap-2.5">
                     <span className="mt-0.5 shrink-0 text-base">{TYPE_ICONS[activity.type]}</span>
@@ -260,20 +304,25 @@ export default async function ActivitiesPage({
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-medium text-foreground">{activity.title}</p>
                         {isTask ? (
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[activity.status]}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[activity.status]}`}
+                          >
                             {activity.status}
                           </span>
                         ) : null}
                       </div>
-                      {activity.body ? (
-                        <p className="mt-0.5 text-xs text-muted">{activity.body}</p>
-                      ) : null}
+                      {activity.body ? <p className="mt-0.5 text-xs text-muted">{activity.body}</p> : null}
                       <p className="mt-1 text-xs text-muted">
                         {actor?.name ?? actor?.email ?? "Unknown"}
-                        {assigned && assigned.id !== actor?.id ? ` → ${assigned.name ?? assigned.email}` : null}
+                        {assigned && assigned.id !== actor?.id
+                          ? ` → ${assigned.name ?? assigned.email}`
+                          : null}
                         {activity.dueAt ? ` · Due ${new Date(activity.dueAt).toLocaleDateString()}` : null}
                         {" · "}
-                        <Link href={entityHref} className="underline decoration-foreground/20 hover:text-foreground">
+                        <Link
+                          href={entityHref}
+                          className="underline decoration-foreground/20 hover:text-foreground"
+                        >
                           {entityLabel}
                         </Link>
                       </p>

@@ -44,7 +44,11 @@ export function LandingLockup({
   className?: string;
 }) {
   return (
-    <Link href={href} className={["lockup", className].filter(Boolean).join(" ")} aria-label="Realcorp · home">
+    <Link
+      href={href}
+      className={["lockup", className].filter(Boolean).join(" ")}
+      aria-label="Realcorp · home"
+    >
       <LandingMark surface={surface} size={markSize} className="mark" priority />
       <span>Realcorp</span>
     </Link>

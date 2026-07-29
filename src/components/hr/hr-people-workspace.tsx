@@ -53,9 +53,17 @@ function Field({
     <label className={["block text-sm", className].filter(Boolean).join(" ")}>
       <span className="mb-1 block text-xs font-medium text-foreground">
         {label}
-        {required ? <span className="text-red-600"> *</span> : null}
+        {required ? <span className="text-[var(--danger)]"> *</span> : null}
       </span>
-      {children ?? <input name={name} type={type} required={required} defaultValue={defaultValue} className={inputClass} />}
+      {children ?? (
+        <input
+          name={name}
+          type={type}
+          required={required}
+          defaultValue={defaultValue}
+          className={inputClass}
+        />
+      )}
       {hint ? <span className="mt-0.5 block text-[11px] text-muted">{hint}</span> : null}
     </label>
   );
@@ -101,7 +109,12 @@ export function HrPeopleWorkspace({
   initialOnboardUserId?: string;
   offerByUserId?: Record<
     string,
-    { bodyHtml: string; status: "DRAFT" | "AWAITING_SIGNATURE" | "SIGNED"; signUrl?: string; profileId: string }
+    {
+      bodyHtml: string;
+      status: "DRAFT" | "AWAITING_SIGNATURE" | "SIGNED";
+      signUrl?: string;
+      profileId: string;
+    }
   >;
   formRequests: Array<{
     id: string;
@@ -136,7 +149,10 @@ export function HrPeopleWorkspace({
   const [showOfferLetter, setShowOfferLetter] = useState(false);
 
   const profileByUserId = useMemo(() => new Map(profileDetails.map((p) => [p.userId, p])), [profileDetails]);
-  const onboardingByUserId = useMemo(() => new Map(profileOnboarding.map((o) => [o.userId, o])), [profileOnboarding]);
+  const onboardingByUserId = useMemo(
+    () => new Map(profileOnboarding.map((o) => [o.userId, o])),
+    [profileOnboarding],
+  );
   const ytdByUser = useMemo(() => new Map(ytdByUserId.map((o) => [o.userId, o.ytd])), [ytdByUserId]);
   const selectedMember = teamMembers.find((m) => m.userId === selectedUserId);
   const selectedProfile = selectedUserId ? profileByUserId.get(selectedUserId) : undefined;
@@ -309,7 +325,8 @@ export function HrPeopleWorkspace({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Everyone on <strong className="font-medium text-foreground">Team</strong> appears here. Open their record to edit details, or send them a form link to their work email.
+        Everyone on <strong className="font-medium text-foreground">Team</strong> appears here. Open their
+        record to edit details, or send them a form link to their work email.
       </p>
 
       <div className="flex flex-wrap gap-1 border-b border-foreground/10 pb-1">
@@ -320,7 +337,9 @@ export function HrPeopleWorkspace({
             onClick={() => setPeopleTab(t.id)}
             className={[
               "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              peopleTab === t.id ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+              peopleTab === t.id
+                ? "bg-foreground text-background"
+                : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
             ].join(" ")}
           >
             {t.label}
@@ -368,11 +387,11 @@ export function HrPeopleWorkspace({
                       <td className="px-3 py-2 text-xs">{m.role}</td>
                       <td className="px-3 py-2">
                         {prof ? (
-                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+                          <span className="rounded-full bg-[var(--success-wash)] px-2 py-0.5 text-xs font-medium text-[var(--success)]">
                             {prof.statusValue === "ACTIVE" ? "Active" : prof.status}
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-900 dark:text-amber-200">
+                          <span className="rounded-full bg-[var(--warn-wash)] px-2 py-0.5 text-xs font-medium text-[var(--warn)]">
                             Not set up
                           </span>
                         )}
@@ -381,7 +400,7 @@ export function HrPeopleWorkspace({
                         <div className="flex items-center gap-2">
                           <div className="h-1.5 w-16 overflow-hidden rounded-full bg-foreground/10">
                             <div
-                              className="h-full bg-emerald-600"
+                              className="h-full bg-[var(--success)]"
                               style={{ width: `${onboard?.percent ?? 0}%` }}
                             />
                           </div>
@@ -395,11 +414,18 @@ export function HrPeopleWorkspace({
                             onClick={() =>
                               prof?.statusValue === "ACTIVE"
                                 ? openRecord(m.userId)
-                                : startOnboarding(m.userId, prof ? inferOnboardingStep(onboard?.items ?? []) : undefined)
+                                : startOnboarding(
+                                    m.userId,
+                                    prof ? inferOnboardingStep(onboard?.items ?? []) : undefined,
+                                  )
                             }
                             className="text-xs font-semibold underline"
                           >
-                            {prof?.statusValue === "ACTIVE" ? "Open record" : prof ? "Continue onboarding" : "Start onboarding"}
+                            {prof?.statusValue === "ACTIVE"
+                              ? "Open record"
+                              : prof
+                                ? "Continue onboarding"
+                                : "Start onboarding"}
                           </button>
                           {prof ? (
                             <Link
@@ -449,208 +475,339 @@ export function HrPeopleWorkspace({
       {peopleTab === "record" ? (
         !selectedMember || !record ? (
           <div className="rounded-lg border border-dashed border-foreground/20 p-8 text-center text-sm text-muted">
-            Pick someone from <button type="button" className="font-semibold underline" onClick={() => setPeopleTab("directory")}>Team directory</button> to view or edit their HR record.
+            Pick someone from{" "}
+            <button
+              type="button"
+              className="font-semibold underline"
+              onClick={() => setPeopleTab("directory")}
+            >
+              Team directory
+            </button>{" "}
+            to view or edit their HR record.
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-[1fr_minmax(240px,280px)]">
-          <form
-            className="rounded-lg border border-foreground/10 p-4 sm:p-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              try {
-                const payload = formDataToEmployeeProfilePayload(new FormData(e.currentTarget));
-                void runAction(() => upsertEmployeeProfile(tenantSlug, payload), "Employee record saved.");
-              } catch (err) {
-                showSnackbar(err instanceof Error ? err.message : "Invalid form data.", "error");
-              }
-            }}
-          >
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 pb-3">
-              <div>
-                <p className="font-semibold text-foreground">{record.fullName || selectedMember.name}</p>
-                <p className="text-xs text-muted">{selectedMember.email}</p>
-              </div>
-              <button type="button" className="text-xs text-muted underline" onClick={() => setPeopleTab("directory")}>
-                ← Back to directory
-              </button>
-            </div>
-
-            <input type="hidden" name="userId" value={record.userId} />
-
-            <div className="mb-4 flex flex-wrap gap-1">
-              {recordTabs.map((t) => (
+            <form
+              className="rounded-lg border border-foreground/10 p-4 sm:p-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                try {
+                  const payload = formDataToEmployeeProfilePayload(new FormData(e.currentTarget));
+                  void runAction(() => upsertEmployeeProfile(tenantSlug, payload), "Employee record saved.");
+                } catch (err) {
+                  showSnackbar(err instanceof Error ? err.message : "Invalid form data.", "error");
+                }
+              }}
+            >
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 pb-3">
+                <div>
+                  <p className="font-semibold text-foreground">{record.fullName || selectedMember.name}</p>
+                  <p className="text-xs text-muted">{selectedMember.email}</p>
+                </div>
                 <button
-                  key={t.id}
                   type="button"
-                  onClick={() => setRecordTab(t.id)}
-                  className={[
-                    "rounded-md px-2.5 py-1.5 text-xs font-medium",
-                    recordTab === t.id ? "bg-foreground/10 text-foreground" : "text-muted hover:text-foreground",
-                  ].join(" ")}
+                  className="text-xs text-muted underline"
+                  onClick={() => setPeopleTab("directory")}
                 >
-                  {t.label}
+                  ← Back to directory
                 </button>
-              ))}
-            </div>
-
-            {recordTab === "personal" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Full name" name="fullName" required defaultValue={record.fullName || selectedMember.name} />
-                <Field label="Employee ID" name="employeeNumber" defaultValue={record.employeeNumber} hint="Leave blank to auto-generate (e.g. BOPR-2026-0001)." />
-                <Field label="Gender" name="gender" defaultValue={record.gender}>
-                  <UiSelect name="gender" defaultValue={record.gender}>
-                    <option value="">—</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </UiSelect>
-                </Field>
-                <Field label="Date of birth" name="dateOfBirth" type="date" defaultValue={record.dateOfBirth} />
-                <Field label="Marital status" name="maritalStatus" defaultValue={record.maritalStatus} />
-                <Field label="Nationality" name="nationality" defaultValue={record.nationality} />
-                <Field label="Mobile phone" name="phoneMobile" type="tel" defaultValue={record.phoneMobile} />
-                <Field label="Work email" name="workEmail" type="email" defaultValue={record.workEmail || selectedMember.email} hint="From Team — used when you send forms." />
-                <Field label="Street address" name="addressStreet" defaultValue={record.addressStreet} className="sm:col-span-2" />
-                <Field label="City" name="addressCity" defaultValue={record.addressCity} />
-                <Field label="State" name="addressState" defaultValue={record.addressState} />
               </div>
-            ) : null}
 
-            {recordTab === "job" ? (
-              <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Job title" name="position" defaultValue={record.position} />
-                  <Field label="Department" name="department" defaultValue={record.department} />
-                  <Field label="Date of joining" name="dateOfJoining" type="date" defaultValue={record.dateOfJoining} />
-                  <Field label="Reports to" name="reportingToLabel" defaultValue={record.reportingToLabel} />
-                  <Field label="Employment type" name="employmentType" defaultValue={record.employmentType} hint="e.g. Full-Time, Contract" />
-                  <Field label="Work schedule" name="workSchedule" defaultValue={record.workSchedule} />
-                  <Field label="Pay group" name="paygroupName" defaultValue={record.paygroupName} hint="Used to filter payroll runs (e.g. Lagos, Abuja)." />
-                  <Field
-                    label={`Monthly gross pay (${currency})`}
-                    name="grossMonthly"
-                    defaultValue={record.grossMonthly}
-                    hint="Numbers only — used for payslips."
+              <input type="hidden" name="userId" value={record.userId} />
+
+              <div className="mb-4 flex flex-wrap gap-1">
+                {recordTabs.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setRecordTab(t.id)}
+                    className={[
+                      "rounded-md px-2.5 py-1.5 text-xs font-medium",
+                      recordTab === t.id
+                        ? "bg-foreground/10 text-foreground"
+                        : "text-muted hover:text-foreground",
+                    ].join(" ")}
                   >
-                    <input
-                      name="grossMonthly"
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      inputMode="decimal"
-                      defaultValue={record.grossMonthly}
-                      className={inputClass}
-                      onKeyDown={(e) => {
-                        if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
-                      }}
-                    />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {recordTab === "personal" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label="Full name"
+                    name="fullName"
+                    required
+                    defaultValue={record.fullName || selectedMember.name}
+                  />
+                  <Field
+                    label="Employee ID"
+                    name="employeeNumber"
+                    defaultValue={record.employeeNumber}
+                    hint="Leave blank to auto-generate (e.g. BOPR-2026-0001)."
+                  />
+                  <Field label="Gender" name="gender" defaultValue={record.gender}>
+                    <UiSelect name="gender" defaultValue={record.gender}>
+                      <option value="">—</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </UiSelect>
                   </Field>
                   <Field
-                    label={`Payee tax override (${currency})`}
-                    name="payeeTaxMonthly"
-                    defaultValue={record.payeeTaxMonthly}
-                    hint="Leave blank to auto-calculate (~9.98% of gross)."
-                  >
-                    <input
-                      name="payeeTaxMonthly"
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      inputMode="decimal"
-                      defaultValue={record.payeeTaxMonthly}
-                      className={inputClass}
-                      onKeyDown={(e) => {
-                        if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
-                      }}
+                    label="Date of birth"
+                    name="dateOfBirth"
+                    type="date"
+                    defaultValue={record.dateOfBirth}
+                  />
+                  <Field label="Marital status" name="maritalStatus" defaultValue={record.maritalStatus} />
+                  <Field label="Nationality" name="nationality" defaultValue={record.nationality} />
+                  <Field
+                    label="Mobile phone"
+                    name="phoneMobile"
+                    type="tel"
+                    defaultValue={record.phoneMobile}
+                  />
+                  <Field
+                    label="Work email"
+                    name="workEmail"
+                    type="email"
+                    defaultValue={record.workEmail || selectedMember.email}
+                    hint="From Team — used when you send forms."
+                  />
+                  <Field
+                    label="Street address"
+                    name="addressStreet"
+                    defaultValue={record.addressStreet}
+                    className="sm:col-span-2"
+                  />
+                  <Field label="City" name="addressCity" defaultValue={record.addressCity} />
+                  <Field label="State" name="addressState" defaultValue={record.addressState} />
+                </div>
+              ) : null}
+
+              {recordTab === "job" ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Job title" name="position" defaultValue={record.position} />
+                    <Field label="Department" name="department" defaultValue={record.department} />
+                    <Field
+                      label="Date of joining"
+                      name="dateOfJoining"
+                      type="date"
+                      defaultValue={record.dateOfJoining}
                     />
+                    <Field
+                      label="Reports to"
+                      name="reportingToLabel"
+                      defaultValue={record.reportingToLabel}
+                    />
+                    <Field
+                      label="Employment type"
+                      name="employmentType"
+                      defaultValue={record.employmentType}
+                      hint="e.g. Full-Time, Contract"
+                    />
+                    <Field label="Work schedule" name="workSchedule" defaultValue={record.workSchedule} />
+                    <Field
+                      label="Pay group"
+                      name="paygroupName"
+                      defaultValue={record.paygroupName}
+                      hint="Used to filter payroll runs (e.g. Lagos, Abuja)."
+                    />
+                    <Field
+                      label={`Monthly gross pay (${currency})`}
+                      name="grossMonthly"
+                      defaultValue={record.grossMonthly}
+                      hint="Numbers only — used for payslips."
+                    >
+                      <input
+                        name="grossMonthly"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        inputMode="decimal"
+                        defaultValue={record.grossMonthly}
+                        className={inputClass}
+                        onKeyDown={(e) => {
+                          if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+                        }}
+                      />
+                    </Field>
+                    <Field
+                      label={`Payee tax override (${currency})`}
+                      name="payeeTaxMonthly"
+                      defaultValue={record.payeeTaxMonthly}
+                      hint="Leave blank to auto-calculate (~9.98% of gross)."
+                    >
+                      <input
+                        name="payeeTaxMonthly"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        inputMode="decimal"
+                        defaultValue={record.payeeTaxMonthly}
+                        className={inputClass}
+                        onKeyDown={(e) => {
+                          if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+                        }}
+                      />
+                    </Field>
+                  </div>
+                  <PayslipYtdCard
+                    ytd={selectedUserId ? (ytdByUser.get(selectedUserId) ?? null) : null}
+                    currency={currency}
+                  />
+                </div>
+              ) : null}
+
+              {recordTab === "bank" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label="Account holder name"
+                    name="bankAccountHolderName"
+                    defaultValue={record.bankAccountHolderName}
+                  />
+                  <Field label="Bank name" name="bankName" defaultValue={record.bankName} />
+                  <Field
+                    label="Account number"
+                    name="bankAccountNumber"
+                    defaultValue={record.bankAccountNumber}
+                  />
+                  <Field label="Account type" name="bankAccountType" defaultValue={record.bankAccountType}>
+                    <UiSelect name="bankAccountType" defaultValue={record.bankAccountType || "Checking"}>
+                      <option value="Checking">Checking</option>
+                      <option value="Savings">Savings</option>
+                      <option value="Other">Other</option>
+                    </UiSelect>
+                  </Field>
+                  <Field
+                    label="Use for salary payments?"
+                    name="bankReceivePayments"
+                    defaultValue={record.bankReceivePayments}
+                  >
+                    <UiSelect name="bankReceivePayments" defaultValue={record.bankReceivePayments}>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </UiSelect>
                   </Field>
                 </div>
-                <PayslipYtdCard ytd={selectedUserId ? ytdByUser.get(selectedUserId) ?? null : null} currency={currency} />
-              </div>
-            ) : null}
-
-            {recordTab === "bank" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Account holder name" name="bankAccountHolderName" defaultValue={record.bankAccountHolderName} />
-                <Field label="Bank name" name="bankName" defaultValue={record.bankName} />
-                <Field label="Account number" name="bankAccountNumber" defaultValue={record.bankAccountNumber} />
-                <Field label="Account type" name="bankAccountType" defaultValue={record.bankAccountType}>
-                  <UiSelect name="bankAccountType" defaultValue={record.bankAccountType || "Checking"}>
-                    <option value="Checking">Checking</option>
-                    <option value="Savings">Savings</option>
-                    <option value="Other">Other</option>
-                  </UiSelect>
-                </Field>
-                <Field label="Use for salary payments?" name="bankReceivePayments" defaultValue={record.bankReceivePayments}>
-                  <UiSelect name="bankReceivePayments" defaultValue={record.bankReceivePayments}>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                  </UiSelect>
-                </Field>
-              </div>
-            ) : null}
-
-            {recordTab === "emergency" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Contact name" name="emergencyName" defaultValue={record.emergencyName} />
-                <Field label="Relationship" name="emergencyRelationship" defaultValue={record.emergencyRelationship} />
-                <Field label="Phone" name="emergencyPhone" type="tel" defaultValue={record.emergencyPhone} />
-                <Field label="Email" name="emergencyEmail" type="email" defaultValue={record.emergencyEmail} />
-              </div>
-            ) : null}
-
-            {recordTab === "family" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <p className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted">Next of kin</p>
-                <Field label="Full name" name="nextOfKinName" defaultValue={record.nextOfKinName} />
-                <Field label="Relationship" name="nextOfKinRelationship" defaultValue={record.nextOfKinRelationship} />
-                <Field label="Phone" name="nextOfKinPhone" type="tel" defaultValue={record.nextOfKinPhone} />
-                <Field label="Email" name="nextOfKinEmail" type="email" defaultValue={record.nextOfKinEmail} />
-                <Field label="Street" name="nextOfKinStreet" defaultValue={record.nextOfKinStreet} />
-                <Field label="City" name="nextOfKinCity" defaultValue={record.nextOfKinCity} />
-                <Field label="State" name="nextOfKinState" defaultValue={record.nextOfKinState} />
-                <Field label="Occupation" name="nextOfKinOccupation" defaultValue={record.nextOfKinOccupation} />
-                <p className="sm:col-span-2 mt-2 text-xs font-semibold uppercase tracking-wide text-muted">Education</p>
-                <Field label="Highest level" name="educationLevel" defaultValue={record.educationLevel} />
-                <Field label="Institution" name="educationInstitution" defaultValue={record.educationInstitution} />
-                <Field label="Qualification" name="educationQualification" defaultValue={record.educationQualification} />
-                <Field label="Year" name="educationYear" defaultValue={record.educationYear} />
-              </div>
-            ) : null}
-
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-foreground/10 pt-4">
-              <button type="submit" disabled={pending} className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-                {pending ? "Saving…" : "Save record"}
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
-                onClick={() => openSendForm("BIODATA")}
-              >
-                Send form to this person
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
-                onClick={() => setShowOfferLetter(true)}
-              >
-                Offer letter
-              </button>
-              {profiles.find((p) => p.userId === selectedMember.userId)?.statusValue !== "ACTIVE" ? (
-                <button type="button" className="text-sm font-semibold text-violet-700 underline" onClick={() => startOnboarding(selectedMember.userId)}>
-                  Open onboarding wizard
-                </button>
               ) : null}
-            </div>
-          </form>
-          <ProfileComplianceChecklist
-            items={selectedOnboarding?.items ?? []}
-            percent={selectedOnboarding?.percent ?? 0}
-            tenantSlug={tenantSlug}
-            onGenerateOffer={() => setShowOfferLetter(true)}
-            onSendForm={(ft) => openSendForm(ft)}
-            onSendAllForms={openSendAllForms}
-          />
+
+              {recordTab === "emergency" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Contact name" name="emergencyName" defaultValue={record.emergencyName} />
+                  <Field
+                    label="Relationship"
+                    name="emergencyRelationship"
+                    defaultValue={record.emergencyRelationship}
+                  />
+                  <Field
+                    label="Phone"
+                    name="emergencyPhone"
+                    type="tel"
+                    defaultValue={record.emergencyPhone}
+                  />
+                  <Field
+                    label="Email"
+                    name="emergencyEmail"
+                    type="email"
+                    defaultValue={record.emergencyEmail}
+                  />
+                </div>
+              ) : null}
+
+              {recordTab === "family" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <p className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Next of kin
+                  </p>
+                  <Field label="Full name" name="nextOfKinName" defaultValue={record.nextOfKinName} />
+                  <Field
+                    label="Relationship"
+                    name="nextOfKinRelationship"
+                    defaultValue={record.nextOfKinRelationship}
+                  />
+                  <Field
+                    label="Phone"
+                    name="nextOfKinPhone"
+                    type="tel"
+                    defaultValue={record.nextOfKinPhone}
+                  />
+                  <Field
+                    label="Email"
+                    name="nextOfKinEmail"
+                    type="email"
+                    defaultValue={record.nextOfKinEmail}
+                  />
+                  <Field label="Street" name="nextOfKinStreet" defaultValue={record.nextOfKinStreet} />
+                  <Field label="City" name="nextOfKinCity" defaultValue={record.nextOfKinCity} />
+                  <Field label="State" name="nextOfKinState" defaultValue={record.nextOfKinState} />
+                  <Field
+                    label="Occupation"
+                    name="nextOfKinOccupation"
+                    defaultValue={record.nextOfKinOccupation}
+                  />
+                  <p className="sm:col-span-2 mt-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Education
+                  </p>
+                  <Field label="Highest level" name="educationLevel" defaultValue={record.educationLevel} />
+                  <Field
+                    label="Institution"
+                    name="educationInstitution"
+                    defaultValue={record.educationInstitution}
+                  />
+                  <Field
+                    label="Qualification"
+                    name="educationQualification"
+                    defaultValue={record.educationQualification}
+                  />
+                  <Field label="Year" name="educationYear" defaultValue={record.educationYear} />
+                </div>
+              ) : null}
+
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-foreground/10 pt-4">
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                >
+                  {pending ? "Saving…" : "Save record"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
+                  onClick={() => openSendForm("BIODATA")}
+                >
+                  Send form to this person
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
+                  onClick={() => setShowOfferLetter(true)}
+                >
+                  Offer letter
+                </button>
+                {profiles.find((p) => p.userId === selectedMember.userId)?.statusValue !== "ACTIVE" ? (
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-[var(--accent)] underline"
+                    onClick={() => startOnboarding(selectedMember.userId)}
+                  >
+                    Open onboarding wizard
+                  </button>
+                ) : null}
+              </div>
+            </form>
+            <ProfileComplianceChecklist
+              items={selectedOnboarding?.items ?? []}
+              percent={selectedOnboarding?.percent ?? 0}
+              tenantSlug={tenantSlug}
+              onGenerateOffer={() => setShowOfferLetter(true)}
+              onSendForm={(ft) => openSendForm(ft)}
+              onSendAllForms={openSendAllForms}
+            />
           </div>
         )
       ) : null}
@@ -703,9 +860,7 @@ export function HrPeopleWorkspace({
               const emailHint = result.sendToEmail ? ` Send to: ${result.sendToEmail}` : "";
               const isBundle = (result.links?.length ?? 0) > 1;
               showSnackbar(
-                isBundle
-                  ? `Master onboarding link ready.${emailHint}`
-                  : `Form link ready.${emailHint}`,
+                isBundle ? `Master onboarding link ready.${emailHint}` : `Form link ready.${emailHint}`,
                 "success",
               );
               router.refresh();
@@ -715,9 +870,9 @@ export function HrPeopleWorkspace({
           <p className="mb-3 text-sm font-semibold text-foreground">Send a form link</p>
           {sendMode === "team" && selectedMember ? (
             <div className="mb-3 space-y-2">
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-foreground">
-                Sending to <strong>{selectedMember.name}</strong> ({selectedMember.email}) — they are already on Team.
-                Job title and payroll details come from their HR record, not Team role.
+              <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] px-3 py-2 text-sm text-foreground">
+                Sending to <strong>{selectedMember.name}</strong> ({selectedMember.email}) — they are already
+                on Team. Job title and payroll details come from their HR record, not Team role.
               </div>
               <Link
                 href={`/${tenantSlug}/hr/dashboard?employeeUserId=${selectedMember.userId}`}
@@ -729,11 +884,25 @@ export function HrPeopleWorkspace({
           ) : null}
           <div className="mb-4 flex gap-2 rounded-lg bg-foreground/[0.04] p-1">
             <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md px-3 py-2 text-sm has-[:checked]:bg-background has-[:checked]:font-semibold has-[:checked]:shadow-sm">
-              <input type="radio" name="sendMode" value="team" checked={sendMode === "team"} onChange={() => setSendMode("team")} className="sr-only" />
+              <input
+                type="radio"
+                name="sendMode"
+                value="team"
+                checked={sendMode === "team"}
+                onChange={() => setSendMode("team")}
+                className="sr-only"
+              />
               Team member
             </label>
             <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md px-3 py-2 text-sm has-[:checked]:bg-background has-[:checked]:font-semibold has-[:checked]:shadow-sm">
-              <input type="radio" name="sendMode" value="newcomer" checked={sendMode === "newcomer"} onChange={() => setSendMode("newcomer")} className="sr-only" />
+              <input
+                type="radio"
+                name="sendMode"
+                value="newcomer"
+                checked={sendMode === "newcomer"}
+                onChange={() => setSendMode("newcomer")}
+                className="sr-only"
+              />
               New joiner (not on Team yet)
             </label>
           </div>
@@ -741,7 +910,11 @@ export function HrPeopleWorkspace({
           {sendMode === "team" ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Team member" name="userId" required={sendMode === "team"}>
-                <UiSelect name="userId" defaultValue={selectedUserId ?? ""} key={`send-user-${selectedUserId ?? "none"}`}>
+                <UiSelect
+                  name="userId"
+                  defaultValue={selectedUserId ?? ""}
+                  key={`send-user-${selectedUserId ?? "none"}`}
+                >
                   <option value="">Select…</option>
                   {teamMembers.map((m) => (
                     <option key={m.userId} value={m.userId}>
@@ -751,13 +924,19 @@ export function HrPeopleWorkspace({
                 </UiSelect>
               </Field>
               <p className="sm:col-span-2 text-xs text-muted">
-                We will email the link to their address on file when you copy it into your mail app. Their name is filled in automatically.
+                We will email the link to their address on file when you copy it into your mail app. Their
+                name is filled in automatically.
               </p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Full name" name="recipientName" required={sendMode === "newcomer"} />
-              <Field label="Email address" name="recipientEmail" type="email" required={sendMode === "newcomer"} />
+              <Field
+                label="Email address"
+                name="recipientEmail"
+                type="email"
+                required={sendMode === "newcomer"}
+              />
               <p className="sm:col-span-2 text-xs text-muted">
                 For candidates not on Team yet. After they join, add them under Team and merge records.
               </p>
@@ -793,17 +972,24 @@ export function HrPeopleWorkspace({
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="How they complete it" name="deliveryMode">
-              <UiSelect name="deliveryMode" defaultValue="BOTH">
-                <option value="ONLINE_FILL">Fill online only</option>
-                <option value="PRINT_UPLOAD">Print & upload only</option>
-                <option value="BOTH">Online or print & upload</option>
-              </UiSelect>
-            </Field>
-            <Field label="Link expires (days)" name="expiresInDays" type="number" defaultValue="14">
-              <input name="expiresInDays" type="number" min={1} max={90} defaultValue={14} className={inputClass} />
-            </Field>
-            <Field label="Note to employee" name="hrNote" hint="Optional message shown on the form." />
+              <Field label="How they complete it" name="deliveryMode">
+                <UiSelect name="deliveryMode" defaultValue="BOTH">
+                  <option value="ONLINE_FILL">Fill online only</option>
+                  <option value="PRINT_UPLOAD">Print & upload only</option>
+                  <option value="BOTH">Online or print & upload</option>
+                </UiSelect>
+              </Field>
+              <Field label="Link expires (days)" name="expiresInDays" type="number" defaultValue="14">
+                <input
+                  name="expiresInDays"
+                  type="number"
+                  min={1}
+                  max={90}
+                  defaultValue={14}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Note to employee" name="hrNote" hint="Optional message shown on the form." />
             </div>
           </div>
 
@@ -812,17 +998,23 @@ export function HrPeopleWorkspace({
             disabled={pending || selectedFormTypes.length === 0}
             className="mt-4 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
           >
-            {pending ? "Generating…" : selectedFormTypes.length > 1 ? "Generate master link" : "Generate link"}
+            {pending
+              ? "Generating…"
+              : selectedFormTypes.length > 1
+                ? "Generate master link"
+                : "Generate link"}
           </button>
 
           {createdMasterUrl || createdFormLinks.length > 0 ? (
-            <div className="mt-4 space-y-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
+            <div className="mt-4 space-y-3 rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] p-3 text-xs">
               {createdSendToEmail ? (
                 <p className="font-semibold text-foreground">Send to: {createdSendToEmail}</p>
               ) : null}
               {createdMasterUrl && createdFormLinks.length > 1 ? (
                 <>
-                  <p className="font-medium text-foreground">Master onboarding link — one URL for all {createdFormLinks.length} sections</p>
+                  <p className="font-medium text-foreground">
+                    Master onboarding link — one URL for all {createdFormLinks.length} sections
+                  </p>
                   <input
                     readOnly
                     value={createdMasterUrl}
@@ -831,7 +1023,9 @@ export function HrPeopleWorkspace({
                   />
                   {createdMasterPrintUrls.length > 0 ? (
                     <details className="mt-2">
-                      <summary className="cursor-pointer font-medium text-muted">Print blank forms (per section)</summary>
+                      <summary className="cursor-pointer font-medium text-muted">
+                        Print blank forms (per section)
+                      </summary>
                       <ul className="mt-2 space-y-2">
                         {createdMasterPrintUrls.map((p) => (
                           <li key={p.formTypeLabel}>
@@ -894,15 +1088,19 @@ export function HrPeopleWorkspace({
                     <td className="px-3 py-2">{r.formTypeLabel}</td>
                     <td className="px-3 py-2">
                       {r.status}
-                      {r.submittedAtLabel !== "—" ? <span className="block text-[10px] text-muted">{r.submittedAtLabel}</span> : null}
+                      {r.submittedAtLabel !== "—" ? (
+                        <span className="block text-[10px] text-muted">{r.submittedAtLabel}</span>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2 text-xs">{r.expiresLabel}</td>
                     <td className="px-3 py-2 space-x-2">
                       {r.statusValue === "SUBMITTED" ? (
                         <button
                           type="button"
-                          className="text-xs font-semibold text-emerald-700 underline"
-                          onClick={() => void runAction(() => approveHrFormRequest(tenantSlug, r.id), "Approved.")}
+                          className="text-xs font-semibold text-[var(--success)] underline"
+                          onClick={() =>
+                            void runAction(() => approveHrFormRequest(tenantSlug, r.id), "Approved.")
+                          }
                         >
                           Approve
                         </button>
@@ -911,7 +1109,9 @@ export function HrPeopleWorkspace({
                         <button
                           type="button"
                           className="text-xs text-muted underline"
-                          onClick={() => void runAction(() => cancelHrFormRequest(tenantSlug, r.id), "Cancelled.")}
+                          onClick={() =>
+                            void runAction(() => cancelHrFormRequest(tenantSlug, r.id), "Cancelled.")
+                          }
                         >
                           Cancel
                         </button>
@@ -953,7 +1153,9 @@ export function HrPeopleWorkspace({
                 position: record.position,
                 department: record.department,
                 dateOfJoining: record.dateOfJoining
-                  ? new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(new Date(record.dateOfJoining))
+                  ? new Intl.DateTimeFormat("en-NG", { dateStyle: "long" }).format(
+                      new Date(record.dateOfJoining),
+                    )
                   : "to be confirmed",
                 employmentType: record.employmentType || "full-time",
                 grossMonthly: record.grossMonthly

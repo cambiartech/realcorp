@@ -6,11 +6,7 @@ import { ExploreWorkspace } from "../../[tenantSlug]/explore-workspace";
 export const dynamic = "force-dynamic";
 
 /** Iframe-friendly variant: no page chrome, compact grid. */
-export default async function ExploreEmbedPage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function ExploreEmbedPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const [brand, result] = await Promise.all([
     loadPublicListingBrand(tenantSlug),

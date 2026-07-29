@@ -142,7 +142,9 @@ export function PublicCaptureFormClient({
       });
       if (!result?.ok) {
         setError(result?.error ?? "Could not submit form. Try again shortly.");
-        requestAnimationFrame(() => errorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+        requestAnimationFrame(() =>
+          errorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+        );
         return;
       }
       submittedRef.current = true;
@@ -199,7 +201,7 @@ export function PublicCaptureFormClient({
           <div
             ref={errorRef}
             role="alert"
-            className="sm:col-span-2 rounded-lg border border-red-400 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200"
+            className="sm:col-span-2 rounded-lg border border-[var(--danger-line)] bg-[var(--danger-wash)] px-4 py-3 text-sm font-medium text-[var(--danger)]"
           >
             {error}
           </div>
@@ -264,7 +266,13 @@ export function PublicCaptureFormClient({
           }
 
           const inputType =
-            field.type === "email" ? "email" : field.type === "phone" ? "tel" : field.type === "number" ? "number" : "text";
+            field.type === "email"
+              ? "email"
+              : field.type === "phone"
+                ? "tel"
+                : field.type === "number"
+                  ? "number"
+                  : "text";
 
           return (
             <div key={field.key} className={col}>

@@ -14,9 +14,24 @@ export const createRealtorPartnerSchema = z.object({
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined))
     .refine((v) => !v || v.length >= 7, "Phone number is too short."),
-  company: z.string().trim().max(120, "Company is too long.").optional().transform((v) => (v && v !== "" ? v : undefined)),
-  territory: z.string().trim().max(120, "Territory is too long.").optional().transform((v) => (v && v !== "" ? v : undefined)),
-  notes: z.string().trim().max(4000, "Notes are too long.").optional().transform((v) => (v && v !== "" ? v : undefined)),
+  company: z
+    .string()
+    .trim()
+    .max(120, "Company is too long.")
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  territory: z
+    .string()
+    .trim()
+    .max(120, "Territory is too long.")
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  notes: z
+    .string()
+    .trim()
+    .max(4000, "Notes are too long.")
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
 });
 
 export function parseCreateRealtorPartnerForm(formData: FormData) {

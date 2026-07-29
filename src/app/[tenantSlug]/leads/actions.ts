@@ -261,7 +261,6 @@ export async function importLeads(
   return { ok: true, count: created.count };
 }
 
-
 // ---------------------------------------------------------------------------
 // SMS a lead via Termii
 // ---------------------------------------------------------------------------
@@ -306,12 +305,7 @@ export async function sendSmsToLead(
   if (!lead.phone) return { ok: false, error: "Lead has no phone number." };
 
   const { sendSms } = await import("@/lib/termii");
-  const result = await sendSms(
-    lead.phone,
-    message,
-    apiKey,
-    tenant.settings?.termiiSenderId ?? "Realcorp",
-  );
+  const result = await sendSms(lead.phone, message, apiKey, tenant.settings?.termiiSenderId ?? "Realcorp");
   if (!result.ok) return { ok: false, error: result.error };
 
   // Log as an activity

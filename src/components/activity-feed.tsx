@@ -45,9 +45,9 @@ const TYPE_LABELS: Record<ActivityType, string> = {
 };
 
 const STATUS_STYLE: Record<ActivityStatus, string> = {
-  DONE: "bg-green-500/10 text-green-700 border border-green-500/20",
-  PENDING: "bg-amber-500/10 text-amber-700 border border-amber-500/20",
-  OVERDUE: "bg-red-500/10 text-red-700 border border-red-500/20",
+  DONE: "bg-[var(--success-wash)] text-[var(--success)] border border-[var(--success-line)]",
+  PENDING: "bg-[var(--warn-wash)] text-[var(--warn)] border border-[var(--warn-line)]",
+  OVERDUE: "bg-[var(--danger-wash)] text-[var(--danger)] border border-[var(--danger-line)]",
 };
 
 export function ActivityFeed({
@@ -104,9 +104,7 @@ export function ActivityFeed({
   }
 
   const displayed =
-    typeFilter === "ALL"
-      ? initialActivities
-      : initialActivities.filter((a) => a.type === typeFilter);
+    typeFilter === "ALL" ? initialActivities : initialActivities.filter((a) => a.type === typeFilter);
 
   return (
     <div>
@@ -173,7 +171,9 @@ export function ActivityFeed({
                 <label className="mb-1 block text-xs text-muted">Assign to</label>
                 <UiSelect name="assignedUserId" defaultValue={currentUserId}>
                   {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.label}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.label}
+                    </option>
                   ))}
                 </UiSelect>
               </div>
@@ -245,7 +245,8 @@ export function ActivityFeed({
             const isOwner = activity.createdByUserId === currentUserId;
             const canDelete = isOwner || canManage;
             const isTask = activity.type === ActivityType.TASK;
-            const isPending = activity.status === ActivityStatus.PENDING || activity.status === ActivityStatus.OVERDUE;
+            const isPending =
+              activity.status === ActivityStatus.PENDING || activity.status === ActivityStatus.OVERDUE;
 
             return (
               <div
@@ -259,7 +260,9 @@ export function ActivityFeed({
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-medium text-foreground">{activity.title}</p>
                         {isTask ? (
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[activity.status]}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLE[activity.status]}`}
+                          >
                             {activity.status}
                           </span>
                         ) : null}
@@ -273,7 +276,8 @@ export function ActivityFeed({
                           ? ` · Assigned to ${activity.assignedLabel}`
                           : null}
                         {activity.dueAt ? ` · Due ${new Date(activity.dueAt).toLocaleDateString()}` : null}
-                        {" · "}{new Date(activity.createdAt).toLocaleDateString()}
+                        {" · "}
+                        {new Date(activity.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -282,8 +286,12 @@ export function ActivityFeed({
                       <button
                         type="button"
                         disabled={completingId === activity.id}
-                        onClick={() => startTransition(() => { void handleComplete(activity.id); })}
-                        className="text-[11px] text-green-700 underline decoration-green-400/50 underline-offset-2 disabled:opacity-50"
+                        onClick={() =>
+                          startTransition(() => {
+                            void handleComplete(activity.id);
+                          })
+                        }
+                        className="text-[11px] text-[var(--success)] underline decoration-[var(--success-line)] underline-offset-2 disabled:opacity-50"
                       >
                         {completingId === activity.id ? "…" : "Done"}
                       </button>
@@ -292,7 +300,11 @@ export function ActivityFeed({
                       <button
                         type="button"
                         disabled={deletingId === activity.id}
-                        onClick={() => startTransition(() => { void handleDelete(activity.id); })}
+                        onClick={() =>
+                          startTransition(() => {
+                            void handleDelete(activity.id);
+                          })
+                        }
                         className="text-[11px] text-error underline decoration-error/40 underline-offset-2 disabled:opacity-50"
                       >
                         {deletingId === activity.id ? "…" : "Delete"}

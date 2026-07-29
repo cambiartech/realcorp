@@ -9,7 +9,10 @@ export function sha256Hex(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-export function verifyPortalToken(raw: string | null | undefined, storedHash: string | null | undefined): boolean {
+export function verifyPortalToken(
+  raw: string | null | undefined,
+  storedHash: string | null | undefined,
+): boolean {
   if (!raw || !storedHash) return false;
   const computed = sha256Hex(raw);
   if (computed.length !== storedHash.length || computed.length % 2 !== 0) return false;

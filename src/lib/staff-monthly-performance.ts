@@ -1,8 +1,4 @@
-import {
-  averageConfirmedRatings,
-  averageSelfRatings,
-  parseActionScores,
-} from "@/lib/appraisal-scores";
+import { averageConfirmedRatings, averageSelfRatings, parseActionScores } from "@/lib/appraisal-scores";
 
 export type StaffMonthlyPerformancePeriod = {
   year: number;
@@ -103,11 +99,7 @@ function relativeScore(value: number, teamMax: number): number {
   return Math.round((value / teamMax) * 100);
 }
 
-function computeTasksScore(input: {
-  assigned: number;
-  completed: number;
-  onTime: number;
-}): number {
+function computeTasksScore(input: { assigned: number; completed: number; onTime: number }): number {
   if (input.assigned <= 0 && input.completed <= 0) return 0;
   const assigned = Math.max(input.assigned, input.completed, 1);
   const completionRate = input.completed / assigned;
@@ -179,7 +171,11 @@ export function buildStaffMonthlyPerformance(input: {
     value: unknown;
     updatedAt: Date | string;
   }>;
-  activities: Array<{ assignedUserId: string | null; completedAt: Date | string | null; createdAt: Date | string }>;
+  activities: Array<{
+    assignedUserId: string | null;
+    completedAt: Date | string | null;
+    createdAt: Date | string;
+  }>;
   goals: Array<{ employeeProfileId: string; progressPercent: number; status: string }>;
 }): StaffMonthlyScoreEntry[] {
   const activeProfiles = input.profiles.filter((p) => p.status === "ACTIVE" && p.userId);
@@ -295,10 +291,7 @@ export function buildStaffMonthlyPerformance(input: {
       const actionIds = input.appraisalActionIds;
 
       if (appraisal.status === "REVIEWED") {
-        const rating =
-          appraisal.overallRating ??
-          averageConfirmedRatings(scores, actionIds) ??
-          null;
+        const rating = appraisal.overallRating ?? averageConfirmedRatings(scores, actionIds) ?? null;
         row.appraisalRating = rating;
         row.appraisalScore = ratingToScore(rating);
       } else if (appraisal.status === "SELF_SUBMITTED") {
@@ -331,9 +324,7 @@ export function buildStaffMonthlyPerformance(input: {
       const activeWeight = parts.reduce((sum, p) => sum + (p.value != null ? p.weight : 0), 0);
       const composite =
         activeWeight > 0
-          ? Math.round(
-              parts.reduce((sum, p) => sum + (p.value ?? 0) * p.weight, 0) / activeWeight,
-            )
+          ? Math.round(parts.reduce((sum, p) => sum + (p.value ?? 0) * p.weight, 0) / activeWeight)
           : Math.round(row.tasksScore * weights.tasks + row.departmentKpiScore * weights.departmentKpi);
 
       return {

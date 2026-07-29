@@ -21,11 +21,7 @@ type TenantPageShellProps = {
 export function TenantPageShell({ children, width = "default", className = "" }: TenantPageShellProps) {
   return (
     <div
-      className={[
-        "w-full px-4 py-6 sm:px-6 sm:py-8",
-        WIDTH_CLASS[width],
-        className,
-      ]
+      className={["w-full px-4 py-6 sm:px-6 sm:py-8", WIDTH_CLASS[width], className]
         .filter(Boolean)
         .join(" ")}
     >

@@ -61,14 +61,21 @@ export function PaymentReceiptPrintView({
           { label: "Payment mode", value: paymentMode },
           { label: "Reference", value: reference },
           { label: "Recorded by", value: recordedBy },
-          ...(invoiceBalanceLabel ? [{ label: "Invoice balance remaining", value: invoiceBalanceLabel }] : []),
+          ...(invoiceBalanceLabel
+            ? [{ label: "Invoice balance remaining", value: invoiceBalanceLabel }]
+            : []),
         ]}
       />
 
       {attachmentUrl ? (
         <p className="mt-4 text-sm text-neutral-600">
           Attachment:{" "}
-          <a href={attachmentUrl} target="_blank" rel="noreferrer" className="font-medium text-neutral-900 underline">
+          <a
+            href={attachmentUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-neutral-900 underline"
+          >
             {attachmentName || "View attachment"}
           </a>
         </p>

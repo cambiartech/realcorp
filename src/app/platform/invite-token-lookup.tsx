@@ -21,8 +21,8 @@ export function InviteTokenLookup() {
     <section className="rounded-lg border border-foreground/10 p-5">
       <h2 className="text-base font-semibold text-foreground">Investigate a broken link</h2>
       <p className="mt-1 text-sm text-muted">
-        Paste the token from a failed URL (everything after <code className="text-xs">?token=</code>) to see why it
-        failed.
+        Paste the token from a failed URL (everything after <code className="text-xs">?token=</code>) to see
+        why it failed.
       </p>
       <form onSubmit={handleLookup} className="mt-4 flex flex-wrap gap-2">
         <input

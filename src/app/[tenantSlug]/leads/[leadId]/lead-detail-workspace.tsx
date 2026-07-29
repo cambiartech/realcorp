@@ -1,7 +1,14 @@
 "use client";
 
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { LeadQuality } from "@/generated/prisma";
@@ -65,13 +72,17 @@ type WhatsAppRow = {
 function WaStatusTicks({ status }: { status: string | null }) {
   if (!status) return null;
   if (status === "failed") {
-    return <span className="font-medium text-red-600" title="Failed to deliver">Failed</span>;
+    return (
+      <span className="font-medium text-[var(--danger)]" title="Failed to deliver">
+        Failed
+      </span>
+    );
   }
   const double = status === "delivered" || status === "read";
   const read = status === "read";
   return (
     <span
-      className={read ? "text-sky-500" : "text-muted"}
+      className={read ? "text-[var(--info)]" : "text-muted"}
       title={status === "sent" ? "Sent" : status === "delivered" ? "Delivered" : "Read"}
       aria-label={status}
     >
@@ -114,9 +125,9 @@ function ScorePill({ score }: { score: number }) {
   const hot = score >= 70;
   const warm = score >= 40;
   const cls = hot
-    ? "bg-red-500/10 text-red-600 ring-1 ring-red-400/40"
+    ? "bg-[var(--danger-wash)] text-[var(--danger)] ring-1 ring-[var(--danger-line)]"
     : warm
-      ? "bg-amber-400/10 text-amber-600 ring-1 ring-amber-400/40"
+      ? "bg-[var(--warn-wash)] text-[var(--warn)] ring-1 ring-[var(--warn-line)]"
       : "bg-foreground/5 text-muted ring-1 ring-foreground/10";
   const emoji = hot ? "🔥" : warm ? "☀" : "❄";
   return (
@@ -130,15 +141,15 @@ function ScorePill({ score }: { score: number }) {
 }
 
 const QUALITY_STYLES: Record<string, string> = {
-  HOT: "bg-red-500/15 text-red-600 border border-red-500/30",
-  WARM: "bg-amber-500/15 text-amber-600 border border-amber-500/30",
-  COLD: "bg-sky-500/15 text-sky-600 border border-sky-500/30",
+  HOT: "bg-[var(--danger-wash)] text-[var(--danger)] border border-[var(--danger-line)]",
+  WARM: "bg-[var(--warn-wash)] text-[var(--warn)] border border-[var(--warn-line)]",
+  COLD: "bg-[var(--info-wash)] text-[var(--info)] border border-[var(--info-line)]",
 };
 
 const STAGE_STYLES: Record<string, string> = {
-  CLOSED_WON: "text-green-600",
-  CLOSED_LOST: "text-red-500",
-  RESERVATION_MADE: "text-amber-600",
+  CLOSED_WON: "text-[var(--success)]",
+  CLOSED_LOST: "text-[var(--danger)]",
+  RESERVATION_MADE: "text-[var(--warn)]",
 };
 
 export function LeadDetailWorkspace({
@@ -169,10 +180,7 @@ export function LeadDetailWorkspace({
   const [isEditing, setIsEditing] = useState(false);
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
   const [waMessage, setWaMessage] = useState("");
-  const [state, formAction, pending] = useActionState(
-    updateLead.bind(null, tenantSlug, lead.id),
-    initial,
-  );
+  const [state, formAction, pending] = useActionState(updateLead.bind(null, tenantSlug, lead.id), initial);
   const [waState, waAction, waPending] = useActionState(
     sendWhatsAppToLead.bind(null, tenantSlug, lead.id),
     initial,
@@ -203,7 +211,8 @@ export function LeadDetailWorkspace({
     }
   }, [waState, showSnackbar]);
 
-  const qualityStyle = QUALITY_STYLES[lead.quality] ?? "bg-foreground/10 text-foreground border border-foreground/15";
+  const qualityStyle =
+    QUALITY_STYLES[lead.quality] ?? "bg-foreground/10 text-foreground border border-foreground/15";
   const waTemplates = buildWhatsAppTemplates(lead);
 
   return (
@@ -215,7 +224,13 @@ export function LeadDetailWorkspace({
             href={`/${tenantSlug}/leads`}
             className="mb-2 inline-flex items-center gap-1 text-xs text-muted hover:text-foreground"
           >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M15 6l-6 6 6 6" />
             </svg>
             Back to leads
@@ -228,8 +243,8 @@ export function LeadDetailWorkspace({
             <ScorePill score={lead.score} />
           </div>
           <p className="mt-0.5 text-sm text-muted">
-            {lead.source ? `Source: ${lead.source}` : "No source"} ·{" "}
-            {lead.ownerLabel} · Added {lead.createdAt.slice(0, 10)}
+            {lead.source ? `Source: ${lead.source}` : "No source"} · {lead.ownerLabel} · Added{" "}
+            {lead.createdAt.slice(0, 10)}
             {lead.lastActivityAt ? ` · Last activity ${lead.lastActivityAt}` : ""}
           </p>
         </div>
@@ -238,7 +253,7 @@ export function LeadDetailWorkspace({
             <button
               type="button"
               onClick={() => setIsWhatsAppOpen(true)}
-              className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-500/15"
+              className="rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] px-4 py-2 text-sm font-medium text-[var(--success)] hover:bg-[var(--success-wash)]"
             >
               WhatsApp
             </button>
@@ -267,8 +282,16 @@ export function LeadDetailWorkspace({
           <section className="rounded-lg border border-foreground/10 bg-foreground/[0.015] p-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">Contact</p>
             <dl className="space-y-2 text-sm">
-              <DetailRow label="Email" value={lead.email} href={lead.email ? `mailto:${lead.email}` : undefined} />
-              <DetailRow label="Phone" value={lead.phone} href={lead.phone ? `tel:${lead.phone}` : undefined} />
+              <DetailRow
+                label="Email"
+                value={lead.email}
+                href={lead.email ? `mailto:${lead.email}` : undefined}
+              />
+              <DetailRow
+                label="Phone"
+                value={lead.phone}
+                href={lead.phone ? `tel:${lead.phone}` : undefined}
+              />
               <DetailRow label="Budget" value={lead.budgetRange} />
               <DetailRow label="Project interest" value={lead.projectInterest} />
               <DetailRow label="Campaign" value={lead.campaignName} />
@@ -276,9 +299,11 @@ export function LeadDetailWorkspace({
             </dl>
           </section>
 
-          {(lead.utmSource || lead.utmMedium || lead.utmCampaign || lead.utmContent || lead.utmTerm) ? (
+          {lead.utmSource || lead.utmMedium || lead.utmCampaign || lead.utmContent || lead.utmTerm ? (
             <section className="rounded-lg border border-foreground/10 bg-foreground/[0.015] p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">UTM tracking</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">
+                UTM tracking
+              </p>
               <dl className="space-y-2 text-sm">
                 <DetailRow label="utm_source" value={lead.utmSource} mono />
                 <DetailRow label="utm_medium" value={lead.utmMedium} mono />
@@ -291,7 +316,9 @@ export function LeadDetailWorkspace({
 
           {lead.notes ? (
             <section className="rounded-lg border border-foreground/10 bg-foreground/[0.015] p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">Form responses</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">
+                Form responses
+              </p>
               <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">{lead.notes}</pre>
             </section>
           ) : null}
@@ -306,17 +333,25 @@ export function LeadDetailWorkspace({
             {deals.length === 0 ? (
               <div className="rounded-lg border border-foreground/10 p-6 text-center text-sm text-muted">
                 No deals yet.{" "}
-                <Link href={`/${tenantSlug}/deals?leadId=${lead.id}`} className="underline decoration-foreground/30 hover:text-foreground">
+                <Link
+                  href={`/${tenantSlug}/deals?leadId=${lead.id}`}
+                  className="underline decoration-foreground/30 hover:text-foreground"
+                >
                   Convert this lead to a deal.
                 </Link>
               </div>
             ) : (
               <div className="divide-y divide-foreground/10 overflow-hidden rounded-lg border border-foreground/10">
                 {deals.map((deal) => (
-                  <div key={deal.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-foreground/[0.02]">
+                  <div
+                    key={deal.id}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-foreground/[0.02]"
+                  >
                     <div>
                       <p className="text-sm font-medium text-foreground">{deal.unitLabel}</p>
-                      <p className="mt-0.5 text-xs text-muted">{deal.projectName} · {deal.ownerLabel} · {deal.createdAt}</p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {deal.projectName} · {deal.ownerLabel} · {deal.createdAt}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <span className={`font-medium ${STAGE_STYLES[deal.stageValue] ?? "text-foreground"}`}>
@@ -352,7 +387,7 @@ export function LeadDetailWorkspace({
                     return (
                       <div
                         key={msg.id}
-                        className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${inbound ? "mr-auto bg-foreground/[0.06]" : "ml-auto bg-emerald-500/10"}`}
+                        className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${inbound ? "mr-auto bg-foreground/[0.06]" : "ml-auto bg-[var(--success-wash)]"}`}
                       >
                         <p className="whitespace-pre-wrap text-foreground">{msg.body}</p>
                         <p className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
@@ -368,9 +403,7 @@ export function LeadDetailWorkspace({
               )}
             </div>
 
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">
-              Activity feed
-            </p>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted">Activity feed</p>
             <ActivityFeed
               tenantSlug={tenantSlug}
               entityType="LEAD"
@@ -385,207 +418,247 @@ export function LeadDetailWorkspace({
       </div>
 
       {/* Edit modal */}
-      <ModalOverlay open={Boolean(isEditing)} onClose={() => setIsEditing(false)} panelClassName={MODAL_PANEL_MD}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Edit lead</h2>
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+      <ModalOverlay
+        open={Boolean(isEditing)}
+        onClose={() => setIsEditing(false)}
+        panelClassName={MODAL_PANEL_MD}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Edit lead</h2>
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <form ref={formRef} action={formAction} className="mt-4 space-y-3">
+          {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="edit-lead-name" className="mb-1 block text-xs text-muted">
+                Name *
+              </label>
+              <input
+                id="edit-lead-name"
+                name="name"
+                defaultValue={lead.name}
+                required
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
             </div>
+            <div>
+              <label htmlFor="edit-lead-phone" className="mb-1 block text-xs text-muted">
+                Phone
+              </label>
+              <input
+                id="edit-lead-phone"
+                name="phone"
+                defaultValue={lead.phone ?? ""}
+                placeholder="+234..."
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-lead-email" className="mb-1 block text-xs text-muted">
+                Email
+              </label>
+              <input
+                id="edit-lead-email"
+                name="email"
+                type="email"
+                defaultValue={lead.email ?? ""}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-lead-budget" className="mb-1 block text-xs text-muted">
+                Budget range
+              </label>
+              <input
+                id="edit-lead-budget"
+                name="budgetRange"
+                defaultValue={lead.budgetRange ?? ""}
+                placeholder="e.g. ₦30–50M"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+            </div>
+          </div>
 
-            <form ref={formRef} action={formAction} className="mt-4 space-y-3">
-              {state && !state.ok ? <FormAlert>{state.error}</FormAlert> : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="edit-lead-source" className="mb-1 block text-xs text-muted">
+                Source
+              </label>
+              <UiSelect id="edit-lead-source" name="source" defaultValue={lead.source ?? ""}>
+                <option value="">— Select source —</option>
+                {sourceOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label htmlFor="edit-lead-quality" className="mb-1 block text-xs text-muted">
+                Quality
+              </label>
+              <UiSelect id="edit-lead-quality" name="quality" defaultValue={lead.quality}>
+                <option value={LeadQuality.HOT}>Hot</option>
+                <option value={LeadQuality.WARM}>Warm</option>
+                <option value={LeadQuality.COLD}>Cold</option>
+              </UiSelect>
+            </div>
+            <div>
+              <label htmlFor="edit-lead-project" className="mb-1 block text-xs text-muted">
+                Project interest
+              </label>
+              <UiSelect
+                id="edit-lead-project"
+                name="projectInterest"
+                defaultValue={lead.projectInterest ?? ""}
+              >
+                <option value="">— None —</option>
+                {projectOptions.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label htmlFor="edit-lead-owner" className="mb-1 block text-xs text-muted">
+                Assigned owner
+              </label>
+              <UiSelect id="edit-lead-owner" name="assignedUserId" defaultValue={lead.assignedUserId ?? ""}>
+                <option value="">Unassigned</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label htmlFor="edit-lead-campaign" className="mb-1 block text-xs text-muted">
+                Campaign
+              </label>
+              <UiSelect id="edit-lead-campaign" name="campaignId" defaultValue={lead.campaignId ?? ""}>
+                <option value="">— None —</option>
+                {campaignOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="edit-lead-name" className="mb-1 block text-xs text-muted">Name *</label>
-                  <input
-                    id="edit-lead-name"
-                    name="name"
-                    defaultValue={lead.name}
-                    required
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="edit-lead-phone" className="mb-1 block text-xs text-muted">Phone</label>
-                  <input
-                    id="edit-lead-phone"
-                    name="phone"
-                    defaultValue={lead.phone ?? ""}
-                    placeholder="+234..."
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="edit-lead-email" className="mb-1 block text-xs text-muted">Email</label>
-                  <input
-                    id="edit-lead-email"
-                    name="email"
-                    type="email"
-                    defaultValue={lead.email ?? ""}
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="edit-lead-budget" className="mb-1 block text-xs text-muted">Budget range</label>
-                  <input
-                    id="edit-lead-budget"
-                    name="budgetRange"
-                    defaultValue={lead.budgetRange ?? ""}
-                    placeholder="e.g. ₦30–50M"
-                    className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="edit-lead-source" className="mb-1 block text-xs text-muted">Source</label>
-                  <UiSelect id="edit-lead-source" name="source" defaultValue={lead.source ?? ""}>
-                    <option value="">— Select source —</option>
-                    {sourceOptions.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label htmlFor="edit-lead-quality" className="mb-1 block text-xs text-muted">Quality</label>
-                  <UiSelect id="edit-lead-quality" name="quality" defaultValue={lead.quality}>
-                    <option value={LeadQuality.HOT}>Hot</option>
-                    <option value={LeadQuality.WARM}>Warm</option>
-                    <option value={LeadQuality.COLD}>Cold</option>
-                  </UiSelect>
-                </div>
-                <div>
-                  <label htmlFor="edit-lead-project" className="mb-1 block text-xs text-muted">Project interest</label>
-                  <UiSelect id="edit-lead-project" name="projectInterest" defaultValue={lead.projectInterest ?? ""}>
-                    <option value="">— None —</option>
-                    {projectOptions.map((p) => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label htmlFor="edit-lead-owner" className="mb-1 block text-xs text-muted">Assigned owner</label>
-                  <UiSelect id="edit-lead-owner" name="assignedUserId" defaultValue={lead.assignedUserId ?? ""}>
-                    <option value="">Unassigned</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.label}</option>
-                    ))}
-                  </UiSelect>
-                </div>
-                <div>
-                  <label htmlFor="edit-lead-campaign" className="mb-1 block text-xs text-muted">Campaign</label>
-                  <UiSelect id="edit-lead-campaign" name="campaignId" defaultValue={lead.campaignId ?? ""}>
-                    <option value="">— None —</option>
-                    {campaignOptions.map((c) => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
-                    ))}
-                  </UiSelect>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
-                >
-                  {pending ? <ButtonSpinner /> : null}
-                  {pending ? "Saving…" : "Save changes"}
-                </button>
-              </div>
-            </form>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
       {/* WhatsApp modal */}
-      <ModalOverlay open={Boolean(isWhatsAppOpen)} onClose={() => setIsWhatsAppOpen(false)} panelClassName={MODAL_PANEL_MD}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Send WhatsApp message</h2>
-              <button
-                type="button"
-                onClick={() => setIsWhatsAppOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
+      <ModalOverlay
+        open={Boolean(isWhatsAppOpen)}
+        onClose={() => setIsWhatsAppOpen(false)}
+        panelClassName={MODAL_PANEL_MD}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Send WhatsApp message</h2>
+          <button
+            type="button"
+            onClick={() => setIsWhatsAppOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
 
-            <p className="mt-1 text-sm text-muted">
-              Sending to <span className="font-medium text-foreground">{lead.phone}</span>
-            </p>
+        <p className="mt-1 text-sm text-muted">
+          Sending to <span className="font-medium text-foreground">{lead.phone}</span>
+        </p>
 
-            <form ref={waFormRef} action={waAction} className="mt-4 space-y-3">
-              {waState && !waState.ok ? <FormAlert>{waState.error}</FormAlert> : null}
+        <form ref={waFormRef} action={waAction} className="mt-4 space-y-3">
+          {waState && !waState.ok ? <FormAlert>{waState.error}</FormAlert> : null}
 
-              <div>
-                <p className="mb-2 text-xs text-muted">Quick templates</p>
-                <div className="flex flex-wrap gap-2">
-                  {waTemplates.map((template) => (
-                    <button
-                      key={template.id}
-                      type="button"
-                      onClick={() => setWaMessage(template.body)}
-                      className="rounded-full border border-foreground/15 px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.06]"
-                    >
-                      {template.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="wa-message" className="mb-1 block text-xs text-muted">Message *</label>
-                <textarea
-                  id="wa-message"
-                  name="message"
-                  value={waMessage}
-                  onChange={(e) => setWaMessage(e.target.value)}
-                  required
-                  rows={5}
-                  placeholder={`Hi ${lead.name}, just following up on your property interest.`}
-                  className="w-full resize-y border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
+          <div>
+            <p className="mb-2 text-xs text-muted">Quick templates</p>
+            <div className="flex flex-wrap gap-2">
+              {waTemplates.map((template) => (
                 <button
+                  key={template.id}
                   type="button"
-                  onClick={() => setIsWhatsAppOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+                  onClick={() => setWaMessage(template.body)}
+                  className="rounded-full border border-foreground/15 px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.06]"
                 >
-                  Cancel
+                  {template.label}
                 </button>
-                <button
-                  type="submit"
-                  disabled={waPending}
-                  aria-busy={waPending}
-                  className="inline-flex items-center gap-2 rounded-md border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  {waPending ? <ButtonSpinner /> : null}
-                  {waPending ? "Sending…" : "Send WhatsApp"}
-                </button>
-              </div>
-            </form>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="wa-message" className="mb-1 block text-xs text-muted">
+              Message *
+            </label>
+            <textarea
+              id="wa-message"
+              name="message"
+              value={waMessage}
+              onChange={(e) => setWaMessage(e.target.value)}
+              required
+              rows={5}
+              placeholder={`Hi ${lead.name}, just following up on your property interest.`}
+              className="w-full resize-y border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsWhatsAppOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={waPending}
+              aria-busy={waPending}
+              className="inline-flex items-center gap-2 rounded-md border border-[var(--success-line)] bg-[var(--success)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {waPending ? <ButtonSpinner /> : null}
+              {waPending ? "Sending…" : "Send WhatsApp"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
     </div>
   );

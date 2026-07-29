@@ -41,7 +41,9 @@ export function groupGoalsByDepartment(
   const summaries: DepartmentGoalsSummary[] = [];
   for (const [department, deptGoals] of byDept) {
     const profileIds = new Set(deptGoals.map((g) => g.employeeProfileId));
-    const completedCount = deptGoals.filter((g) => g.status === "COMPLETED" || g.progressPercent >= 100).length;
+    const completedCount = deptGoals.filter(
+      (g) => g.status === "COMPLETED" || g.progressPercent >= 100,
+    ).length;
     const avgProgress =
       deptGoals.length > 0
         ? Math.round(deptGoals.reduce((s, g) => s + g.progressPercent, 0) / deptGoals.length)

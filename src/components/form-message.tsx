@@ -3,13 +3,7 @@
  * Tokens: globals.css :root / .dark → --error, --error-bg, --error-border
  */
 
-export function FormFieldError({
-  id,
-  children,
-}: {
-  id?: string;
-  children: React.ReactNode;
-}) {
+export function FormFieldError({ id, children }: { id?: string; children: React.ReactNode }) {
   return (
     <p id={id} role="alert" className="mt-1.5 text-sm font-medium text-error">
       {children}

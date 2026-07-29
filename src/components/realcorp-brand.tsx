@@ -1,9 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 
+/**
+ * Mark B — the R knocked out of an ink tile with a copper leg.
+ * Masters and every export live in /public/brand; the previous dot-matrix
+ * mark is still on disk at /mark-dark.svg and /mark-light.svg if we need it.
+ */
 const MARK = {
-  light: "/mark-dark.svg",
-  dark: "/mark-light.svg",
+  light: "/brand/svg/mark-ink.svg", // dark mark, for light surfaces
+  dark: "/brand/svg/mark-light.svg", // light mark, for dark surfaces
 } as const;
 
 export function RealcorpMark({
@@ -49,7 +54,9 @@ export function RealcorpLogoLink({
       <RealcorpMark variant={variant} size={32} className="h-8 w-8" />
       {showWordmark ? (
         <span className="min-w-0">
-          <span className="block text-sm font-bold tracking-tight text-foreground group-hover:opacity-90">Realcorp</span>
+          <span className="block text-sm font-bold tracking-tight text-foreground group-hover:opacity-90">
+            Realcorp
+          </span>
           {subtitle ? <span className="block truncate text-xs text-muted">{subtitle}</span> : null}
         </span>
       ) : null}
@@ -101,7 +108,9 @@ export function RealcorpHeroLogo({
           <RealcorpMark variant="dark" size={80} className="mx-auto hidden h-20 w-20 dark:block" />
         </>
       )}
-      <p className="mt-5 text-center font-serif text-3xl font-semibold tracking-tight text-foreground">Realcorp</p>
+      <p className="mt-5 text-center font-serif text-3xl font-semibold tracking-tight text-foreground">
+        Realcorp
+      </p>
     </div>
   );
 }

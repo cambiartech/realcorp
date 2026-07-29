@@ -14,13 +14,18 @@ export const DEFAULT_SHORTLET_PMS_SETTINGS: ShortletPmsSettings = {
   financeSync: false,
 };
 
-export function parseShortletPmsSettings(raw: {
-  shortletCheckInTime?: string | null;
-  shortletCheckOutTime?: string | null;
-  shortletEodTime?: string | null;
-  shortletCheckoutAlertHours?: number | null;
-  shortletFinanceSync?: boolean | null;
-} | null | undefined): ShortletPmsSettings {
+export function parseShortletPmsSettings(
+  raw:
+    | {
+        shortletCheckInTime?: string | null;
+        shortletCheckOutTime?: string | null;
+        shortletEodTime?: string | null;
+        shortletCheckoutAlertHours?: number | null;
+        shortletFinanceSync?: boolean | null;
+      }
+    | null
+    | undefined,
+): ShortletPmsSettings {
   return {
     checkInTime: raw?.shortletCheckInTime?.trim() || DEFAULT_SHORTLET_PMS_SETTINGS.checkInTime,
     checkOutTime: raw?.shortletCheckOutTime?.trim() || DEFAULT_SHORTLET_PMS_SETTINGS.checkOutTime,
@@ -39,7 +44,12 @@ export function parseTimeToMinutes(time: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
-export function isCheckoutDueSoon(checkOut: Date, checkOutTime: string, alertHours: number, now = new Date()): boolean {
+export function isCheckoutDueSoon(
+  checkOut: Date,
+  checkOutTime: string,
+  alertHours: number,
+  now = new Date(),
+): boolean {
   const due = new Date(checkOut);
   const mins = parseTimeToMinutes(checkOutTime);
   due.setHours(Math.floor(mins / 60), mins % 60, 0, 0);

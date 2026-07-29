@@ -6,10 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ProfileComplianceChecklist } from "@/components/hr/profile-compliance-checklist";
 import type { ProfileChecklistItem } from "@/lib/hr-profile-checklist";
 import { formDataToEmployeeProfilePayload, type ProfileDetailRow } from "@/lib/hr-profile-form";
-import {
-  type OnboardingStepId,
-  writeStoredOnboardingStep,
-} from "@/lib/hr-onboarding-step";
+import { type OnboardingStepId, writeStoredOnboardingStep } from "@/lib/hr-onboarding-step";
 import { mergeProfileDraftFromForm, profileDraftFingerprint } from "@/lib/hr-onboarding-draft";
 import { OnboardingProfileHiddenFields } from "@/components/hr/onboarding-profile-hidden-fields";
 import { upsertEmployeeProfile } from "@/app/[tenantSlug]/hr/actions";
@@ -112,7 +109,7 @@ export function HrOnboardingWizard({
   }
 
   return (
-    <div className="rounded-xl border border-violet-500/25 bg-violet-500/[0.03] p-4 sm:p-5">
+    <div className="rounded-xl border border-[var(--accent-line)] bg-[var(--accent)]/[0.03] p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-foreground">Onboarding wizard</p>
@@ -133,7 +130,11 @@ export function HrOnboardingWizard({
             onClick={() => goToStep(s.id)}
             className={[
               "flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition",
-              step === s.id ? "bg-foreground text-background" : i < stepIndex ? "bg-emerald-500/15 text-emerald-800" : "bg-foreground/10 text-muted hover:bg-foreground/15",
+              step === s.id
+                ? "bg-foreground text-background"
+                : i < stepIndex
+                  ? "bg-[var(--success-wash)] text-[var(--success)]"
+                  : "bg-foreground/10 text-muted hover:bg-foreground/15",
             ].join(" ")}
           >
             <span>{i + 1}</span>
@@ -142,7 +143,11 @@ export function HrOnboardingWizard({
         ))}
       </div>
 
-      {error ? <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-800">{error}</p> : null}
+      {error ? (
+        <p className="mb-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-xs text-[var(--danger)]">
+          {error}
+        </p>
+      ) : null}
 
       {step === "personal" ? (
         <form
@@ -155,12 +160,24 @@ export function HrOnboardingWizard({
           <input type="hidden" name="status" value="DRAFT" />
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-xs font-medium">Full name *</span>
-            <input name="fullName" required defaultValue={draft.fullName || memberName} className={inputClass} />
+            <input
+              name="fullName"
+              required
+              defaultValue={draft.fullName || memberName}
+              className={inputClass}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Job title</span>
-            <input name="position" defaultValue={draft.position} placeholder="e.g. Sales Manager" className={inputClass} />
-            <span className="mt-1 block text-[11px] text-muted">Payroll title — separate from their Team app role.</span>
+            <input
+              name="position"
+              defaultValue={draft.position}
+              placeholder="e.g. Sales Manager"
+              className={inputClass}
+            />
+            <span className="mt-1 block text-[11px] text-muted">
+              Payroll title — separate from their Team app role.
+            </span>
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Department</span>
@@ -168,11 +185,20 @@ export function HrOnboardingWizard({
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Date of joining</span>
-            <input name="dateOfJoining" type="date" defaultValue={draft.dateOfJoining} className={inputClass} />
+            <input
+              name="dateOfJoining"
+              type="date"
+              defaultValue={draft.dateOfJoining}
+              className={inputClass}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Employment type</span>
-            <input name="employmentType" defaultValue={draft.employmentType || "Full-Time"} className={inputClass} />
+            <input
+              name="employmentType"
+              defaultValue={draft.employmentType || "Full-Time"}
+              className={inputClass}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Mobile phone</span>
@@ -180,11 +206,23 @@ export function HrOnboardingWizard({
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Work email</span>
-            <input name="workEmail" type="email" defaultValue={draft.workEmail || memberEmail} className={inputClass} />
+            <input
+              name="workEmail"
+              type="email"
+              defaultValue={draft.workEmail || memberEmail}
+              className={inputClass}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Monthly gross ({currency})</span>
-            <input name="grossMonthly" type="number" min={0} step={0.01} defaultValue={draft.grossMonthly} className={inputClass} />
+            <input
+              name="grossMonthly"
+              type="number"
+              min={0}
+              step={0.01}
+              defaultValue={draft.grossMonthly}
+              className={inputClass}
+            />
           </label>
         </form>
       ) : null}
@@ -199,7 +237,11 @@ export function HrOnboardingWizard({
           <OnboardingProfileHiddenFields draft={{ ...draft, status: "DRAFT" }} statusOverride="DRAFT" />
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Account holder</span>
-            <input name="bankAccountHolderName" defaultValue={draft.bankAccountHolderName || draft.fullName} className={inputClass} />
+            <input
+              name="bankAccountHolderName"
+              defaultValue={draft.bankAccountHolderName || draft.fullName}
+              className={inputClass}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Bank name</span>
@@ -215,7 +257,12 @@ export function HrOnboardingWizard({
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Emergency phone</span>
-            <input name="emergencyPhone" type="tel" defaultValue={draft.emergencyPhone} className={inputClass} />
+            <input
+              name="emergencyPhone"
+              type="tel"
+              defaultValue={draft.emergencyPhone}
+              className={inputClass}
+            />
           </label>
         </form>
       ) : null}
@@ -247,9 +294,13 @@ export function HrOnboardingWizard({
       {step === "activate" ? (
         <div className="space-y-3 text-sm">
           <p className="text-foreground">
-            Mark <strong>{draft.fullName || memberName}</strong> as <strong>Active</strong> when onboarding is complete. They can then receive payslips and appraisals.
+            Mark <strong>{draft.fullName || memberName}</strong> as <strong>Active</strong> when onboarding is
+            complete. They can then receive payslips and appraisals.
           </p>
-          <p className="text-xs text-muted">Checklist: {checklistPercent}% complete. You can activate even if some items are pending and finish later.</p>
+          <p className="text-xs text-muted">
+            Checklist: {checklistPercent}% complete. You can activate even if some items are pending and
+            finish later.
+          </p>
           <form id="onboard-activate" onSubmit={(e) => e.preventDefault()}>
             <OnboardingProfileHiddenFields draft={draft} statusOverride="ACTIVE" />
             <input type="hidden" name="bankAccountHolderName" value={draft.bankAccountHolderName} />
@@ -277,7 +328,8 @@ export function HrOnboardingWizard({
             disabled={pending}
             aria-busy={pending}
             onClick={async () => {
-              const formId = step === "personal" ? "onboard-personal" : step === "bank" ? "onboard-bank" : null;
+              const formId =
+                step === "personal" ? "onboard-personal" : step === "bank" ? "onboard-bank" : null;
               if (formId) {
                 const form = document.getElementById(formId) as HTMLFormElement | null;
                 if (form && !(await saveForm(form))) return;
@@ -300,7 +352,7 @@ export function HrOnboardingWizard({
               if (form && !(await saveForm(form, "ACTIVE"))) return;
               onComplete();
             }}
-            className="inline-flex items-center gap-1 rounded-md border border-emerald-600 bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--success-line)] bg-[var(--success)] px-4 py-1.5 text-xs font-semibold text-white"
           >
             {pending ? <InlineSpinner /> : null}
             {pending ? "Activating…" : "Activate employee"}

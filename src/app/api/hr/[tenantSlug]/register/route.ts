@@ -11,10 +11,7 @@ function bankField(bank: unknown, key: string): string {
   return typeof v === "string" ? v : "";
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

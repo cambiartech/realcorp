@@ -110,8 +110,7 @@ export default async function ProjectUnitsPage({
         statusValue: unit.status,
         pricingPlanId: unit.pricingPlanId,
         pricingPlanName: unit.pricingPlan?.name ?? "No plan",
-        canDelete:
-          !unit.deal?.id && unit.status !== "RESERVED" && unit.status !== "SOLD",
+        canDelete: !unit.deal?.id && unit.status !== "RESERVED" && unit.status !== "SOLD",
         canReserve: !unit.deal?.id && unit.status === "AVAILABLE",
         canUnreserve: unit.status === "RESERVED",
       }))}

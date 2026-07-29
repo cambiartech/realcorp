@@ -2,7 +2,11 @@ import { LeadQuality } from "@/generated/prisma";
 import { z } from "zod";
 
 export const createLeadSchema = z.object({
-  name: z.string().trim().min(2, "Lead name must be at least 2 characters.").max(120, "Lead name is too long."),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Lead name must be at least 2 characters.")
+    .max(120, "Lead name is too long."),
   email: z
     .string()
     .trim()

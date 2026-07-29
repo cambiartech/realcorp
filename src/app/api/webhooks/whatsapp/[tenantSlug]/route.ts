@@ -3,10 +3,7 @@ import { phoneVariants, canonicalPhone } from "@/lib/phone";
 import { handleBotMessage } from "@/lib/whatsapp-bot";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const url = new URL(req.url);
   const mode = url.searchParams.get("hub.mode");
@@ -92,10 +89,7 @@ const TRACKED_STATUSES = new Set(["sent", "delivered", "read", "failed"]);
 /** Never downgrade a status (e.g. read -> delivered when events arrive out of order). */
 const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 4 };
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ tenantSlug: string }> },
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   let body: unknown;
   try {
@@ -201,9 +195,8 @@ export async function POST(
           body: bodyText,
           timestamp: msg.timestamp ? new Date(Number(msg.timestamp) * 1000) : new Date(),
           profileName,
-          text: msg.type === "text" || !msg.type ? (msg.text?.body?.trim() || null) : null,
-          interactiveReplyId:
-            msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id ?? null,
+          text: msg.type === "text" || !msg.type ? msg.text?.body?.trim() || null : null,
+          interactiveReplyId: msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id ?? null,
         });
       }
     }

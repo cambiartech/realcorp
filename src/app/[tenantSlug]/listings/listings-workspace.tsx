@@ -56,13 +56,15 @@ export function ListingsWorkspace({ tenantSlug, canManage, projects }: Props) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={project.coverImageUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-muted">No cover image</div>
+                  <div className="flex h-full items-center justify-center text-xs text-muted">
+                    No cover image
+                  </div>
                 )}
                 <span
                   className={[
                     "absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                     project.isPublished
-                      ? "bg-emerald-600 text-white"
+                      ? "bg-[var(--success)] text-white"
                       : "bg-foreground/70 text-background",
                   ].join(" ")}
                 >

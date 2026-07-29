@@ -104,8 +104,7 @@ export default async function TenantSettingsPage({
     ? "Platform Admin"
     : formatEnumLabel(membership?.role ?? "SALES_EXECUTIVE");
 
-  const canManageOrg =
-    Boolean(session.user.isPlatformAdmin) || membership?.role === MembershipRole.ORG_ADMIN;
+  const canManageOrg = Boolean(session.user.isPlatformAdmin) || membership?.role === MembershipRole.ORG_ADMIN;
 
   const workspaceMeta = {
     slug: tenant.slug,
@@ -181,7 +180,9 @@ export default async function TenantSettingsPage({
             logoUrl: tenant.settings?.logoUrl ?? null,
             financeBankAccounts: (tenant.settings?.financeBankAccounts as string[] | null | undefined) ?? [],
             financePaymentModes: (tenant.settings?.financePaymentModes as string[] | null | undefined) ?? [],
-            financeCurrencies: (tenant.settings?.financeCurrencies as string[] | null | undefined) ?? [tenant.defaultCurrency],
+            financeCurrencies: (tenant.settings?.financeCurrencies as string[] | null | undefined) ?? [
+              tenant.defaultCurrency,
+            ],
           }}
         />
       </div>

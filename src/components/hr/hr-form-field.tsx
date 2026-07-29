@@ -6,7 +6,14 @@ export const HR_FIELD_CLASS =
 export function HrFieldChevron() {
   return (
     <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-500">
-      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <svg
+        viewBox="0 0 20 20"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        aria-hidden
+      >
         <path d="M5 7.5l5 5 5-5" />
       </svg>
     </span>
@@ -65,7 +72,7 @@ export function HrFormField({
     <label className={`block text-sm ${className ?? ""}`}>
       <span className="mb-1 block font-medium text-slate-700">
         {label}
-        {required ? <span className="text-red-600"> *</span> : null}
+        {required ? <span className="text-[var(--danger)]"> *</span> : null}
       </span>
       {children ?? (
         <input

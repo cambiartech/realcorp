@@ -71,8 +71,12 @@ const fmtDay = (d: Date) => new Intl.DateTimeFormat("en-NG", { dateStyle: "mediu
 
 export function buildNightAuditSnapshot(input: BuildNightAuditInput): NightAuditSnapshot {
   const { currency, businessDate, units, reservations, dayPayments, dayFolioLines } = input;
-  const hk = countByHousekeepingStatus(units.map((u) => ({ housekeepingStatus: u.housekeepingStatus as never })));
-  const occupancy = computeOccupancyPercent(units.map((u) => ({ housekeepingStatus: u.housekeepingStatus as never })));
+  const hk = countByHousekeepingStatus(
+    units.map((u) => ({ housekeepingStatus: u.housekeepingStatus as never })),
+  );
+  const occupancy = computeOccupancyPercent(
+    units.map((u) => ({ housekeepingStatus: u.housekeepingStatus as never })),
+  );
   const adr = computeAdr(
     reservations.map((r) => ({
       status: r.status as never,

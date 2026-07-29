@@ -44,14 +44,19 @@ export async function ensureBundleTokensForPendingRequests(requests: RequestRow[
 
 /** If this request belongs to a multi-form group, ensure bundle token exists and return it. */
 export async function resolveBundleTokenForFormRequest(
-  req: Pick<HrFormRequest, "id" | "token" | "tenantId" | "employeeProfileId" | "recipientEmail" | "bundleToken">,
+  req: Pick<
+    HrFormRequest,
+    "id" | "token" | "tenantId" | "employeeProfileId" | "recipientEmail" | "bundleToken"
+  >,
 ): Promise<string | null> {
   if (req.bundleToken) return req.bundleToken;
 
   const key = hrFormRequestGroupKey(req);
   if (!key) return null;
 
-  const or: Array<{ employeeProfileId: string } | { recipientEmail: { equals: string; mode: "insensitive" } }> = [];
+  const or: Array<
+    { employeeProfileId: string } | { recipientEmail: { equals: string; mode: "insensitive" } }
+  > = [];
   if (req.employeeProfileId) or.push({ employeeProfileId: req.employeeProfileId });
   const email = req.recipientEmail?.trim();
   if (email) or.push({ recipientEmail: { equals: email, mode: "insensitive" } });

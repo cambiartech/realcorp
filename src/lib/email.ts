@@ -44,7 +44,10 @@ export async function sendInviteEmail(input: {
 }) {
   const resend = getResendClient();
   if (!resend) {
-    return { ok: false as const, error: "RESEND_API_KEY is missing or invalid. Use your real key starting with re_." };
+    return {
+      ok: false as const,
+      error: "RESEND_API_KEY is missing or invalid. Use your real key starting with re_.",
+    };
   }
 
   const from = `${getFromName()} <${getFromAddress()}>`;
@@ -145,10 +148,7 @@ export async function sendSalesReceiptEmail(input: {
   }
 }
 
-function paymentBlockHtml(input: {
-  bankAccountLines: string[];
-  customPaymentInstructions?: string | null;
-}) {
+function paymentBlockHtml(input: { bankAccountLines: string[]; customPaymentInstructions?: string | null }) {
   const banks = parseBankAccounts(input.bankAccountLines);
   if (banks.length > 0) {
     return `<div style="margin-top:12px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#333">Pay into:</p>${formatBankAccountsForHtml(banks)}</div>`;

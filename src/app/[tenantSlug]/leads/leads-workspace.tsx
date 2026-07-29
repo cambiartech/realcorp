@@ -1,7 +1,14 @@
 "use client";
 
 import { ModalOverlay } from "@/components/modal-overlay";
-import { MODAL_PANEL_LG, MODAL_PANEL_MD, MODAL_PANEL_SM, MODAL_PANEL_XL, MODAL_PANEL_XS, MODAL_PANEL_2XL } from "@/lib/modal-panel";
+import {
+  MODAL_PANEL_LG,
+  MODAL_PANEL_MD,
+  MODAL_PANEL_SM,
+  MODAL_PANEL_XL,
+  MODAL_PANEL_XS,
+  MODAL_PANEL_2XL,
+} from "@/lib/modal-panel";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
@@ -31,13 +38,15 @@ function ScoreBadge({ score }: { score: number }) {
   const hot = score >= 70;
   const warm = score >= 40;
   const ring = hot
-    ? "bg-red-500/10 text-red-600 ring-1 ring-red-400/40"
+    ? "bg-[var(--danger-wash)] text-[var(--danger)] ring-1 ring-[var(--danger-line)]"
     : warm
-      ? "bg-amber-400/10 text-amber-600 ring-1 ring-amber-400/40"
+      ? "bg-[var(--warn-wash)] text-[var(--warn)] ring-1 ring-[var(--warn-line)]"
       : "bg-foreground/5 text-muted ring-1 ring-foreground/10";
   const label = hot ? "🔥" : warm ? "☀" : "❄";
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${ring}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${ring}`}
+    >
       {label} {score}
     </span>
   );
@@ -147,7 +156,7 @@ export function LeadsWorkspace({
               ))}
               <Link
                 href={`/${tenantSlug}/leads`}
-                className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2"
+                className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
               >
                 Clear filters
               </Link>
@@ -171,23 +180,23 @@ export function LeadsWorkspace({
             ]}
             breakdowns={[{ title: "Leads by source", rows: sourceBreakdown }]}
           />
-        {canCreate ? (
-          <>
-            <Link
-              href={`/${tenantSlug}/leads/import`}
-              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
-            >
-              Import CSV
-            </Link>
-            <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-            >
-              New lead
-            </button>
-          </>
-        ) : null}
+          {canCreate ? (
+            <>
+              <Link
+                href={`/${tenantSlug}/leads/import`}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+              >
+                Import CSV
+              </Link>
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(true)}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+              >
+                New lead
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -218,11 +227,11 @@ export function LeadsWorkspace({
 
       {/* Hot leads priority band */}
       {leads.some((l) => l.score >= 70) && (
-        <div className="mt-5 rounded-lg border border-red-400/30 bg-red-500/5 p-4">
+        <div className="mt-5 rounded-lg border border-[var(--danger-line)] bg-[var(--danger-wash)] p-4">
           <div className="mb-3 flex items-center gap-2">
             <span className="text-base">🔥</span>
-            <span className="text-sm font-semibold text-red-600">Hot leads — act now</span>
-            <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600">
+            <span className="text-sm font-semibold text-[var(--danger)]">Hot leads — act now</span>
+            <span className="rounded-full bg-[var(--danger-wash)] px-2 py-0.5 text-xs font-medium text-[var(--danger)]">
               {leads.filter((l) => l.score >= 70).length}
             </span>
           </div>
@@ -234,7 +243,7 @@ export function LeadsWorkspace({
                 <Link
                   key={lead.id}
                   href={`/${tenantSlug}/leads/${lead.id}`}
-                  className="flex items-center gap-2 rounded-lg border border-red-400/25 bg-background px-3 py-2 text-sm shadow-sm hover:border-red-400/50 hover:shadow-md"
+                  className="flex items-center gap-2 rounded-lg border border-[var(--danger-line)] bg-background px-3 py-2 text-sm shadow-sm hover:border-[var(--danger-line)] hover:shadow-md"
                 >
                   <span className="font-medium text-foreground">{lead.name}</span>
                   <ScoreBadge score={lead.score} />
@@ -270,12 +279,15 @@ export function LeadsWorkspace({
               </tr>
             ) : (
               leads.map((lead) => (
-                <tr key={lead.id} className={lead.score >= 70 ? "bg-red-500/[0.02]" : ""}>
+                <tr key={lead.id} className={lead.score >= 70 ? "bg-[var(--danger)]/[0.02]" : ""}>
                   <td className="px-4 py-3">
                     <ScoreBadge score={lead.score} />
                   </td>
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <Link href={`/${tenantSlug}/leads/${lead.id}`} className="hover:underline hover:decoration-foreground/30">
+                    <Link
+                      href={`/${tenantSlug}/leads/${lead.id}`}
+                      className="hover:underline hover:decoration-foreground/30"
+                    >
                       {lead.name}
                     </Link>
                   </td>
@@ -312,177 +324,173 @@ export function LeadsWorkspace({
         </table>
       </div>
 
-      <ModalOverlay open={Boolean(isCreateOpen)} onClose={() => setIsCreateOpen(false)} panelClassName={MODAL_PANEL_LG}>
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Create lead</h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                aria-label="Close modal"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+      <ModalOverlay
+        open={Boolean(isCreateOpen)}
+        onClose={() => setIsCreateOpen(false)}
+        panelClassName={MODAL_PANEL_LG}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Create lead</h2>
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <form ref={formRef} action={formAction} className="mt-4 grid gap-3 sm:grid-cols-2">
+          {state && !state.ok ? (
+            <div className="sm:col-span-2">
+              <FormAlert>{state.error}</FormAlert>
             </div>
+          ) : null}
 
-            <form ref={formRef} action={formAction} className="mt-4 grid gap-3 sm:grid-cols-2">
-              {state && !state.ok ? (
-                <div className="sm:col-span-2">
-                  <FormAlert>{state.error}</FormAlert>
-                </div>
-              ) : null}
+          <div className="sm:col-span-2">
+            <label htmlFor="lead-name" className="mb-1 block text-sm text-muted">
+              Lead name
+            </label>
+            <input
+              id="lead-name"
+              name="name"
+              required
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
 
-              <div className="sm:col-span-2">
-                <label htmlFor="lead-name" className="mb-1 block text-sm text-muted">
-                  Lead name
-                </label>
-                <input
-                  id="lead-name"
-                  name="name"
-                  required
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
+          <div>
+            <label htmlFor="lead-email" className="mb-1 block text-sm text-muted">
+              Email
+            </label>
+            <input
+              id="lead-email"
+              name="email"
+              type="text"
+              inputMode="email"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div>
+            <label htmlFor="lead-phone" className="mb-1 block text-sm text-muted">
+              Phone
+            </label>
+            <input
+              id="lead-phone"
+              name="phone"
+              type="text"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
 
-              <div>
-                <label htmlFor="lead-email" className="mb-1 block text-sm text-muted">
-                  Email
-                </label>
-                <input
-                  id="lead-email"
-                  name="email"
-                  type="text"
-                  inputMode="email"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
-              <div>
-                <label htmlFor="lead-phone" className="mb-1 block text-sm text-muted">
-                  Phone
-                </label>
-                <input
-                  id="lead-phone"
-                  name="phone"
-                  type="text"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
+          <div>
+            <label htmlFor="lead-source" className="mb-1 block text-sm text-muted">
+              Source
+            </label>
+            <UiSelect id="lead-source" name="source" defaultValue={sourceOptions[0] ?? ""}>
+              {sourceOptions.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label htmlFor="lead-campaign-record" className="mb-1 block text-sm text-muted">
+              Link to campaign
+            </label>
+            <UiSelect id="lead-campaign-record" name="campaignId" defaultValue="">
+              <option value="">None</option>
+              {campaignOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label htmlFor="lead-campaign" className="mb-1 block text-sm text-muted">
+              Campaign name (free text)
+            </label>
+            <input
+              id="lead-campaign"
+              name="campaignName"
+              placeholder="e.g. Rio Q2"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
 
-              <div>
-                <label htmlFor="lead-source" className="mb-1 block text-sm text-muted">
-                  Source
-                </label>
-                <UiSelect
-                  id="lead-source"
-                  name="source"
-                  defaultValue={sourceOptions[0] ?? ""}
-                >
-                  {sourceOptions.map((source) => (
-                    <option key={source} value={source}>
-                      {source}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="lead-campaign-record" className="mb-1 block text-sm text-muted">
-                  Link to campaign
-                </label>
-                <UiSelect id="lead-campaign-record" name="campaignId" defaultValue="">
-                  <option value="">None</option>
-                  {campaignOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="lead-campaign" className="mb-1 block text-sm text-muted">
-                  Campaign name (free text)
-                </label>
-                <input
-                  id="lead-campaign"
-                  name="campaignName"
-                  placeholder="e.g. Rio Q2"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
+          <div>
+            <label htmlFor="lead-project-interest" className="mb-1 block text-sm text-muted">
+              Project interest
+            </label>
+            <UiSelect id="lead-project-interest" name="projectInterest" defaultValue="">
+              <option value="">Not specified</option>
+              {projectOptions.map((project) => (
+                <option key={project.id} value={project.name}>
+                  {project.name}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div>
+            <label htmlFor="lead-budget" className="mb-1 block text-sm text-muted">
+              Budget range
+            </label>
+            <input
+              id="lead-budget"
+              name="budgetRange"
+              placeholder="e.g. NGN 50m - 80m"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
 
-              <div>
-                <label htmlFor="lead-project-interest" className="mb-1 block text-sm text-muted">
-                  Project interest
-                </label>
-                <UiSelect
-                  id="lead-project-interest"
-                  name="projectInterest"
-                  defaultValue=""
-                >
-                  <option value="">Not specified</option>
-                  {projectOptions.map((project) => (
-                    <option key={project.id} value={project.name}>
-                      {project.name}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="lead-budget" className="mb-1 block text-sm text-muted">
-                  Budget range
-                </label>
-                <input
-                  id="lead-budget"
-                  name="budgetRange"
-                  placeholder="e.g. NGN 50m - 80m"
-                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
-              </div>
+          <div>
+            <label htmlFor="lead-quality" className="mb-1 block text-sm text-muted">
+              Quality
+            </label>
+            <UiSelect id="lead-quality" name="quality" defaultValue={LeadQuality.WARM}>
+              <option value={LeadQuality.HOT}>Hot</option>
+              <option value={LeadQuality.WARM}>Warm</option>
+              <option value={LeadQuality.COLD}>Cold</option>
+            </UiSelect>
+          </div>
+          <div>
+            <label htmlFor="lead-owner" className="mb-1 block text-sm text-muted">
+              Assign owner
+            </label>
+            <UiSelect id="lead-owner" name="assignedUserId" defaultValue="">
+              <option value="">Unassigned</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.label}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
 
-              <div>
-                <label htmlFor="lead-quality" className="mb-1 block text-sm text-muted">
-                  Quality
-                </label>
-                <UiSelect id="lead-quality" name="quality" defaultValue={LeadQuality.WARM}>
-                  <option value={LeadQuality.HOT}>Hot</option>
-                  <option value={LeadQuality.WARM}>Warm</option>
-                  <option value={LeadQuality.COLD}>Cold</option>
-                </UiSelect>
-              </div>
-              <div>
-                <label htmlFor="lead-owner" className="mb-1 block text-sm text-muted">
-                  Assign owner
-                </label>
-                <UiSelect id="lead-owner" name="assignedUserId" defaultValue="">
-                  <option value="">Unassigned</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.label}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
-
-              <div className="sm:col-span-2 flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  aria-busy={pending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {pending ? <ButtonSpinner /> : null}
-                  {pending ? "Creating..." : "Create lead"}
-                </button>
-              </div>
-            </form>
+          <div className="sm:col-span-2 flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : null}
+              {pending ? "Creating..." : "Create lead"}
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
     </div>
   );

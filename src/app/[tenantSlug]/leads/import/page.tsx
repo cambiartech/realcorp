@@ -7,11 +7,7 @@ import { LeadImportWorkspace } from "./import-workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeadImportPage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function LeadImportPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) notFound();
@@ -40,8 +36,7 @@ export default async function LeadImportPage({
   });
   assertTenantNavAccess(session, membership, tenant.settings, "leads");
 
-  const canImport =
-    Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;
+  const canImport = Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;
   if (!canImport) notFound();
 
   return <LeadImportWorkspace tenantSlug={tenant.slug} />;

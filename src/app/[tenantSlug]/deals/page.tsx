@@ -12,7 +12,13 @@ export default async function DealsPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ leadId?: string; owner?: string; stage?: string; projectId?: string; view?: string }>;
+  searchParams: Promise<{
+    leadId?: string;
+    owner?: string;
+    stage?: string;
+    projectId?: string;
+    view?: string;
+  }>;
 }) {
   const { tenantSlug } = await params;
   const { leadId, owner, stage, projectId, view } = await searchParams;
@@ -46,7 +52,9 @@ export default async function DealsPage({
   const allowed = Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;
   if (!allowed) notFound();
 
-  const parsedStage = Object.values(DealStage).includes((stage || "") as DealStage) ? (stage as DealStage) : undefined;
+  const parsedStage = Object.values(DealStage).includes((stage || "") as DealStage)
+    ? (stage as DealStage)
+    : undefined;
 
   const [deals, leads, users, units, projects] = await Promise.all([
     prisma.deal.findMany({
@@ -65,7 +73,9 @@ export default async function DealsPage({
       orderBy: { createdAt: "desc" },
       include: {
         lead: { select: { id: true, name: true, score: true } },
-        unit: { select: { id: true, label: true, projectId: true, project: { select: { id: true, name: true } } } },
+        unit: {
+          select: { id: true, label: true, projectId: true, project: { select: { id: true, name: true } } },
+        },
       },
       take: 500,
     }),

@@ -13,11 +13,7 @@ import { PortalWorkspace } from "./portal-workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function StakeholderPortalPage({
-  params,
-}: {
-  params: Promise<{ tenantSlug: string }>;
-}) {
+export default async function StakeholderPortalPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
   const session = await auth();
   if (!session?.user?.id) notFound();
@@ -52,26 +48,25 @@ export default async function StakeholderPortalPage({
     select: { role: true, status: true },
   });
 
-  const isAdminViewer =
-    Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";
+  const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";
   if (!isAdminViewer) {
     assertTenantNavAccess(session, membership, tenant.settings, "portal");
   }
 
   const [portfolio, shortletPortfolio, discoverListings, allOrganizations, brand, investorContact] =
     await Promise.all([
-    loadStakeholderPortfolio(tenant.id, session.user.id),
-    tenant.settings?.moduleShortLets
-      ? loadInvestorShortletPortfolio(tenant.id, session.user.id)
-      : Promise.resolve({ units: [], totals: { currency: "NGN", collected: 0, earnings: 0, units: 0 } }),
-    loadPortalDiscoverListings(tenant.slug, session.user.id),
-    loadInvestorOrganizations(session.user.id),
-    loadPublicListingBrand(tenant.slug),
-    prisma.propertyClient.findFirst({
-      where: { tenantId: tenant.id, userId: session.user.id },
-      select: { fullName: true, email: true, phone: true, alternatePhone: true },
-    }),
-  ]);
+      loadStakeholderPortfolio(tenant.id, session.user.id),
+      tenant.settings?.moduleShortLets
+        ? loadInvestorShortletPortfolio(tenant.id, session.user.id)
+        : Promise.resolve({ units: [], totals: { currency: "NGN", collected: 0, earnings: 0, units: 0 } }),
+      loadPortalDiscoverListings(tenant.slug, session.user.id),
+      loadInvestorOrganizations(session.user.id),
+      loadPublicListingBrand(tenant.slug),
+      prisma.propertyClient.findFirst({
+        where: { tenantId: tenant.id, userId: session.user.id },
+        select: { fullName: true, email: true, phone: true, alternatePhone: true },
+      }),
+    ]);
 
   const contact = {
     name: investorContact?.fullName || session.user.name || session.user.email?.split("@")[0] || "Investor",

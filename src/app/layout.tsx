@@ -14,15 +14,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://realcorp.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://realcoerp.com"),
   title: {
     default: "Realcorp",
     template: "%s · Realcorp",
   },
-  description: "Multi-tenant CRM & ERP for real corporations — sales, finance, inventory, and people on one platform.",
+  description:
+    "Multi-tenant CRM & ERP for real corporations — sales, finance, inventory, and people on one platform.",
   icons: {
-    icon: [{ url: "/fav.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/fav.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/brand/svg/mark-ink.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   applicationName: "Realcorp",
 };

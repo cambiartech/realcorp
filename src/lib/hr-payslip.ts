@@ -47,9 +47,7 @@ export function calculateNigeriaPayslip(input: {
 
   const pensionDeduction = round2(bht * pensionRate);
   const payeeTax =
-    input.payeeTax !== undefined && input.payeeTax >= 0
-      ? round2(input.payeeTax)
-      : round2(gross * 0.0998);
+    input.payeeTax !== undefined && input.payeeTax >= 0 ? round2(input.payeeTax) : round2(gross * 0.0998);
   const otherDeductions = round2(Math.max(0, input.otherDeductions ?? 0));
   const netPay = round2(gross - payeeTax - pensionDeduction - otherDeductions);
 
@@ -63,7 +61,11 @@ export function calculateNigeriaPayslip(input: {
     ],
     deductions: [
       { code: "PAYEE", label: "Payee (tax)", amount: payeeTax },
-      { code: "PENSION", label: `Pension (${(pensionRate * 100).toFixed(0)}% of Basic+Housing+Transport)`, amount: pensionDeduction },
+      {
+        code: "PENSION",
+        label: `Pension (${(pensionRate * 100).toFixed(0)}% of Basic+Housing+Transport)`,
+        amount: pensionDeduction,
+      },
       ...(otherDeductions > 0 ? [{ code: "OTHER", label: "Other deductions", amount: otherDeductions }] : []),
     ],
     payeeTax,

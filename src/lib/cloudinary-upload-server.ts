@@ -1,7 +1,11 @@
 import "server-only";
 
 import { buildCloudinaryAttachmentSignature } from "@/lib/cloudinary";
-import { getPlatformCloudinaryConfig, tenantCloudinaryFolder, type CloudinaryArea } from "@/lib/cloudinary-config";
+import {
+  getPlatformCloudinaryConfig,
+  tenantCloudinaryFolder,
+  type CloudinaryArea,
+} from "@/lib/cloudinary-config";
 import {
   CLOUDINARY_SETUP_MESSAGE,
   type CloudinaryUploadError,
@@ -12,10 +16,9 @@ import prisma from "@/lib/db";
 export type { CloudinaryUploadError, CloudinaryUploadSignature };
 export { CLOUDINARY_SETUP_MESSAGE };
 
-export async function resolveCloudinaryCredentials(tenantId: string): Promise<
-  | { cloudName: string; apiKey: string; apiSecret: string; source: "platform" | "tenant" }
-  | null
-> {
+export async function resolveCloudinaryCredentials(
+  tenantId: string,
+): Promise<{ cloudName: string; apiKey: string; apiSecret: string; source: "platform" | "tenant" } | null> {
   const platform = getPlatformCloudinaryConfig();
   if (platform) {
     return {
@@ -52,12 +55,14 @@ export async function resolveCloudinaryCredentials(tenantId: string): Promise<
 }
 
 function safeUploadBasename(fileName?: string, fallback = "file") {
-  return (fileName || fallback)
-    .toLowerCase()
-    .replace(/\.[^/.]+$/, "")
-    .replace(/[^a-z0-9-_]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50) || fallback;
+  return (
+    (fileName || fallback)
+      .toLowerCase()
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[^a-z0-9-_]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 50) || fallback
+  );
 }
 
 export async function createTenantUploadSignature(input: {
@@ -76,10 +81,12 @@ export async function createTenantUploadSignature(input: {
   const folder =
     creds.source === "platform"
       ? tenantCloudinaryFolder(input.tenantSlug, input.area)
-      : (await prisma.tenantSettings.findUnique({
-          where: { tenantId: input.tenantId },
-          select: { cloudinaryFolder: true },
-        }))?.cloudinaryFolder?.trim() || `realcorp/${input.area}`;
+      : (
+          await prisma.tenantSettings.findUnique({
+            where: { tenantId: input.tenantId },
+            select: { cloudinaryFolder: true },
+          })
+        )?.cloudinaryFolder?.trim() || `realcorp/${input.area}`;
 
   const safeName = safeUploadBasename(input.fileName);
   const publicId = `${input.publicIdPrefix ?? input.tenantId}/${safeName}-${timestamp}`;
@@ -120,10 +127,12 @@ export async function uploadBufferToCloudinary(input: {
   const folder =
     creds.source === "platform"
       ? tenantCloudinaryFolder(input.tenantSlug, input.area)
-      : (await prisma.tenantSettings.findUnique({
-          where: { tenantId: input.tenantId },
-          select: { cloudinaryFolder: true },
-        }))?.cloudinaryFolder?.trim() || `realcorp/${input.area}`;
+      : (
+          await prisma.tenantSettings.findUnique({
+            where: { tenantId: input.tenantId },
+            select: { cloudinaryFolder: true },
+          })
+        )?.cloudinaryFolder?.trim() || `realcorp/${input.area}`;
 
   const safeName = safeUploadBasename(input.fileName, "document");
   const publicId = `${input.tenantId}/${safeName}-${timestamp}`;
@@ -146,7 +155,11 @@ export async function uploadBufferToCloudinary(input: {
 
   try {
     const response = await fetch(uploadUrl, { method: "POST", body });
-    const json = (await response.json()) as { secure_url?: string; public_id?: string; error?: { message?: string } };
+    const json = (await response.json()) as {
+      secure_url?: string;
+      public_id?: string;
+      error?: { message?: string };
+    };
     if (!response.ok || !json.secure_url) {
       return { ok: false, error: json.error?.message || "File upload failed." };
     }

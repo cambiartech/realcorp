@@ -37,7 +37,9 @@ export function OfferLetterEditor({
   const [signUrl, setSignUrl] = useState(initialSignUrl ?? "");
   const [pending, setPending] = useState(false);
   const [aiPending, setAiPending] = useState(false);
-  const [aiInstruction, setAiInstruction] = useState("Make tone warmer and keep all salary figures unchanged.");
+  const [aiInstruction, setAiInstruction] = useState(
+    "Make tone warmer and keep all salary figures unchanged.",
+  );
 
   useEffect(() => {
     if (seeded.current || !editorRef.current) return;
@@ -46,7 +48,10 @@ export function OfferLetterEditor({
   }, [initialHtml, fields, brand.companyName]);
 
   const readHtml = useCallback(
-    () => sanitizeOfferLetterHtml(editorRef.current?.innerHTML || defaultOfferLetterHtml(fields, brand.companyName)),
+    () =>
+      sanitizeOfferLetterHtml(
+        editorRef.current?.innerHTML || defaultOfferLetterHtml(fields, brand.companyName),
+      ),
     [fields, brand.companyName],
   );
 
@@ -103,7 +108,10 @@ export function OfferLetterEditor({
       });
       const data = (await res.json()) as { html?: string; error?: string };
       if (!res.ok || !data.html) {
-        showSnackbar(data.error || "AI edit unavailable. Add GEMINI_API_KEY or GROQ_API_KEY to .env.local.", "error");
+        showSnackbar(
+          data.error || "AI edit unavailable. Add GEMINI_API_KEY or GROQ_API_KEY to .env.local.",
+          "error",
+        );
         return;
       }
       const cleaned = sanitizeOfferLetterHtml(data.html);
@@ -154,7 +162,7 @@ export function OfferLetterEditor({
           <button
             type="button"
             onClick={() => void navigator.clipboard.writeText(signUrl)}
-            className="rounded-md border border-emerald-600/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-900"
+            className="rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] px-3 py-1.5 text-xs font-semibold text-[var(--success)]"
           >
             Copy sign link
           </button>
@@ -166,7 +174,8 @@ export function OfferLetterEditor({
           <p className="text-xs font-semibold text-foreground">Edit letter · AI assist (optional)</p>
           <p className="mt-1 text-[11px] text-muted">
             Click the letter body to edit text for this employee only. AI uses Gemini or Groq free tier when{" "}
-            <code className="text-xs">GEMINI_API_KEY</code> or <code className="text-xs">GROQ_API_KEY</code> is set.
+            <code className="text-xs">GEMINI_API_KEY</code> or <code className="text-xs">GROQ_API_KEY</code>{" "}
+            is set.
           </p>
           <textarea
             value={aiInstruction}
@@ -197,21 +206,29 @@ export function OfferLetterEditor({
           suppressContentEditableWarning
           className={[
             "min-h-[12rem] space-y-3 text-sm leading-relaxed text-slate-800 outline-none",
-            editable ? "rounded-md ring-1 ring-transparent focus:ring-[var(--hr-brand-accent)]/40 print:ring-0" : "",
+            editable
+              ? "rounded-md ring-1 ring-transparent focus:ring-[var(--hr-brand-accent)]/40 print:ring-0"
+              : "",
           ].join(" ")}
         />
 
         {status === "SIGNED" ? (
-          <p className="mt-6 text-xs font-semibold text-emerald-700">This offer has been signed online.</p>
+          <p className="mt-6 text-xs font-semibold text-[var(--success)]">
+            This offer has been signed online.
+          </p>
         ) : (
           <div className="mt-10 grid gap-8 border-t border-slate-200 pt-6 sm:grid-cols-2 print:mt-16">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Candidate acceptance</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Candidate acceptance
+              </p>
               <div className="mt-4 min-h-[4rem] rounded border border-dashed border-slate-300 bg-slate-50/50" />
               <p className="mt-2 text-xs text-slate-600">Candidate signs via the link you send</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">For {brand.companyName}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                For {brand.companyName}
+              </p>
               <div className="mt-8 border-b border-slate-400" />
               <p className="mt-2 text-xs text-slate-600">Authorized signatory</p>
             </div>

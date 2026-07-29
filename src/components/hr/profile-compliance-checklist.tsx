@@ -34,13 +34,16 @@ export function ProfileComplianceChecklist({
         <span className="text-xs font-medium text-muted">{percent}% complete</span>
       </div>
       <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-foreground/10">
-        <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${percent}%` }} />
+        <div
+          className="h-full rounded-full bg-[var(--success)] transition-all"
+          style={{ width: `${percent}%` }}
+        />
       </div>
       <ul className="space-y-2">
         {items.map((item) => (
           <li key={item.id} className="flex gap-2 text-sm">
             {item.done ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--success)]" />
             ) : (
               <Circle className="h-4 w-4 shrink-0 text-muted" />
             )}
@@ -72,13 +75,25 @@ export function ProfileComplianceChecklist({
                 Send all forms at once (biodata, bank, guarantor, health)
               </button>
             ) : null}
-            <button type="button" onClick={() => onSendForm("BIODATA")} className="text-xs font-semibold text-foreground underline">
+            <button
+              type="button"
+              onClick={() => onSendForm("BIODATA")}
+              className="text-xs font-semibold text-foreground underline"
+            >
               Send biodata form
             </button>
-            <button type="button" onClick={() => onSendForm("BANK_FORM")} className="text-xs font-semibold text-foreground underline">
+            <button
+              type="button"
+              onClick={() => onSendForm("BANK_FORM")}
+              className="text-xs font-semibold text-foreground underline"
+            >
               Send bank form
             </button>
-            <button type="button" onClick={() => onSendForm("GUARANTOR")} className="text-xs font-semibold text-foreground underline">
+            <button
+              type="button"
+              onClick={() => onSendForm("GUARANTOR")}
+              className="text-xs font-semibold text-foreground underline"
+            >
               Send guarantor form
             </button>
           </>
@@ -92,12 +107,17 @@ export function ProfileComplianceChecklist({
             Upload signed NDA / documents (for this employee) →
           </button>
         ) : (
-          <Link href={`/${tenantSlug}/hr/documents`} className="text-xs font-semibold text-foreground underline">
+          <Link
+            href={`/${tenantSlug}/hr/documents`}
+            className="text-xs font-semibold text-foreground underline"
+          >
             Upload signed NDA / documents →
           </Link>
         )}
         {!nda?.done || !guarantor?.done ? (
-          <p className="text-[10px] text-muted">Upload signed NDA and guarantor under Documents after the employee returns them.</p>
+          <p className="text-[10px] text-muted">
+            Upload signed NDA and guarantor under Documents after the employee returns them.
+          </p>
         ) : null}
       </div>
     </div>

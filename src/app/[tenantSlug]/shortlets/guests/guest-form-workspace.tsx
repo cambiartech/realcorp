@@ -102,10 +102,13 @@ export function GuestFormWorkspace({ tenantSlug, mode, guestId, initial, returnT
   return (
     <div className="space-y-6">
       <div>
-        <Link href={backHref} className="text-sm text-muted hover:text-foreground">← Back</Link>
+        <Link href={backHref} className="text-sm text-muted hover:text-foreground">
+          ← Back
+        </Link>
         <h2 className="mt-2 text-xl font-bold">{mode === "create" ? "Add guest" : "Edit guest"}</h2>
         <p className="mt-1 text-sm text-muted">
-          Short-let guest profile — separate from sales clients. Reusable for repeat bookings and future marketplace listings.
+          Short-let guest profile — separate from sales clients. Reusable for repeat bookings and future
+          marketplace listings.
         </p>
       </div>
 
@@ -116,38 +119,69 @@ export function GuestFormWorkspace({ tenantSlug, mode, guestId, initial, returnT
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-muted">
                 First name *
-                <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} required />
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={form.firstName}
+                  onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                  required
+                />
               </label>
               <label className="block text-sm text-muted">
                 Last name
-                <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={form.lastName}
+                  onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                />
               </label>
               <label className="block text-sm text-muted">
                 Email
-                <input type="email" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                <input
+                  type="email"
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                />
               </label>
               <label className="block text-sm text-muted">
                 Phone
-                <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm" placeholder="+234 xxx xxx xxxx" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="+234 xxx xxx xxxx"
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                />
               </label>
             </div>
           </section>
 
           <section className="rounded-lg border border-foreground/10 p-4">
             <h3 className="font-semibold">Identification (KYC)</h3>
-            <p className="mt-1 text-xs text-muted">Optional — useful for check-in compliance and damage claims.</p>
+            <p className="mt-1 text-xs text-muted">
+              Optional — useful for check-in compliance and damage claims.
+            </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="block text-sm text-muted">
                 ID type
-                <UiSelect className="mt-1" value={form.idType} onChange={(e) => setForm((f) => ({ ...f, idType: e.target.value }))}>
+                <UiSelect
+                  className="mt-1"
+                  value={form.idType}
+                  onChange={(e) => setForm((f) => ({ ...f, idType: e.target.value }))}
+                >
                   {ID_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
                   ))}
                 </UiSelect>
               </label>
               <label className="block text-sm text-muted">
                 ID number
-                <input className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={form.idNumber} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} />
+                <input
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={form.idNumber}
+                  onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))}
+                />
               </label>
             </div>
             <div className="mt-3">
@@ -167,7 +201,9 @@ export function GuestFormWorkspace({ tenantSlug, mode, guestId, initial, returnT
                   />
                 </label>
                 {form.idDocumentUrl ? (
-                  <a href={form.idDocumentUrl} target="_blank" rel="noreferrer" className="text-sm underline">View uploaded ID</a>
+                  <a href={form.idDocumentUrl} target="_blank" rel="noreferrer" className="text-sm underline">
+                    View uploaded ID
+                  </a>
                 ) : (
                   <span className="text-xs text-muted">JPG, PNG, or PDF (max 5MB)</span>
                 )}
@@ -178,11 +214,32 @@ export function GuestFormWorkspace({ tenantSlug, mode, guestId, initial, returnT
           <section className="rounded-lg border border-foreground/10 p-4">
             <h3 className="font-semibold">Address</h3>
             <div className="mt-4 space-y-3">
-              <textarea className="w-full rounded-md border px-3 py-2 text-sm" rows={2} placeholder="Street address" value={form.addressLine} onChange={(e) => setForm((f) => ({ ...f, addressLine: e.target.value }))} />
+              <textarea
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                rows={2}
+                placeholder="Street address"
+                value={form.addressLine}
+                onChange={(e) => setForm((f) => ({ ...f, addressLine: e.target.value }))}
+              />
               <div className="grid gap-3 sm:grid-cols-3">
-                <input className="rounded-md border px-3 py-2 text-sm" placeholder="City" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
-                <input className="rounded-md border px-3 py-2 text-sm" placeholder="State" value={form.state} onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))} />
-                <input className="rounded-md border px-3 py-2 text-sm" placeholder="Country" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} />
+                <input
+                  className="rounded-md border px-3 py-2 text-sm"
+                  placeholder="City"
+                  value={form.city}
+                  onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                />
+                <input
+                  className="rounded-md border px-3 py-2 text-sm"
+                  placeholder="State"
+                  value={form.state}
+                  onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
+                />
+                <input
+                  className="rounded-md border px-3 py-2 text-sm"
+                  placeholder="Country"
+                  value={form.country}
+                  onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+                />
               </div>
             </div>
           </section>
@@ -192,18 +249,36 @@ export function GuestFormWorkspace({ tenantSlug, mode, guestId, initial, returnT
           <section className="rounded-lg border border-foreground/10 p-4">
             <label className="block text-sm text-muted">
               Guest type
-              <UiSelect className="mt-1" value={form.guestType} onChange={(e) => setForm((f) => ({ ...f, guestType: e.target.value as GuestFormData["guestType"] }))}>
+              <UiSelect
+                className="mt-1"
+                value={form.guestType}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, guestType: e.target.value as GuestFormData["guestType"] }))
+                }
+              >
                 <option value="INDIVIDUAL">Individual</option>
                 <option value="CORPORATE">Corporate</option>
               </UiSelect>
             </label>
-            <textarea className="mt-3 w-full rounded-md border px-3 py-2 text-sm" rows={3} placeholder="Internal notes (optional)" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+            <textarea
+              className="mt-3 w-full rounded-md border px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Internal notes (optional)"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            />
           </section>
           <div className="flex flex-col gap-2">
-            <button type="submit" disabled={isPending || uploading} className="rounded-md bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-50">
+            <button
+              type="submit"
+              disabled={isPending || uploading}
+              className="rounded-md bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-50"
+            >
               {mode === "create" ? "Create guest" : "Save changes"}
             </button>
-            <Link href={backHref} className="text-center text-sm text-muted hover:text-foreground">Cancel</Link>
+            <Link href={backHref} className="text-center text-sm text-muted hover:text-foreground">
+              Cancel
+            </Link>
           </div>
         </div>
       </form>

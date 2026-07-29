@@ -1,5 +1,10 @@
 import { auth } from "@/auth";
-import { CampaignStatus, LeadCaptureSessionStatus, MembershipRole, MembershipStatus } from "@/generated/prisma";
+import {
+  CampaignStatus,
+  LeadCaptureSessionStatus,
+  MembershipRole,
+  MembershipStatus,
+} from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { headers } from "next/headers";
@@ -114,15 +119,13 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
       if (!s.utmSource) continue;
       sourceCounts.set(s.utmSource, (sourceCounts.get(s.utmSource) ?? 0) + 1);
     }
-    const topSource =
-      [...sourceCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const topSource = [...sourceCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     const hourCounts = new Map<number, number>();
     for (const s of formSessions) {
       if (s.localHour == null) continue;
       hourCounts.set(s.localHour, (hourCounts.get(s.localHour) ?? 0) + 1);
     }
-    const peakHour =
-      [...hourCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const peakHour = [...hourCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
     return {
       formId: form.id,

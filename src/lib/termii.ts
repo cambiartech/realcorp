@@ -5,9 +5,7 @@
 
 const TERMII_BASE = "https://api.ng.termii.com/api";
 
-export type TermiiSendResult =
-  | { ok: true; messageId: string }
-  | { ok: false; error: string };
+export type TermiiSendResult = { ok: true; messageId: string } | { ok: false; error: string };
 
 /**
  * Send a single SMS via Termii.

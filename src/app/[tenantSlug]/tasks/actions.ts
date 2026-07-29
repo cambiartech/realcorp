@@ -30,9 +30,7 @@ async function getTenantContext(tenantSlug: string) {
   });
 
   const moduleTasks = tenant.settings?.moduleTasks ?? true;
-  if (
-    !canViewTasksModule(Boolean(session.user.isPlatformAdmin), membership, moduleTasks)
-  ) {
+  if (!canViewTasksModule(Boolean(session.user.isPlatformAdmin), membership, moduleTasks)) {
     return null;
   }
 
@@ -140,8 +138,7 @@ export async function updateWorkTask(
   if (!existing) return { ok: false, error: "Task not found." };
 
   const isOwner =
-    existing.createdByUserId === ctx.session.user.id ||
-    existing.assigneeUserId === ctx.session.user.id;
+    existing.createdByUserId === ctx.session.user.id || existing.assigneeUserId === ctx.session.user.id;
   const isAdmin = Boolean(ctx.session.user.isPlatformAdmin) || ctx.membership?.role === "ORG_ADMIN";
   if (!isOwner && !isAdmin && !canManageTasks(Boolean(ctx.session.user.isPlatformAdmin), ctx.membership)) {
     return { ok: false, error: "You cannot edit this task." };
@@ -180,8 +177,7 @@ export async function deleteWorkTask(tenantSlug: string, taskId: string): Promis
   if (!existing) return { ok: false, error: "Task not found." };
 
   const isOwner =
-    existing.createdByUserId === ctx.session.user.id ||
-    existing.assigneeUserId === ctx.session.user.id;
+    existing.createdByUserId === ctx.session.user.id || existing.assigneeUserId === ctx.session.user.id;
   const isAdmin = Boolean(ctx.session.user.isPlatformAdmin) || ctx.membership?.role === "ORG_ADMIN";
   if (!isOwner && !isAdmin) return { ok: false, error: "You cannot delete this task." };
 

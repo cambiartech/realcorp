@@ -12,7 +12,10 @@ export default async function HrFormPrintPage({ params }: { params: Promise<{ to
   if (!loaded) notFound();
 
   return (
-    <div className="min-h-screen bg-white py-8 px-4 print:py-0 print:px-0" style={brandingCssVars(loaded.brand)}>
+    <div
+      className="min-h-screen bg-white py-8 px-4 print:py-0 print:px-0"
+      style={brandingCssVars(loaded.brand)}
+    >
       <HrPrintToolbar />
       <HrFormPrintDocument
         brand={loaded.brand}

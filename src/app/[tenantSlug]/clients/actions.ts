@@ -441,7 +441,8 @@ export async function sendClientPortalInvite(
 
   if (!tenantRecord) return { ok: false, error: "Organization not found." };
   if (!client) return { ok: false, error: "Client not found." };
-  if (!client.email?.trim()) return { ok: false, error: "Add an email address before sending a portal invite." };
+  if (!client.email?.trim())
+    return { ok: false, error: "Add an email address before sending a portal invite." };
 
   const inviteResult = await sendPropertyClientPortalInvite({
     tenantId: tenantRecord.id,
@@ -630,8 +631,7 @@ export async function importClients(
   tenantSlug: string,
   rows: ImportClientRow[],
 ): Promise<
-  | { ok: true; count: number; unitsLinked: number; unitLinkSkipped: number }
-  | { ok: false; error: string }
+  { ok: true; count: number; unitsLinked: number; unitLinkSkipped: number } | { ok: false; error: string }
 > {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
