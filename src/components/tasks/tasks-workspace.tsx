@@ -8,6 +8,7 @@ import { TenantPageShell } from "@/components/tenant-page-shell";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
 import {
+  MODAL_PANEL_FORM,
   MODAL_PANEL_LG,
   MODAL_PANEL_MD,
   MODAL_PANEL_SM,
@@ -15,6 +16,7 @@ import {
   MODAL_PANEL_XS,
   MODAL_PANEL_2XL,
 } from "@/lib/modal-panel";
+import type { OrgDepartment } from "@/lib/org-membership-profile";
 import {
   createWorkTask,
   createTaskSpace,
@@ -59,6 +61,31 @@ export type WorkTaskRow = {
 };
 
 export type MemberOption = { id: string; label: string };
+
+const DEPT_SPACE_SLUG: Partial<Record<OrgDepartment, string>> = {
+  hr: "people",
+  marketing: "product",
+  operations: "engineering",
+  community: "people",
+};
+
+const DEPT_TASK_LABEL: Record<OrgDepartment, string> = {
+  sales: "Sales task",
+  finance: "Finance task",
+  marketing: "Marketing task",
+  community: "Community task",
+  hr: "People (HR) task",
+  operations: "Operations task",
+};
+
+function defaultSpaceIdForDepartment(spaces: TaskSpaceRow[], department: OrgDepartment | null | undefined) {
+  const slug = department ? DEPT_SPACE_SLUG[department] : undefined;
+  if (slug) {
+    const match = spaces.find((s) => s.slug === slug);
+    if (match) return match.id;
+  }
+  return spaces.find((s) => s.slug === "company-hq")?.id || spaces[0]?.id || "";
+}
 
 type ViewTab = "company" | "my" | "sprint";
 
@@ -122,6 +149,7 @@ export function TasksWorkspace({
   members,
   canManageSpaces,
   initialView = "company",
+  department = null,
 }: {
   tenantSlug: string;
   currentUserId: string;
@@ -131,6 +159,7 @@ export function TasksWorkspace({
   members: MemberOption[];
   canManageSpaces: boolean;
   initialView?: ViewTab;
+  department?: OrgDepartment | null;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -143,7 +172,13 @@ export function TasksWorkspace({
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
-  const [createSpaceId, setCreateSpaceId] = useState(spaces[0]?.id || "");
+  const preferredSpaceId = defaultSpaceIdForDepartment(spaces, department);
+  const [createSpaceId, setCreateSpaceId] = useState(preferredSpaceId);
+
+  function openCreateModal() {
+    setCreateSpaceId(preferredSpaceId);
+    setIsCreateOpen(true);
+  }
   const [taskToDelete, setTaskToDelete] = useState<WorkTaskRow | null>(null);
   const [editingTask, setEditingTask] = useState<WorkTaskRow | null>(null);
   const [editSpaceId, setEditSpaceId] = useState(spaces[0]?.id || "");
@@ -323,7 +358,7 @@ export function TasksWorkspace({
         </div>
         <button
           type="button"
-          onClick={() => setIsCreateOpen(true)}
+          onClick={openCreateModal}
           className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
         >
           New task
@@ -678,7 +713,7 @@ export function TasksWorkspace({
       ) : null}
 
       {editingTask ? (
-        <ModalOverlay open onClose={() => setEditingTask(null)} panelClassName={MODAL_PANEL_SM}>
+        <ModalOverlay open onClose={() => setEditingTask(null)} panelClassName={MODAL_PANEL_FORM}>
           <div className="flex items-start justify-between gap-3">
             <h2 className="text-lg font-semibold text-foreground">Edit task</h2>
             <button
@@ -811,10 +846,19 @@ export function TasksWorkspace({
       <ModalOverlay
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        panelClassName={MODAL_PANEL_SM}
+        panelClassName={MODAL_PANEL_FORM}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">New task</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              {department ? DEPT_TASK_LABEL[department] : "New task"}
+            </h2>
+            {department ? (
+              <p className="mt-0.5 text-xs text-muted">
+                Defaults to your department teamspace — adjust assignee and due date below.
+              </p>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={() => setIsCreateOpen(false)}
@@ -824,24 +868,24 @@ export function TasksWorkspace({
             ×
           </button>
         </div>
-        <form action={handleCreate} className="mt-4 space-y-3">
+        <form action={handleCreate} className="mt-5 space-y-4">
           <div>
             <label className="mb-1 block text-sm text-muted">Title</label>
             <input
               name="title"
               required
-              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              className="w-full border border-foreground/15 bg-field px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Description (optional)</label>
             <textarea
               name="description"
-              rows={3}
-              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              rows={4}
+              className="w-full border border-foreground/15 bg-field px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Teamspace</label>
               <UiSelect
@@ -869,7 +913,7 @@ export function TasksWorkspace({
               </UiSelect>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Assignee</label>
               <UiSelect name="assigneeUserId" defaultValue={currentUserId}>
@@ -891,7 +935,7 @@ export function TasksWorkspace({
               </UiSelect>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Due date</label>
               <input

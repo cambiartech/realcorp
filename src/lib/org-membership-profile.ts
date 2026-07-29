@@ -144,6 +144,15 @@ export function dashboardShowsFinanceKpis(view: DashboardRoleView): boolean {
   return view === "ORG_ADMIN" || view === "FINANCE";
 }
 
+/** Sales integrations & org provisioning — org admin and sales leadership only. */
+export function dashboardShowsSetupIntegrations(view: DashboardRoleView): boolean {
+  return view === "ORG_ADMIN" || view === "SALES_MANAGER";
+}
+
+export function dashboardShowsHrPeoplePanel(view: DashboardRoleView, moduleHr: boolean): boolean {
+  return moduleHr && view === "HR";
+}
+
 export const DASHBOARD_ROLE_VIEW_LABELS: Record<DashboardRoleView, string> = {
   ORG_ADMIN: "Organization admin",
   FINANCE: "Finance",

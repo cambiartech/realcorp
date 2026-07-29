@@ -1,10 +1,12 @@
 import { auth } from "@/auth";
+import { MembershipRole } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
 import { canManageTasks } from "@/lib/tasks-access";
 import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "@/lib/membership-departments";
+import { profileFromMembershipRole, type OrgDepartment } from "@/lib/org-membership-profile";
 import { ensureDefaultTaskSpaces } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -94,11 +96,15 @@ export default async function TasksPage({
   });
 
   const initialView = view === "my" ? "my" : view === "sprint" ? "sprint" : "company";
+  const department =
+    (membership?.department as OrgDepartment | null) ??
+    profileFromMembershipRole(membership?.role ?? MembershipRole.SALES_EXECUTIVE).department;
 
   return (
     <TasksWorkspace
       tenantSlug={tenantSlug}
       currentUserId={session.user.id}
+      department={department}
       spaces={spaces.map((s) => ({
         id: s.id,
         name: s.name,

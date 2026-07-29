@@ -35,6 +35,12 @@ import type { OrgSetupStep } from "@/lib/org-setup-checklist";
 import { UiSelect } from "@/components/ui-select";
 import { formatEnumLabel } from "@/lib/ui-format";
 import {
+  departmentOverviewKind,
+  departmentOverviewToggleLabel,
+  departmentQuickActions,
+  type DepartmentOverviewKind,
+} from "@/lib/dashboard-department-experience";
+import {
   dashboardShowsFinanceKpis,
   dashboardShowsSalesKpis,
   DASHBOARD_ROLE_VIEW_LABELS,
@@ -296,9 +302,9 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
   ],
   SALES: ["my_pipeline", "my_new_leads", "lead_funnel", "my_open_tasks"],
   HR: ["hr_team_snapshot", "hr_top_performers", "hr_pending_forms", "hr_open_appraisals", "my_open_tasks"],
-  MARKETING: ["lead_source_quality", "my_open_tasks"],
-  COMMUNITY: ["my_open_tasks"],
-  OPERATIONS: ["my_open_tasks"],
+  MARKETING: ["lead_source_quality", "lead_funnel", "unassigned_leads", "my_open_tasks"],
+  COMMUNITY: ["my_open_tasks", "lead_funnel"],
+  OPERATIONS: ["inventory_snapshot", "my_open_tasks"],
 };
 
 const ALL_WIDGET_IDS = new Set(Object.values(ROLE_WIDGETS).flat());
@@ -405,12 +411,21 @@ type DashboardBootstrapUi = {
 function getServerAlignedDashboardUi(
   initialRoleView: RoleView,
   initialWidgetIds: string[],
+  hrModuleEnabled: boolean,
 ): DashboardBootstrapUi {
   const pool = ROLE_WIDGETS[initialRoleView];
-  const mergedInitial =
+  let mergedInitial =
     initialWidgetIds.length > 0
       ? initialWidgetIds.filter((id) => pool.includes(id))
       : [...pool];
+
+  if (initialRoleView === "HR" && hrModuleEnabled) {
+    const hasHrWidget = mergedInitial.some((id) => id.startsWith("hr_"));
+    if (!hasHrWidget) {
+      mergedInitial = [...new Set([...pool, ...mergedInitial])].filter((id) => pool.includes(id));
+    }
+  }
+
   const selectedWidgets = mergedInitial.length > 0 ? mergedInitial : [...pool];
   return {
     roleView: initialRoleView,
@@ -428,6 +443,7 @@ function mergeDashboardDraftFromStorage(
   tenantSlug: string,
   roleViewOptions: readonly RoleView[],
   initialRoleView: RoleView,
+  hrModuleEnabled: boolean,
 ): DashboardBootstrapUi | null {
   const d = readDashboardDraft(tenantSlug);
   if (!d) return null;
@@ -435,6 +451,9 @@ function mergeDashboardDraftFromStorage(
   const pool = ROLE_WIDGETS[rv];
   const poolSet = new Set(pool);
   let nextIds = d.widgetIds.length > 0 ? d.widgetIds.filter((id) => poolSet.has(id)) : [...pool];
+  if (rv === "HR" && hrModuleEnabled && !nextIds.some((id) => id.startsWith("hr_"))) {
+    nextIds = [...new Set([...pool, ...nextIds])].filter((id) => poolSet.has(id));
+  }
   if (nextIds.length === 0) nextIds = [...pool];
   return {
     roleView: rv,
@@ -480,8 +499,8 @@ export function DashboardWorkspace({
   initialOpenGoals?: boolean;
 }) {
   const initialUi = useMemo(
-    () => getServerAlignedDashboardUi(initialRoleView, initialWidgetIds),
-    [initialRoleView, initialWidgetIds],
+    () => getServerAlignedDashboardUi(initialRoleView, initialWidgetIds, values.hrModuleEnabled),
+    [initialRoleView, initialWidgetIds, values.hrModuleEnabled],
   );
 
   const [roleView, setRoleView] = useState<RoleView>(initialUi.roleView);
@@ -512,7 +531,7 @@ export function DashboardWorkspace({
 
   useEffect(() => {
     const { roleViewOptions: rvo, initialRoleView: irv } = draftBootstrapRef.current;
-    const fromDraft = mergeDashboardDraftFromStorage(tenantSlug, rvo, irv);
+    const fromDraft = mergeDashboardDraftFromStorage(tenantSlug, rvo, irv, values.hrModuleEnabled);
     if (!fromDraft) return;
     setRoleView(fromDraft.roleView);
     setSelectedWidgets(fromDraft.selectedWidgets);
@@ -522,7 +541,7 @@ export function DashboardWorkspace({
     setOwnerFilter(fromDraft.owner);
     setProjectFilter(fromDraft.project);
     setSourceFilter(fromDraft.source);
-  }, [tenantSlug]);
+  }, [tenantSlug, values.hrModuleEnabled]);
 
   useEffect(() => {
     try {
@@ -539,7 +558,12 @@ export function DashboardWorkspace({
   const [openScopeFilters, setOpenScopeFilters] = useState(false);
   const [openSavedViews, setOpenSavedViews] = useState(false);
   const [openOnboardingGuide, setOpenOnboardingGuide] = useState(false);
-  const [showSetupPanel, setShowSetupPanel] = useState(!orgSetupCriticalComplete);
+  const [showSetupPanel, setShowSetupPanel] = useState(() => {
+    const kind = departmentOverviewKind(initialRoleView, values.hrModuleEnabled);
+    if (!kind) return false;
+    if (kind === "org_sales_setup") return !orgSetupCriticalComplete && canManageOrgSetup;
+    return true;
+  });
   const [openKpiDetail, setOpenKpiDetail] = useState<
     null | "LEADS_TODAY" | "DEALS_TODAY" | "PROJECTS" | "TOP_PROJECTS"
   >(null);
@@ -562,6 +586,17 @@ export function DashboardWorkspace({
     const map = new Map(widgetPool.map((id, idx) => [id, idx]));
     return enabledWidgets.slice().sort((a, b) => (map.get(a) ?? 999) - (map.get(b) ?? 999));
   }, [enabledWidgets, widgetPool]);
+
+  const overviewKind = departmentOverviewKind(roleView, values.hrModuleEnabled);
+  const overviewToggleLabel = departmentOverviewToggleLabel(overviewKind);
+  const quickActions = useMemo(
+    () =>
+      departmentQuickActions(roleView, tenantSlug, {
+        canManageOrgSetup,
+        hrModuleEnabled: values.hrModuleEnabled,
+      }),
+    [roleView, tenantSlug, canManageOrgSetup, values.hrModuleEnabled],
+  );
 
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1174,83 +1209,41 @@ export function DashboardWorkspace({
         </section>
       ) : null}
 
-      <div className="mt-4">
-        <button
-          type="button"
-          onClick={() => setShowSetupPanel((open) => !open)}
-          className="inline-flex items-center gap-2 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.04]"
-          aria-expanded={showSetupPanel}
-        >
-          <span>{showSetupPanel ? "Hide" : "Show"} setup &amp; integrations</span>
-          <svg
-            viewBox="0 0 24 24"
-            className={["h-3.5 w-3.5 transition-transform", showSetupPanel ? "rotate-180" : ""].join(" ")}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
+      {overviewKind && overviewToggleLabel ? (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowSetupPanel((open) => !open)}
+            className="inline-flex items-center gap-2 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.04]"
+            aria-expanded={showSetupPanel}
           >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+            <span>
+              {showSetupPanel ? "Hide" : "Show"} {overviewToggleLabel}
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              className={["h-3.5 w-3.5 transition-transform", showSetupPanel ? "rotate-180" : ""].join(" ")}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
 
-        {showSetupPanel ? (
-          <div className="mt-3 grid gap-3 lg:grid-cols-3">
-            <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization setup</p>
-                {canManageOrgSetup ? (
-                  <button
-                    type="button"
-                    onClick={() => setOpenOnboardingGuide(true)}
-                    className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
-                  >
-                    Open full guide
-                  </button>
-                ) : null}
-              </div>
-              {canManageOrgSetup ? (
-                <ul className="mt-2 space-y-1.5 text-sm">
-                  {orgSetupSteps.map((step) => (
-                    <ChecklistRow key={step.id} label={step.title} done={step.done} />
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-muted">Ask an org admin to complete workspace setup.</p>
-              )}
-            </section>
-            <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; ops</p>
-              <ul className="mt-2 space-y-1.5 text-sm">
-                <ChecklistRow
-                  label="Connect at least one integration"
-                  done={values.onboarding.connectIntegrationDone}
-                />
-                <ChecklistRow label="Import your first leads" done={values.onboarding.importedLeadsDone} />
-                <ChecklistRow label="Create your first deal" done={values.onboarding.createdDealDone} />
-                <ChecklistRow label="Send first follow-up" done={values.onboarding.followUpSentDone} />
-                <ChecklistRow label="Complete first task/activity" done={values.onboarding.firstTaskDone} />
-              </ul>
-            </section>
-            <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Integration health</p>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <HealthPill label="Meta Leads" ok={values.integrationHealth.metaLeads} />
-                <HealthPill label="WhatsApp" ok={values.integrationHealth.whatsapp} />
-                <HealthPill label="SMS (Termii)" ok={values.integrationHealth.sms} />
-                <div className="rounded-md border border-foreground/10 px-2 py-1.5">
-                  <p className="text-[11px] text-muted">Webhook</p>
-                  <p className="text-xs font-medium text-foreground">
-                    {values.integrationHealth.inboundWebhookLastAt
-                      ? `Last event ${new Date(values.integrationHealth.inboundWebhookLastAt).toLocaleString()}`
-                      : "No events yet"}
-                  </p>
-                </div>
-              </div>
-            </section>
-          </div>
-        ) : null}
-      </div>
+          {showSetupPanel ? (
+            <DepartmentOverviewPanel
+              kind={overviewKind}
+              tenantSlug={tenantSlug}
+              values={values}
+              canManageOrgSetup={canManageOrgSetup}
+              orgSetupSteps={orgSetupSteps}
+              onOpenSetupGuide={() => setOpenOnboardingGuide(true)}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       {globalRange !== "1M" || moduleFilter !== "ALL" || ownerFilter || projectFilter || sourceFilter ? (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
@@ -1554,38 +1547,33 @@ export function DashboardWorkspace({
 
       <div className="fixed bottom-6 right-6 z-30 flex flex-col items-end gap-2">
         {openFabMenu ? (
-          <div className="w-52 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-2 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => {
-                setOpenScopeFilters(true);
-                setOpenFabMenu(false);
-              }}
-              className="flex w-full items-center rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-foreground/[0.06]"
-            >
-              Dashboard & filters
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setOpenSavedViews((v) => !v);
-                setOpenFabMenu(false);
-              }}
-              className="mt-0.5 flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-foreground/[0.06]"
-            >
-              <span>Saved views</span>
-              <span className="text-xs text-muted">{openSavedViews ? "On" : "Off"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setOpenOnboardingGuide(true);
-                setOpenFabMenu(false);
-              }}
-              className="mt-0.5 flex w-full items-center rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-foreground/[0.06]"
-            >
-              Launch setup guide
-            </button>
+          <div className="w-64 rounded-lg border border-foreground/10 bg-background p-2 shadow-2xl">
+            {quickActions.map((action) =>
+              action.type === "link" ? (
+                <Link
+                  key={action.href + action.label}
+                  href={action.href}
+                  onClick={() => setOpenFabMenu(false)}
+                  className="flex w-full items-center rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-foreground/[0.06]"
+                >
+                  {action.label}
+                </Link>
+              ) : (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => {
+                    if (action.action === "filters") setOpenScopeFilters(true);
+                    if (action.action === "saved_views") setOpenSavedViews((v) => !v);
+                    if (action.action === "setup_guide") setOpenOnboardingGuide(true);
+                    setOpenFabMenu(false);
+                  }}
+                  className="flex w-full items-center rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-foreground/[0.06]"
+                >
+                  {action.label}
+                </button>
+              ),
+            )}
           </div>
         ) : null}
         <button
@@ -3083,16 +3071,406 @@ function StatPill({
   );
 }
 
-function ChecklistRow({ label, done }: { label: string; done: boolean }) {
+function DepartmentOverviewPanel({
+  kind,
+  tenantSlug,
+  values,
+  canManageOrgSetup,
+  orgSetupSteps,
+  onOpenSetupGuide,
+}: {
+  kind: DepartmentOverviewKind;
+  tenantSlug: string;
+  values: WidgetValue;
+  canManageOrgSetup: boolean;
+  orgSetupSteps: OrgSetupStep[];
+  onOpenSetupGuide: () => void;
+}) {
+  if (kind === "hr_people") {
+    return (
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Team snapshot</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <HrStat label="Active members" value={values.hrTeamSnapshot.activeMemberCount} />
+            <HrStat label="HR profiles" value={values.hrTeamSnapshot.employeeProfileCount} />
+            <HrStat label="Active employees" value={values.hrTeamSnapshot.activeEmployeeCount} />
+            <HrStat label="Pending invites" value={values.hrTeamSnapshot.pendingInviteCount} />
+          </div>
+          <Link
+            href={`${values.hrPageUrl}?tab=people`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Open people directory →
+          </Link>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Top performers · {values.hrPeriodLabel}
+          </p>
+          {values.hrTopPerformers.length ? (
+            <ul className="mt-2 space-y-2 text-sm">
+              {values.hrTopPerformers.slice(0, 3).map((person) => (
+                <li key={`${person.rank}-${person.name}`} className="flex items-center justify-between gap-2">
+                  <span className="truncate text-foreground">
+                    <span className="mr-1 font-semibold text-muted">#{person.rank}</span>
+                    {person.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted">
+                    {person.tasksCompleted}/{person.tasksAssigned} tasks
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Add employee profiles in HR to track performance.</p>
+          )}
+          <Link
+            href={`${values.hrPageUrl}?tab=insights`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Full performance board →
+          </Link>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">HR queue</p>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <ChecklistRow
+              label="Pending onboarding forms"
+              done={values.hrPendingFormCount === 0}
+              detail={
+                values.hrPendingFormCount > 0
+                  ? `${values.hrPendingFormCount} awaiting submission`
+                  : "All caught up"
+              }
+            />
+            <ChecklistRow
+              label="Open appraisals"
+              done={values.hrOpenAppraisalCount === 0}
+              detail={
+                values.hrOpenAppraisalCount > 0
+                  ? `${values.hrOpenAppraisalCount} in progress`
+                  : "No open cycles"
+              }
+            />
+            <ChecklistRow
+              label="Your open tasks"
+              done={values.myOpenTaskCount === 0}
+              detail={
+                values.myOpenTaskCount > 0
+                  ? `${values.myOpenTaskCount} task${values.myOpenTaskCount === 1 ? "" : "s"}`
+                  : "Clear"
+              }
+            />
+          </ul>
+          <Link
+            href={values.hrPageUrl}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Open HR workspace →
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
+  if (kind === "finance_queue") {
+    return (
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Collections</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <HrStat label="Expected this month" value={values.expectedThisMonth} money />
+            <HrStat label="Revenue MTD" value={values.revenueMtd} money />
+          </div>
+          <Link
+            href={`/${tenantSlug}/finance`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Open finance workspace →
+          </Link>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Risk &amp; verification</p>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <ChecklistRow
+              label="Overdue installments"
+              done={values.overdueCount === 0}
+              detail={
+                values.overdueCount > 0
+                  ? `${values.overdueCount} · ${formatMoney(values.overdueAmount)}`
+                  : "None overdue"
+              }
+            />
+            <ChecklistRow
+              label="Pending verification"
+              done={values.pendingVerificationCount === 0}
+              detail={
+                values.pendingVerificationCount > 0
+                  ? `${values.pendingVerificationCount} to review`
+                  : "Queue clear"
+              }
+            />
+            <ChecklistRow
+              label="Finance queue"
+              done={values.pendingFinanceCount === 0}
+              detail={
+                values.pendingFinanceCount > 0
+                  ? `${values.pendingFinanceCount} pending`
+                  : "All clear"
+              }
+            />
+          </ul>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Your workload</p>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <ChecklistRow
+              label="Invoices this month"
+              done={values.invoicesMtdCount > 0}
+              detail={`${values.invoicesMtdCount} issued`}
+            />
+            <ChecklistRow
+              label="Open tasks"
+              done={values.myOpenTaskCount === 0}
+              detail={`${values.myOpenTaskCount} assigned to you`}
+            />
+          </ul>
+          <Link
+            href={`/${tenantSlug}/tasks?view=my`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            View my tasks →
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
+  if (kind === "marketing_pipeline") {
+    return (
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Lead pipeline</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <HrStat label="Unassigned leads" value={values.unassignedLeads} />
+            <HrStat label="New leads (7d)" value={values.myNewLeads7d} />
+          </div>
+          <Link
+            href={`/${tenantSlug}/leads`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Work lead queue →
+          </Link>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Top lead sources</p>
+          {values.leadSourceQuality.length ? (
+            <ul className="mt-2 space-y-2 text-sm">
+              {values.leadSourceQuality.slice(0, 4).map((row) => (
+                <li key={row.source} className="flex items-center justify-between gap-2">
+                  <span className="truncate text-foreground">{row.source}</span>
+                  <span className="shrink-0 text-xs text-muted">
+                    {row.leads} leads · {row.winRate}% win
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Import or connect leads to see source quality.</p>
+          )}
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Campaign checklist</p>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <ChecklistRow label="Leads imported" done={values.onboarding.importedLeadsDone} />
+            <ChecklistRow
+              label="Integration connected"
+              done={values.onboarding.connectIntegrationDone}
+            />
+            <ChecklistRow
+              label="Your open tasks"
+              done={values.myOpenTaskCount === 0}
+              detail={`${values.myOpenTaskCount} task${values.myOpenTaskCount === 1 ? "" : "s"}`}
+            />
+          </ul>
+          <Link
+            href={`/${tenantSlug}/marketing`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Open marketing hub →
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
+  if (kind === "community_engagement") {
+    return (
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Community workload</p>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <ChecklistRow
+              label="Your open tasks"
+              done={values.myOpenTaskCount === 0}
+              detail={`${values.myOpenTaskCount} community task${values.myOpenTaskCount === 1 ? "" : "s"}`}
+            />
+            <ChecklistRow
+              label="Team pipeline active"
+              done={values.teamPipelineCount > 0}
+              detail={`${values.teamPipelineCount} open deals`}
+            />
+          </ul>
+          <Link
+            href={`/${tenantSlug}/community`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Open community hub →
+          </Link>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Resident touchpoints</p>
+          <p className="mt-2 text-sm text-muted">
+            Track move-ins, events, and resident requests from Tasks and Community — not sales integrations.
+          </p>
+          <Link
+            href={`/${tenantSlug}/tasks`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Tasks board →
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
+  if (kind === "operations_floor") {
+    return (
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Inventory</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <HrStat label="Available" value={values.availableUnits} />
+            <HrStat label="Reserved" value={values.reservedUnits} />
+            <HrStat label="Sold" value={values.soldUnits} />
+          </div>
+          <Link
+            href={`/${tenantSlug}/projects`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            View projects →
+          </Link>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Floor tasks</p>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            <ChecklistRow
+              label="Your open tasks"
+              done={values.myOpenTaskCount === 0}
+              detail={`${values.myOpenTaskCount} ops task${values.myOpenTaskCount === 1 ? "" : "s"}`}
+            />
+            <ChecklistRow
+              label="First activity logged"
+              done={values.onboarding.firstTaskDone}
+              detail={values.onboarding.firstTaskDone ? "Team is active" : "Log site activity"}
+            />
+          </ul>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Short lets &amp; sites</p>
+          <p className="mt-2 text-sm text-muted">Front desk, inspections, and unit turnover live under Short lets.</p>
+          <Link
+            href={`/${tenantSlug}/shortlets`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Open short lets →
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
   return (
-    <li className="flex items-center gap-2">
+    <div className="mt-3 grid gap-3 lg:grid-cols-3">
+      <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Organization setup</p>
+          {canManageOrgSetup ? (
+            <button
+              type="button"
+              onClick={onOpenSetupGuide}
+              className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
+            >
+              Open full guide
+            </button>
+          ) : null}
+        </div>
+        {canManageOrgSetup ? (
+          <ul className="mt-2 space-y-1.5 text-sm">
+            {orgSetupSteps.map((step) => (
+              <ChecklistRow key={step.id} label={step.title} done={step.done} />
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-muted">Ask an org admin to complete workspace setup.</p>
+        )}
+      </section>
+      <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Sales &amp; ops</p>
+        <ul className="mt-2 space-y-1.5 text-sm">
+          <ChecklistRow
+            label="Connect at least one integration"
+            done={values.onboarding.connectIntegrationDone}
+          />
+          <ChecklistRow label="Import your first leads" done={values.onboarding.importedLeadsDone} />
+          <ChecklistRow label="Create your first deal" done={values.onboarding.createdDealDone} />
+          <ChecklistRow label="Send first follow-up" done={values.onboarding.followUpSentDone} />
+          <ChecklistRow label="Complete first task/activity" done={values.onboarding.firstTaskDone} />
+        </ul>
+      </section>
+      <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Integration health</p>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <HealthPill label="Meta Leads" ok={values.integrationHealth.metaLeads} />
+          <HealthPill label="WhatsApp" ok={values.integrationHealth.whatsapp} />
+          <HealthPill label="SMS (Termii)" ok={values.integrationHealth.sms} />
+          <div className="rounded-md border border-foreground/10 px-2 py-1.5">
+            <p className="text-[11px] text-muted">Webhook</p>
+            <p className="text-xs font-medium text-foreground">
+              {values.integrationHealth.inboundWebhookLastAt
+                ? `Last event ${new Date(values.integrationHealth.inboundWebhookLastAt).toLocaleString()}`
+                : "No events yet"}
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ChecklistRow({ label, done, detail }: { label: string; done: boolean; detail?: string }) {
+  return (
+    <li className="flex items-start gap-2">
       <span
-        className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? "bg-[var(--success-wash)] text-[var(--success)]" : "bg-foreground/10 text-muted"}`}
+        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs ${done ? "bg-[var(--success-wash)] text-[var(--success)]" : "bg-foreground/10 text-muted"}`}
       >
         {done ? "✓" : "•"}
       </span>
-      <span className={done ? "text-foreground" : "text-muted"}>{label}</span>
+      <span className={done ? "text-foreground" : "text-muted"}>
+        {label}
+        {detail ? <span className="block text-[11px] text-muted">{detail}</span> : null}
+      </span>
     </li>
+  );
+}
+
+function HrStat({ label, value, money }: { label: string; value: number; money?: boolean }) {
+  return (
+    <div className="rounded-md border border-foreground/10 px-2 py-1.5">
+      <p className="text-[11px] text-muted">{label}</p>
+      <p className="text-lg font-bold text-foreground">{money ? formatMoney(value) : value}</p>
+    </div>
   );
 }
 

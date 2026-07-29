@@ -1,8 +1,9 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { acceptInvite, type AcceptInviteResult } from "./actions";
 import { parseJoinForm, zodJoinIssuesToFieldRecord, type JoinFieldName } from "@/lib/validators/join";
@@ -31,12 +32,13 @@ type JoinFormProps = {
 export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(acceptInvite.bind(null, token), initial);
+  const [isTransitionPending, startTransition] = useTransition();
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<JoinFieldName, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const busy = pending || submitting;
+  const busy = pending || isTransitionPending || submitting;
 
   useEffect(() => {
     if (state != null) setSubmitting(false);
@@ -55,18 +57,21 @@ export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setSubmitting(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
     const parsed = parseJoinForm(formData);
 
     if (!parsed.success) {
       setFieldErrors(zodJoinIssuesToFieldRecord(parsed.error.issues));
+      setSubmitting(false);
       return;
     }
 
     setFieldErrors({});
-    setSubmitting(true);
-    formAction(formData);
+    startTransition(() => {
+      formAction(formData);
+    });
   }
 
   return (
@@ -123,21 +128,22 @@ export function JoinForm({ token, inviteEmail, tenantName }: JoinFormProps) {
         type="submit"
         disabled={busy}
         aria-busy={busy}
-        className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-70"
+        className="relative mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 overflow-hidden border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-80"
       >
-        {busy ? <InlineSpinner /> : null}
+        {busy ? (
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-background/40">
+            <span className="block h-full w-1/3 animate-pulse bg-background" />
+          </span>
+        ) : null}
+        {busy ? <ButtonSpinner /> : null}
         {busy ? "Joining organization…" : "Join organization"}
       </button>
+      {busy ? (
+        <p className="text-center text-xs text-muted" role="status" aria-live="polite">
+          Creating your account and signing you in…
+        </p>
+      ) : null}
     </form>
-  );
-}
-
-function InlineSpinner() {
-  return (
-    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
   );
 }
 
