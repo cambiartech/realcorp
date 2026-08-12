@@ -1,0 +1,2 @@
+ALTER TABLE "TenantSettings"
+ADD COLUMN "moduleAi" BOOLEAN NOT NULL DEFAULT false;

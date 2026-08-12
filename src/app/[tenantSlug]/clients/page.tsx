@@ -1,13 +1,16 @@
 import { auth } from "@/auth";
+import { PropertyClientStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import { canManageClients } from "@/lib/clients-access";
 import { batchResolveClientPortalStatus, type ClientPortalStatus } from "@/lib/client-portal-invite";
 import prisma from "@/lib/db";
+import { paginate, parsePage } from "@/lib/pagination";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { ClientsWorkspace } from "./clients-workspace";
 
 export const dynamic = "force-dynamic";
+const CLIENTS_PAGE_SIZE = 50;
 
 function parseTab(tab?: string): "clients" | "documents" {
   return tab === "documents" ? "documents" : "clients";
@@ -18,10 +21,11 @@ export default async function ClientsPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; clientsPage?: string }>;
 }) {
   const { tenantSlug } = await params;
-  const { tab: tabRaw } = await searchParams;
+  const query = await searchParams;
+  const { tab: tabRaw, clientsPage } = query;
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -53,22 +57,34 @@ export default async function ClientsPage({
   });
   assertTenantNavAccess(session, membership, tenant.settings, "clients");
 
-  const [clients, documents] = await Promise.all([
-    prisma.propertyClient.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: { select: { unitLinks: true, documents: true } },
-      },
-      take: 500,
+  const [totalClients, activeClients, totalUnitLinks, documents, documentClients] = await Promise.all([
+    prisma.propertyClient.count({ where: { tenantId: tenant.id } }),
+    prisma.propertyClient.count({
+      where: { tenantId: tenant.id, status: PropertyClientStatus.ACTIVE },
     }),
+    prisma.clientUnitLink.count({ where: { tenantId: tenant.id } }),
     prisma.clientDocument.findMany({
       where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       include: { client: { select: { id: true, fullName: true } } },
       take: 500,
     }),
+    prisma.propertyClient.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ fullName: "asc" }, { id: "asc" }],
+      select: { id: true, fullName: true },
+    }),
   ]);
+  const pagination = paginate(totalClients, parsePage(clientsPage), CLIENTS_PAGE_SIZE);
+  const clients = await prisma.propertyClient.findMany({
+    where: { tenantId: tenant.id },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    skip: pagination.skip,
+    take: pagination.pageSize,
+    include: {
+      _count: { select: { unitLinks: true, documents: true } },
+    },
+  });
 
   const portalStatusByClient = await batchResolveClientPortalStatus(
     tenant.id,
@@ -80,6 +96,9 @@ export default async function ClientsPage({
       tenantSlug={tenant.slug}
       canManage={canManageClients(Boolean(session.user.isPlatformAdmin), membership)}
       activeTab={parseTab(tabRaw)}
+      pagination={pagination}
+      paginationSearchParams={query}
+      clientStats={{ active: activeClients, totalUnits: totalUnitLinks }}
       clients={clients.map((c) => ({
         id: c.id,
         fullName: c.fullName,
@@ -92,7 +111,7 @@ export default async function ClientsPage({
         createdAtLabel: c.createdAt.toISOString().slice(0, 10),
         portalStatus: portalStatusByClient.get(c.id) ?? ("none" as ClientPortalStatus),
       }))}
-      documentClients={clients.map((c) => ({ id: c.id, fullName: c.fullName }))}
+      documentClients={documentClients}
       documents={documents.map((doc) => ({
         id: doc.id,
         clientId: doc.clientId,

@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Download, FileSpreadsheet, Send, UserPlus, Users } from "lucide-react";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { ButtonSpinner } from "@/components/button-spinner";
+import { ModalOverlay } from "@/components/modal-overlay";
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 import type { HrFormDeliveryMode, HrFormType } from "@/generated/prisma";
 import { formDataToEmployeeProfilePayload, type ProfileDetailRow } from "@/lib/hr-profile-form";
 import { OfferLetterEditor } from "@/components/hr/offer-letter-editor";
@@ -18,14 +22,30 @@ import type { PayslipYtdSummary } from "@/lib/hr-payslip-ytd";
 import type { TenantBranding } from "@/lib/tenant-branding";
 import {
   approveHrFormRequest,
+  approveHrFormRequestsBatch,
+  applyPayTemplate,
   cancelHrFormRequest,
+  createPayTemplate,
   createHrFormRequestsBatch,
   upsertEmployeeProfile,
 } from "@/app/[tenantSlug]/hr/actions";
+import { createHrOnlyEmployee } from "@/app/[tenantSlug]/hr/document-intake-actions";
+import { inviteTenantMembersBatch } from "@/app/[tenantSlug]/team/actions";
 import { HR_FORM_OPTIONS } from "@/lib/hr-form-types";
+import { INVITE_DEPARTMENT_OPTIONS } from "@/lib/team-membership-roles";
+import { downloadExcel } from "@/lib/table-export";
+import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
+import { GlobalLocationFields } from "@/components/global-location-fields";
 
 type PeopleTab = "directory" | "onboard" | "record" | "send" | "requests";
 type RecordTab = "personal" | "job" | "bank" | "emergency" | "family";
+type InviteMode = "single" | "bulk" | "excel";
+type InviteRow = {
+  email: string;
+  accessKind: "department";
+  department: string;
+  isDepartmentLead: boolean;
+};
 
 const inputClass =
   "w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20";
@@ -74,8 +94,10 @@ export function HrPeopleWorkspace({
   companyName,
   tenantBrand,
   currency,
+  aiEnabled,
   teamMembers,
   profiles,
+  payTemplates,
   profileDetails,
   profileOnboarding,
   ytdByUserId,
@@ -87,6 +109,7 @@ export function HrPeopleWorkspace({
   companyName: string;
   tenantBrand: TenantBranding;
   currency: string;
+  aiEnabled: boolean;
   teamMembers: Array<{ userId: string; name: string; email: string; role: string; hasProfile: boolean }>;
   profiles: Array<{
     id: string;
@@ -97,6 +120,19 @@ export function HrPeopleWorkspace({
     status: string;
     statusValue: string;
     grossMonthly: number | null;
+  }>;
+  payTemplates: Array<{
+    id: string;
+    name: string;
+    countryCode: string;
+    basicPercent: number;
+    housingPercent: number;
+    transportPercent: number;
+    otherPercent: number;
+    pensionEnabled: boolean;
+    employeePensionRate: number;
+    employerPensionRate: number;
+    isDefault: boolean;
   }>;
   profileDetails: ProfileDetailRow[];
   profileOnboarding: Array<{
@@ -126,13 +162,18 @@ export function HrPeopleWorkspace({
     expiresLabel: string;
     submittedAtLabel: string;
     hasFileUpload: boolean;
+    submittedFileUrl: string | null;
+    submittedPayload: Record<string, unknown> | null;
+    reviewNote: string | null;
   }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showSnackbar } = useSnackbar();
   const [onboardInitialStep, setOnboardInitialStep] = useState<OnboardingStepId>("personal");
-  const [peopleTab, setPeopleTab] = useState<PeopleTab>("directory");
+  const [peopleTab, setPeopleTab] = useState<PeopleTab>(() =>
+    searchParams.get("reviewForms") === "1" ? "requests" : "directory",
+  );
   const [recordTab, setRecordTab] = useState<RecordTab>("personal");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -147,6 +188,19 @@ export function HrPeopleWorkspace({
   const [selectedFormTypes, setSelectedFormTypes] = useState<HrFormType[]>(["BIODATA"]);
   const [sendMode, setSendMode] = useState<"team" | "newcomer">("team");
   const [showOfferLetter, setShowOfferLetter] = useState(false);
+  const [showHrOnlyForm, setShowHrOnlyForm] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteMode, setInviteMode] = useState<InviteMode>("single");
+  const [inviteDepartment, setInviteDepartment] = useState("operations");
+  const [inviteLead, setInviteLead] = useState(false);
+  const [bulkInviteEmails, setBulkInviteEmails] = useState("");
+  const [excelInviteRows, setExcelInviteRows] = useState<InviteRow[]>([]);
+  const [excelInviteFile, setExcelInviteFile] = useState("");
+  const [inviteResult, setInviteResult] = useState<{ invited: number; failed: Array<{ email: string; error: string }> } | null>(
+    null,
+  );
+  const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
+  const [showPayTemplateModal, setShowPayTemplateModal] = useState(false);
 
   const profileByUserId = useMemo(() => new Map(profileDetails.map((p) => [p.userId, p])), [profileDetails]);
   const onboardingByUserId = useMemo(
@@ -155,19 +209,136 @@ export function HrPeopleWorkspace({
   );
   const ytdByUser = useMemo(() => new Map(ytdByUserId.map((o) => [o.userId, o.ytd])), [ytdByUserId]);
   const selectedMember = teamMembers.find((m) => m.userId === selectedUserId);
-  const selectedProfile = selectedUserId ? profileByUserId.get(selectedUserId) : undefined;
   const selectedOnboarding = selectedUserId ? onboardingByUserId.get(selectedUserId) : undefined;
+  const submittedRequests = formRequests.filter((request) => request.statusValue === "SUBMITTED");
 
   async function runAction(fn: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     setPending(true);
-    const result = await fn();
-    setPending(false);
-    if (!result.ok) {
-      showSnackbar(result.error || "Something went wrong.", "error");
+    try {
+      const result = await fn();
+      if (!result.ok) {
+        showSnackbar(result.error || "Something went wrong.", "error");
+        return false;
+      }
+      showSnackbar(success, "success");
+      router.refresh();
+      return true;
+    } catch (error) {
+      showSnackbar(error instanceof Error ? error.message : "The request failed. Please try again.", "error");
+      return false;
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function closeInviteModal() {
+    if (pending) return;
+    setShowInviteModal(false);
+    setInviteResult(null);
+    setExcelInviteRows([]);
+    setExcelInviteFile("");
+  }
+
+  function inviteRowsForEmails(emails: string[]): InviteRow[] {
+    return Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))).map((email) => ({
+      email,
+      accessKind: "department" as const,
+      department: inviteDepartment,
+      isDepartmentLead: inviteLead,
+    }));
+  }
+
+  async function sendInvites(rows: InviteRow[]) {
+    if (!rows.length) {
+      showSnackbar("Add at least one email address.", "error");
       return;
     }
-    showSnackbar(success, "success");
-    router.refresh();
+    setPending(true);
+    setInviteResult(null);
+    try {
+      const result = await inviteTenantMembersBatch(tenantSlug, rows);
+      setInviteResult({ invited: result.invited, failed: result.failed });
+      if (result.invited) {
+        showSnackbar(
+          `${result.invited} invitation${result.invited === 1 ? "" : "s"} created${
+            result.failed.length ? `; ${result.failed.length} could not be created` : ""
+          }.`,
+          result.failed.length ? "info" : "success",
+        );
+        router.refresh();
+      } else {
+        showSnackbar(result.failed[0]?.error || "No invitations were created.", "error");
+      }
+    } catch (error) {
+      showSnackbar(error instanceof Error ? error.message : "Could not create invitations.", "error");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function readInviteWorkbook(file: File) {
+    setPending(true);
+    setInviteResult(null);
+    try {
+      const { default: ExcelJS } = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      const bytes = await file.arrayBuffer();
+      await workbook.xlsx.load(bytes as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+      const sheet = workbook.worksheets[0];
+      if (!sheet) throw new Error("The workbook does not contain a worksheet.");
+      const headers = Array.from({ length: sheet.columnCount }, (_, index) =>
+        sheet.getRow(1).getCell(index + 1).text.trim().toLowerCase(),
+      );
+      const emailColumn = headers.findIndex((header) => header === "email" || header === "email address") + 1;
+      const departmentColumn = headers.findIndex((header) => header === "department") + 1;
+      const leadColumn =
+        headers.findIndex((header) => header === "department lead" || header === "lead" || header === "team lead") +
+        1;
+      if (!emailColumn) throw new Error("Add an Email column to the first row.");
+
+      const rows: InviteRow[] = [];
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const email = row.getCell(emailColumn).text.trim().toLowerCase();
+        if (!email) return;
+        const departmentText = departmentColumn ? row.getCell(departmentColumn).text.trim().toLowerCase() : "";
+        const department =
+          INVITE_DEPARTMENT_OPTIONS.find(
+            (option) =>
+              option.value.toLowerCase() === departmentText || option.label.toLowerCase() === departmentText,
+          )?.value || inviteDepartment;
+        const leadText = leadColumn ? row.getCell(leadColumn).text.trim().toLowerCase() : "";
+        rows.push({
+          email,
+          accessKind: "department",
+          department,
+          isDepartmentLead: ["yes", "true", "1", "lead"].includes(leadText),
+        });
+      });
+      if (!rows.length) throw new Error("No email addresses were found in the workbook.");
+      if (rows.length > 100) throw new Error("Invite workbooks can contain up to 100 people at a time.");
+      setExcelInviteRows(rows);
+      setExcelInviteFile(file.name);
+    } catch (error) {
+      setExcelInviteRows([]);
+      setExcelInviteFile("");
+      showSnackbar(error instanceof Error ? error.message : "Could not read this workbook.", "error");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function downloadInviteTemplate() {
+    await downloadExcel(
+      "realcorp-team-invite-template",
+      "Invites",
+      ["Email", "Department", "Department Lead"],
+      [
+        { email: "employee@company.com", department: "operations", lead: "No" },
+        { email: "manager@company.com", department: "hr", lead: "Yes" },
+      ],
+      ["email", "department", "lead"],
+    );
   }
 
   function openRecord(userId: string, mode: "record" | "onboard" = "record") {
@@ -252,7 +423,7 @@ export function HrPeopleWorkspace({
   function buildDraftFromTeam(member: { userId: string; name: string; email: string }): ProfileDetailRow {
     const existing = profileByUserId.get(member.userId);
     if (existing) return existing;
-    return {
+    const draft: ProfileDetailRow = {
       id: "",
       userId: member.userId,
       employeeNumber: "",
@@ -267,6 +438,7 @@ export function HrPeopleWorkspace({
       addressStreet: "",
       addressCity: "",
       addressState: "",
+      addressCountry: "Nigeria",
       position: "",
       department: "",
       dateOfJoining: "",
@@ -274,8 +446,23 @@ export function HrPeopleWorkspace({
       employmentType: "",
       workSchedule: "",
       paygroupName: "",
+      payTemplateId: "",
       grossMonthly: "",
       payeeTaxMonthly: "",
+      payrollCountryCode: "NG",
+      payrollRegionCode: "",
+      taxId: "",
+      taxOverrideReason: "",
+      pensionEnabled: "yes",
+      employeePensionRate: "8",
+      employerPensionRate: "10",
+      nhfMonthly: "",
+      nhiaMonthly: "",
+      annualRent: "",
+      annualLifeInsurance: "",
+      annualMortgageInterest: "",
+      otherPreTaxMonthly: "",
+      otherPostTaxMonthly: "",
       basicPercent: "30",
       housingPercent: "20",
       transportPercent: "15",
@@ -297,11 +484,26 @@ export function HrPeopleWorkspace({
       nextOfKinStreet: "",
       nextOfKinCity: "",
       nextOfKinState: "",
+      nextOfKinCountry: "Nigeria",
       nextOfKinOccupation: "",
       educationLevel: "",
       educationInstitution: "",
       educationQualification: "",
       educationYear: "",
+    };
+    const defaultTemplate = payTemplates.find((template) => template.isDefault);
+    if (!defaultTemplate) return draft;
+    return {
+      ...draft,
+      payTemplateId: defaultTemplate.id,
+      payrollCountryCode: defaultTemplate.countryCode,
+      basicPercent: String(defaultTemplate.basicPercent),
+      housingPercent: String(defaultTemplate.housingPercent),
+      transportPercent: String(defaultTemplate.transportPercent),
+      otherPercent: String(defaultTemplate.otherPercent),
+      pensionEnabled: defaultTemplate.pensionEnabled ? "yes" : "no",
+      employeePensionRate: String(defaultTemplate.employeePensionRate),
+      employerPensionRate: String(defaultTemplate.employerPensionRate),
     };
   }
 
@@ -311,7 +513,14 @@ export function HrPeopleWorkspace({
     { id: "directory", label: "Team directory" },
     { id: "record", label: "Employee record" },
     { id: "send", label: "Send forms" },
-    { id: "requests", label: "Form requests" },
+    {
+      id: "requests",
+      label: `Form requests${
+        formRequests.filter((request) => request.statusValue === "SUBMITTED").length
+          ? ` (${formRequests.filter((request) => request.statusValue === "SUBMITTED").length})`
+          : ""
+      }`,
+    },
   ];
 
   const recordTabs: { id: RecordTab; label: string }[] = [
@@ -347,13 +556,55 @@ export function HrPeopleWorkspace({
         ))}
       </div>
 
+      {peopleTab === "directory" && submittedRequests.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {submittedRequests.length} extracted form record{submittedRequests.length === 1 ? "" : "s"} need HR
+              approval
+            </p>
+            <p className="text-xs text-muted">
+              Employee and payroll records remain unchanged until these submissions are approved.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPeopleTab("requests")}
+            className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background"
+          >
+            Review pending work →
+          </button>
+        </div>
+      ) : null}
+
       {peopleTab === "directory" ? (
         <div className="overflow-hidden rounded-lg border border-foreground/10">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 bg-foreground/[0.03] px-3 py-2">
-            <p className="text-sm font-semibold text-foreground">Team members</p>
-            <Link href={`/${tenantSlug}/team`} className="text-xs font-semibold text-foreground underline">
-              Add someone on Team →
-            </Link>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-foreground/10 bg-foreground/[0.025] px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Employees and team members</p>
+              <p className="mt-0.5 text-xs text-muted">Manage payroll records separately from software access.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowHrOnlyForm(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 bg-background px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.05]"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Add HR/payroll member
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setInviteResult(null);
+                  setShowInviteModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background hover:opacity-90"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Invite members
+              </button>
+            </div>
           </div>
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted">
@@ -453,6 +704,7 @@ export function HrPeopleWorkspace({
           memberName={selectedMember.name}
           memberEmail={selectedMember.email}
           record={record}
+          payTemplates={payTemplates}
           checklist={selectedOnboarding?.items ?? []}
           checklistPercent={selectedOnboarding?.percent ?? 0}
           initialStep={onboardInitialStep}
@@ -492,7 +744,9 @@ export function HrPeopleWorkspace({
               onSubmit={(e) => {
                 e.preventDefault();
                 try {
-                  const payload = formDataToEmployeeProfilePayload(new FormData(e.currentTarget));
+                  const formData = new FormData(e.currentTarget);
+                  if (!formData.has("fullName")) formData.set("fullName", record.fullName);
+                  const payload = formDataToEmployeeProfilePayload(formData);
                   void runAction(() => upsertEmployeeProfile(tenantSlug, payload), "Employee record saved.");
                 } catch (err) {
                   showSnackbar(err instanceof Error ? err.message : "Invalid form data.", "error");
@@ -582,8 +836,15 @@ export function HrPeopleWorkspace({
                     defaultValue={record.addressStreet}
                     className="sm:col-span-2"
                   />
-                  <Field label="City" name="addressCity" defaultValue={record.addressCity} />
-                  <Field label="State" name="addressState" defaultValue={record.addressState} />
+                  <GlobalLocationFields
+                    countryName="addressCountry"
+                    stateName="addressState"
+                    cityName="addressCity"
+                    defaultCountry={record.addressCountry || "Nigeria"}
+                    defaultState={record.addressState}
+                    defaultCity={record.addressCity}
+                    className="grid gap-3 sm:col-span-2 sm:grid-cols-3"
+                  />
                 </div>
               ) : null}
 
@@ -616,6 +877,48 @@ export function HrPeopleWorkspace({
                       defaultValue={record.paygroupName}
                       hint="Used to filter payroll runs (e.g. Lagos, Abuja)."
                     />
+                    <div className="sm:col-span-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
+                      <div className="flex flex-wrap items-end gap-2">
+                        <label className="min-w-[220px] flex-1 text-sm">
+                          <span className="mb-1 block text-xs font-medium text-foreground">Pay template</span>
+                          <UiSelect
+                            defaultValue={record.payTemplateId}
+                            disabled={pending}
+                            onChange={(event) => {
+                              if (!event.target.value) return;
+                              void runAction(
+                                () =>
+                                  applyPayTemplate(tenantSlug, {
+                                    employeeProfileId: record.id,
+                                    templateId: event.target.value,
+                                  }),
+                                "Pay template applied.",
+                              );
+                            }}
+                          >
+                            <option value="">Custom allocation</option>
+                            {payTemplates.map((template) => (
+                              <option key={template.id} value={template.id}>
+                                {template.name} · {template.countryCode}
+                                {template.isDefault ? " · Default" : ""}
+                              </option>
+                            ))}
+                          </UiSelect>
+                        </label>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => setShowPayTemplateModal(true)}
+                          className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold hover:bg-foreground/[0.05] disabled:opacity-50"
+                        >
+                          Create template
+                        </button>
+                      </div>
+                      <p className="mt-2 text-[11px] text-muted">
+                        Applying a template copies its current allocation to this employee. You can still override the
+                        percentages below.
+                      </p>
+                    </div>
                     <Field
                       label={`Monthly gross pay (${currency})`}
                       name="grossMonthly"
@@ -636,10 +939,35 @@ export function HrPeopleWorkspace({
                       />
                     </Field>
                     <Field
-                      label={`Payee tax override (${currency})`}
+                      label="Basic salary (%)"
+                      name="basicPercent"
+                      type="number"
+                      defaultValue={record.basicPercent}
+                    />
+                    <Field
+                      label="Housing allowance (%)"
+                      name="housingPercent"
+                      type="number"
+                      defaultValue={record.housingPercent}
+                    />
+                    <Field
+                      label="Transport allowance (%)"
+                      name="transportPercent"
+                      type="number"
+                      defaultValue={record.transportPercent}
+                    />
+                    <Field
+                      label="Other earnings (%)"
+                      name="otherPercent"
+                      type="number"
+                      defaultValue={record.otherPercent}
+                      hint="The four salary allocation percentages must total 100%."
+                    />
+                    <Field
+                      label={`PAYE tax override (${currency})`}
                       name="payeeTaxMonthly"
                       defaultValue={record.payeeTaxMonthly}
-                      hint="Leave blank to auto-calculate (~9.98% of gross)."
+                      hint="Leave blank for the reviewed country tax engine. Overrides are audited."
                     >
                       <input
                         name="payeeTaxMonthly"
@@ -654,7 +982,82 @@ export function HrPeopleWorkspace({
                         }}
                       />
                     </Field>
+                    <Field
+                      label="Payroll country (ISO code)"
+                      name="payrollCountryCode"
+                      defaultValue={record.payrollCountryCode}
+                      hint="NG is available now. Other countries require a reviewed rule pack before payroll can run."
+                    />
+                    <Field
+                      label="Tax region / state code"
+                      name="payrollRegionCode"
+                      defaultValue={record.payrollRegionCode}
+                    />
+                    <Field label="Tax identification number" name="taxId" defaultValue={record.taxId} />
+                    <Field
+                      label="Tax override reason"
+                      name="taxOverrideReason"
+                      defaultValue={record.taxOverrideReason}
+                      hint="Required operational evidence whenever a manual PAYE amount is used."
+                    />
                   </div>
+                  <details className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                    <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                      Statutory deductions and verified reliefs
+                    </summary>
+                    <p className="mt-1 text-xs text-muted">
+                      Enter only amounts supported by employee evidence. Annual reliefs are apportioned and included in
+                      the calculation snapshot.
+                    </p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <Field label="Pension participation" name="pensionEnabled" defaultValue={record.pensionEnabled}>
+                        <UiSelect name="pensionEnabled" defaultValue={record.pensionEnabled}>
+                          <option value="yes">Enabled</option>
+                          <option value="no">Not applicable</option>
+                        </UiSelect>
+                      </Field>
+                      <div />
+                      <Field
+                        label="Employee pension rate (%)"
+                        name="employeePensionRate"
+                        type="number"
+                        defaultValue={record.employeePensionRate}
+                      />
+                      <Field
+                        label="Employer pension rate (%)"
+                        name="employerPensionRate"
+                        type="number"
+                        defaultValue={record.employerPensionRate}
+                      />
+                      <Field label={`NHF monthly (${currency})`} name="nhfMonthly" type="number" defaultValue={record.nhfMonthly} />
+                      <Field label={`NHIA monthly (${currency})`} name="nhiaMonthly" type="number" defaultValue={record.nhiaMonthly} />
+                      <Field label={`Annual rent paid (${currency})`} name="annualRent" type="number" defaultValue={record.annualRent} />
+                      <Field
+                        label={`Annual life insurance (${currency})`}
+                        name="annualLifeInsurance"
+                        type="number"
+                        defaultValue={record.annualLifeInsurance}
+                      />
+                      <Field
+                        label={`Annual mortgage interest (${currency})`}
+                        name="annualMortgageInterest"
+                        type="number"
+                        defaultValue={record.annualMortgageInterest}
+                      />
+                      <Field
+                        label={`Other pre-tax monthly (${currency})`}
+                        name="otherPreTaxMonthly"
+                        type="number"
+                        defaultValue={record.otherPreTaxMonthly}
+                      />
+                      <Field
+                        label={`Other post-tax monthly (${currency})`}
+                        name="otherPostTaxMonthly"
+                        type="number"
+                        defaultValue={record.otherPostTaxMonthly}
+                      />
+                    </div>
+                  </details>
                   <PayslipYtdCard
                     ytd={selectedUserId ? (ytdByUser.get(selectedUserId) ?? null) : null}
                     currency={currency}
@@ -742,8 +1145,15 @@ export function HrPeopleWorkspace({
                     defaultValue={record.nextOfKinEmail}
                   />
                   <Field label="Street" name="nextOfKinStreet" defaultValue={record.nextOfKinStreet} />
-                  <Field label="City" name="nextOfKinCity" defaultValue={record.nextOfKinCity} />
-                  <Field label="State" name="nextOfKinState" defaultValue={record.nextOfKinState} />
+                  <GlobalLocationFields
+                    countryName="nextOfKinCountry"
+                    stateName="nextOfKinState"
+                    cityName="nextOfKinCity"
+                    defaultCountry={record.nextOfKinCountry || record.addressCountry || "Nigeria"}
+                    defaultState={record.nextOfKinState}
+                    defaultCity={record.nextOfKinCity}
+                    className="grid gap-3 sm:col-span-2 sm:grid-cols-3"
+                  />
                   <Field
                     label="Occupation"
                     name="nextOfKinOccupation"
@@ -814,7 +1224,7 @@ export function HrPeopleWorkspace({
 
       {peopleTab === "send" ? (
         <form
-          className="rounded-lg border border-foreground/10 p-4"
+          className="overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-sm"
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
@@ -867,23 +1277,16 @@ export function HrPeopleWorkspace({
             })();
           }}
         >
-          <p className="mb-3 text-sm font-semibold text-foreground">Send a form link</p>
-          {sendMode === "team" && selectedMember ? (
-            <div className="mb-3 space-y-2">
-              <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] px-3 py-2 text-sm text-foreground">
-                Sending to <strong>{selectedMember.name}</strong> ({selectedMember.email}) — they are already
-                on Team. Job title and payroll details come from their HR record, not Team role.
-              </div>
-              <Link
-                href={`/${tenantSlug}/hr/dashboard?employeeUserId=${selectedMember.userId}`}
-                className="inline-block text-xs font-semibold text-foreground underline"
-              >
-                Preview their My dashboard →
-              </Link>
-            </div>
-          ) : null}
-          <div className="mb-4 flex gap-2 rounded-lg bg-foreground/[0.04] p-1">
-            <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md px-3 py-2 text-sm has-[:checked]:bg-background has-[:checked]:font-semibold has-[:checked]:shadow-sm">
+          <div className="border-b border-foreground/10 bg-foreground/[0.025] px-5 py-4">
+            <p className="text-base font-semibold text-foreground">Create onboarding link</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Choose the recipient and forms. Multiple forms are combined into one guided link.
+            </p>
+          </div>
+
+          <div className="p-5">
+            <div className="flex gap-1 rounded-lg border border-foreground/10 bg-foreground/[0.035] p-1">
+            <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md px-3 py-2.5 text-sm transition has-[:checked]:bg-background has-[:checked]:font-semibold has-[:checked]:shadow-sm">
               <input
                 type="radio"
                 name="sendMode"
@@ -894,7 +1297,7 @@ export function HrPeopleWorkspace({
               />
               Team member
             </label>
-            <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md px-3 py-2 text-sm has-[:checked]:bg-background has-[:checked]:font-semibold has-[:checked]:shadow-sm">
+            <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md px-3 py-2.5 text-sm transition has-[:checked]:bg-background has-[:checked]:font-semibold has-[:checked]:shadow-sm">
               <input
                 type="radio"
                 name="sendMode"
@@ -903,110 +1306,149 @@ export function HrPeopleWorkspace({
                 onChange={() => setSendMode("newcomer")}
                 className="sr-only"
               />
-              New joiner (not on Team yet)
+              New joiner
             </label>
           </div>
 
-          {sendMode === "team" ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Team member" name="userId" required={sendMode === "team"}>
-                <UiSelect
-                  name="userId"
-                  defaultValue={selectedUserId ?? ""}
-                  key={`send-user-${selectedUserId ?? "none"}`}
-                >
-                  <option value="">Select…</option>
-                  {teamMembers.map((m) => (
-                    <option key={m.userId} value={m.userId}>
-                      {m.name} — {m.email}
-                    </option>
-                  ))}
-                </UiSelect>
-              </Field>
-              <p className="sm:col-span-2 text-xs text-muted">
-                We will email the link to their address on file when you copy it into your mail app. Their
-                name is filled in automatically.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Full name" name="recipientName" required={sendMode === "newcomer"} />
-              <Field
-                label="Email address"
-                name="recipientEmail"
-                type="email"
-                required={sendMode === "newcomer"}
-              />
-              <p className="sm:col-span-2 text-xs text-muted">
-                For candidates not on Team yet. After they join, add them under Team and merge records.
-              </p>
-            </div>
-          )}
+            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+              <div className="space-y-5">
+                <section>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">Recipient</p>
+                    {sendMode === "team" && selectedMember ? (
+                      <Link
+                        href={`/${tenantSlug}/hr/dashboard?employeeUserId=${selectedMember.userId}`}
+                        className="text-xs font-semibold text-foreground underline"
+                      >
+                        Preview dashboard
+                      </Link>
+                    ) : null}
+                  </div>
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
+                    {sendMode === "team" ? (
+                      <Field label="Employee" name="userId" required>
+                        <UiSelect
+                          name="userId"
+                          defaultValue={selectedUserId ?? ""}
+                          key={`send-user-${selectedUserId ?? "none"}`}
+                          onChange={(event) => setSelectedUserId(event.target.value || null)}
+                        >
+                          <option value="">Select employee…</option>
+                          {teamMembers.map((m) => (
+                            <option key={m.userId} value={m.userId}>
+                              {m.name} — {m.email}
+                            </option>
+                          ))}
+                        </UiSelect>
+                      </Field>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Full name" name="recipientName" required />
+                        <Field label="Email address" name="recipientEmail" type="email" required />
+                      </div>
+                    )}
+                    {sendMode === "team" && selectedMember ? (
+                      <div className="mt-3 flex items-center gap-3 rounded-md bg-[var(--success-wash)] px-3 py-2">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--success)] text-xs font-bold text-white">
+                          {selectedMember.name.slice(0, 1).toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{selectedMember.name}</p>
+                          <p className="truncate text-xs text-muted">{selectedMember.email}</p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
 
-          <div className="mt-3 space-y-3">
-            <div>
-              <p className="mb-2 text-xs font-semibold text-foreground">Forms to send *</p>
-              <p className="mb-2 text-[11px] text-muted">
-                Select one or more — multiple forms share one master link with a step-by-step checklist.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {HR_FORM_OPTIONS.map((opt) => {
-                  const on = selectedFormTypes.includes(opt.value);
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => toggleFormType(opt.value)}
-                      className={[
-                        "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                        on
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-foreground/15 bg-background text-foreground hover:bg-foreground/[0.04]",
-                      ].join(" ")}
-                    >
-                      {on ? "✓ " : ""}
-                      {opt.label}
-                    </button>
-                  );
-                })}
+                <section>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Forms</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {HR_FORM_OPTIONS.map((opt) => {
+                      const on = selectedFormTypes.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => toggleFormType(opt.value)}
+                          className={[
+                            "flex items-center justify-between rounded-lg border px-3 py-3 text-left text-sm font-medium transition-all",
+                            on
+                              ? "border-foreground bg-foreground text-background shadow-sm"
+                              : "border-foreground/10 bg-background text-foreground hover:border-foreground/25 hover:bg-foreground/[0.025]",
+                          ].join(" ")}
+                        >
+                          <span>{opt.label}</span>
+                          <span
+                            className={[
+                              "flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
+                              on ? "border-background/30 bg-background/15" : "border-foreground/15",
+                            ].join(" ")}
+                          >
+                            {on ? "✓" : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
               </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="How they complete it" name="deliveryMode">
-                <UiSelect name="deliveryMode" defaultValue="BOTH">
-                  <option value="ONLINE_FILL">Fill online only</option>
-                  <option value="PRINT_UPLOAD">Print & upload only</option>
-                  <option value="BOTH">Online or print & upload</option>
-                </UiSelect>
-              </Field>
-              <Field label="Link expires (days)" name="expiresInDays" type="number" defaultValue="14">
-                <input
-                  name="expiresInDays"
-                  type="number"
-                  min={1}
-                  max={90}
-                  defaultValue={14}
-                  className={inputClass}
-                />
-              </Field>
-              <Field label="Note to employee" name="hrNote" hint="Optional message shown on the form." />
+
+              <aside className="rounded-xl border border-foreground/10 bg-foreground/[0.025] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Delivery</p>
+                <div className="mt-3 space-y-3">
+                  <Field label="Completion method" name="deliveryMode">
+                    <UiSelect name="deliveryMode" defaultValue="BOTH">
+                      <option value="ONLINE_FILL">Fill online</option>
+                      <option value="PRINT_UPLOAD">Print and upload</option>
+                      <option value="BOTH">Online or print and upload</option>
+                    </UiSelect>
+                  </Field>
+                  <Field label="Link expires after" name="expiresInDays">
+                    <div className="relative">
+                      <input
+                        name="expiresInDays"
+                        type="number"
+                        min={1}
+                        max={90}
+                        defaultValue={14}
+                        className={`${inputClass} pr-14`}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted">
+                        days
+                      </span>
+                    </div>
+                  </Field>
+                  <Field label="Message" name="hrNote" hint="Optional note shown to the recipient." />
+                </div>
+
+                <div className="mt-4 rounded-lg border border-foreground/10 bg-background p-3">
+                  <p className="text-xs text-muted">Request summary</p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">
+                    {selectedFormTypes.length} form{selectedFormTypes.length === 1 ? "" : "s"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {selectedFormTypes.length > 1 ? "One master onboarding link" : "One secure form link"}
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={pending || selectedFormTypes.length === 0}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-md border border-foreground bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {pending
+                    ? "Creating link…"
+                    : selectedFormTypes.length > 1
+                      ? "Create onboarding link"
+                      : "Create form link"}
+                </button>
+              </aside>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={pending || selectedFormTypes.length === 0}
-            className="mt-4 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-          >
-            {pending
-              ? "Generating…"
-              : selectedFormTypes.length > 1
-                ? "Generate master link"
-                : "Generate link"}
-          </button>
-
           {createdMasterUrl || createdFormLinks.length > 0 ? (
-            <div className="mt-4 space-y-3 rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] p-3 text-xs">
+            <div className="mx-5 mb-5 space-y-3 rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4 text-xs">
               {createdSendToEmail ? (
                 <p className="font-semibold text-foreground">Send to: {createdSendToEmail}</p>
               ) : null}
@@ -1070,8 +1512,29 @@ export function HrPeopleWorkspace({
         formRequests.length === 0 ? (
           <p className="text-sm text-muted">No form requests yet. Send a form from the Send forms tab.</p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-foreground/10">
-            <table className="w-full text-left text-sm">
+          <div className="space-y-3">
+            {submittedRequests.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {submittedRequests.length} record{submittedRequests.length === 1 ? "" : "s"} ready for review
+                  </p>
+                  <p className="text-xs text-muted">
+                    Bulk approval applies all extracted fields to their matched employees.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setShowBulkApproveModal(true)}
+                  className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                >
+                  {pending ? "Approving…" : `Approve all ${submittedRequests.length}`}
+                </button>
+              </div>
+            ) : null}
+            <div className="overflow-hidden rounded-lg border border-foreground/10">
+              <table className="w-full text-left text-sm">
               <thead className="bg-foreground/[0.03] text-xs uppercase text-muted">
                 <tr>
                   <th className="px-3 py-2">Person</th>
@@ -1085,7 +1548,37 @@ export function HrPeopleWorkspace({
                 {formRequests.map((r) => (
                   <tr key={r.id}>
                     <td className="px-3 py-2">{r.employeeName}</td>
-                    <td className="px-3 py-2">{r.formTypeLabel}</td>
+                    <td className="px-3 py-2">
+                      {r.formTypeLabel}
+                      {r.submittedPayload ? (
+                        <details className="mt-1 max-w-sm text-xs">
+                          <summary className="cursor-pointer font-semibold text-[var(--accent)]">
+                            Review extracted data
+                          </summary>
+                          {r.reviewNote ? <p className="mt-1 text-[10px] text-muted">{r.reviewNote}</p> : null}
+                          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 rounded-md bg-foreground/[0.04] p-2">
+                            {Object.entries(r.submittedPayload)
+                              .filter(([, value]) => value !== "" && value != null)
+                              .map(([key, value]) => (
+                                <div key={key} className="contents">
+                                  <dt className="font-medium text-muted">{key.replace(/([A-Z])/g, " $1")}</dt>
+                                  <dd className="break-words text-foreground">{String(value)}</dd>
+                                </div>
+                              ))}
+                          </dl>
+                          {r.submittedFileUrl ? (
+                            <a
+                              href={r.submittedFileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-block font-semibold underline"
+                            >
+                              Open source document
+                            </a>
+                          ) : null}
+                        </details>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2">
                       {r.status}
                       {r.submittedAtLabel !== "—" ? (
@@ -1120,10 +1613,470 @@ export function HrPeopleWorkspace({
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )
       ) : null}
+
+      <ModalOverlay
+        open={showPayTemplateModal}
+        onClose={() => {
+          if (!pending) setShowPayTemplateModal(false);
+        }}
+        panelClassName={MODAL_PANEL_FORM}
+        aria-labelledby="pay-template-title"
+      >
+        <div>
+          <h2 id="pay-template-title" className="text-xl font-semibold text-foreground">
+            Create pay template
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Reuse one salary allocation across employees, then override individual records when needed.
+          </p>
+        </div>
+        <form
+          className="mt-5 space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const formData = new FormData(event.currentTarget);
+            const data = {
+              name: String(formData.get("name") || ""),
+              countryCode: String(formData.get("countryCode") || "NG"),
+              basicPercent: Number(formData.get("basicPercent")),
+              housingPercent: Number(formData.get("housingPercent")),
+              transportPercent: Number(formData.get("transportPercent")),
+              otherPercent: Number(formData.get("otherPercent")),
+              pensionEnabled: formData.get("pensionEnabled") === "on",
+              employeePensionRate: Number(formData.get("employeePensionRate")),
+              employerPensionRate: Number(formData.get("employerPensionRate")),
+              isDefault: formData.get("isDefault") === "on",
+            };
+            void runAction(() => createPayTemplate(tenantSlug, data), "Pay template created.").then((ok) => {
+              if (ok) setShowPayTemplateModal(false);
+            });
+          }}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Template name" name="name" required />
+            <Field
+              label="Payroll country code"
+              name="countryCode"
+              defaultValue={record?.payrollCountryCode || "NG"}
+              required
+            />
+            <Field
+              label="Basic (%)"
+              name="basicPercent"
+              type="number"
+              defaultValue={record?.basicPercent || "30"}
+              required
+            />
+            <Field
+              label="Housing (%)"
+              name="housingPercent"
+              type="number"
+              defaultValue={record?.housingPercent || "20"}
+              required
+            />
+            <Field
+              label="Transport (%)"
+              name="transportPercent"
+              type="number"
+              defaultValue={record?.transportPercent || "15"}
+              required
+            />
+            <Field
+              label="Other earnings (%)"
+              name="otherPercent"
+              type="number"
+              defaultValue={record?.otherPercent || "35"}
+              required
+            />
+            <Field
+              label="Employee pension (%)"
+              name="employeePensionRate"
+              type="number"
+              defaultValue={record?.employeePensionRate || "8"}
+              required
+            />
+            <Field
+              label="Employer pension (%)"
+              name="employerPensionRate"
+              type="number"
+              defaultValue={record?.employerPensionRate || "10"}
+              required
+            />
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
+            <label className="flex items-center gap-2">
+              <input name="pensionEnabled" type="checkbox" defaultChecked={record?.pensionEnabled !== "no"} />
+              Pension applies
+            </label>
+            <label className="flex items-center gap-2">
+              <input name="isDefault" type="checkbox" />
+              Default for this country
+            </label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setShowPayTemplateModal(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            >
+              {pending ? "Creating…" : "Create template"}
+            </button>
+          </div>
+        </form>
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={showHrOnlyForm}
+        onClose={() => {
+          if (!pending) setShowHrOnlyForm(false);
+        }}
+        panelClassName={MODAL_PANEL_FORM}
+        aria-labelledby="add-hr-member-title"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="add-hr-member-title" className="text-xl font-semibold text-foreground">
+              Add HR/payroll member
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Create an employee record for payroll, headcount and documents without giving software access.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setShowHrOnlyForm(false)}
+            className="text-sm font-medium text-muted underline disabled:opacity-50"
+          >
+            Close
+          </button>
+        </div>
+        <form
+          className="mt-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const data = Object.fromEntries(new FormData(form));
+            void runAction(() => createHrOnlyEmployee(tenantSlug, data), "HR/payroll member added.").then((ok) => {
+              if (ok) {
+                form.reset();
+                setShowHrOnlyForm(false);
+              }
+            });
+          }}
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Full name" name="fullName" required />
+            <Field label="Work email (optional)" name="workEmail" type="email" />
+            <Field label="Phone" name="phoneMobile" />
+            <Field label="Job title" name="position" />
+            <Field label="Department" name="department" />
+            <Field label="Pay group" name="paygroupName" />
+            <Field label={`Gross monthly pay (${currency})`} name="grossMonthly" type="number" />
+          </div>
+          <div className="mt-5 rounded-lg border border-[var(--info-line)] bg-[var(--info-wash)] px-4 py-3 text-xs text-foreground">
+            This person will not receive an invitation and cannot sign in. You can invite them separately later.
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setShowHrOnlyForm(false)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium hover:bg-foreground/[0.05] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : <UserPlus className="h-4 w-4" />}
+              {pending ? "Adding member…" : "Add HR/payroll member"}
+            </button>
+          </div>
+        </form>
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={showInviteModal}
+        onClose={closeInviteModal}
+        panelClassName={MODAL_PANEL_FORM}
+        aria-labelledby="invite-members-title"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="invite-members-title" className="text-xl font-semibold text-foreground">
+              Invite members
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Send {companyName} software access to one person or a whole team.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={closeInviteModal}
+            className="text-sm font-medium text-muted underline disabled:opacity-50"
+          >
+            Close
+          </button>
+        </div>
+
+        <form
+          className="mt-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (inviteMode === "single") {
+              const email = String(new FormData(event.currentTarget).get("inviteEmail") || "");
+              void sendInvites(inviteRowsForEmails([email]));
+            } else if (inviteMode === "bulk") {
+              void sendInvites(inviteRowsForEmails(bulkInviteEmails.split(/[\s,;]+/)));
+            } else {
+              void sendInvites(excelInviteRows);
+            }
+          }}
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                { id: "single", label: "One person", hint: "Send one invitation", icon: UserPlus },
+                { id: "bulk", label: "Bulk invite", hint: "Paste multiple emails", icon: Users },
+                { id: "excel", label: "Excel upload", hint: "Import a prepared list", icon: FileSpreadsheet },
+              ] as const
+            ).map((option) => {
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    setInviteMode(option.id);
+                    setInviteResult(null);
+                  }}
+                  className={[
+                    "rounded-lg border p-3 text-left transition",
+                    inviteMode === option.id
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-foreground/10 bg-background hover:border-foreground/25",
+                  ].join(" ")}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="mt-2 block text-sm font-semibold">{option.label}</span>
+                  <span className={inviteMode === option.id ? "text-xs text-background/70" : "text-xs text-muted"}>
+                    {option.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4">
+            {inviteMode === "single" ? (
+              <Field label="Work email" name="inviteEmail" type="email" required />
+            ) : null}
+            {inviteMode === "bulk" ? (
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-foreground">Email addresses</span>
+                <textarea
+                  value={bulkInviteEmails}
+                  onChange={(event) => setBulkInviteEmails(event.target.value)}
+                  rows={6}
+                  placeholder={"ada@company.com\nchidi@company.com\nfatima@company.com"}
+                  className={`${inputClass} resize-y font-mono text-xs`}
+                />
+                <span className="mt-1 block text-[11px] text-muted">
+                  Separate addresses with new lines, commas or spaces.
+                </span>
+              </label>
+            ) : null}
+            {inviteMode === "excel" ? (
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Upload invite workbook</p>
+                    <p className="mt-0.5 text-xs text-muted">Columns: Email, Department, Department Lead.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void downloadInviteTemplate()}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold underline"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download template
+                  </button>
+                </div>
+                <label className="mt-4 flex cursor-pointer flex-col items-center rounded-lg border border-dashed border-foreground/20 bg-background px-4 py-7 text-center hover:border-foreground/40">
+                  <FileSpreadsheet className="h-7 w-7 text-muted" />
+                  <span className="mt-2 text-sm font-semibold text-foreground">
+                    {excelInviteFile || "Choose Excel file"}
+                  </span>
+                  <span className="mt-1 text-xs text-muted">.xlsx files up to 100 invitations</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="sr-only"
+                    disabled={pending}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void readInviteWorkbook(file);
+                    }}
+                  />
+                </label>
+                {excelInviteRows.length ? (
+                  <div className="mt-3 rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] px-3 py-2 text-xs text-foreground">
+                    {excelInviteRows.length} valid invitation{excelInviteRows.length === 1 ? "" : "s"} ready to send.
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-medium text-foreground">
+                {inviteMode === "excel" ? "Fallback department" : "Department"}
+              </span>
+              <UiSelect value={inviteDepartment} onChange={(event) => setInviteDepartment(event.target.value)}>
+                {INVITE_DEPARTMENT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </label>
+            <label className="flex items-center gap-3 rounded-md border border-foreground/10 bg-field px-3 py-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={inviteLead}
+                onChange={(event) => setInviteLead(event.target.checked)}
+                className="h-4 w-4"
+              />
+              <span>
+                <span className="block font-medium text-foreground">Department lead</span>
+                <span className="block text-[11px] text-muted">Applied to single and pasted invitations.</span>
+              </span>
+            </label>
+          </div>
+
+          {inviteResult ? (
+            <div
+              className={[
+                "mt-4 rounded-lg border px-4 py-3 text-sm",
+                inviteResult.failed.length
+                  ? "border-[var(--warn-line)] bg-[var(--warn-wash)]"
+                  : "border-[var(--success-line)] bg-[var(--success-wash)]",
+              ].join(" ")}
+            >
+              <p className="font-semibold text-foreground">
+                {inviteResult.invited} invitation{inviteResult.invited === 1 ? "" : "s"} created
+              </p>
+              {inviteResult.failed.length ? (
+                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto text-xs text-muted">
+                  {inviteResult.failed.map((failure) => (
+                    <li key={`${failure.email}-${failure.error}`}>
+                      <strong className="text-foreground">{failure.email || "Row"}:</strong> {failure.error}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={closeInviteModal}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium hover:bg-foreground/[0.05] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending || (inviteMode === "excel" && !excelInviteRows.length)}
+              className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? <ButtonSpinner /> : <Send className="h-4 w-4" />}
+              {pending
+                ? "Sending invitations…"
+                : inviteMode === "single"
+                  ? "Send invitation"
+                  : inviteMode === "bulk"
+                    ? "Send bulk invitations"
+                    : `Send ${excelInviteRows.length || ""} invitations`}
+            </button>
+          </div>
+        </form>
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={showBulkApproveModal}
+        onClose={() => {
+          if (!pending) setShowBulkApproveModal(false);
+        }}
+        panelClassName={MODAL_PANEL_XS}
+        aria-labelledby="bulk-approve-title"
+      >
+        <h2 id="bulk-approve-title" className="text-lg font-semibold text-foreground">
+          Approve all submitted records?
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          This will apply data from{" "}
+          <strong className="font-semibold text-foreground">
+            {submittedRequests.length} extracted record{submittedRequests.length === 1 ? "" : "s"}
+          </strong>{" "}
+          to their matched employee profiles.
+        </p>
+        <div className="mt-3 rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-xs text-foreground">
+          Review any uncertain extraction before continuing. Approved employment and payroll fields immediately
+          become part of the employee record.
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setShowBulkApproveModal(false)}
+            className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={pending || submittedRequests.length === 0}
+            aria-busy={pending}
+            onClick={() => {
+              void runAction(
+                () =>
+                  approveHrFormRequestsBatch(
+                    tenantSlug,
+                    submittedRequests.map((request) => request.id),
+                  ),
+                `${submittedRequests.length} records approved.`,
+              ).then((ok) => {
+                if (ok) setShowBulkApproveModal(false);
+              });
+            }}
+            className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+          >
+            {pending ? <ButtonSpinner /> : null}
+            {pending ? "Approving…" : `Approve all ${submittedRequests.length}`}
+          </button>
+        </div>
+      </ModalOverlay>
 
       {showOfferLetter && record && selectedUserId ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4 print:bg-white print:p-0">
@@ -1132,16 +2085,13 @@ export function HrPeopleWorkspace({
               <button type="button" className="text-sm underline" onClick={() => setShowOfferLetter(false)}>
                 Close
               </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
-              >
-                Print / Save PDF
-              </button>
+              <PdfDownloadButton filename={`offer-letter-${record.fullName || "employee"}`}>
+                Download PDF
+              </PdfDownloadButton>
             </div>
             <OfferLetterEditor
               tenantSlug={tenantSlug}
+              aiEnabled={aiEnabled}
               brand={tenantBrand}
               userId={selectedUserId}
               employeeProfileId={offerByUserId?.[selectedUserId]?.profileId || record.id || undefined}

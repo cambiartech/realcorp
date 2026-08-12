@@ -2,10 +2,12 @@ import { auth } from "@/auth";
 import { DealStage, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
+import { paginate, parsePage } from "@/lib/pagination";
 import { notFound } from "next/navigation";
 import { DealsWorkspace } from "./deals-workspace";
 
 export const dynamic = "force-dynamic";
+const DEALS_PAGE_SIZE = 50;
 
 export default async function DealsPage({
   params,
@@ -18,10 +20,12 @@ export default async function DealsPage({
     stage?: string;
     projectId?: string;
     view?: string;
+    dealsPage?: string;
   }>;
 }) {
   const { tenantSlug } = await params;
-  const { leadId, owner, stage, projectId, view } = await searchParams;
+  const query = await searchParams;
+  const { leadId, owner, stage, projectId, view, dealsPage } = query;
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -56,29 +60,20 @@ export default async function DealsPage({
     ? (stage as DealStage)
     : undefined;
 
-  const [deals, leads, users, units, projects] = await Promise.all([
-    prisma.deal.findMany({
-      where: {
-        tenantId: tenant.id,
-        ...(owner ? { assignedUserId: owner } : {}),
-        ...(parsedStage ? { stage: parsedStage } : {}),
-        ...(projectId
-          ? {
-              unit: {
-                projectId,
-              },
-            }
-          : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      include: {
-        lead: { select: { id: true, name: true, score: true } },
-        unit: {
-          select: { id: true, label: true, projectId: true, project: { select: { id: true, name: true } } },
-        },
-      },
-      take: 500,
-    }),
+  const dealWhere = {
+    tenantId: tenant.id,
+    ...(owner ? { assignedUserId: owner } : {}),
+    ...(parsedStage ? { stage: parsedStage } : {}),
+    ...(projectId
+      ? {
+          unit: {
+            projectId,
+          },
+        }
+      : {}),
+  };
+  const [totalDeals, leads, users, units, projects] = await Promise.all([
+    prisma.deal.count({ where: dealWhere }),
     prisma.lead.findMany({
       where: { tenantId: tenant.id },
       orderBy: { createdAt: "desc" },
@@ -103,6 +98,19 @@ export default async function DealsPage({
       take: 400,
     }),
   ]);
+  const pagination = paginate(totalDeals, parsePage(dealsPage), DEALS_PAGE_SIZE);
+  const deals = await prisma.deal.findMany({
+    where: dealWhere,
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    skip: pagination.skip,
+    take: pagination.pageSize,
+    include: {
+      lead: { select: { id: true, name: true, score: true } },
+      unit: {
+        select: { id: true, label: true, projectId: true, project: { select: { id: true, name: true } } },
+      },
+    },
+  });
 
   const userMap = new Map(users.map((u) => [u.user.id, u.user]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
@@ -141,6 +149,8 @@ export default async function DealsPage({
       defaultLeadId={leadId}
       activeFilterChips={activeFilterChips}
       initialView={view === "list" ? "list" : "kanban"}
+      pagination={pagination}
+      paginationSearchParams={query}
       deals={deals.map((deal) => ({
         id: deal.id,
         leadId: deal.leadId,

@@ -1,7 +1,7 @@
 "use client";
 
-import { Printer } from "lucide-react";
 import { PaymentReceiptPrintView } from "@/components/finance/payment-receipt-print-view";
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 import type { TenantBranding } from "@/lib/tenant-branding";
 
 export function PaymentReceiptPrintClient(props: {
@@ -21,14 +21,7 @@ export function PaymentReceiptPrintClient(props: {
   return (
     <>
       <div className="mb-4 flex justify-end print:hidden">
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
-        >
-          <Printer className="h-3.5 w-3.5" />
-          Print / Save PDF
-        </button>
+        <PdfDownloadButton filename={`payment-receipt-${props.receiptNumber}`}>Download PDF</PdfDownloadButton>
       </div>
       <PaymentReceiptPrintView {...props} />
     </>

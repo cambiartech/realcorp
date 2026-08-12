@@ -394,6 +394,7 @@ export function TenantSidebar({
     ? canManageHr
       ? [
           { id: "people", label: "People", href: `${hrItem.href}/people`, icon: Users },
+          { id: "leave", label: "Leave tracker", href: `${hrItem.href}/leave`, icon: CalendarDays },
           { id: "payslips", label: "Payslips", href: `${hrItem.href}/payslips`, icon: Banknote },
           { id: "appraisals", label: "Appraisals", href: `${hrItem.href}/appraisals`, icon: Star },
           { id: "documents", label: "Documents", href: `${hrItem.href}/documents`, icon: FileText },
@@ -402,7 +403,10 @@ export function TenantSidebar({
             ? [{ id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard`, icon: UserCircle }]
             : []),
         ]
-      : [{ id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard`, icon: UserCircle }]
+      : [
+          { id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard`, icon: UserCircle },
+          { id: "leave", label: "Leave tracker", href: `${hrItem.href}/leave`, icon: CalendarDays },
+        ]
     : [];
   const hasFinanceItems = financeSubItems.length > 0;
   const hasHrItems = hrSubItems.length > 0;

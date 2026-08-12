@@ -1,4 +1,4 @@
-import { HrFormRequestStatus } from "@/generated/prisma";
+import { HrFormRequestStatus, HrLeaveRequestStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   buildStaffMonthlyPerformance,
@@ -15,6 +15,7 @@ export type HrDashboardMetrics = {
   employeeProfileCount: number;
   activeEmployeeCount: number;
   pendingFormCount: number;
+  pendingLeaveCount: number;
   openAppraisalCount: number;
   topPerformers: Array<{
     name: string;
@@ -36,6 +37,7 @@ const EMPTY: HrDashboardMetrics = {
   employeeProfileCount: 0,
   activeEmployeeCount: 0,
   pendingFormCount: 0,
+  pendingLeaveCount: 0,
   openAppraisalCount: 0,
   topPerformers: [],
 };
@@ -58,6 +60,7 @@ export async function loadHrDashboardMetrics(
     employeeProfileCount,
     activeEmployeeCount,
     pendingFormCount,
+    pendingLeaveCount,
     openAppraisalCount,
     profiles,
     tasks,
@@ -76,6 +79,9 @@ export async function loadHrDashboardMetrics(
         status: { in: [HrFormRequestStatus.PENDING] },
         expiresAt: { gt: now },
       },
+    }),
+    prisma.hrLeaveRequest.count({
+      where: { tenantId, status: HrLeaveRequestStatus.PENDING },
     }),
     prisma.hrAppraisal.count({
       where: {
@@ -148,6 +154,7 @@ export async function loadHrDashboardMetrics(
     employeeProfileCount,
     activeEmployeeCount,
     pendingFormCount,
+    pendingLeaveCount,
     openAppraisalCount,
     topPerformers,
   };

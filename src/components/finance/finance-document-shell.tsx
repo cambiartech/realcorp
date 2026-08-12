@@ -17,7 +17,10 @@ export function FinanceDocumentShell({
   const address = formatOrgAddress(brand);
 
   return (
-    <article className="mx-auto max-w-[720px] rounded-lg border border-neutral-200 bg-white text-neutral-900 shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+    <article
+      data-pdf-document="true"
+      className="mx-auto max-w-[720px] rounded-lg border border-neutral-200 bg-white text-neutral-900 shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none"
+    >
       <header className="border-b border-neutral-200 px-8 pb-6 pt-8 print:px-6">
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
@@ -147,9 +148,18 @@ function HeroBackdrop() {
   return (
     <div className="backdrop" aria-hidden="true">
       <div className="backdrop-grid" />
-      <motion.div className="backdrop-glow glow-a" {...drift([0, 60, -20, 0], [0, 30, 60, 0], 22)} />
-      <motion.div className="backdrop-glow glow-b" {...drift([0, -50, 30, 0], [0, 40, -20, 0], 26)} />
-      <motion.div className="backdrop-glow glow-c" {...drift([0, 40, -40, 0], [0, -30, 20, 0], 30)} />
+      <motion.div
+        className="backdrop-glow glow-a"
+        {...drift([0, 60, -20, 0], [0, 30, 60, 0], 22)}
+      />
+      <motion.div
+        className="backdrop-glow glow-b"
+        {...drift([0, -50, 30, 0], [0, 40, -20, 0], 26)}
+      />
+      <motion.div
+        className="backdrop-glow glow-c"
+        {...drift([0, 40, -40, 0], [0, -30, 20, 0], 30)}
+      />
     </div>
   );
 }
@@ -166,7 +176,13 @@ const NAV = [
   { href: "#faq", label: "FAQ" },
 ];
 
-const CUSTOMERS = ["Kingsway Estates", "Marigold Group", "Lekki Heights", "Sterling Realty", "Adron Homes"];
+const CUSTOMERS = [
+  "Kingsway Estates",
+  "Marigold Group",
+  "Lekki Heights",
+  "Sterling Realty",
+  "Adron Homes",
+];
 
 const BEFORE = [
   "Unit availability lives in a WhatsApp thread",
@@ -306,7 +322,12 @@ const MODULES = [
     icon: <IconLayers />,
     title: "Multi-tenant platform",
     body: "An isolated workspace per organization, one console to run them.",
-    items: ["Isolated tenant data", "Platform console", "SSO & role-based access", "Per-tenant branding"],
+    items: [
+      "Isolated tenant data",
+      "Platform console",
+      "SSO & role-based access",
+      "Per-tenant branding",
+    ],
   },
   {
     n: "06",
@@ -323,12 +344,36 @@ const MODULES = [
 ];
 
 const CHAIN = [
-  { k: "01", t: "Lead", d: "Arrives from WhatsApp, Meta or a form. Scored and routed." },
-  { k: "02", t: "Deal", d: "Stages, documents and the rep who owns the outcome." },
-  { k: "03", t: "Unit", d: "Allocated and locked the moment the deal reaches contract." },
-  { k: "04", t: "Plan", d: "Milestones generated from the contract, not retyped." },
-  { k: "05", t: "Ledger", d: "Receivables age, payments match, the audit trail writes itself." },
-  { k: "06", t: "Payslip", d: "Commission accrues off the same number sales closed on." },
+  {
+    k: "01",
+    t: "Lead",
+    d: "Arrives from WhatsApp, Meta or a form. Scored and routed.",
+  },
+  {
+    k: "02",
+    t: "Deal",
+    d: "Stages, documents and the rep who owns the outcome.",
+  },
+  {
+    k: "03",
+    t: "Unit",
+    d: "Allocated and locked the moment the deal reaches contract.",
+  },
+  {
+    k: "04",
+    t: "Plan",
+    d: "Milestones generated from the contract, not retyped.",
+  },
+  {
+    k: "05",
+    t: "Ledger",
+    d: "Receivables age, payments match, the audit trail writes itself.",
+  },
+  {
+    k: "06",
+    t: "Payslip",
+    d: "Commission accrues off the same number sales closed on.",
+  },
 ];
 
 const SECURITY = [
@@ -487,14 +532,22 @@ function Nav() {
           >
             <div className="wrap nav-sheet-in">
               {NAV.map((item) => (
-                <a key={item.href} href={item.href} onClick={() => setOpen(false)}>
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                >
                   {item.label}
                 </a>
               ))}
               <Link href="/login" onClick={() => setOpen(false)}>
                 Sign in
               </Link>
-              <a className="btn btn-primary" href="#cta" onClick={() => setOpen(false)}>
+              <a
+                className="btn btn-primary"
+                href="#cta"
+                onClick={() => setOpen(false)}
+              >
                 Book a demo <IconChev className="chev" />
               </a>
             </div>
@@ -509,7 +562,10 @@ function Nav() {
 function Hero() {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
   const raw = useTransform(scrollYProgress, [0, 1], [0, -70]);
   const lift = useSpring(raw, { stiffness: 90, damping: 26, mass: 0.5 });
 
@@ -519,9 +575,14 @@ function Hero() {
       <div className="wrap-wide">
         <motion.div
           className="hero-in"
-          initial="hidden"
+          initial={false}
           animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } } }}
+          variants={{
+            hidden: {},
+            show: {
+              transition: { staggerChildren: 0.09, delayChildren: 0.05 },
+            },
+          }}
         >
           <motion.a className="pill" href="#modules" variants={rise}>
             <b>New</b> Shortlets, channel manager & night audit
@@ -530,12 +591,14 @@ function Hero() {
 
           <motion.h1 className="h1" variants={rise}>
             {/* nbsp keeps the italic phrase from breaking across two lines */}
-            Everything a <span className="em">real&nbsp;corporation</span> runs on.
+            Everything a <span className="em">real&nbsp;corporation</span> runs
+            on.
           </motion.h1>
 
           <motion.p className="lede" variants={rise}>
-            Sales, inventory, finance and people on one ledger — not four systems pretending to talk. A
-            contract signed this morning is a locked unit, a payment schedule and a commission accrual before
+            Sales, inventory, finance and people on one ledger — not four
+            systems pretending to talk. A contract signed this morning is a
+            locked unit, a payment schedule and a commission accrual before
             lunch. Property-first, built for companies that build real things.
           </motion.p>
 
@@ -579,10 +642,14 @@ function Hero() {
               <span>realcorp · command center</span>
             </div>
             <div className="shot-inner">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src="/screenshots/sc-1.png"
                 alt="Realcorp command centre: lead and deal counters, collections against target, pipeline against target, pending finance approvals and a live inventory snapshot on one dashboard"
+                width={3022}
+                height={1480}
+                sizes="(max-width: 760px) 94vw, 1200px"
+                quality={78}
+                priority
               />
             </div>
           </motion.div>
@@ -597,7 +664,9 @@ function LogoStrip() {
   return (
     <section className="strip" id="customers">
       <div className="wrap strip-in">
-        <div className="strip-label">Trusted by real corporations — property-first, built to scale</div>
+        <div className="strip-label">
+          Trusted by real corporations — property-first, built to scale
+        </div>
         {CUSTOMERS.map((name, i) => (
           <Reveal key={name} delay={i} className="strip-logo">
             <CustomerGlyph index={i} />
@@ -615,11 +684,20 @@ function CustomerGlyph({ index }: { index: number }) {
     <path key="0" d="M4 14 10 3l6 11H4Z" />,
     <rect key="1" x="4" y="4" width="10" height="10" rx="2" />,
     <path key="2" d="M9 3l6 6-6 6-6-6 6-6Z" />,
-    <path key="3" d="M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3Zm0 3.5A2.5 2.5 0 1 1 9 11.5a2.5 2.5 0 0 1 0-5Z" />,
+    <path
+      key="3"
+      d="M9 3a6 6 0 1 0 0 12A6 6 0 0 0 9 3Zm0 3.5A2.5 2.5 0 1 1 9 11.5a2.5 2.5 0 0 1 0-5Z"
+    />,
     <path key="4" d="M3 15V6l6-3 6 3v9H3Z" />,
   ];
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       {shapes[index % shapes.length]}
     </svg>
   );
@@ -636,8 +714,9 @@ function Shift() {
             Stop reconciling. Start <span className="em">closing.</span>
           </h2>
           <p className="lede">
-            The problem was never that your team lacked software. It is that eleven tools each hold a
-            different version of the same number, and not one of them holds the corporation.
+            The problem was never that your team lacked software. It is that
+            eleven tools each hold a different version of the same number, and
+            not one of them holds the corporation.
           </p>
         </Reveal>
 
@@ -691,8 +770,9 @@ function Roles() {
             </h2>
           </div>
           <p className="body">
-            Sales does not wait on finance. Finance does not chase sales. Operations and HR read the same
-            unit, the same contract and the same number — because there is only one of each.
+            Sales does not wait on finance. Finance does not chase sales.
+            Operations and HR read the same unit, the same contract and the same
+            number — because there is only one of each.
           </p>
         </Reveal>
 
@@ -736,10 +816,13 @@ function Roles() {
               </ul>
             </div>
             <div className="tab-shot">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={role.shot}
                 alt={`Realcorp ${role.label.toLowerCase()} workspace — ${role.headline.replace(/\.$/, "")}`}
+                width={3024}
+                height={1530}
+                sizes="(max-width: 900px) 94vw, 52vw"
+                quality={76}
               />
             </div>
           </motion.div>
@@ -762,9 +845,9 @@ function Modules() {
             </h2>
           </div>
           <p className="body">
-            Every module reads from and writes to the same record. The pipeline closes a deal; the payment
-            plan posts to receivables; the audit trail keeps everyone honest. No exports, no reconciliation
-            theatre.
+            Every module reads from and writes to the same record. The pipeline
+            closes a deal; the payment plan posts to receivables; the audit
+            trail keeps everyone honest. No exports, no reconciliation theatre.
           </p>
         </Reveal>
 
@@ -801,11 +884,13 @@ function LedgerChain() {
         <Reveal className="head center">
           <div className="eyebrow">How it works</div>
           <h2 className="h2">
-            A lead becomes a payslip <span className="em">without retyping.</span>
+            A lead becomes a payslip{" "}
+            <span className="em">without retyping.</span>
           </h2>
           <p className="lede">
-            This is the whole product in one line. Each step inherits the last one&apos;s numbers, so nobody
-            re-enters anything and nobody argues about which figure is real.
+            This is the whole product in one line. Each step inherits the last
+            one&apos;s numbers, so nobody re-enters anything and nobody argues
+            about which figure is real.
           </p>
         </Reveal>
 
@@ -816,7 +901,12 @@ function LedgerChain() {
               initial={{ x: "-30%" }}
               whileInView={{ x: "130%" }}
               viewport={{ once: false, margin: "-25%" }}
-              transition={{ duration: 2.6, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.8 }}
+              transition={{
+                duration: 2.6,
+                ease: "easeInOut",
+                repeat: Infinity,
+                repeatDelay: 0.8,
+              }}
             />
           )}
         </div>
@@ -845,7 +935,8 @@ function Proof() {
             A note from operations
           </div>
           <blockquote style={{ marginTop: 24 }}>
-            &ldquo;From contract to payslip, the <span className="em">same number</span> reaches every desk.
+            &ldquo;From contract to payslip, the{" "}
+            <span className="em">same number</span> reaches every desk.
             Month-end went from four days to one afternoon.&rdquo;
           </blockquote>
           <cite>Hannah Reyes · SVP Operations · Kingsway Estates</cite>
@@ -893,8 +984,8 @@ function Security() {
             Built to survive an <span className="em">audit.</span>
           </h2>
           <p className="lede">
-            The reason finance teams trust a single ledger is that it can be proven. Realcorp is built so
-            every number has a provenance.
+            The reason finance teams trust a single ledger is that it can be
+            proven. Realcorp is built so every number has a provenance.
           </p>
         </Reveal>
 
@@ -909,9 +1000,18 @@ function Security() {
         </div>
 
         <Reveal delay={2}>
-          <p className="small" style={{ marginTop: 32, display: "flex", alignItems: "center", gap: 8 }}>
+          <p
+            className="small"
+            style={{
+              marginTop: 32,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
             <IconShield size={16} />
-            Encryption in transit and at rest · role-scoped access · full export on request.
+            Encryption in transit and at rest · role-scoped access · full export
+            on request.
           </p>
         </Reveal>
       </div>
@@ -982,8 +1082,9 @@ function FinalCta() {
             See Realcorp running <span className="em">your projects.</span>
           </h2>
           <p className="lede">
-            Thirty minutes with a solutions engineer, in a workspace pre-loaded with your project list. So the
-            demo is about your business, not a fictional one.
+            Thirty minutes with a solutions engineer, in a workspace pre-loaded
+            with your project list. So the demo is about your business, not a
+            fictional one.
           </p>
           <div className="hero-cta">
             <a className="btn btn-primary" href={`mailto:${SITE.email}`}>
@@ -1008,7 +1109,8 @@ function Footer() {
           <div>
             <Wordmark size={28} />
             <p className="small" style={{ marginTop: 14, maxWidth: "34ch" }}>
-              Everything a real corporation runs on. Offices in Lagos, New York and Dubai.
+              Everything a real corporation runs on. Offices in Lagos, New York
+              and Dubai.
             </p>
           </div>
           {FOOTER.map((col) => (
@@ -1017,7 +1119,11 @@ function Footer() {
               <ul>
                 {col.links.map(([label, href]) => (
                   <li key={label}>
-                    {href.startsWith("/") ? <Link href={href}>{label}</Link> : <a href={href}>{label}</a>}
+                    {href.startsWith("/") ? (
+                      <Link href={href}>{label}</Link>
+                    ) : (
+                      <a href={href}>{label}</a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1026,7 +1132,9 @@ function Footer() {
         </div>
         <div className="foot-bottom">
           {/* Server and client can straddle midnight on New Year's Eve. */}
-          <span suppressHydrationWarning>© {new Date().getFullYear()} Realcorp, Inc.</span>
+          <span suppressHydrationWarning>
+            © {new Date().getFullYear()} Realcorp, Inc.
+          </span>
           <span>Lagos · New York · Dubai</span>
         </div>
       </div>

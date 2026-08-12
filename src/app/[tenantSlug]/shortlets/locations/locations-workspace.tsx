@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useSnackbar } from "@/components/snackbar";
 import { ModalOverlay } from "@/components/modal-overlay";
+import { GlobalLocationFields } from "@/components/global-location-fields";
 import { MODAL_PANEL_LG } from "@/lib/modal-panel";
 import { deleteShortletProperty, saveShortletProperty } from "../actions";
 
@@ -214,26 +215,12 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
               />
             </label>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <input
-                className="rounded-md border px-3 py-2 text-sm"
-                placeholder="City"
-                value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-              />
-              <input
-                className="rounded-md border px-3 py-2 text-sm"
-                placeholder="State"
-                value={form.state}
-                onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
-              />
-              <input
-                className="rounded-md border px-3 py-2 text-sm"
-                placeholder="Country"
-                value={form.country}
-                onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-              />
-            </div>
+            <GlobalLocationFields
+              defaultCountry={form.country}
+              defaultState={form.state}
+              defaultCity={form.city}
+              onLocationChange={(location) => setForm((current) => ({ ...current, ...location }))}
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 className="rounded-md border px-3 py-2 text-sm"

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { downloadModuleReportXlsx, type ModuleReportBreakdown } from "@/lib/module-report-xlsx";
-import { downloadPdfViaPrint, downloadCsv, type ExportRow } from "@/lib/table-export";
+import { downloadTablePdf, downloadCsv, type ExportRow } from "@/lib/table-export";
 import type { KpiItem } from "@/lib/report-xlsx-theme";
 
 type Props = {
@@ -38,6 +38,7 @@ export function DataExportMenu({
   breakdowns,
 }: Props) {
   const [busy, setBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   async function exportExcel() {
     setBusy(true);
@@ -62,6 +63,15 @@ export function DataExportMenu({
       });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function exportPdf() {
+    setPdfBusy(true);
+    try {
+      await downloadTablePdf(filename, headers, rows, keys);
+    } finally {
+      setPdfBusy(false);
     }
   }
 
@@ -99,10 +109,11 @@ export function DataExportMenu({
       {showPdf ? (
         <button
           type="button"
-          onClick={downloadPdfViaPrint}
+          disabled={pdfBusy || rows.length === 0}
+          onClick={() => void exportPdf()}
           className="rc-btn rc-btn-ghost rc-btn-sm rounded-none border-l border-[var(--border-subtle)]"
         >
-          PDF
+          {pdfBusy ? "Building…" : "PDF"}
         </button>
       ) : null}
     </div>

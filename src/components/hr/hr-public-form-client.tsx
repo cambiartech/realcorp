@@ -90,11 +90,7 @@ export function HrPublicFormClient({
       setError(sig.error);
       return;
     }
-    const uploaded = await uploadViaCloudinarySignature(file, {
-      ...sig,
-      uploadUrl: `https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`,
-      source: "platform",
-    });
+    const uploaded = await uploadViaCloudinarySignature(file, sig);
     if (!uploaded.ok) {
       setPending(false);
       setError(uploaded.error);
@@ -368,8 +364,10 @@ function BankFields({ v }: { v: InitialValues }) {
       <HrFormField label="Bank name" name="bankName" required defaultValue={v.bankName} />
       <HrFormField label="Bank address" name="bankAddress" defaultValue={v.bankAddress} />
       <HrLocationFields
+        countryName="bankCountry"
         stateName="bankState"
         cityName="bankCity"
+        countryDefault={v.bankCountry}
         stateDefault={v.bankState}
         cityDefault={v.bankCity}
       />

@@ -21,6 +21,7 @@ export function OnboardingProfileHiddenFields({
       <input type="hidden" name="employmentType" value={draft.employmentType} />
       <input type="hidden" name="workSchedule" value={draft.workSchedule} />
       <input type="hidden" name="paygroupName" value={draft.paygroupName} />
+      <input type="hidden" name="payTemplateId" value={draft.payTemplateId} />
       <input type="hidden" name="phoneMobile" value={draft.phoneMobile} />
       <input type="hidden" name="workEmail" value={draft.workEmail} />
       <input type="hidden" name="grossMonthly" value={draft.grossMonthly} />

@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 import { PayslipYtdCard } from "@/components/hr/payslip-ytd-card";
 import type { PayslipYtdSummary } from "@/lib/hr-payslip-ytd";
 import { useSnackbar } from "@/components/snackbar";
@@ -368,6 +370,14 @@ export function HrMyDashboard({
             )
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Link
+              href={`/${tenantSlug}/hr/leave`}
+              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+            >
+              <CalendarDays className="h-5 w-5 text-muted" />
+              <p className="mt-2 text-sm font-semibold text-foreground">Request leave</p>
+              <p className="text-xs text-muted">Balances, requests and decisions</p>
+            </Link>
             <button
               type="button"
               onClick={() => setTab("payslips")}
@@ -536,7 +546,9 @@ export function HrMyDashboard({
                 <ReadRow label="Work email" value={p.workEmail} />
                 <ReadRow
                   label="Address"
-                  value={[p.addressStreet, p.addressCity, p.addressState].filter(Boolean).join(", ")}
+                  value={[p.addressStreet, p.addressCity, p.addressState, p.addressCountry]
+                    .filter(Boolean)
+                    .join(", ")}
                 />
               </>
             ) : null}
@@ -764,13 +776,12 @@ export function HrMyDashboard({
               currency={currency}
               calc={viewPayslip.calc}
             />
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="mt-4 w-full rounded-md border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background"
+            <PdfDownloadButton
+              filename={`payslip-${viewPayslip.periodLabel}`}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-60"
             >
-              Print or save as PDF
-            </button>
+              Download PDF
+            </PdfDownloadButton>
           </div>
         </div>
       ) : null}

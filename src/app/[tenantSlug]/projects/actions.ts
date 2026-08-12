@@ -349,6 +349,7 @@ export async function updateProjectListing(
         listingDescription: text("listingDescription", 2000),
         locationCity: text("locationCity", 120),
         locationState: text("locationState", 120),
+        locationCountry: text("locationCountry", 120),
         locationAddress: text("locationAddress", 300),
         coverImageUrl: text("coverImageUrl", 600),
         galleryUrls,

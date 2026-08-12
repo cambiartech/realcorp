@@ -31,12 +31,12 @@ export function PayrollWorkflowGuide({
     },
     {
       icon: Send,
-      title: "2. Generate & publish",
+      title: "2. Generate, adjust & publish",
       body:
         periodStatus === "none"
-          ? `Generate ${periodLabel ?? "the month"} to create draft payslips, then Publish so staff see them in My dashboard.`
+          ? `Generate ${periodLabel ?? "the month"}, add any one-time bonuses or deductions, then publish after review.`
           : periodStatus === "DRAFT"
-            ? `${periodLabel}: ${periodSlipCount} draft slip${periodSlipCount === 1 ? "" : "s"} — publish when amounts look correct.`
+            ? `${periodLabel}: ${periodSlipCount} draft slip${periodSlipCount === 1 ? "" : "s"} — use Adjust for bonuses, reimbursements or deductions before publishing.`
             : `${periodLabel}: published — ${periodSlipCount} slip${periodSlipCount === 1 ? "" : "s"} visible to employees.`,
     },
     {

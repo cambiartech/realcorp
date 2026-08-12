@@ -16,7 +16,9 @@ export default async function HrFormPrintPage({ params }: { params: Promise<{ to
       className="min-h-screen bg-white py-8 px-4 print:py-0 print:px-0"
       style={brandingCssVars(loaded.brand)}
     >
-      <HrPrintToolbar />
+      <HrPrintToolbar
+        filename={`${loaded.formType}-${loaded.profile?.fullName || loaded.recipientName || "employee"}`}
+      />
       <HrFormPrintDocument
         brand={loaded.brand}
         formType={loaded.formType}

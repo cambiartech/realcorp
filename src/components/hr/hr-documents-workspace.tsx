@@ -2,17 +2,37 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, File, FileImage, FileText, Folder, FolderOpen, HardDrive, Users } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import {
+  ChevronRight,
+  ExternalLink,
+  File,
+  FileImage,
+  FileText,
+  Folder,
+  FolderOpen,
+  HardDrive,
+  Link2,
+  Trash2,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
+import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { addHrDocument, getHrUploadSignature } from "@/app/[tenantSlug]/hr/actions";
+import { addHrDocument, getHrUploadSignature, softDeleteHrDocument } from "@/app/[tenantSlug]/hr/actions";
+import { ingestHrDocument } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
+import { MODAL_PANEL_XS } from "@/lib/modal-panel";
 
 const DOC_CATEGORIES = [
   { value: "BIODATA", label: "Biodata" },
   { value: "BANK_FORM", label: "Bank forms" },
+  { value: "EMERGENCY_CONTACT", label: "Emergency contacts" },
+  { value: "NEXT_OF_KIN", label: "Next of kin" },
+  { value: "HEALTH_RECORD", label: "Health records" },
+  { value: "EDUCATION", label: "Education records" },
   { value: "OFFER_LETTER", label: "Offer letters" },
   { value: "NDA", label: "NDAs" },
   { value: "GUARANTOR", label: "Guarantor" },
@@ -22,6 +42,21 @@ const DOC_CATEGORIES = [
   { value: "APPRAISAL", label: "Appraisals" },
   { value: "OTHER", label: "Other" },
 ] as const;
+
+const EXTRACTABLE_CATEGORIES = new Set([
+  "AUTO",
+  "BIODATA",
+  "BANK_FORM",
+  "EMERGENCY_CONTACT",
+  "NEXT_OF_KIN",
+  "HEALTH_RECORD",
+  "EDUCATION",
+  "GUARANTOR",
+  "OFFER_LETTER",
+  "JOB_DESCRIPTION",
+  "CONTRACT",
+  "PAYSLIP",
+]);
 
 type BrowseMode = "type" | "employee";
 
@@ -67,41 +102,55 @@ function FileIcon({ fileName, className }: { fileName: string; className?: strin
   return <File className={className} strokeWidth={1.5} />;
 }
 
+function fileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The selected file could not be read."));
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      const base64 = dataUrl.split(",", 2)[1];
+      if (!base64) reject(new Error("The selected file could not be read."));
+      else resolve(base64);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export function HrDocumentsWorkspace({
   tenantSlug,
   employees,
   documents,
   preselectUserId,
   returnOnboardUserId,
+  pendingReviewCount,
+  aiEnabled,
 }: {
   tenantSlug: string;
   employees: DocumentEmployee[];
   documents: HrDocumentItem[];
   preselectUserId?: string;
   returnOnboardUserId?: string;
+  pendingReviewCount: number;
+  aiEnabled: boolean;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  const initialEmployee = preselectUserId ? employees.find((employee) => employee.userId === preselectUserId) : null;
+  const initialEmployeeKey = initialEmployee ? employeeOptionValue(initialEmployee) : null;
   const [browseMode, setBrowseMode] = useState<BrowseMode>(preselectUserId ? "employee" : "type");
   const [selectedTypeFolder, setSelectedTypeFolder] = useState<string>("ALL");
-  const [selectedEmployeeKey, setSelectedEmployeeKey] = useState<string | null>(null);
-  const [uploadEmployeeId, setUploadEmployeeId] = useState("");
-  const [uploadCategory, setUploadCategory] = useState("NDA");
+  const [selectedEmployeeKey, setSelectedEmployeeKey] = useState<string | null>(initialEmployeeKey);
+  const [uploadEmployeeId, setUploadEmployeeId] = useState(initialEmployeeKey || "");
+  const [uploadCategory, setUploadCategory] = useState(preselectUserId ? "NDA" : aiEnabled ? "AUTO" : "OTHER");
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [generatingDocumentId, setGeneratingDocumentId] = useState<string | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<HrDocumentItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showUploadPanel, setShowUploadPanel] = useState(Boolean(preselectUserId));
-
-  useEffect(() => {
-    if (!preselectUserId) return;
-    const emp = employees.find((e) => e.userId === preselectUserId);
-    if (!emp) return;
-    const key = employeeOptionValue(emp);
-    setBrowseMode("employee");
-    setSelectedEmployeeKey(key);
-    setUploadEmployeeId(key);
-    setUploadCategory("NDA");
-    setShowUploadPanel(true);
-  }, [preselectUserId, employees]);
+  const [lastUploadResults, setLastUploadResults] = useState<string[]>([]);
+  const uploadPanelRef = useRef<HTMLDivElement>(null);
+  const aiCategorySelected = aiEnabled && EXTRACTABLE_CATEGORIES.has(uploadCategory);
 
   const countByCategory = useMemo(() => {
     const m = new Map<string, number>();
@@ -146,24 +195,37 @@ export function HrDocumentsWorkspace({
     return ["Employees", selectedEmployee.fullName];
   }, [browseMode, selectedTypeFolder, selectedEmployee]);
 
-  async function uploadFile(file: File) {
-    if (!uploadEmployeeId) {
-      showSnackbar("Select which employee this document belongs to.", "error");
-      return;
+  async function processFile(file: File) {
+    const extractsProfileData = aiEnabled && EXTRACTABLE_CATEGORIES.has(uploadCategory);
+    if (!extractsProfileData && !uploadEmployeeId) throw new Error("Select which employee this document belongs to.");
+    if (extractsProfileData && file.size > 15 * 1024 * 1024) {
+      throw new Error("AI extraction supports files up to 15 MB.");
     }
+    const fileBase64 = extractsProfileData ? await fileAsBase64(file) : undefined;
     const title = uploadTitle.trim() || file.name.replace(/\.[^/.]+$/, "");
-    setUploading(true);
-    const sig = await getHrUploadSignature(tenantSlug, { fileName: file.name });
-    if (!sig.ok) {
-      showSnackbar(sig.error, "error");
-      setUploading(false);
-      return;
-    }
+    const resourceType = /\.(pdf|docx?|xlsx?)$/i.test(file.name) ? "raw" : "auto";
+    const sig = await getHrUploadSignature(tenantSlug, { fileName: file.name, resourceType });
+    if (!sig.ok) throw new Error(sig.error);
     const uploaded = await uploadViaCloudinarySignature(file, sig);
-    setUploading(false);
-    if (!uploaded.ok) {
-      showSnackbar(uploaded.error, "error");
-      return;
+    if (!uploaded.ok) throw new Error(uploaded.error);
+
+    if (extractsProfileData) {
+      const selection = parseEmployeeSelection(uploadEmployeeId);
+      const result = await ingestHrDocument(tenantSlug, {
+        fileUrl: uploaded.secureUrl,
+        fileName: file.name,
+        fileBase64,
+        fileMimeType: file.type || undefined,
+        category: uploadCategory,
+        preferredProfileId: selection.employeeProfileId,
+        preferredUserId: selection.userId,
+      });
+      if (!result.ok) throw new Error(result.error);
+      const categoryLabel =
+        DOC_CATEGORIES.find((category) => category.value === result.category)?.label || result.category;
+      return `${file.name} → ${categoryLabel} → ${result.personName} (${result.matchedBy}, ${Math.round(
+        result.confidence * 100,
+      )}% confidence)`;
     }
     const result = await addHrDocument(tenantSlug, {
       ...parseEmployeeSelection(uploadEmployeeId),
@@ -172,11 +234,76 @@ export function HrDocumentsWorkspace({
       fileUrl: uploaded.secureUrl,
       fileName: file.name,
     });
+    if (!result.ok) throw new Error(result.error || "Could not save document.");
+    return `${file.name} uploaded`;
+  }
+
+  async function generateRecords(document: HrDocumentItem) {
+    setGeneratingDocumentId(document.id);
+    const result = await ingestHrDocument(tenantSlug, {
+      fileUrl: document.fileUrl,
+      fileName: document.fileName,
+      category: document.categoryValue,
+      preferredProfileId: document.employeeProfileId,
+    });
+    setGeneratingDocumentId(null);
     if (!result.ok) {
-      showSnackbar(result.error || "Could not save document.", "error");
+      showSnackbar(
+        result.error.includes("could not be read")
+          ? "This older stored file cannot be read by the extractor. Re-upload it once to generate records."
+          : result.error,
+        "error",
+      );
       return;
     }
-    showSnackbar("Document uploaded.", "success");
+    showSnackbar(`Records generated for ${result.personName} and staged for approval.`, "success");
+    router.refresh();
+  }
+
+  function mapSimilar(document: HrDocumentItem) {
+    setUploadEmployeeId(document.employeeProfileId);
+    setUploadCategory(document.categoryValue);
+    setShowUploadPanel(true);
+    window.setTimeout(() => uploadPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  async function removeDocument() {
+    if (!documentToDelete) return;
+    setDeleting(true);
+    const result = await softDeleteHrDocument(tenantSlug, documentToDelete.id);
+    setDeleting(false);
+    if (!result.ok) {
+      showSnackbar(result.error || "Could not remove this document.", "error");
+      return;
+    }
+    showSnackbar("Document removed from the library.", "success");
+    setDocumentToDelete(null);
+    router.refresh();
+  }
+
+  async function uploadFiles(files: File[]) {
+    if (!files.length) return;
+    setUploading(true);
+    const completed: string[] = [];
+    const failed: string[] = [];
+    for (const file of files) {
+      try {
+        completed.push(await processFile(file));
+      } catch (error) {
+        failed.push(`${file.name}: ${error instanceof Error ? error.message : "Upload failed."}`);
+      }
+    }
+    setUploading(false);
+    setLastUploadResults([...completed, ...failed.map((message) => `Failed: ${message}`)]);
+    if (completed.length) {
+      showSnackbar(
+        aiCategorySelected
+          ? `${completed.length} document${completed.length === 1 ? "" : "s"} extracted and staged for HR review.`
+          : `${completed.length} document${completed.length === 1 ? "" : "s"} uploaded.`,
+        "success",
+      );
+    }
+    if (failed.length) showSnackbar(failed.join(" "), "error");
     setUploadTitle("");
     router.refresh();
   }
@@ -194,6 +321,24 @@ export function HrDocumentsWorkspace({
 
   return (
     <div className="space-y-4">
+      {pendingReviewCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {pendingReviewCount} extracted document{pendingReviewCount === 1 ? "" : "s"} awaiting HR approval
+            </p>
+            <p className="text-xs text-muted">
+              Review the detected employee and fields before updating employee records.
+            </p>
+          </div>
+          <Link
+            href={`/${tenantSlug}/hr/people?reviewForms=1`}
+            className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background"
+          >
+            Review and approve →
+          </Link>
+        </div>
+      ) : null}
       {returnOnboardUserId ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--accent-line)] bg-[var(--accent-wash)] px-4 py-3">
           <p className="text-sm text-foreground">
@@ -248,20 +393,28 @@ export function HrDocumentsWorkspace({
       </div>
 
       {showUploadPanel ? (
-        <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm">
+        <div
+          ref={uploadPanelRef}
+          className="scroll-mt-4 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 shadow-sm"
+        >
           <p className="mb-3 text-sm font-semibold text-foreground">Upload & map to employee</p>
           <div className="grid gap-4 lg:grid-cols-[1fr_minmax(220px,280px)]">
             <FileDropZone
-              onFile={uploadFile}
+              onFile={(file) => void uploadFiles([file])}
+              onFiles={(files) => void uploadFiles(files)}
+              multiple
               uploading={uploading}
-              disabled={!uploadEmployeeId && !employees.length}
+              disabled={!aiCategorySelected && !uploadEmployeeId}
+              hint="PDF, DOCX, XLSX, or images · multiple files allowed"
             />
             <div className="flex flex-col gap-3">
               <label className="text-xs font-medium text-muted">
-                Employee <span className="text-[var(--danger)]">*</span>
+                Employee {aiCategorySelected ? "(optional)" : null}
               </label>
               <UiSelect value={uploadEmployeeId} onChange={(e) => setUploadEmployeeId(e.target.value)}>
-                <option value="">Select employee…</option>
+                <option value="">
+                  {aiCategorySelected ? "Auto-match each file…" : "Select employee…"}
+                </option>
                 {employees.map((e) => (
                   <option key={e.userId} value={employeeOptionValue(e)}>
                     {e.fullName}
@@ -271,6 +424,7 @@ export function HrDocumentsWorkspace({
               </UiSelect>
               <label className="text-xs font-medium text-muted">Folder / type</label>
               <UiSelect value={uploadCategory} onChange={(e) => setUploadCategory(e.target.value)}>
+                {aiEnabled ? <option value="AUTO">✨ Auto-detect each file</option> : null}
                 {DOC_CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -281,11 +435,21 @@ export function HrDocumentsWorkspace({
               <input
                 value={uploadTitle}
                 onChange={(e) => setUploadTitle(e.target.value)}
-                placeholder="e.g. Signed NDA — March 2026"
+                placeholder="Optional; file name is used by default"
                 className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
               />
             </div>
           </div>
+          {lastUploadResults.length ? (
+            <div className="mt-3 rounded-lg border border-foreground/10 bg-background p-3">
+              <p className="text-xs font-semibold text-foreground">Last bulk upload</p>
+              <ul className="mt-1 space-y-1 text-xs text-muted">
+                {lastUploadResults.map((result) => (
+                  <li key={result}>{result}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -510,52 +674,81 @@ export function HrDocumentsWorkspace({
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {visibleDocuments.map((d) => (
-                    <div
+                    <article
                       key={d.id}
-                      className="group flex gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 shadow-sm transition hover:border-foreground/20 hover:shadow-md"
+                      className="flex min-h-52 flex-col rounded-xl border border-foreground/10 bg-background p-4 shadow-sm transition hover:border-foreground/20 hover:shadow-md"
                     >
-                      <div
-                        className={[
-                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-lg",
-                          fileKind(d.fileName) === "pdf"
-                            ? "bg-[var(--danger-wash)] text-[var(--danger)]"
-                            : fileKind(d.fileName) === "image"
-                              ? "bg-[var(--info-wash)] text-[var(--info)]"
-                              : "bg-foreground/10 text-foreground",
-                        ].join(" ")}
-                      >
-                        <FileIcon fileName={d.fileName} className="h-6 w-6" />
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={[
+                            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                            fileKind(d.fileName) === "pdf"
+                              ? "bg-[var(--danger-wash)] text-[var(--danger)]"
+                              : fileKind(d.fileName) === "image"
+                                ? "bg-[var(--info-wash)] text-[var(--info)]"
+                                : "bg-foreground/10 text-foreground",
+                          ].join(" ")}
+                        >
+                          <FileIcon fileName={d.fileName} className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-semibold leading-5 text-foreground" title={d.title}>
+                            {d.title}
+                          </p>
+                          <p className="mt-0.5 truncate text-[10px] text-muted" title={d.fileName}>
+                            {d.fileName}
+                          </p>
+                          <span className="mt-1 inline-flex rounded-full bg-foreground/[0.06] px-2 py-0.5 text-[10px] font-medium text-muted">
+                            {d.category}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDocumentToDelete(d)}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-[var(--danger-wash)] hover:text-[var(--danger)]"
+                          aria-label={`Remove ${d.title}`}
+                          title="Remove document"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-foreground" title={d.title}>
-                          {d.title}
-                        </p>
-                        <p className="truncate text-xs text-muted">
-                          {browseMode === "type" ? d.employeeName : d.category}
-                        </p>
-                        <p className="text-[10px] text-muted">{d.uploadedAtLabel}</p>
-                        <div className="mt-2 flex gap-2">
-                          <Link
-                            href={d.fileUrl}
-                            target="_blank"
-                            className="rounded-md border border-foreground/15 px-2 py-1 text-[11px] font-semibold hover:bg-foreground/[0.06]"
-                          >
-                            Open
-                          </Link>
+
+                      <div className="mt-4 flex items-center gap-2 text-xs text-muted">
+                        <UserRound className="h-3.5 w-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">{d.employeeName}</span>
+                        <span className="shrink-0 text-[10px]">{d.uploadedAtLabel}</span>
+                      </div>
+
+                      <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
+                        <Link
+                          href={d.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-foreground/15 px-2.5 py-2 text-xs font-semibold hover:bg-foreground/[0.05]"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          Open
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => mapSimilar(d)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-foreground/15 px-2.5 py-2 text-xs font-semibold hover:bg-foreground/[0.05]"
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          Map similar
+                        </button>
+                        {aiEnabled && EXTRACTABLE_CATEGORIES.has(d.categoryValue) ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              setUploadEmployeeId(d.employeeProfileId);
-                              setUploadCategory(d.categoryValue);
-                              setShowUploadPanel(true);
-                            }}
-                            className="text-[11px] text-muted underline opacity-0 transition group-hover:opacity-100"
+                            disabled={generatingDocumentId === d.id}
+                            onClick={() => void generateRecords(d)}
+                            className="col-span-2 rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background hover:opacity-90 disabled:opacity-50"
                           >
-                            Map similar
+                            {generatingDocumentId === d.id ? "Generating records…" : "Generate records"}
                           </button>
-                        </div>
+                        ) : null}
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
               )
@@ -568,17 +761,34 @@ export function HrDocumentsWorkspace({
                   {documents.slice(0, 12).map((d) => (
                     <div
                       key={d.id}
-                      className="flex items-center gap-2 rounded-md border border-foreground/10 bg-background px-3 py-2 text-sm"
+                      className="flex items-center gap-3 rounded-lg border border-foreground/10 bg-background px-3 py-3 text-sm shadow-sm"
                     >
-                      <FileIcon fileName={d.fileName} className="h-4 w-4 shrink-0 text-muted" />
-                      <span className="min-w-0 flex-1 truncate">{d.title}</span>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.05]">
+                        <FileIcon fileName={d.fileName} className="h-4 w-4 text-muted" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-foreground">{d.title}</p>
+                        <p className="truncate text-[11px] text-muted">
+                          {d.employeeName} · {d.category}
+                        </p>
+                      </div>
                       <Link
                         href={d.fileUrl}
                         target="_blank"
-                        className="shrink-0 text-xs font-semibold underline"
+                        rel="noreferrer"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-foreground/10 hover:bg-foreground/[0.05]"
+                        aria-label={`Open ${d.title}`}
                       >
-                        Open
+                        <ExternalLink className="h-3.5 w-3.5" />
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => setDocumentToDelete(d)}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-[var(--danger-wash)] hover:text-[var(--danger)]"
+                        aria-label={`Remove ${d.title}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -587,6 +797,47 @@ export function HrDocumentsWorkspace({
           </div>
         </div>
       </div>
+
+      <ModalOverlay
+        open={Boolean(documentToDelete)}
+        onClose={() => {
+          if (!deleting) setDocumentToDelete(null);
+        }}
+        panelClassName={MODAL_PANEL_XS}
+        aria-labelledby="remove-hr-document-title"
+      >
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--danger-wash)] text-[var(--danger)]">
+          <Trash2 className="h-5 w-5" />
+        </div>
+        <h2 id="remove-hr-document-title" className="mt-4 text-lg font-semibold text-foreground">
+          Remove this document?
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          <strong className="font-semibold text-foreground">{documentToDelete?.title}</strong> will disappear from{" "}
+          {documentToDelete?.employeeName}&apos;s document library and employee view.
+        </p>
+        <p className="mt-3 rounded-md border border-foreground/10 bg-foreground/[0.03] px-3 py-2 text-xs text-muted">
+          This is a soft delete. The removal remains in the audit trail and can be recovered by an administrator.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={() => setDocumentToDelete(null)}
+            className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium hover:bg-foreground/[0.05] disabled:opacity-50"
+          >
+            Keep document
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={() => void removeDocument()}
+            className="rounded-md bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {deleting ? "Removing…" : "Remove document"}
+          </button>
+        </div>
+      </ModalOverlay>
     </div>
   );
 }

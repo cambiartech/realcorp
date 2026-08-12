@@ -100,6 +100,7 @@ type WidgetValue = {
     tasksScore: number;
   }>;
   hrPendingFormCount: number;
+  hrPendingLeaveCount: number;
   hrOpenAppraisalCount: number;
   leadFunnel: Array<{ stage: string; count: number }>;
   leaderboard: Array<{ label: string; value: number }>;
@@ -262,6 +263,7 @@ const WIDGET_LABELS: Record<string, string> = {
   hr_team_snapshot: "Team headcount",
   hr_top_performers: "Top performers (tasks)",
   hr_pending_forms: "Pending HR forms",
+  hr_pending_leave: "Pending leave requests",
   hr_open_appraisals: "Open appraisals",
 };
 
@@ -301,7 +303,14 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
     "my_open_tasks",
   ],
   SALES: ["my_pipeline", "my_new_leads", "lead_funnel", "my_open_tasks"],
-  HR: ["hr_team_snapshot", "hr_top_performers", "hr_pending_forms", "hr_open_appraisals", "my_open_tasks"],
+  HR: [
+    "hr_team_snapshot",
+    "hr_top_performers",
+    "hr_pending_forms",
+    "hr_pending_leave",
+    "hr_open_appraisals",
+    "my_open_tasks",
+  ],
   MARKETING: ["lead_source_quality", "lead_funnel", "unassigned_leads", "my_open_tasks"],
   COMMUNITY: ["my_open_tasks", "lead_funnel"],
   OPERATIONS: ["inventory_snapshot", "my_open_tasks"],
@@ -2929,6 +2938,26 @@ function WidgetCard({
     ) : (
       <p className="mt-3 text-xs text-muted">HR module is not enabled for this organization.</p>
     );
+  } else if (id === "hr_pending_leave") {
+    title = "Pending Leave Requests";
+    body = values.hrModuleEnabled ? (
+      <>
+        <div className="mt-3 rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] p-3">
+          <p className="text-xl font-bold text-foreground">{values.hrPendingLeaveCount}</p>
+          <p className="text-[11px] text-muted">
+            leave request{values.hrPendingLeaveCount === 1 ? "" : "s"} awaiting HR review
+          </p>
+        </div>
+        <Link
+          href={`${values.hrPageUrl}/leave`}
+          className="mt-2 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+        >
+          Review leave requests →
+        </Link>
+      </>
+    ) : (
+      <p className="mt-3 text-xs text-muted">HR module is not enabled for this organization.</p>
+    );
   } else if (id === "hr_open_appraisals") {
     title = "Open Appraisals";
     body = values.hrModuleEnabled ? (
@@ -3141,6 +3170,15 @@ function DepartmentOverviewPanel({
               detail={
                 values.hrPendingFormCount > 0
                   ? `${values.hrPendingFormCount} awaiting submission`
+                  : "All caught up"
+              }
+            />
+            <ChecklistRow
+              label="Pending leave requests"
+              done={values.hrPendingLeaveCount === 0}
+              detail={
+                values.hrPendingLeaveCount > 0
+                  ? `${values.hrPendingLeaveCount} awaiting review`
                   : "All caught up"
               }
             />

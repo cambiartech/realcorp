@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
 import { ModalOverlay } from "@/components/modal-overlay";
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 import { MODAL_PANEL_LG, MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { UiSelect } from "@/components/ui-select";
 import { InHouseTable } from "@/components/shortlets/night-audit-report";
@@ -118,13 +119,13 @@ export function FrontDeskWorkspace({
     <div className="space-y-8">
       {canManage ? (
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="rounded-md border border-foreground/15 px-4 py-2 text-sm"
+          <PdfDownloadButton
+            targetSelector="[data-front-desk-in-house='true']"
+            filename={`in-house-guests-${new Date().toISOString().slice(0, 10)}`}
+            className="inline-flex items-center gap-2 rounded-md border border-foreground/15 px-4 py-2 text-sm disabled:opacity-60"
           >
-            Print in-house list
-          </button>
+            Download in-house PDF
+          </PdfDownloadButton>
           <button
             type="button"
             onClick={() => setWalkInOpen(true)}
@@ -135,7 +136,10 @@ export function FrontDeskWorkspace({
         </div>
       ) : null}
 
-      <section className="rounded-lg border border-foreground/10 p-4 print:border-none">
+      <section
+        data-front-desk-in-house="true"
+        className="rounded-lg border border-foreground/10 bg-background p-4 print:border-none"
+      >
         <h2 className="text-lg font-semibold text-foreground">In-house now</h2>
         <p className="mt-1 text-sm text-muted">{inHouseGuests.length} guest(s) currently checked in.</p>
         <div className="mt-4">

@@ -91,62 +91,68 @@ model Tenant {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  settings             TenantSettings?
-  memberships          Membership[]
-  invitations          Invitation[]
-  pricingPlans         ProjectPricingPlan[]
-  projects             Project[]
-  projectStakeholders  ProjectStakeholder[]
-  leads                Lead[]
-  deals                Deal[]
-  invoices             Invoice[]
-  salesReceipts        SalesReceipt[]
-  payments             PaymentRecord[]
-  auditLogs            AuditLog[]
-  goals                TenantGoal[]
-  dashboardPreferences DashboardPreference[]
-  campaigns            Campaign[]
-  realtorPartners      RealtorPartner[]
-  shortletUnits        ShortletUnit[]
-  shortletProperties   ShortletProperty[]
-  shortletReservations ShortletReservation[]
-  shortletPayments     ShortletPayment[]
-  shortletFolioLines   ShortletFolioLine[]
-  shortletServiceItems ShortletServiceItem[]
-  shortletBusinessDays ShortletBusinessDay[]
-  shortletGuests       ShortletGuest[]
+  settings                    TenantSettings?
+  memberships                 Membership[]
+  invitations                 Invitation[]
+  pricingPlans                ProjectPricingPlan[]
+  projects                    Project[]
+  projectStakeholders         ProjectStakeholder[]
+  leads                       Lead[]
+  deals                       Deal[]
+  invoices                    Invoice[]
+  salesReceipts               SalesReceipt[]
+  payments                    PaymentRecord[]
+  auditLogs                   AuditLog[]
+  goals                       TenantGoal[]
+  dashboardPreferences        DashboardPreference[]
+  campaigns                   Campaign[]
+  realtorPartners             RealtorPartner[]
+  shortletUnits               ShortletUnit[]
+  shortletProperties          ShortletProperty[]
+  shortletReservations        ShortletReservation[]
+  shortletPayments            ShortletPayment[]
+  shortletFolioLines          ShortletFolioLine[]
+  shortletServiceItems        ShortletServiceItem[]
+  shortletBusinessDays        ShortletBusinessDay[]
+  shortletGuests              ShortletGuest[]
   shortletCheckoutInspections ShortletCheckoutInspection[]
-  activities           Activity[]
-  whatsappMessages     WhatsAppMessage[]
-  expenses             Expense[]
-  financeVendors       FinanceVendor[]
-  financeExpenseCategories FinanceExpenseCategory[]
-  vendorBills          VendorBill[]
-  vendorBillPayments   VendorBillPayment[]
-  bankStatementImports BankStatementImport[]
-  bankStatementRows    BankStatementRow[]
-  employeeProfiles     EmployeeProfile[]
-  hrAppraisalActions   HrAppraisalAction[]
-  hrAppraisalCycles    HrAppraisalCycle[]
-  hrAppraisals         HrAppraisal[]
-  hrPayslipRuns        HrPayslipRun[]
-  hrPayslips           HrPayslip[]
-  hrDocuments          HrDocument[]
-  hrPerformanceGoals   HrPerformanceGoal[]
-  hrFormRequests       HrFormRequest[]
-  hrOfferLetters       HrOfferLetter[]
-  taskSpaces           TaskSpace[]
-  taskProjects         TaskProject[]
-  workTasks            WorkTask[]
-  propertyClients      PropertyClient[]
-  clientUnitLinks      ClientUnitLink[]
-  clientShortletLinks  ClientShortletLink[]
-  clientDocuments      ClientDocument[]
-  financeDocuments     FinanceDocument[]
-  leadCaptureForms     LeadCaptureForm[]
-  leadCaptureSessions  LeadCaptureFormSession[]
-  leadCaptureEvents    LeadCaptureFormEvent[]
-  platformErrorEvents  PlatformErrorEvent[]
+  activities                  Activity[]
+  whatsappMessages            WhatsAppMessage[]
+  expenses                    Expense[]
+  financeVendors              FinanceVendor[]
+  financeExpenseCategories    FinanceExpenseCategory[]
+  vendorBills                 VendorBill[]
+  vendorBillPayments          VendorBillPayment[]
+  bankStatementImports        BankStatementImport[]
+  bankStatementRows           BankStatementRow[]
+  employeeProfiles            EmployeeProfile[]
+  hrAppraisalActions          HrAppraisalAction[]
+  hrAppraisalCycles           HrAppraisalCycle[]
+  hrAppraisals                HrAppraisal[]
+  hrPayslipRuns               HrPayslipRun[]
+  hrPayslips                  HrPayslip[]
+  hrPayTemplates              HrPayTemplate[]
+  hrPayrollAdjustments        HrPayrollAdjustment[]
+  hrLeaveTypes                HrLeaveType[]
+  hrLeaveRequests             HrLeaveRequest[]
+  hrLeaveBalances             HrLeaveBalance[]
+  hrHolidays                  HrHoliday[]
+  hrDocuments                 HrDocument[]
+  hrPerformanceGoals          HrPerformanceGoal[]
+  hrFormRequests              HrFormRequest[]
+  hrOfferLetters              HrOfferLetter[]
+  taskSpaces                  TaskSpace[]
+  taskProjects                TaskProject[]
+  workTasks                   WorkTask[]
+  propertyClients             PropertyClient[]
+  clientUnitLinks             ClientUnitLink[]
+  clientShortletLinks         ClientShortletLink[]
+  clientDocuments             ClientDocument[]
+  financeDocuments            FinanceDocument[]
+  leadCaptureForms            LeadCaptureForm[]
+  leadCaptureSessions         LeadCaptureFormSession[]
+  leadCaptureEvents           LeadCaptureFormEvent[]
+  platformErrorEvents         PlatformErrorEvent[]
 }
 
 model TenantSettings {
@@ -155,14 +161,17 @@ model TenantSettings {
   monthlyRevenueTarget Decimal? @db.Decimal(18, 2)
   pipelineTarget       Decimal? @db.Decimal(18, 2)
   logoUrl              String?
-  primaryColor         String?   @default("#1e3a5f")
-  accentColor          String?   @default("#4f46e5")
+  primaryColor         String?  @default("#1e3a5f")
+  accentColor          String?  @default("#4f46e5")
   orgEmail             String?
   orgPhone             String?
   orgAddressLine       String?
   orgCity              String?
   orgState             String?
-  orgCountry           String?   @default("Nigeria")
+  orgCountry           String?  @default("Nigeria")
+  payrollCountryCode   String   @default("NG")
+  /// Jurisdiction-specific employer settings, contribution rates, and reviewed overrides.
+  payrollSettings      Json?
   moduleSales          Boolean  @default(true)
   moduleFinance        Boolean  @default(true)
   moduleMarketing      Boolean  @default(true)
@@ -170,6 +179,7 @@ model TenantSettings {
   moduleRealtorPortal  Boolean  @default(true)
   moduleShortLets      Boolean  @default(false)
   moduleHr             Boolean  @default(false)
+  moduleAi             Boolean  @default(false)
   moduleTasks          Boolean  @default(true)
   moduleClients        Boolean  @default(false)
   // Growth & channels (sellable add-ons)
@@ -181,31 +191,31 @@ model TenantSettings {
   orgDepartments       Json?
 
   // Meta Lead Ads integration
-  metaVerifyToken      String?   // random string you enter in Meta webhook settings
-  metaPageAccessToken  String?   // long-lived Page Access Token from Meta
-  metaDefaultSource    String?   @default("Facebook")
+  metaVerifyToken     String? // random string you enter in Meta webhook settings
+  metaPageAccessToken String? // long-lived Page Access Token from Meta
+  metaDefaultSource   String? @default("Facebook")
 
   // Termii SMS integration
-  termiiApiKey         String?
-  termiiSenderId       String?   @default("Realcorp")
+  termiiApiKey   String?
+  termiiSenderId String? @default("Realcorp")
 
   // WhatsApp Cloud API integration (Meta)
-  whatsappAccessToken  String?
+  whatsappAccessToken   String?
   whatsappPhoneNumberId String?
-  whatsappVerifyToken  String?
+  whatsappVerifyToken   String?
   // Realcorp Bot: auto-reply to inbound WhatsApp messages with listings menu
-  whatsappBotEnabled   Boolean @default(false)
+  whatsappBotEnabled    Boolean @default(false)
 
   // Cloudinary uploads (finance attachments)
-  cloudinaryCloudName  String?
-  cloudinaryApiKey     String?
-  cloudinaryApiSecret  String?
-  cloudinaryFolder     String?   @default("realcorp/finance")
-  financeBankAccounts  Json?
-  financePaymentModes  Json?
-  financeCurrencies    Json?
+  cloudinaryCloudName String?
+  cloudinaryApiKey    String?
+  cloudinaryApiSecret String?
+  cloudinaryFolder    String? @default("realcorp/finance")
+  financeBankAccounts Json?
+  financePaymentModes Json?
+  financeCurrencies   Json?
   /// e.g. { expenseApprovalThreshold, firstReminderAfterDays, secondReminderAfterDays }
-  financeControls      Json?
+  financeControls     Json?
 
   // Short lets / PMS
   shortletCheckInTime        String  @default("14:00")
@@ -272,19 +282,19 @@ enum MembershipStatus {
 }
 
 model Membership {
-  id        String           @id @default(cuid())
-  tenantId  String
-  userId    String
-  role      MembershipRole
-  status    MembershipStatus @default(ACTIVE)
+  id                String           @id @default(cuid())
+  tenantId          String
+  userId            String
+  role              MembershipRole
+  status            MembershipStatus @default(ACTIVE)
   /// sales | finance | marketing | community | hr | operations
-  department String?
+  department        String?
   /// Department lead / coordinator — controls team visibility and task assignment scope
-  isDepartmentLead Boolean @default(false)
+  isDepartmentLead  Boolean          @default(false)
   /// Per-user module overrides: { "finance": "read", "marketing": "full" } — see membership-module-permissions.ts
   modulePermissions Json?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -295,16 +305,16 @@ model Membership {
 }
 
 model Invitation {
-  id         String         @id @default(cuid())
-  tenantId   String
-  email      String
-  role       MembershipRole
-  department String?
-  isDepartmentLead Boolean @default(false)
-  token      String         @unique
-  expiresAt  DateTime
-  acceptedAt DateTime?
-  createdAt  DateTime       @default(now())
+  id               String         @id @default(cuid())
+  tenantId         String
+  email            String
+  role             MembershipRole
+  department       String?
+  isDepartmentLead Boolean        @default(false)
+  token            String         @unique
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  createdAt        DateTime       @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -336,6 +346,7 @@ model Project {
   listingDescription String?   @db.Text
   locationCity       String?
   locationState      String?
+  locationCountry    String?
   locationAddress    String?
   coverImageUrl      String?
   galleryUrls        Json? // string[]
@@ -343,6 +354,7 @@ model Project {
 
   tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   units        Unit[]
+  expenses     Expense[]
   pricingPlans ProjectPricingPlan[]
   stakeholders ProjectStakeholder[]
 
@@ -392,9 +404,9 @@ model ProjectPricingPlan {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  units   Unit[]
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  units       Unit[]
   clientLinks ClientUnitLink[]
 
   @@index([tenantId])
@@ -450,7 +462,7 @@ model WhatsAppMessage {
   id              String    @id @default(cuid())
   tenantId        String
   leadId          String?
-  direction       String    // INBOUND | OUTBOUND
+  direction       String // INBOUND | OUTBOUND
   waMessageId     String?
   fromPhone       String?
   toPhone         String?
@@ -470,22 +482,23 @@ model WhatsAppMessage {
 }
 
 model Unit {
-  id            String       @id @default(cuid())
+  id            String      @id @default(cuid())
   tenantId      String
   projectId     String
   pricingPlanId String?
   label         String
-  purpose       UnitPurpose  @default(SALE)
+  purpose       UnitPurpose @default(SALE)
   unitType      String?
-  status        UnitStatus   @default(AVAILABLE)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  status        UnitStatus  @default(AVAILABLE)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pricingPlan  ProjectPricingPlan? @relation(fields: [pricingPlanId], references: [id], onDelete: SetNull)
   deal         Deal?
   shortletUnit ShortletUnit?
   clientLinks  ClientUnitLink[]
+  expenses     Expense[]
 
   @@index([tenantId])
   @@index([projectId])
@@ -517,8 +530,8 @@ model Campaign {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  leads  Lead[]
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leads        Lead[]
   captureForms LeadCaptureForm[]
 
   @@unique([tenantId, code])
@@ -539,8 +552,8 @@ model RealtorPartner {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  leads  Lead[]
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leads        Lead[]
   captureForms LeadCaptureForm[]
 
   @@index([tenantId])
@@ -572,13 +585,13 @@ model Lead {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campaign       Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  realtorPartner RealtorPartner? @relation(fields: [realtorPartnerId], references: [id], onDelete: SetNull)
-  deals          Deal[]
-  whatsappMessages WhatsAppMessage[]
-  propertyClient PropertyClient?
-  captureFormSession LeadCaptureFormSession?
+  tenant               Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign             Campaign?               @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  realtorPartner       RealtorPartner?         @relation(fields: [realtorPartnerId], references: [id], onDelete: SetNull)
+  deals                Deal[]
+  whatsappMessages     WhatsAppMessage[]
+  propertyClient       PropertyClient?
+  captureFormSession   LeadCaptureFormSession?
   shortletReservations ShortletReservation[]
 
   @@index([tenantId])
@@ -620,11 +633,11 @@ model Deal {
   createdAt               DateTime               @default(now())
   updatedAt               DateTime               @updatedAt
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  invoices Invoice[]
-  salesReceipts SalesReceipt[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead           Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  invoices       Invoice[]
+  salesReceipts  SalesReceipt[]
   propertyClient PropertyClient?
 
   @@index([tenantId])
@@ -637,6 +650,14 @@ enum InvoiceStatus {
   PARTIALLY_PAID
   PAID
   VOID
+}
+
+enum FinanceVatTreatment {
+  NONE
+  EXCLUSIVE
+  INCLUSIVE
+  EXEMPT
+  ZERO_RATED
 }
 
 model Invoice {
@@ -671,24 +692,24 @@ model Invoice {
 }
 
 model PaymentRecord {
-  id               String   @id @default(cuid())
-  tenantId         String
-  invoiceId        String?
-  standaloneTitle  String?
-  payerName        String?
-  amount           Decimal  @db.Decimal(18, 2)
-  currency         String   @default("NGN")
-  department       String?
-  paidAt           DateTime
-  method           String?
-  reference        String?
-  note             String?
-  attachmentUrl    String?
-  attachmentName   String?
+  id                 String   @id @default(cuid())
+  tenantId           String
+  invoiceId          String?
+  standaloneTitle    String?
+  payerName          String?
+  amount             Decimal  @db.Decimal(18, 2)
+  currency           String   @default("NGN")
+  department         String?
+  paidAt             DateTime
+  method             String?
+  reference          String?
+  note               String?
+  attachmentUrl      String?
+  attachmentName     String?
   attachmentPublicId String?
-  recordedByUserId String?
-  recordedByLabel  String?
-  createdAt        DateTime @default(now())
+  recordedByUserId   String?
+  recordedByLabel    String?
+  createdAt          DateTime @default(now())
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
@@ -698,15 +719,20 @@ model PaymentRecord {
 }
 
 model Expense {
-  id                 String   @id @default(cuid())
+  id                 String              @id @default(cuid())
   tenantId           String
   projectId          String?
   unitId             String?
   category           String
   department         String?
   vendorName         String?
-  amount             Decimal  @db.Decimal(18, 2)
-  currency           String   @default("NGN")
+  amount             Decimal             @db.Decimal(18, 2)
+  subtotal           Decimal             @default(0) @db.Decimal(18, 2)
+  vatAmount          Decimal             @default(0) @db.Decimal(18, 2)
+  vatRate            Decimal             @default(0) @db.Decimal(5, 2)
+  vatTreatment       FinanceVatTreatment @default(NONE)
+  vatRecoverable     Boolean             @default(false)
+  currency           String              @default("NGN")
   expenseDate        DateTime
   paidThroughAccount String?
   reference          String?
@@ -716,13 +742,16 @@ model Expense {
   attachmentPublicId String?
   createdByUserId    String?
   createdByLabel     String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  unit    Unit?    @relation(fields: [unitId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, expenseDate])
   @@index([tenantId, category])
+  @@index([tenantId, projectId, unitId])
 }
 
 model FinanceVendor {
@@ -820,31 +849,31 @@ model VendorBillPayment {
 }
 
 model SalesReceipt {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  dealId             String?
-  receiptNumber      String
-  title              String
-  customerName       String?
-  amount             Decimal  @db.Decimal(18, 2)
-  currency           String   @default("NGN")
-  paymentMode        String?
-  depositAccount     String?
-  reference          String?
-  note               String?
-  status             String   @default("RECORDED")
-  pdfUrl             String?
-  sentAt             DateTime?
-  sentToEmail        String?
-  issuedAt           DateTime @default(now())
-  createdByUserId    String?
-  createdByLabel     String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id              String    @id @default(cuid())
+  tenantId        String
+  dealId          String?
+  receiptNumber   String
+  title           String
+  customerName    String?
+  amount          Decimal   @db.Decimal(18, 2)
+  currency        String    @default("NGN")
+  paymentMode     String?
+  depositAccount  String?
+  reference       String?
+  note            String?
+  status          String    @default("RECORDED")
+  pdfUrl          String?
+  sentAt          DateTime?
+  sentToEmail     String?
+  issuedAt        DateTime  @default(now())
+  createdByUserId String?
+  createdByLabel  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  deal            Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  financeDocument FinanceDocument?
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal                 Deal?                 @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  financeDocument      FinanceDocument?
   shortletPayments     ShortletPayment[]
   shortletBusinessDays ShortletBusinessDay[]
 
@@ -887,44 +916,44 @@ enum BankMatchStatus {
 }
 
 model BankStatementImport {
-  id              String             @id @default(cuid())
-  tenantId        String
-  sourceName      String
-  importedByUserId String?
-  importedByLabel String?
-  importedAt      DateTime           @default(now())
-  finalizedAt     DateTime?
+  id                String    @id @default(cuid())
+  tenantId          String
+  sourceName        String
+  importedByUserId  String?
+  importedByLabel   String?
+  importedAt        DateTime  @default(now())
+  finalizedAt       DateTime?
   finalizedByUserId String?
-  finalizedByLabel String?
-  createdAt       DateTime           @default(now())
+  finalizedByLabel  String?
+  createdAt         DateTime  @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   rows   BankStatementRow[]
 
   @@index([tenantId, importedAt])
 }
 
 model BankStatementRow {
-  id                String          @id @default(cuid())
-  tenantId          String
-  importId          String
-  postedAt          DateTime?
-  description       String?
-  reference         String?
-  debit             Decimal         @default(0) @db.Decimal(18, 2)
-  credit            Decimal         @default(0) @db.Decimal(18, 2)
-  amountAbs         Decimal         @db.Decimal(18, 2)
-  direction         String
-  matchStatus       BankMatchStatus @default(UNMATCHED)
-  matchedEntityType String?
-  matchedEntityId   String?
-  matchedAt         DateTime?
-  matchedByUserId   String?
-  matchedByLabel    String?
-  exceptionReason   String?
+  id                 String          @id @default(cuid())
+  tenantId           String
+  importId           String
+  postedAt           DateTime?
+  description        String?
+  reference          String?
+  debit              Decimal         @default(0) @db.Decimal(18, 2)
+  credit             Decimal         @default(0) @db.Decimal(18, 2)
+  amountAbs          Decimal         @db.Decimal(18, 2)
+  direction          String
+  matchStatus        BankMatchStatus @default(UNMATCHED)
+  matchedEntityType  String?
+  matchedEntityId    String?
+  matchedAt          DateTime?
+  matchedByUserId    String?
+  matchedByLabel     String?
+  exceptionReason    String?
   reconciliationNote String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   import BankStatementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
@@ -994,23 +1023,23 @@ enum ShortletListingStatus {
 }
 
 model ShortletProperty {
-  id        String   @id @default(cuid())
-  tenantId  String
-  name      String
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
   locationCode String?
-  address   String?
-  city      String?
-  state     String?
-  country   String?  @default("Nigeria")
-  phone     String?
-  email     String?
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  address      String?
+  city         String?
+  state        String?
+  country      String?  @default("Nigeria")
+  phone        String?
+  email        String?
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  units  ShortletUnit[]
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  units        ShortletUnit[]
   reservations ShortletReservation[]
 
   @@index([tenantId, isActive])
@@ -1043,11 +1072,11 @@ model ShortletUnit {
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
 
-  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  property          ShortletProperty?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  projectUnit       Unit?                 @relation(fields: [projectUnitId], references: [id], onDelete: SetNull)
-  activeReservation ShortletReservation?  @relation("ActiveShortletReservation", fields: [activeReservationId], references: [id], onDelete: SetNull)
-  reservations      ShortletReservation[]
+  tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  property            ShortletProperty?            @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  projectUnit         Unit?                        @relation(fields: [projectUnitId], references: [id], onDelete: SetNull)
+  activeReservation   ShortletReservation?         @relation("ActiveShortletReservation", fields: [activeReservationId], references: [id], onDelete: SetNull)
+  reservations        ShortletReservation[]
   checkoutInspections ShortletCheckoutInspection[]
   clientLinks         ClientShortletLink[]
 
@@ -1057,7 +1086,7 @@ model ShortletUnit {
 }
 
 model ShortletGuest {
-  id               String           @id @default(cuid())
+  id               String            @id @default(cuid())
   tenantId         String
   firstName        String
   lastName         String?
@@ -1071,14 +1100,14 @@ model ShortletGuest {
   addressLine      String?
   city             String?
   state            String?
-  country          String?          @default("Nigeria")
-  notes            String?          @db.Text
+  country          String?           @default("Nigeria")
+  notes            String?           @db.Text
   propertyClientId String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  propertyClient PropertyClient?     @relation(fields: [propertyClientId], references: [id], onDelete: SetNull)
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyClient PropertyClient?       @relation(fields: [propertyClientId], references: [id], onDelete: SetNull)
   reservations   ShortletReservation[]
 
   @@index([tenantId, fullName])
@@ -1116,15 +1145,15 @@ model ShortletReservation {
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
 
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  unit         ShortletUnit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  property     ShortletProperty?   @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  guest        ShortletGuest?      @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  guestClient  PropertyClient?     @relation(fields: [guestClientId], references: [id], onDelete: SetNull)
-  channelLead  Lead?               @relation(fields: [channelLeadId], references: [id], onDelete: SetNull)
-  activeOnUnit ShortletUnit?       @relation("ActiveShortletReservation")
-  payments     ShortletPayment[]
-  folioLines   ShortletFolioLine[]
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unit               ShortletUnit?               @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  property           ShortletProperty?           @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  guest              ShortletGuest?              @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  guestClient        PropertyClient?             @relation(fields: [guestClientId], references: [id], onDelete: SetNull)
+  channelLead        Lead?                       @relation(fields: [channelLeadId], references: [id], onDelete: SetNull)
+  activeOnUnit       ShortletUnit?               @relation("ActiveShortletReservation")
+  payments           ShortletPayment[]
+  folioLines         ShortletFolioLine[]
   checkoutInspection ShortletCheckoutInspection?
 
   @@index([tenantId, status])
@@ -1138,24 +1167,24 @@ model ShortletReservation {
 }
 
 model ShortletCheckoutInspection {
-  id                           String                      @id @default(cuid())
+  id                           String                       @id @default(cuid())
   tenantId                     String
-  reservationId                String                      @unique
+  reservationId                String                       @unique
   unitId                       String
-  status                       ShortletInspectionStatus    @default(AWAITING_INSPECTION)
+  status                       ShortletInspectionStatus     @default(AWAITING_INSPECTION)
   condition                    ShortletInspectionCondition?
-  damageNotes                  String?                     @db.Text
-  cautionFeeAmount             Decimal?                    @db.Decimal(18, 2)
-  cautionRefunded              Decimal?                    @db.Decimal(18, 2)
-  cautionDeduction             Decimal?                    @db.Decimal(18, 2)
+  damageNotes                  String?                      @db.Text
+  cautionFeeAmount             Decimal?                     @db.Decimal(18, 2)
+  cautionRefunded              Decimal?                     @db.Decimal(18, 2)
+  cautionDeduction             Decimal?                     @db.Decimal(18, 2)
   inspectedAt                  DateTime?
   inspectedByUserId            String?
   inspectedByLabel             String?
   housekeepingCompletedAt      DateTime?
   housekeepingCompletedByLabel String?
   photoUrls                    Json?
-  createdAt                    DateTime                    @default(now())
-  updatedAt                    DateTime                    @updatedAt
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
 
   tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   reservation ShortletReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
@@ -1180,9 +1209,9 @@ model ShortletPayment {
   recordedByLabel  String?
   createdAt        DateTime @default(now())
 
-  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  reservation ShortletReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  financeReceipt SalesReceipt?    @relation(fields: [financeReceiptId], references: [id], onDelete: SetNull)
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reservation    ShortletReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  financeReceipt SalesReceipt?       @relation(fields: [financeReceiptId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, paidAt])
   @@index([reservationId])
@@ -1190,16 +1219,16 @@ model ShortletPayment {
 }
 
 model ShortletServiceItem {
-  id        String                  @id @default(cuid())
-  tenantId  String
+  id         String                  @id @default(cuid())
+  tenantId   String
   department ShortletFolioDepartment
-  name      String
-  price     Decimal                 @db.Decimal(18, 2)
-  currency  String                  @default("NGN")
-  active    Boolean                 @default(true)
-  sortOrder Int                     @default(0)
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
+  name       String
+  price      Decimal                 @db.Decimal(18, 2)
+  currency   String                  @default("NGN")
+  active     Boolean                 @default(true)
+  sortOrder  Int                     @default(0)
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
 
   tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   folioLines ShortletFolioLine[]
@@ -1208,20 +1237,20 @@ model ShortletServiceItem {
 }
 
 model ShortletFolioLine {
-  id               String                  @id @default(cuid())
-  tenantId         String
-  reservationId    String
-  serviceItemId    String?
-  department       ShortletFolioDepartment
-  description      String
-  quantity         Int                     @default(1)
-  unitPrice        Decimal                 @db.Decimal(18, 2)
-  amount           Decimal                 @db.Decimal(18, 2)
-  currency         String                  @default("NGN")
-  postedAt         DateTime                @default(now())
-  postedByUserId   String?
-  postedByLabel    String?
-  createdAt        DateTime                @default(now())
+  id             String                  @id @default(cuid())
+  tenantId       String
+  reservationId  String
+  serviceItemId  String?
+  department     ShortletFolioDepartment
+  description    String
+  quantity       Int                     @default(1)
+  unitPrice      Decimal                 @db.Decimal(18, 2)
+  amount         Decimal                 @db.Decimal(18, 2)
+  currency       String                  @default("NGN")
+  postedAt       DateTime                @default(now())
+  postedByUserId String?
+  postedByLabel  String?
+  createdAt      DateTime                @default(now())
 
   tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   reservation ShortletReservation  @relation(fields: [reservationId], references: [id], onDelete: Cascade)
@@ -1304,6 +1333,10 @@ enum EmployeeProfileStatus {
 enum HrDocumentCategory {
   BIODATA
   BANK_FORM
+  EMERGENCY_CONTACT
+  NEXT_OF_KIN
+  HEALTH_RECORD
+  EDUCATION
   OFFER_LETTER
   NDA
   GUARANTOR
@@ -1340,6 +1373,30 @@ enum HrPayslipPaymentStatus {
   PAID
 }
 
+enum HrPayrollAdjustmentType {
+  EARNING
+  DEDUCTION
+}
+
+enum HrLeaveAccrualMethod {
+  ANNUAL_GRANT
+  MONTHLY
+  NONE
+}
+
+enum HrLeaveDayUnit {
+  WORKING_DAYS
+  CALENDAR_DAYS
+  HOURS
+}
+
+enum HrLeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum HrFormType {
   BIODATA
   BANK_FORM
@@ -1368,20 +1425,20 @@ enum HrOfferLetterStatus {
 }
 
 model HrOfferLetter {
-  id                  String               @id @default(cuid())
-  tenantId            String
-  employeeProfileId   String               @unique
-  bodyHtml            String               @db.Text
-  status              HrOfferLetterStatus  @default(DRAFT)
-  token               String?              @unique
-  tokenExpiresAt      DateTime?
-  candidateSignature  String?              @db.Text
-  candidateSignedAt   DateTime?
-  signedSnapshotUrl   String?
-  lastEditedByUserId  String?
-  lastEditedByLabel   String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                 String              @id @default(cuid())
+  tenantId           String
+  employeeProfileId  String              @unique
+  bodyHtml           String              @db.Text
+  status             HrOfferLetterStatus @default(DRAFT)
+  token              String?             @unique
+  tokenExpiresAt     DateTime?
+  candidateSignature String?             @db.Text
+  candidateSignedAt  DateTime?
+  signedSnapshotUrl  String?
+  lastEditedByUserId String?
+  lastEditedByLabel  String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
@@ -1391,56 +1448,80 @@ model HrOfferLetter {
 }
 
 model EmployeeProfile {
-  id               String                @id @default(cuid())
-  tenantId         String
-  userId           String
-  employeeNumber   String?
-  status           EmployeeProfileStatus @default(DRAFT)
-  fullName         String?
-  gender           String?
-  dateOfBirth      DateTime?
-  maritalStatus    String?
-  nationality      String?
-  phoneMobile      String?
-  workEmail        String?
-  addressStreet    String?
-  addressCity      String?
-  addressState     String?
-  position         String?
-  department       String?
-  dateOfJoining    DateTime?
-  reportingToLabel String?
-  employmentType   String?
-  workSchedule     String?
-  paygroupName     String?
-  grossMonthly     Decimal?              @db.Decimal(18, 2)
-  payeeTaxMonthly  Decimal?              @db.Decimal(18, 2)
-  basicPercent     Decimal               @default(30) @db.Decimal(5, 2)
-  housingPercent   Decimal               @default(20) @db.Decimal(5, 2)
-  transportPercent Decimal               @default(15) @db.Decimal(5, 2)
-  otherPercent     Decimal               @default(35) @db.Decimal(5, 2)
-  emergencyContact Json?
-  education        Json?
-  nextOfKin        Json?
-  healthInfo       Json?
-  additionalInfo   Json?
-  bankAccount      Json?
-  guarantorInfo    Json?
-  hrNotes          String?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  id                     String                @id @default(cuid())
+  tenantId               String
+  userId                 String
+  employeeNumber         String?
+  status                 EmployeeProfileStatus @default(DRAFT)
+  fullName               String?
+  gender                 String?
+  dateOfBirth            DateTime?
+  maritalStatus          String?
+  nationality            String?
+  phoneMobile            String?
+  workEmail              String?
+  addressStreet          String?
+  addressCity            String?
+  addressState           String?
+  addressCountry         String?
+  position               String?
+  department             String?
+  dateOfJoining          DateTime?
+  reportingToLabel       String?
+  employmentType         String?
+  workSchedule           String?
+  paygroupName           String?
+  payTemplateId          String?
+  grossMonthly           Decimal?              @db.Decimal(18, 2)
+  payeeTaxMonthly        Decimal?              @db.Decimal(18, 2)
+  payrollCountryCode     String                @default("NG")
+  payrollRegionCode      String?
+  taxId                  String?
+  taxOverrideReason      String?
+  pensionEnabled         Boolean               @default(true)
+  employeePensionRate    Decimal               @default(8) @db.Decimal(5, 2)
+  employerPensionRate    Decimal               @default(10) @db.Decimal(5, 2)
+  nhfMonthly             Decimal               @default(0) @db.Decimal(18, 2)
+  nhiaMonthly            Decimal               @default(0) @db.Decimal(18, 2)
+  annualRent             Decimal               @default(0) @db.Decimal(18, 2)
+  annualLifeInsurance    Decimal               @default(0) @db.Decimal(18, 2)
+  annualMortgageInterest Decimal               @default(0) @db.Decimal(18, 2)
+  otherPreTaxMonthly     Decimal               @default(0) @db.Decimal(18, 2)
+  otherPostTaxMonthly    Decimal               @default(0) @db.Decimal(18, 2)
+  /// Additional reviewed fields required by a country-specific payroll adapter.
+  payrollSettings        Json?
+  basicPercent           Decimal               @default(30) @db.Decimal(5, 2)
+  housingPercent         Decimal               @default(20) @db.Decimal(5, 2)
+  transportPercent       Decimal               @default(15) @db.Decimal(5, 2)
+  otherPercent           Decimal               @default(35) @db.Decimal(5, 2)
+  emergencyContact       Json?
+  education              Json?
+  nextOfKin              Json?
+  healthInfo             Json?
+  additionalInfo         Json?
+  bankAccount            Json?
+  guarantorInfo          Json?
+  hrNotes                String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
-  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  documents        HrDocument[]
-  appraisals       HrAppraisal[]
-  payslips         HrPayslip[]
-  performanceGoals HrPerformanceGoal[]
-  formRequests     HrFormRequest[]
-  offerLetter      HrOfferLetter?
+  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  documents          HrDocument[]
+  appraisals         HrAppraisal[]
+  payslips           HrPayslip[]
+  payrollAdjustments HrPayrollAdjustment[]
+  leaveRequests      HrLeaveRequest[]
+  leaveBalances      HrLeaveBalance[]
+  performanceGoals   HrPerformanceGoal[]
+  formRequests       HrFormRequest[]
+  offerLetter        HrOfferLetter?
+  payTemplate        HrPayTemplate?        @relation(fields: [payTemplateId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, userId])
   @@index([tenantId, status])
   @@index([tenantId, department])
+  @@index([tenantId, payrollCountryCode])
+  @@index([tenantId, payTemplateId])
 }
 
 model HrDocument {
@@ -1454,12 +1535,16 @@ model HrDocument {
   uploadedByUserId  String?
   uploadedByLabel   String?
   createdAt         DateTime           @default(now())
+  deletedAt         DateTime?
+  deletedByUserId   String?
+  deletedByLabel    String?
 
   tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, employeeProfileId])
   @@index([tenantId, category])
+  @@index([tenantId, deletedAt])
 }
 
 model HrAppraisalAction {
@@ -1520,41 +1605,201 @@ model HrAppraisal {
 }
 
 model HrPayslipRun {
-  id        String             @id @default(cuid())
-  tenantId  String
-  year      Int
-  month     Int
-  label     String
-  status    HrPayslipRunStatus   @default(DRAFT)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id                String             @id @default(cuid())
+  tenantId          String
+  year              Int
+  month             Int
+  label             String
+  status            HrPayslipRunStatus @default(DRAFT)
+  generatedAt       DateTime?
+  generatedByUserId String?
+  generatedByLabel  String?
+  finalizedAt       DateTime?
+  finalizedByUserId String?
+  finalizedByLabel  String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
-  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payslips HrPayslip[]
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payslips    HrPayslip[]
+  adjustments HrPayrollAdjustment[]
 
   @@unique([tenantId, year, month])
   @@index([tenantId, status])
 }
 
-model HrPayslip {
-  id                String   @id @default(cuid())
+model HrPayTemplate {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  name                String
+  countryCode         String   @default("NG")
+  basicPercent        Decimal  @default(30) @db.Decimal(5, 2)
+  housingPercent      Decimal  @default(20) @db.Decimal(5, 2)
+  transportPercent    Decimal  @default(15) @db.Decimal(5, 2)
+  otherPercent        Decimal  @default(35) @db.Decimal(5, 2)
+  pensionEnabled      Boolean  @default(true)
+  employeePensionRate Decimal  @default(8) @db.Decimal(5, 2)
+  employerPensionRate Decimal  @default(10) @db.Decimal(5, 2)
+  isDefault           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profiles EmployeeProfile[]
+
+  @@unique([tenantId, countryCode, name])
+  @@index([tenantId, countryCode, isDefault])
+}
+
+model HrPayrollAdjustment {
+  id                String                  @id @default(cuid())
   tenantId          String
   runId             String
   employeeProfileId String
-  currency          String   @default("NGN")
-  grossPay          Decimal  @db.Decimal(18, 2)
-  payeeTax          Decimal  @db.Decimal(18, 2)
-  pensionDeduction  Decimal  @db.Decimal(18, 2)
-  otherDeductions   Decimal  @default(0) @db.Decimal(18, 2)
-  netPay            Decimal  @db.Decimal(18, 2)
-  earningsBreakdown Json
-  deductionsBreakdown Json
-  paymentStatus     HrPayslipPaymentStatus @default(PENDING)
-  paidAt            DateTime?
-  paymentReference  String?
-  paidByLabel       String?
+  type              HrPayrollAdjustmentType
+  code              String
+  label             String
+  amount            Decimal                 @db.Decimal(18, 2)
+  taxable           Boolean                 @default(true)
+  pensionable       Boolean                 @default(false)
+  preTax            Boolean                 @default(false)
+  createdByUserId   String?
+  createdByLabel    String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run     HrPayslipRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, runId])
+  @@index([runId, employeeProfileId])
+}
+
+model HrLeaveType {
+  id                         String               @id @default(cuid())
+  tenantId                   String
+  name                       String
+  code                       String
+  countryCode                String?
+  department                 String?
+  dayUnit                    HrLeaveDayUnit       @default(WORKING_DAYS)
+  accrualMethod              HrLeaveAccrualMethod @default(ANNUAL_GRANT)
+  annualEntitlement          Decimal              @default(0) @db.Decimal(8, 2)
+  paidPercentage             Decimal              @default(100) @db.Decimal(5, 2)
+  minimumServiceMonths       Int                  @default(0)
+  carryoverEnabled           Boolean              @default(false)
+  maxCarryoverUnits          Decimal              @default(0) @db.Decimal(8, 2)
+  allowNegativeBalance       Boolean              @default(false)
+  unlimited                  Boolean              @default(false)
+  requiresDocumentAfterUnits Decimal?             @db.Decimal(8, 2)
+  statutoryReference         String?
+  lastReviewedAt             DateTime?
+  isActive                   Boolean              @default(true)
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requests HrLeaveRequest[]
+  balances HrLeaveBalance[]
+
+  @@unique([tenantId, code, countryCode, department])
+  @@index([tenantId, isActive, countryCode])
+}
+
+model HrLeaveRequest {
+  id                String               @id @default(cuid())
+  tenantId          String
+  employeeProfileId String
+  leaveTypeId       String
+  startDate         DateTime
+  endDate           DateTime
+  requestedUnits    Decimal              @db.Decimal(8, 2)
+  reason            String?
+  attachmentUrl     String?
+  status            HrLeaveRequestStatus @default(PENDING)
+  policySnapshot    Json
+  reviewedByUserId  String?
+  reviewedByLabel   String?
+  reviewNote        String?
+  reviewedAt        DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile   EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  leaveType HrLeaveType     @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, startDate])
+  @@index([employeeProfileId, status, startDate])
+  @@index([leaveTypeId, startDate])
+}
+
+model HrLeaveBalance {
+  id                String   @id @default(cuid())
+  tenantId          String
+  employeeProfileId String
+  leaveTypeId       String
+  year              Int
+  carriedUnits      Decimal  @default(0) @db.Decimal(8, 2)
+  adjustmentUnits   Decimal  @default(0) @db.Decimal(8, 2)
+  adjustmentReason  String?
+  adjustedByUserId  String?
+  adjustedByLabel   String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile   EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  leaveType HrLeaveType     @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeProfileId, leaveTypeId, year])
+  @@index([tenantId, year])
+}
+
+model HrHoliday {
+  id          String   @id @default(cuid())
+  tenantId    String
+  countryCode String?
+  regionCode  String?
+  date        DateTime
+  name        String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date, countryCode, regionCode])
+  @@index([tenantId, date])
+}
+
+model HrPayslip {
+  id                    String                 @id @default(cuid())
+  tenantId              String
+  runId                 String
+  employeeProfileId     String
+  currency              String                 @default("NGN")
+  jurisdictionCode      String                 @default("NG")
+  taxRuleVersion        String?
+  grossPay              Decimal                @db.Decimal(18, 2)
+  payeeTax              Decimal                @db.Decimal(18, 2)
+  pensionDeduction      Decimal                @db.Decimal(18, 2)
+  otherDeductions       Decimal                @default(0) @db.Decimal(18, 2)
+  chargeableIncome      Decimal                @default(0) @db.Decimal(18, 2)
+  employerCost          Decimal                @default(0) @db.Decimal(18, 2)
+  netPay                Decimal                @db.Decimal(18, 2)
+  earningsBreakdown     Json
+  deductionsBreakdown   Json
+  employerContributions Json?
+  calculationBreakdown  Json?
+  taxOverrideApplied    Boolean                @default(false)
+  taxOverrideReason     String?
+  paymentStatus         HrPayslipPaymentStatus @default(PENDING)
+  paidAt                DateTime?
+  paymentReference      String?
+  paidByLabel           String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   run     HrPayslipRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -1563,6 +1808,7 @@ model HrPayslip {
   @@unique([runId, employeeProfileId])
   @@index([tenantId, employeeProfileId])
   @@index([tenantId, paymentStatus])
+  @@index([tenantId, jurisdictionCode])
 }
 
 model HrPerformanceGoal {
@@ -1586,15 +1832,15 @@ model HrPerformanceGoal {
 }
 
 model HrFormRequest {
-  id                String               @id @default(cuid())
+  id                String              @id @default(cuid())
   tenantId          String
   employeeProfileId String?
   recipientName     String?
   recipientEmail    String?
   formType          HrFormType
-  deliveryMode      HrFormDeliveryMode   @default(ONLINE_FILL)
-  status            HrFormRequestStatus  @default(PENDING)
-  token             String               @unique
+  deliveryMode      HrFormDeliveryMode  @default(ONLINE_FILL)
+  status            HrFormRequestStatus @default(PENDING)
+  token             String              @unique
   /// When HR sends multiple forms at once, all share this token → one master link.
   bundleToken       String?
   hrNote            String?
@@ -1608,10 +1854,10 @@ model HrFormRequest {
   approvedByLabel   String?
   createdByUserId   String?
   createdByLabel    String?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
-  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   profile EmployeeProfile? @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, employeeProfileId])
@@ -1623,14 +1869,14 @@ model HrFormRequest {
 // ——— Nigeria reference geography (synced from open dataset, shared platform-wide) ———
 
 model NigeriaStateRef {
-  id          String          @id @default(cuid())
-  name        String          @unique
-  slug        String          @unique
-  lgaCount    Int             @default(0)
-  sourceUrl   String?
-  syncedAt    DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  lgas        NigeriaLgaRef[]
+  id        String          @id @default(cuid())
+  name      String          @unique
+  slug      String          @unique
+  lgaCount  Int             @default(0)
+  sourceUrl String?
+  syncedAt  DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  lgas      NigeriaLgaRef[]
 }
 
 model NigeriaLgaRef {
@@ -1705,8 +1951,8 @@ model TaskProject {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  space  TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  space  TaskSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   tasks  WorkTask[]
 
   @@index([tenantId, spaceId])
@@ -1714,25 +1960,25 @@ model TaskProject {
 }
 
 model WorkTask {
-  id              String           @id @default(cuid())
-  tenantId        String
-  spaceId         String?
-  projectId       String?
-  title           String
-  description     String?          @db.Text
-  status          WorkTaskStatus   @default(TODO)
-  priority        WorkTaskPriority @default(MEDIUM)
-  assigneeUserId  String?
-  createdByUserId String
-  dueDate         DateTime?
-  completedAt     DateTime?
-  sprintLabel     String?
-  sortOrder       Int              @default(0)
+  id               String           @id @default(cuid())
+  tenantId         String
+  spaceId          String?
+  projectId        String?
+  title            String
+  description      String?          @db.Text
+  status           WorkTaskStatus   @default(TODO)
+  priority         WorkTaskPriority @default(MEDIUM)
+  assigneeUserId   String?
+  createdByUserId  String
+  dueDate          DateTime?
+  completedAt      DateTime?
+  sprintLabel      String?
+  sortOrder        Int              @default(0)
   /// Future HR/CRM links: HR_APPRAISAL | HR_GOAL | LEAD | DEAL
   linkedEntityType String?
   linkedEntityId   String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   space   TaskSpace?   @relation(fields: [spaceId], references: [id], onDelete: SetNull)
@@ -1792,13 +2038,13 @@ model PropertyClient {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  lead      Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  deal      Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  portalUser User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  unitLinks ClientUnitLink[]
-  shortletLinks ClientShortletLink[]
-  documents ClientDocument[]
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead                 Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  deal                 Deal?                 @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  portalUser           User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  unitLinks            ClientUnitLink[]
+  shortletLinks        ClientShortletLink[]
+  documents            ClientDocument[]
   shortletReservations ShortletReservation[]
   shortletGuests       ShortletGuest[]
 
@@ -1900,29 +2146,29 @@ enum LeadCaptureFormEventType {
 }
 
 model LeadCaptureForm {
-  id               String                @id @default(cuid())
-  tenantId         String
-  name             String
-  slug             String
-  title            String
-  description      String?               @db.Text
-  status           LeadCaptureFormStatus @default(DRAFT)
-  fields           Json
-  thankYouMessage  String?               @db.Text
-  redirectUrl      String?
-  defaultSource    String?               @default("Lead Form")
-  campaignId       String?
-  assignedUserId   String?
-  realtorPartnerId String?
-  createdByUserId  String?
-  viewCount        Int                   @default(0)
-  startCount       Int                   @default(0)
-  partialCount     Int                   @default(0)
-  submitCount       Int                   @default(0)
-  autoWhatsAppEnabled Boolean             @default(false)
-  autoWhatsAppMessage String?             @db.Text
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  id                  String                @id @default(cuid())
+  tenantId            String
+  name                String
+  slug                String
+  title               String
+  description         String?               @db.Text
+  status              LeadCaptureFormStatus @default(DRAFT)
+  fields              Json
+  thankYouMessage     String?               @db.Text
+  redirectUrl         String?
+  defaultSource       String?               @default("Lead Form")
+  campaignId          String?
+  assignedUserId      String?
+  realtorPartnerId    String?
+  createdByUserId     String?
+  viewCount           Int                   @default(0)
+  startCount          Int                   @default(0)
+  partialCount        Int                   @default(0)
+  submitCount         Int                   @default(0)
+  autoWhatsAppEnabled Boolean               @default(false)
+  autoWhatsAppMessage String?               @db.Text
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaign       Campaign?                @relation(fields: [campaignId], references: [id], onDelete: SetNull)
@@ -1967,9 +2213,9 @@ model LeadCaptureFormSession {
   lastActivityAt   DateTime                 @default(now())
   createdAt        DateTime                 @default(now())
 
-  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  form   LeadCaptureForm    @relation(fields: [formId], references: [id], onDelete: Cascade)
-  lead   Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  tenant Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  form   LeadCaptureForm        @relation(fields: [formId], references: [id], onDelete: Cascade)
+  lead   Lead?                  @relation(fields: [leadId], references: [id], onDelete: SetNull)
   events LeadCaptureFormEvent[]
 
   @@unique([formId, sessionToken])

@@ -79,8 +79,10 @@ export function BiodataFormFields({ v }: { v: InitialValues }) {
       )}
       <HrFormField label="Street address" name="addressStreet" defaultValue={v.addressStreet} />
       <HrLocationFields
+        countryName="addressCountry"
         stateName="addressState"
         cityName="addressCity"
+        countryDefault={v.addressCountry}
         stateDefault={v.addressState}
         cityDefault={v.addressCity}
       />

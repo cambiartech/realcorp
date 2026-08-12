@@ -1,7 +1,11 @@
 "use server";
 
 import { HrDocumentCategory, HrFormRequestStatus } from "@/generated/prisma";
-import { createTenantUploadSignature } from "@/lib/cloudinary-upload-server";
+import {
+  createTenantUploadSignature,
+  type CloudinaryUploadError,
+  type CloudinaryUploadSignature,
+} from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
 import { loadHrFormRequestByToken } from "@/lib/hr-form-request-loader";
 import {
@@ -137,18 +141,7 @@ async function revalidateHrFormViews(tenantId: string, bundleToken: string | nul
 export async function getHrFormUploadSignature(
   token: string,
   input?: { fileName?: string },
-): Promise<
-  | {
-      ok: true;
-      cloudName: string;
-      apiKey: string;
-      folder: string;
-      timestamp: number;
-      publicId: string;
-      signature: string;
-    }
-  | { ok: false; error: string }
-> {
+): Promise<CloudinaryUploadSignature | CloudinaryUploadError> {
   const check = await assertWritableRequest(token);
   if (!check.loaded) return { ok: false, error: check.error! };
 

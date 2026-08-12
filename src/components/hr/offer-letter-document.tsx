@@ -22,6 +22,7 @@ export function OfferLetterDocument({
       title="Offer of employment"
       subtitle={`Issued ${issueDate ?? formatOfferDate()}`}
       footerNote="Confidential — for the candidate named above"
+      variant="formal"
     >
       <div className="space-y-4 text-sm leading-relaxed text-slate-800">
         {paragraphs.map((block, i) => {

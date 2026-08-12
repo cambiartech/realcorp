@@ -2,18 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { ModalOverlay } from "@/components/modal-overlay";
-import {
-  MODAL_PANEL_LG,
-  MODAL_PANEL_MD,
-  MODAL_PANEL_SM,
-  MODAL_PANEL_XL,
-  MODAL_PANEL_XS,
-  MODAL_PANEL_2XL,
-} from "@/lib/modal-panel";
+import { MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
+import { PaginationControl } from "@/components/pagination";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import {
@@ -21,6 +15,7 @@ import {
   type ClientDocumentItem,
 } from "@/components/clients/client-documents-workspace";
 import type { ClientPortalStatus } from "@/lib/client-portal-invite";
+import type { Pagination, SearchParamValue } from "@/lib/pagination";
 import { createPropertyClient, sendClientPortalInvite } from "./actions";
 
 type ClientRow = {
@@ -40,7 +35,6 @@ type CreateClientResult =
   | { ok: true; inviteSent?: boolean; inviteError?: string; alreadyOnPortal?: boolean }
   | { ok: false; error: string };
 
-type ActionResult = { ok: true } | { ok: false; error: string };
 const initial: CreateClientResult | null = null;
 
 function portalStatusLabel(status: ClientPortalStatus) {
@@ -76,6 +70,9 @@ export function ClientsWorkspace({
   clients,
   documents,
   documentClients,
+  pagination,
+  paginationSearchParams,
+  clientStats,
 }: {
   tenantSlug: string;
   canManage: boolean;
@@ -83,6 +80,9 @@ export function ClientsWorkspace({
   clients: ClientRow[];
   documents: ClientDocumentItem[];
   documentClients: Array<{ id: string; fullName: string }>;
+  pagination: Pagination;
+  paginationSearchParams: Record<string, SearchParamValue>;
+  clientStats: { active: number; totalUnits: number };
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -107,9 +107,11 @@ export function ClientsWorkspace({
         showSnackbar("Client added.", "success");
       }
       formRef.current?.reset();
-      setCreateEmail("");
-      setSendPortalInvite(true);
-      setIsCreateOpen(false);
+      queueMicrotask(() => {
+        setCreateEmail("");
+        setSendPortalInvite(true);
+        setIsCreateOpen(false);
+      });
       router.refresh();
     } else {
       showSnackbar(state.error, "error");
@@ -133,12 +135,6 @@ export function ClientsWorkspace({
     }
     router.refresh();
   }
-
-  const stats = useMemo(() => {
-    const active = clients.filter((c) => c.statusValue === "ACTIVE").length;
-    const totalUnits = clients.reduce((sum, c) => sum + c.unitsCount, 0);
-    return { active, totalUnits, total: clients.length };
-  }, [clients]);
 
   return (
     <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
@@ -172,15 +168,15 @@ export function ClientsWorkspace({
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Total clients</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{stats.total}</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{pagination.total}</p>
         </div>
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Active</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{stats.active}</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{clientStats.active}</p>
         </div>
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Units linked</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{stats.totalUnits}</p>
+          <p className="mt-1 text-2xl font-bold text-foreground">{clientStats.totalUnits}</p>
         </div>
       </div>
 
@@ -307,6 +303,13 @@ export function ClientsWorkspace({
               )}
             </tbody>
           </table>
+          <PaginationControl
+            pathname={`/${tenantSlug}/clients`}
+            searchParams={paginationSearchParams}
+            pageParam="clientsPage"
+            itemLabel="clients"
+            {...pagination}
+          />
         </div>
       )}
 

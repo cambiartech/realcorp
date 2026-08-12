@@ -93,8 +93,8 @@ export function PlatformModulesForm({
         >
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <p className="text-xs text-muted">
-              Enable modules this organization has paid for. Disabled modules are hidden from their sidebar
-              and routes — including all sub-pages listed below.
+              Enable modules and capabilities included in this organization&apos;s package. Disabled features are
+              hidden from their workspace.
             </p>
 
             <div className="mt-4 space-y-5">

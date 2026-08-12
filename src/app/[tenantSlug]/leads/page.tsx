@@ -3,22 +3,31 @@ import { CampaignStatus, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { buildLeadSourceOptions } from "@/lib/lead-source-options";
+import { paginate, parsePage } from "@/lib/pagination";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { LeadsWorkspace } from "./leads-workspace";
 
 export const dynamic = "force-dynamic";
+const LEADS_PAGE_SIZE = 50;
 
 export default async function TenantLeadsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ owner?: string; source?: string; project?: string; campaign?: string }>;
+  searchParams: Promise<{
+    owner?: string;
+    source?: string;
+    project?: string;
+    campaign?: string;
+    leadsPage?: string;
+  }>;
 }) {
   const { tenantSlug } = await params;
-  const { owner, source, project, campaign } = await searchParams;
+  const query = await searchParams;
+  const { owner, source, project, campaign, leadsPage } = query;
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -48,22 +57,15 @@ export default async function TenantLeadsPage({
   assertTenantNavAccess(session, membership, tenant.settings, "leads");
   const canCreate = Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;
 
-  const [leads, users, projects, campaigns] = await Promise.all([
-    prisma.lead.findMany({
-      where: {
-        tenantId: tenant.id,
-        ...(owner ? { assignedUserId: owner } : {}),
-        ...(source ? { source } : {}),
-        ...(project ? { projectInterest: project } : {}),
-        ...(campaign ? { campaignId: campaign } : {}),
-      },
-      orderBy: [{ score: "desc" }, { createdAt: "desc" }],
-      take: 200,
-      include: {
-        campaign: { select: { name: true, code: true } },
-        realtorPartner: { select: { displayName: true } },
-      },
-    }),
+  const leadWhere = {
+    tenantId: tenant.id,
+    ...(owner ? { assignedUserId: owner } : {}),
+    ...(source ? { source } : {}),
+    ...(project ? { projectInterest: project } : {}),
+    ...(campaign ? { campaignId: campaign } : {}),
+  };
+  const [totalLeads, users, projects, campaigns] = await Promise.all([
+    prisma.lead.count({ where: leadWhere }),
     prisma.membership.findMany({
       where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
       include: {
@@ -88,6 +90,17 @@ export default async function TenantLeadsPage({
       take: 200,
     }),
   ]);
+  const pagination = paginate(totalLeads, parsePage(leadsPage), LEADS_PAGE_SIZE);
+  const leads = await prisma.lead.findMany({
+    where: leadWhere,
+    orderBy: [{ score: "desc" }, { createdAt: "desc" }, { id: "asc" }],
+    skip: pagination.skip,
+    take: pagination.pageSize,
+    include: {
+      campaign: { select: { name: true, code: true } },
+      realtorPartner: { select: { displayName: true } },
+    },
+  });
 
   const userMap = new Map(users.map((m) => [m.userId, m.user]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
@@ -136,6 +149,8 @@ export default async function TenantLeadsPage({
         tenantSlug={tenant.slug}
         tenantName={tenant.name}
         canCreate={canCreate}
+        pagination={pagination}
+        paginationSearchParams={query}
         activeFilterChips={activeFilterChips}
         projectOptions={projects.map((project) => ({ id: project.id, name: project.name }))}
         campaignOptions={campaigns.map((c) => ({ id: c.id, label: `${c.name} (${c.code})` }))}

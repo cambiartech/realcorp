@@ -646,6 +646,7 @@ export default async function TenantHomePage({
         },
         hrTopPerformers: hrMetrics.topPerformers,
         hrPendingFormCount: hrMetrics.pendingFormCount,
+        hrPendingLeaveCount: hrMetrics.pendingLeaveCount,
         hrOpenAppraisalCount: hrMetrics.openAppraisalCount,
         leadFunnel,
         leaderboard,

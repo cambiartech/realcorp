@@ -41,6 +41,7 @@ export default async function HrPage({
   const tab = sp.tab;
 
   if (tab === "people") redirect(`/${tenantSlug}/hr/people`);
+  if (tab === "leave") redirect(`/${tenantSlug}/hr/leave`);
   if (tab === "payslips") redirect(`/${tenantSlug}/hr/payslips`);
   if (tab === "appraisals") redirect(`/${tenantSlug}/hr/appraisals`);
   if (tab === "documents") redirect(`/${tenantSlug}/hr/documents`);

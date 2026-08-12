@@ -7,7 +7,11 @@ import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
 import { sendInviteEmail } from "@/lib/email";
 import { buildInviteUrl, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
-import { parseTeamInviteForm, inviteProfileFromForm, resolveRoleFromTeamInviteForm } from "@/lib/validators/team-invite";
+import {
+  parseTeamInviteForm,
+  inviteProfileFromForm,
+  resolveRoleFromTeamInviteForm,
+} from "@/lib/validators/team-invite";
 import { membershipRoleLabel, profileFromMembershipRole } from "@/lib/org-membership-profile";
 import { Prisma } from "@/generated/prisma";
 import {
@@ -54,12 +58,17 @@ export async function inviteTenantMember(
     select: { role: true, status: true },
   });
 
-  const canInvite =
-    session.user.isPlatformAdmin ||
-    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
+  const isOrgAdmin =
+    membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN;
+  const isHrManager =
+    membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.HR_MANAGER;
+  const canInvite = session.user.isPlatformAdmin || isOrgAdmin || isHrManager;
 
   if (!canInvite) {
-    return { ok: false, error: "Only org admins can invite team members." };
+    return { ok: false, error: "Only organization admins and HR managers can invite team members." };
+  }
+  if (isHrManager && parsed.data.accessKind !== "department") {
+    return { ok: false, error: "HR managers can invite employees, but cannot grant administrator or portal access." };
   }
 
   const email = parsed.data.email.toLowerCase();
@@ -162,12 +171,75 @@ export async function inviteTenantMember(
   });
 
   revalidatePath(`/${tenantSlug}/team`);
+  revalidatePath(`/${tenantSlug}/hr/people`);
   return {
     ok: true,
     inviteUrl,
     emailSent: emailResult.ok,
     ...(emailResult.ok ? {} : { emailError: emailResult.error }),
   };
+}
+
+const batchInviteRowSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  accessKind: z.literal("department"),
+  department: z.enum(["sales", "finance", "marketing", "community", "hr", "operations"]),
+  isDepartmentLead: z.boolean().default(false),
+});
+const batchInviteSchema = z.array(z.unknown()).min(1).max(100);
+
+export async function inviteTenantMembersBatch(
+  tenantSlug: string,
+  input: unknown,
+): Promise<{
+  ok: boolean;
+  invited: number;
+  failed: Array<{ email: string; error: string }>;
+}> {
+  const parsed = batchInviteSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      invited: 0,
+      failed: [{ email: "", error: parsed.error.issues[0]?.message || "Invalid invitation list." }],
+    };
+  }
+
+  let invited = 0;
+  const failed: Array<{ email: string; error: string }> = [];
+  const validRows: Array<z.infer<typeof batchInviteRowSchema>> = [];
+  const seenEmails = new Set<string>();
+  for (const rawRow of parsed.data) {
+    const parsedRow = batchInviteRowSchema.safeParse(rawRow);
+    if (!parsedRow.success) {
+      const email =
+        typeof rawRow === "object" && rawRow && "email" in rawRow ? String(rawRow.email || "") : "";
+      failed.push({ email, error: parsedRow.error.issues[0]?.message || "Invalid invitation row." });
+      continue;
+    }
+    if (seenEmails.has(parsedRow.data.email)) continue;
+    seenEmails.add(parsedRow.data.email);
+    validRows.push(parsedRow.data);
+  }
+
+  for (let index = 0; index < validRows.length; index += 5) {
+    const chunk = validRows.slice(index, index + 5);
+    const results = await Promise.all(
+      chunk.map(async (row) => {
+        const formData = new FormData();
+        formData.set("email", row.email);
+        formData.set("accessKind", row.accessKind);
+        formData.set("department", row.department);
+        if (row.isDepartmentLead) formData.set("isDepartmentLead", "on");
+        return { row, result: await inviteTenantMember(tenantSlug, null, formData) };
+      }),
+    );
+    for (const { row, result } of results) {
+      if (result.ok) invited += 1;
+      else failed.push({ email: row.email, error: result.error });
+    }
+  }
+  return { ok: invited > 0, invited, failed };
 }
 
 const updateRoleSchema = z.object({

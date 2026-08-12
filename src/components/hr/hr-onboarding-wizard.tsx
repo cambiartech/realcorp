@@ -10,6 +10,7 @@ import { type OnboardingStepId, writeStoredOnboardingStep } from "@/lib/hr-onboa
 import { mergeProfileDraftFromForm, profileDraftFingerprint } from "@/lib/hr-onboarding-draft";
 import { OnboardingProfileHiddenFields } from "@/components/hr/onboarding-profile-hidden-fields";
 import { upsertEmployeeProfile } from "@/app/[tenantSlug]/hr/actions";
+import { UiSelect } from "@/components/ui-select";
 
 const inputClass =
   "w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20";
@@ -27,6 +28,7 @@ export function HrOnboardingWizard({
   memberName,
   memberEmail,
   record,
+  payTemplates,
   checklist,
   checklistPercent,
   initialStep,
@@ -41,6 +43,19 @@ export function HrOnboardingWizard({
   memberName: string;
   memberEmail: string;
   record: ProfileDetailRow;
+  payTemplates: Array<{
+    id: string;
+    name: string;
+    countryCode: string;
+    basicPercent: number;
+    housingPercent: number;
+    transportPercent: number;
+    otherPercent: number;
+    pensionEnabled: boolean;
+    employeePensionRate: number;
+    employerPensionRate: number;
+    isDefault: boolean;
+  }>;
   checklist: ProfileChecklistItem[];
   checklistPercent: number;
   initialStep: OnboardingStepId;
@@ -158,6 +173,51 @@ export function HrOnboardingWizard({
         >
           <input type="hidden" name="userId" value={draft.userId} />
           <input type="hidden" name="status" value="DRAFT" />
+          <input type="hidden" name="basicPercent" value={draft.basicPercent} />
+          <input type="hidden" name="housingPercent" value={draft.housingPercent} />
+          <input type="hidden" name="transportPercent" value={draft.transportPercent} />
+          <input type="hidden" name="otherPercent" value={draft.otherPercent} />
+          <input type="hidden" name="payrollCountryCode" value={draft.payrollCountryCode} />
+          <input type="hidden" name="pensionEnabled" value={draft.pensionEnabled} />
+          <input type="hidden" name="employeePensionRate" value={draft.employeePensionRate} />
+          <input type="hidden" name="employerPensionRate" value={draft.employerPensionRate} />
+          <label className="block text-sm sm:col-span-2">
+            <span className="mb-1 block text-xs font-medium">Pay template</span>
+            <UiSelect
+              name="payTemplateId"
+              value={draft.payTemplateId}
+              onChange={(event) => {
+                const template = payTemplates.find((item) => item.id === event.target.value);
+                setDraft((current) =>
+                  template
+                    ? {
+                        ...current,
+                        payTemplateId: template.id,
+                        payrollCountryCode: template.countryCode,
+                        basicPercent: String(template.basicPercent),
+                        housingPercent: String(template.housingPercent),
+                        transportPercent: String(template.transportPercent),
+                        otherPercent: String(template.otherPercent),
+                        pensionEnabled: template.pensionEnabled ? "yes" : "no",
+                        employeePensionRate: String(template.employeePensionRate),
+                        employerPensionRate: String(template.employerPensionRate),
+                      }
+                    : { ...current, payTemplateId: "" },
+                );
+              }}
+            >
+              <option value="">Custom allocation</option>
+              {payTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name} · {template.countryCode}
+                  {template.isDefault ? " · Default" : ""}
+                </option>
+              ))}
+            </UiSelect>
+            <span className="mt-1 block text-[11px] text-muted">
+              Choose this before entering the remaining onboarding details.
+            </span>
+          </label>
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-xs font-medium">Full name *</span>
             <input

@@ -122,6 +122,7 @@ export default async function TenantProjectsPage({
         listingDescription: project.listingDescription,
         locationCity: project.locationCity,
         locationState: project.locationState,
+        locationCountry: project.locationCountry,
         locationAddress: project.locationAddress,
         coverImageUrl: project.coverImageUrl,
         galleryUrls: Array.isArray(project.galleryUrls)

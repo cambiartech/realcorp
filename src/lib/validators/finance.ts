@@ -119,6 +119,16 @@ export const recordStandalonePaymentInputSchema = recordPaymentInputSchema.exten
 });
 
 export const createExpenseInputSchema = z.object({
+  projectId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  unitId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
   category: z.string().trim().min(2, "Expense category is required.").max(80, "Category is too long."),
   department: z
     .string()
@@ -132,6 +142,9 @@ export const createExpenseInputSchema = z.object({
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
   amount: z.coerce.number().positive("Expense amount must be greater than zero."),
+  vatTreatment: z.enum(["NONE", "EXCLUSIVE", "INCLUSIVE", "EXEMPT", "ZERO_RATED"]).default("NONE"),
+  vatRate: z.coerce.number().min(0).max(100).default(0),
+  vatRecoverable: z.coerce.boolean().optional(),
   currency: z
     .string()
     .trim()
@@ -172,6 +185,10 @@ export const createExpenseInputSchema = z.object({
     .max(260, "Attachment public id is too long.")
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
+});
+
+export const updateExpenseInputSchema = createExpenseInputSchema.extend({
+  editReason: z.string().trim().min(3, "Give a reason for this correction.").max(500),
 });
 
 export const createSalesReceiptInputSchema = z.object({

@@ -38,10 +38,17 @@ import {
   resendInvoiceRecord,
   sendInvoiceReminder,
   updateInvoiceRecord,
+  updateExpenseRecord,
   voidInvoiceRecord,
 } from "./actions";
-import { RecordVendorBillModal, type TenantFiscalYear } from "@/components/finance/record-vendor-bill-modal";
-import { VendorNamePicker, type FinanceVendorOption } from "@/components/finance/vendor-name-picker";
+import {
+  RecordVendorBillModal,
+  type TenantFiscalYear,
+} from "@/components/finance/record-vendor-bill-modal";
+import {
+  VendorNamePicker,
+  type FinanceVendorOption,
+} from "@/components/finance/vendor-name-picker";
 import {
   buildBalanceExportLines,
   downloadFinanceReportPackXlsx,
@@ -49,9 +56,15 @@ import {
   type ReportExportKind,
 } from "@/lib/finance-report-xlsx";
 import { vendorNamesMatch } from "@/lib/finance-vendor";
-import { expenseCategoryNamesMatch, normalizeFinanceExpenseCategory } from "@/lib/finance-expense-category";
+import {
+  expenseCategoryNamesMatch,
+  normalizeFinanceExpenseCategory,
+} from "@/lib/finance-expense-category";
 import { UiSelect } from "@/components/ui-select";
-import { recurrenceFrequencyLabel, type VendorBillRecurrenceFrequency } from "@/lib/vendor-bill-recurrence";
+import {
+  recurrenceFrequencyLabel,
+  type VendorBillRecurrenceFrequency,
+} from "@/lib/vendor-bill-recurrence";
 
 type FinanceDeal = {
   id: string;
@@ -138,6 +151,13 @@ type ExpenseRow = {
   vendorName: string;
   amountLabel: string;
   amountValue: number;
+  pnlAmountValue: number;
+  subtotalValue: number;
+  vatAmountValue: number;
+  vatRate: number;
+  vatTreatment: "NONE" | "EXCLUSIVE" | "INCLUSIVE" | "EXEMPT" | "ZERO_RATED";
+  vatRecoverable: boolean;
+  currency: string;
   paidThroughAccount: string;
   reference: string;
   referenceRaw: string;
@@ -149,6 +169,13 @@ type ExpenseRow = {
   unitId: string;
   unitLabel: string;
   department: string;
+  note: string;
+};
+
+type FinanceAllocationOption = {
+  id: string;
+  label: string;
+  units: Array<{ id: string; label: string }>;
 };
 
 type VendorBillRow = {
@@ -397,13 +424,18 @@ function financeAuditLogsUrl(
   if (page > 1) params.set("logsPage", String(page));
   const q = filters.logsQ.trim();
   if (q) params.set("logsQ", q);
-  if (filters.logsModule.trim()) params.set("logsModule", filters.logsModule.trim());
-  if (filters.logsAction.trim()) params.set("logsAction", filters.logsAction.trim());
-  if (filters.logsActor.trim()) params.set("logsActor", filters.logsActor.trim());
+  if (filters.logsModule.trim())
+    params.set("logsModule", filters.logsModule.trim());
+  if (filters.logsAction.trim())
+    params.set("logsAction", filters.logsAction.trim());
+  if (filters.logsActor.trim())
+    params.set("logsActor", filters.logsActor.trim());
   if (filters.logsFrom.trim()) params.set("logsFrom", filters.logsFrom.trim());
   if (filters.logsTo.trim()) params.set("logsTo", filters.logsTo.trim());
-  if (filters.logsEntityType.trim()) params.set("logsEntityType", filters.logsEntityType.trim());
-  if (filters.logsEntityId.trim()) params.set("logsEntityId", filters.logsEntityId.trim());
+  if (filters.logsEntityType.trim())
+    params.set("logsEntityType", filters.logsEntityType.trim());
+  if (filters.logsEntityId.trim())
+    params.set("logsEntityId", filters.logsEntityId.trim());
   const qs = params.toString();
   const base = `/${tenantSlug}/finance/audit-logs`;
   return qs ? `${base}?${qs}` : base;
@@ -442,10 +474,15 @@ function parseMoneyCell(input: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function csvCell(row: string[], idxMap: Record<string, number>, keys: string[]): string {
+function csvCell(
+  row: string[],
+  idxMap: Record<string, number>,
+  keys: string[],
+): string {
   for (const key of keys) {
     const idx = idxMap[key];
-    if (idx !== undefined && idx >= 0 && idx < row.length) return String(row[idx] || "").trim();
+    if (idx !== undefined && idx >= 0 && idx < row.length)
+      return String(row[idx] || "").trim();
   }
   return "";
 }
@@ -457,7 +494,9 @@ function valueTone(value: number) {
 }
 
 function rowFocusClass(highlightId: string | null, rowId: string) {
-  return highlightId === rowId ? "bg-[var(--warn-wash)] ring-1 ring-inset ring-[var(--warn-line)]" : "";
+  return highlightId === rowId
+    ? "bg-[var(--warn-wash)] ring-1 ring-inset ring-[var(--warn-line)]"
+    : "";
 }
 
 function shiftMonthBoundary(date: Date, months: number) {
@@ -484,6 +523,7 @@ export function FinanceWorkspace({
   bankingRows,
   bankingImports,
   financeOptions,
+  allocationOptions,
   financeControls,
   fiscalYear,
   financeVendors,
@@ -514,6 +554,7 @@ export function FinanceWorkspace({
     currencies: string[];
     departments: string[];
   };
+  allocationOptions: FinanceAllocationOption[];
   financeControls: FinanceControls;
   fiscalYear: TenantFiscalYear | null;
   financeVendors: FinanceVendorOption[];
@@ -522,15 +563,21 @@ export function FinanceWorkspace({
 }) {
   const [items, setItems] = useState(deals);
   const [vendorOptions, setVendorOptions] = useState(financeVendors);
-  const [categoryOptions, setCategoryOptions] = useState(financeExpenseCategories);
+  const [categoryOptions, setCategoryOptions] = useState(
+    financeExpenseCategories,
+  );
   const [pendingDealId, setPendingDealId] = useState<string | null>(null);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [isCreateReceiptOpen, setIsCreateReceiptOpen] = useState(false);
   const [isCreateExpenseOpen, setIsCreateExpenseOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null);
+  const [expenseProjectId, setExpenseProjectId] = useState("");
   const [expenseVendorName, setExpenseVendorName] = useState("");
   const [expenseCategoryName, setExpenseCategoryName] = useState("");
-  const [editingInvoice, setEditingInvoice] = useState<InvoiceRecordItem | null>(null);
-  const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRecordItem | null>(null);
+  const [editingInvoice, setEditingInvoice] =
+    useState<InvoiceRecordItem | null>(null);
+  const [paymentInvoice, setPaymentInvoice] =
+    useState<InvoiceRecordItem | null>(null);
   const [paymentAttachment, setPaymentAttachment] = useState<{
     url: string;
     name: string;
@@ -551,30 +598,53 @@ export function FinanceWorkspace({
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const [bankImportName, setBankImportName] = useState("");
-  const [importedBankRows, setImportedBankRows] = useState<ImportedBankRow[]>(bankingRows || []);
+  const [importedBankRows, setImportedBankRows] = useState<ImportedBankRow[]>(
+    bankingRows || [],
+  );
   const [selectedImportId, setSelectedImportId] = useState<string>("all");
   const [showUnmatchedOnly, setShowUnmatchedOnly] = useState(true);
-  const [bankDateFilter, setBankDateFilter] = useState<BankingDateFilter>("all");
-  const [bankStatusFilter, setBankStatusFilter] = useState<BankingStatusFilter>("all");
-  const [exceptionReasonFilter, setExceptionReasonFilter] = useState<string>("all");
-  const [manualMatchSelection, setManualMatchSelection] = useState<Record<string, string>>({});
+  const [bankDateFilter, setBankDateFilter] =
+    useState<BankingDateFilter>("all");
+  const [bankStatusFilter, setBankStatusFilter] =
+    useState<BankingStatusFilter>("all");
+  const [exceptionReasonFilter, setExceptionReasonFilter] =
+    useState<string>("all");
+  const [manualMatchSelection, setManualMatchSelection] = useState<
+    Record<string, string>
+  >({});
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
-  const [exceptionReasonDrafts, setExceptionReasonDrafts] = useState<Record<string, string>>({});
-  const [reportMonthWindow, setReportMonthWindow] = useState<ReportMonthWindow>(6);
+  const [exceptionReasonDrafts, setExceptionReasonDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [reportMonthWindow, setReportMonthWindow] =
+    useState<ReportMonthWindow>(6);
   const [reportKind, setReportKind] = useState<ReportKind>("pnl");
-  const [reportCompareMode, setReportCompareMode] = useState<ReportCompareMode>("previous_period");
+  const [reportCompareMode, setReportCompareMode] =
+    useState<ReportCompareMode>("previous_period");
   const [reportProjectFilter, setReportProjectFilter] = useState<string>("all");
   const [reportUnitFilter, setReportUnitFilter] = useState<string>("all");
-  const [reportDepartmentFilter, setReportDepartmentFilter] = useState<string>("all");
-  const [reportDrilldownMonth, setReportDrilldownMonth] = useState<string | null>(null);
+  const [reportDepartmentFilter, setReportDepartmentFilter] =
+    useState<string>("all");
+  const [reportDrilldownMonth, setReportDrilldownMonth] = useState<
+    string | null
+  >(null);
   const [paymentBill, setPaymentBill] = useState<VendorBillRow | null>(null);
   const [isCreateBillOpen, setIsCreateBillOpen] = useState(false);
-  const [payablesViewTab, setPayablesViewTab] = useState<"aging" | "bills">("bills");
-  const [receivablesViewTab, setReceivablesViewTab] = useState<"current" | "aging">("current");
-  const [financeOverviewTab, setFinanceOverviewTab] = useState<"pending" | "decisions">("pending");
+  const [payablesViewTab, setPayablesViewTab] = useState<"aging" | "bills">(
+    "bills",
+  );
+  const [receivablesViewTab, setReceivablesViewTab] = useState<
+    "current" | "aging"
+  >("current");
+  const [financeOverviewTab, setFinanceOverviewTab] = useState<
+    "pending" | "decisions"
+  >("pending");
   const [showFinanceOverviewHelp, setShowFinanceOverviewHelp] = useState(false);
-  const [paymentsViewTab, setPaymentsViewTab] = useState<"all" | "invoiced" | "direct">("all");
-  const [isCreateDirectPaymentOpen, setIsCreateDirectPaymentOpen] = useState(false);
+  const [paymentsViewTab, setPaymentsViewTab] = useState<
+    "all" | "invoiced" | "direct"
+  >("all");
+  const [isCreateDirectPaymentOpen, setIsCreateDirectPaymentOpen] =
+    useState(false);
   const [sendReceipt, setSendReceipt] = useState<SalesReceiptRow | null>(null);
   const [emailInvoice, setEmailInvoice] = useState<{
     invoice: InvoiceRecordItem;
@@ -588,9 +658,17 @@ export function FinanceWorkspace({
   useEffect(() => {
     setCategoryOptions(financeExpenseCategories);
   }, [financeExpenseCategories]);
+  const expenseUnitOptions = useMemo(
+    () =>
+      allocationOptions.find((project) => project.id === expenseProjectId)
+        ?.units || [],
+    [allocationOptions, expenseProjectId],
+  );
   const [highlightFocusId, setHighlightFocusId] = useState<string | null>(null);
   const [autoMatching, setAutoMatching] = useState(false);
-  const [finalizingImportId, setFinalizingImportId] = useState<string | null>(null);
+  const [finalizingImportId, setFinalizingImportId] = useState<string | null>(
+    null,
+  );
   const { showSnackbar } = useSnackbar();
   const router = useRouter();
   const pathname = usePathname();
@@ -612,18 +690,32 @@ export function FinanceWorkspace({
   }, [bankingImports, selectedImportId]);
 
   const selectedImport = useMemo(
-    () => (selectedImportId === "all" ? null : bankingImports.find((x) => x.id === selectedImportId) || null),
+    () =>
+      selectedImportId === "all"
+        ? null
+        : bankingImports.find((x) => x.id === selectedImportId) || null,
     [bankingImports, selectedImportId],
   );
 
   const normalizedPath = (pathname.replace(/\/$/, "") || pathname) as string;
   const isFinanceOverviewSurface =
-    normalizedPath === financeBasePath || normalizedPath === `${financeBasePath}/overview`;
+    normalizedPath === financeBasePath ||
+    normalizedPath === `${financeBasePath}/overview`;
 
   type DedicatedFinanceSlug =
-    "invoices" | "payments" | "expenses" | "receipts" | "ar" | "payables" | "banking" | "reports" | "logs";
+    | "invoices"
+    | "payments"
+    | "expenses"
+    | "receipts"
+    | "ar"
+    | "payables"
+    | "banking"
+    | "reports"
+    | "logs";
 
-  function dedicatedFinanceSlugFromPath(path: string): DedicatedFinanceSlug | null {
+  function dedicatedFinanceSlugFromPath(
+    path: string,
+  ): DedicatedFinanceSlug | null {
     if (path.endsWith("/finance/invoices")) return "invoices";
     if (path.endsWith("/finance/payments")) return "payments";
     if (path.endsWith("/finance/expenses")) return "expenses";
@@ -636,7 +728,10 @@ export function FinanceWorkspace({
     return null;
   }
 
-  function openFinanceRecord(kind: "invoice" | "payment" | "expense" | "bill", id: string) {
+  function openFinanceRecord(
+    kind: "invoice" | "payment" | "expense" | "bill",
+    id: string,
+  ) {
     const path =
       kind === "invoice"
         ? `${financeBasePath}/invoices`
@@ -651,7 +746,15 @@ export function FinanceWorkspace({
   const dedicatedSlug = dedicatedFinanceSlugFromPath(normalizedPath);
 
   const recordsTab = useMemo<
-    "invoices" | "receipts" | "payments" | "expenses" | "logs" | "ar" | "payables" | "banking" | "reports"
+    | "invoices"
+    | "receipts"
+    | "payments"
+    | "expenses"
+    | "logs"
+    | "ar"
+    | "payables"
+    | "banking"
+    | "reports"
   >(() => {
     if (dedicatedSlug === "invoices") return "invoices";
     if (dedicatedSlug === "receipts") return "receipts";
@@ -673,7 +776,15 @@ export function FinanceWorkspace({
       r === "banking" ||
       r === "reports"
     )
-      return r as "receipts" | "payments" | "expenses" | "logs" | "ar" | "payables" | "banking" | "reports";
+      return r as
+        | "receipts"
+        | "payments"
+        | "expenses"
+        | "logs"
+        | "ar"
+        | "payables"
+        | "banking"
+        | "reports";
     return "invoices";
   }, [dedicatedSlug, logFilters.recordsTab]);
 
@@ -692,25 +803,54 @@ export function FinanceWorkspace({
     };
   }, [searchParams, recordsTab, pathname]);
 
-  const dedicatedHeading: Record<DedicatedFinanceSlug, { title: string; subtitle: string }> = {
-    invoices: { title: "Invoices", subtitle: "Issue, send, and collect on customer invoices." },
+  const dedicatedHeading: Record<
+    DedicatedFinanceSlug,
+    { title: string; subtitle: string }
+  > = {
+    invoices: {
+      title: "Invoices",
+      subtitle: "Issue, send, and collect on customer invoices.",
+    },
     payments: {
       title: "Payments",
-      subtitle: "Invoice payments and direct collections — no invoice required for walk-ins or misc. cash.",
+      subtitle:
+        "Invoice payments and direct collections — no invoice required for walk-ins or misc. cash.",
     },
-    expenses: { title: "Expenses", subtitle: "Operational spend and reimbursements." },
-    receipts: { title: "Sales receipts", subtitle: "Direct collections not tied to an invoice." },
-    ar: { title: "Receivables", subtitle: "Money customers owe you — aging and follow-ups." },
-    payables: { title: "Payables", subtitle: "Bills you owe vendors — record and pay." },
-    banking: { title: "Banking", subtitle: "Import statements and match transactions." },
-    reports: { title: "Reports", subtitle: "Profit, cash flow, and balance summaries." },
-    logs: { title: "Audit logs", subtitle: "Immutable trail of finance actions." },
+    expenses: {
+      title: "Expenses",
+      subtitle: "Operational spend and reimbursements.",
+    },
+    receipts: {
+      title: "Sales receipts",
+      subtitle: "Direct collections not tied to an invoice.",
+    },
+    ar: {
+      title: "Receivables",
+      subtitle: "Money customers owe you — aging and follow-ups.",
+    },
+    payables: {
+      title: "Payables",
+      subtitle: "Bills you owe vendors — record and pay.",
+    },
+    banking: {
+      title: "Banking",
+      subtitle: "Import statements and match transactions.",
+    },
+    reports: {
+      title: "Reports",
+      subtitle: "Profit, cash flow, and balance summaries.",
+    },
+    logs: {
+      title: "Audit logs",
+      subtitle: "Immutable trail of finance actions.",
+    },
   };
 
   const pageHeading = isFinanceOverviewSurface
     ? {
         title: "Finance overview",
-        subtitle: "Key numbers at a glance, plus pending finance checks from sales deals.",
+        subtitle:
+          "Key numbers at a glance, plus pending finance checks from sales deals.",
       }
     : dedicatedSlug
       ? dedicatedHeading[dedicatedSlug]
@@ -721,7 +861,14 @@ export function FinanceWorkspace({
       showSnackbar("No logs to export for selected filters.", "info");
       return;
     }
-    const header = ["Timestamp", "Actor", "Module", "Action", "Entity", "Summary"];
+    const header = [
+      "Timestamp",
+      "Actor",
+      "Module",
+      "Action",
+      "Entity",
+      "Summary",
+    ];
     const rows = masterLogs.map((log) => [
       log.timestamp,
       log.actor,
@@ -731,7 +878,9 @@ export function FinanceWorkspace({
       log.summary,
     ]);
     const toCsvCell = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
-    const csv = [header, ...rows].map((line) => line.map(toCsvCell).join(",")).join("\n");
+    const csv = [header, ...rows]
+      .map((line) => line.map(toCsvCell).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -743,7 +892,10 @@ export function FinanceWorkspace({
     URL.revokeObjectURL(url);
   }
 
-  async function handleDecision(dealId: string, decision: "APPROVE" | "REJECT") {
+  async function handleDecision(
+    dealId: string,
+    decision: "APPROVE" | "REJECT",
+  ) {
     if (!canManageFinance || pendingDealId) return;
 
     setPendingDealId(dealId);
@@ -818,7 +970,9 @@ export function FinanceWorkspace({
   async function uploadPaymentAttachment(file: File) {
     if (!paymentInvoice || uploadPending) return;
     setUploadPending(true);
-    const sig = await getFinanceUploadSignature(tenantSlug, { fileName: file.name });
+    const sig = await getFinanceUploadSignature(tenantSlug, {
+      fileName: file.name,
+    });
     if (!sig.ok) {
       showSnackbar(sig.error, "info");
       setUploadPending(false);
@@ -833,12 +987,18 @@ export function FinanceWorkspace({
       form.append("folder", sig.folder);
       form.append("public_id", sig.publicId);
       form.append("resource_type", "auto");
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`, {
-        method: "POST",
-        body: form,
-      });
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`,
+        {
+          method: "POST",
+          body: form,
+        },
+      );
       if (!response.ok) {
-        showSnackbar("Attachment upload failed. You can continue without attachment.", "error");
+        showSnackbar(
+          "Attachment upload failed. You can continue without attachment.",
+          "error",
+        );
         setUploadPending(false);
         return;
       }
@@ -848,7 +1008,10 @@ export function FinanceWorkspace({
         public_id?: string;
       };
       if (!payload.secure_url || !payload.public_id) {
-        showSnackbar("Upload response invalid. Continue without attachment.", "error");
+        showSnackbar(
+          "Upload response invalid. Continue without attachment.",
+          "error",
+        );
         setUploadPending(false);
         return;
       }
@@ -859,7 +1022,10 @@ export function FinanceWorkspace({
       });
       showSnackbar("Attachment uploaded.", "success");
     } catch {
-      showSnackbar("Could not upload attachment now. Continue without it.", "error");
+      showSnackbar(
+        "Could not upload attachment now. Continue without it.",
+        "error",
+      );
     } finally {
       setUploadPending(false);
     }
@@ -875,7 +1041,10 @@ export function FinanceWorkspace({
       currency: String(formData.get("currency") || "NGN"),
       dueDate: String(formData.get("dueDate") || ""),
       department: String(formData.get("department") || ""),
-      status: statusRaw === "DRAFT" || statusRaw === "SENT" || statusRaw === "VOID" ? statusRaw : "SENT",
+      status:
+        statusRaw === "DRAFT" || statusRaw === "SENT" || statusRaw === "VOID"
+          ? statusRaw
+          : "SENT",
     });
     if (!result.ok) {
       showSnackbar(result.error, "error");
@@ -892,10 +1061,17 @@ export function FinanceWorkspace({
     if (actionPending) return;
     setActionPending(true);
     const result = await createExpenseRecord(tenantSlug, {
+      projectId: String(formData.get("projectId") || ""),
+      unitId: String(formData.get("unitId") || ""),
       category: String(formData.get("category") || ""),
       department: String(formData.get("department") || ""),
       vendorName: String(formData.get("vendorName") || ""),
       amount: Number(formData.get("amount") || 0),
+      vatTreatment: String(
+        formData.get("vatTreatment") || "NONE",
+      ) as ExpenseRow["vatTreatment"],
+      vatRate: Number(formData.get("vatRate") || 0),
+      vatRecoverable: formData.get("vatRecoverable") === "on",
       currency: String(formData.get("currency") || "NGN"),
       expenseDate: String(formData.get("expenseDate") || ""),
       paidThroughAccount: String(formData.get("paidThroughAccount") || ""),
@@ -915,7 +1091,41 @@ export function FinanceWorkspace({
     setExpenseVendorName("");
     setExpenseCategoryName("");
     setExpenseAttachment(null);
+    setExpenseProjectId("");
     setActionPending(false);
+    router.refresh();
+  }
+
+  async function handleEditExpense(formData: FormData) {
+    if (!editingExpense || actionPending) return;
+    setActionPending(true);
+    const result = await updateExpenseRecord(tenantSlug, editingExpense.id, {
+      projectId: String(formData.get("projectId") || ""),
+      unitId: String(formData.get("unitId") || ""),
+      category: String(formData.get("category") || ""),
+      department: String(formData.get("department") || ""),
+      vendorName: String(formData.get("vendorName") || ""),
+      amount: Number(formData.get("amount") || 0),
+      vatTreatment: String(
+        formData.get("vatTreatment") || "NONE",
+      ) as ExpenseRow["vatTreatment"],
+      vatRate: Number(formData.get("vatRate") || 0),
+      vatRecoverable: formData.get("vatRecoverable") === "on",
+      currency: String(formData.get("currency") || "NGN"),
+      expenseDate: String(formData.get("expenseDate") || ""),
+      paidThroughAccount: String(formData.get("paidThroughAccount") || ""),
+      reference: String(formData.get("reference") || ""),
+      note: String(formData.get("note") || ""),
+      editReason: String(formData.get("editReason") || ""),
+    });
+    setActionPending(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar("Expense corrected and added to the audit log.", "success");
+    setEditingExpense(null);
+    setExpenseProjectId("");
     router.refresh();
   }
 
@@ -944,7 +1154,10 @@ export function FinanceWorkspace({
     router.refresh();
   }
 
-  async function handleSendInvoiceEmail(input: { email: string; customPaymentInstructions: string }) {
+  async function handleSendInvoiceEmail(input: {
+    email: string;
+    customPaymentInstructions: string;
+  }) {
     if (!emailInvoice || actionPending) return;
     setActionPending(true);
     const { invoice, mode } = emailInvoice;
@@ -963,22 +1176,38 @@ export function FinanceWorkspace({
       showSnackbar(result.error, "error");
       return;
     }
-    const label = mode === "remind" ? "Reminder sent" : mode === "resend" ? "Invoice resent" : "Invoice sent";
-    showSnackbar(`${label} to ${input.email}. Copy filed in Finance documents.`, "success");
+    const label =
+      mode === "remind"
+        ? "Reminder sent"
+        : mode === "resend"
+          ? "Invoice resent"
+          : "Invoice sent";
+    showSnackbar(
+      `${label} to ${input.email}. Copy filed in Finance documents.`,
+      "success",
+    );
     setEmailInvoice(null);
     router.refresh();
   }
 
-  async function handleSendSalesReceipt(input: { email: string; customPaymentInstructions: string }) {
+  async function handleSendSalesReceipt(input: {
+    email: string;
+    customPaymentInstructions: string;
+  }) {
     if (!sendReceipt || actionPending) return;
     setActionPending(true);
-    const result = await sendSalesReceiptRecord(tenantSlug, sendReceipt.id, { toEmail: input.email });
+    const result = await sendSalesReceiptRecord(tenantSlug, sendReceipt.id, {
+      toEmail: input.email,
+    });
     setActionPending(false);
     if (!result.ok) {
       showSnackbar(result.error, "error");
       return;
     }
-    showSnackbar(`Receipt sent to ${input.email}. Copy filed in Finance documents.`, "success");
+    showSnackbar(
+      `Receipt sent to ${input.email}. Copy filed in Finance documents.`,
+      "success",
+    );
     setSendReceipt(null);
     router.refresh();
   }
@@ -986,7 +1215,9 @@ export function FinanceWorkspace({
   async function uploadExpenseAttachment(file: File) {
     if (uploadPending) return;
     setUploadPending(true);
-    const sig = await getFinanceUploadSignature(tenantSlug, { fileName: file.name });
+    const sig = await getFinanceUploadSignature(tenantSlug, {
+      fileName: file.name,
+    });
     if (!sig.ok) {
       showSnackbar(sig.error, "info");
       setUploadPending(false);
@@ -1001,12 +1232,18 @@ export function FinanceWorkspace({
       form.append("folder", sig.folder);
       form.append("public_id", sig.publicId);
       form.append("resource_type", "auto");
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`, {
-        method: "POST",
-        body: form,
-      });
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`,
+        {
+          method: "POST",
+          body: form,
+        },
+      );
       if (!response.ok) {
-        showSnackbar("Attachment upload failed. You can continue without attachment.", "error");
+        showSnackbar(
+          "Attachment upload failed. You can continue without attachment.",
+          "error",
+        );
         setUploadPending(false);
         return;
       }
@@ -1016,7 +1253,10 @@ export function FinanceWorkspace({
         public_id?: string;
       };
       if (!payload.secure_url || !payload.public_id) {
-        showSnackbar("Upload response invalid. Continue without attachment.", "error");
+        showSnackbar(
+          "Upload response invalid. Continue without attachment.",
+          "error",
+        );
         setUploadPending(false);
         return;
       }
@@ -1027,7 +1267,10 @@ export function FinanceWorkspace({
       });
       showSnackbar("Attachment uploaded.", "success");
     } catch {
-      showSnackbar("Could not upload attachment now. Continue without it.", "error");
+      showSnackbar(
+        "Could not upload attachment now. Continue without it.",
+        "error",
+      );
     } finally {
       setUploadPending(false);
     }
@@ -1071,7 +1314,10 @@ export function FinanceWorkspace({
       setActionPending(false);
       return;
     }
-    showSnackbar(`Sent ${result.sent} reminder(s). Skipped ${result.skipped}.`, "success");
+    showSnackbar(
+      `Sent ${result.sent} reminder(s). Skipped ${result.skipped}.`,
+      "success",
+    );
     setActionPending(false);
     router.refresh();
   }
@@ -1084,8 +1330,8 @@ export function FinanceWorkspace({
     }
     setVendorOptions((prev) => {
       if (prev.some((v) => vendorNamesMatch(v.name, result.name))) return prev;
-      return [...prev, { id: result.vendorId, name: result.name }].sort((a, b) =>
-        a.name.localeCompare(b.name),
+      return [...prev, { id: result.vendorId, name: result.name }].sort(
+        (a, b) => a.name.localeCompare(b.name),
       );
     });
     showSnackbar(`Vendor “${result.name}” saved.`, "success");
@@ -1099,9 +1345,10 @@ export function FinanceWorkspace({
       return false;
     }
     setCategoryOptions((prev) => {
-      if (prev.some((c) => expenseCategoryNamesMatch(c.name, result.name))) return prev;
-      return [...prev, { id: result.categoryId, name: result.name }].sort((a, b) =>
-        a.name.localeCompare(b.name),
+      if (prev.some((c) => expenseCategoryNamesMatch(c.name, result.name)))
+        return prev;
+      return [...prev, { id: result.categoryId, name: result.name }].sort(
+        (a, b) => a.name.localeCompare(b.name),
       );
     });
     showSnackbar(`Category “${result.name}” saved.`, "success");
@@ -1134,7 +1381,8 @@ export function FinanceWorkspace({
   }
 
   const paymentsListFiltered = useMemo(() => {
-    if (paymentsViewTab === "invoiced") return payments.filter((p) => !p.isDirect);
+    if (paymentsViewTab === "invoiced")
+      return payments.filter((p) => !p.isDirect);
     if (paymentsViewTab === "direct") return payments.filter((p) => p.isDirect);
     return payments;
   }, [payments, paymentsViewTab]);
@@ -1145,12 +1393,16 @@ export function FinanceWorkspace({
     const isRecurring = formData.get("isRecurring") === "on";
     const recurrenceRaw = String(formData.get("recurrenceFrequency") || "");
     const recurrenceFrequency =
-      recurrenceRaw === "DAILY" || recurrenceRaw === "WEEKLY" || recurrenceRaw === "MONTHLY"
+      recurrenceRaw === "DAILY" ||
+      recurrenceRaw === "WEEKLY" ||
+      recurrenceRaw === "MONTHLY"
         ? (recurrenceRaw as VendorBillRecurrenceFrequency)
         : undefined;
     const rangeRaw = String(formData.get("recurrenceRangeMode") || "");
     const recurrenceRangeMode =
-      rangeRaw === "FISCAL_YEAR_END" || rangeRaw === "END_DATE" || rangeRaw === "PERIOD_COUNT"
+      rangeRaw === "FISCAL_YEAR_END" ||
+      rangeRaw === "END_DATE" ||
+      rangeRaw === "PERIOD_COUNT"
         ? rangeRaw
         : undefined;
     const result = await createVendorBill(tenantSlug, {
@@ -1164,8 +1416,10 @@ export function FinanceWorkspace({
       isRecurring,
       recurrenceFrequency: isRecurring ? recurrenceFrequency : undefined,
       recurrenceRangeMode: isRecurring ? recurrenceRangeMode : undefined,
-      recurrenceEndDate: String(formData.get("recurrenceEndDate") || "") || undefined,
-      recurrencePeriodCount: Number(formData.get("recurrencePeriodCount") || 0) || undefined,
+      recurrenceEndDate:
+        String(formData.get("recurrenceEndDate") || "") || undefined,
+      recurrencePeriodCount:
+        Number(formData.get("recurrencePeriodCount") || 0) || undefined,
       useAutoTitle: formData.get("useAutoTitle") === "on",
     });
     if (!result.ok) {
@@ -1192,7 +1446,8 @@ export function FinanceWorkspace({
       paidAt: String(formData.get("paidAt") || ""),
       method: String(formData.get("method") || "") || undefined,
       reference: String(formData.get("reference") || "") || undefined,
-      paidThroughAccount: String(formData.get("paidThroughAccount") || "") || undefined,
+      paidThroughAccount:
+        String(formData.get("paidThroughAccount") || "") || undefined,
     });
     if (!result.ok) {
       showSnackbar(result.error, "error");
@@ -1219,10 +1474,18 @@ export function FinanceWorkspace({
     router.refresh();
   }
 
-  async function openTimeline(entityType: string, entityId: string, title: string) {
+  async function openTimeline(
+    entityType: string,
+    entityId: string,
+    title: string,
+  ) {
     setTimelineTarget({ entityType, entityId, title });
     setTimelineLoading(true);
-    const result = await getEntityTimelineLogs(tenantSlug, entityType, entityId);
+    const result = await getEntityTimelineLogs(
+      tenantSlug,
+      entityType,
+      entityId,
+    );
     if (!result.ok) {
       showSnackbar(result.error, "error");
       setTimelineLogs([]);
@@ -1240,11 +1503,16 @@ export function FinanceWorkspace({
       .map((l) => l.trim())
       .filter(Boolean);
     if (lines.length < 2) {
-      showSnackbar("CSV looks empty. Add header + rows and try again.", "error");
+      showSnackbar(
+        "CSV looks empty. Add header + rows and try again.",
+        "error",
+      );
       return;
     }
 
-    const header = splitCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "").replace(/_/g, ""));
+    const header = splitCsvLine(lines[0]).map((h) =>
+      h.toLowerCase().replace(/\s+/g, "").replace(/_/g, ""),
+    );
     const idxMap: Record<string, number> = {};
     header.forEach((h, idx) => {
       idxMap[h] = idx;
@@ -1253,10 +1521,27 @@ export function FinanceWorkspace({
     const parsed: ImportedBankRow[] = [];
     for (let i = 1; i < lines.length; i += 1) {
       const cols = splitCsvLine(lines[i]);
-      const date = csvCell(cols, idxMap, ["date", "valuedate", "transactiondate"]);
-      const description = csvCell(cols, idxMap, ["description", "narration", "details", "memo"]);
-      const reference = csvCell(cols, idxMap, ["reference", "ref", "transactionref"]);
-      const debitRaw = csvCell(cols, idxMap, ["debit", "withdrawal", "moneyout"]);
+      const date = csvCell(cols, idxMap, [
+        "date",
+        "valuedate",
+        "transactiondate",
+      ]);
+      const description = csvCell(cols, idxMap, [
+        "description",
+        "narration",
+        "details",
+        "memo",
+      ]);
+      const reference = csvCell(cols, idxMap, [
+        "reference",
+        "ref",
+        "transactionref",
+      ]);
+      const debitRaw = csvCell(cols, idxMap, [
+        "debit",
+        "withdrawal",
+        "moneyout",
+      ]);
       const creditRaw = csvCell(cols, idxMap, ["credit", "deposit", "moneyin"]);
       const amountRaw = csvCell(cols, idxMap, ["amount"]);
 
@@ -1284,7 +1569,10 @@ export function FinanceWorkspace({
     }
 
     if (parsed.length === 0) {
-      showSnackbar("No usable rows found. Expected amount/debit/credit columns.", "error");
+      showSnackbar(
+        "No usable rows found. Expected amount/debit/credit columns.",
+        "error",
+      );
       return;
     }
     const result = await importBankStatementRows(tenantSlug, {
@@ -1318,12 +1606,17 @@ export function FinanceWorkspace({
       row.direction === "credit"
         ? payments.map((p) => {
             const amountDiff = Math.abs(p.amountValue - row.amountAbs);
-            const paymentDateMs = p.paidAtValue ? new Date(p.paidAtValue).getTime() : NaN;
+            const paymentDateMs = p.paidAtValue
+              ? new Date(p.paidAtValue).getTime()
+              : NaN;
             const dateDiffDays =
               Number.isFinite(dateMs) && Number.isFinite(paymentDateMs)
                 ? Math.abs(dateMs - paymentDateMs) / (1000 * 60 * 60 * 24)
                 : 99;
-            const referenceHit = p.referenceRaw && refNeedle.includes(p.referenceRaw.toLowerCase()) ? 1 : 0;
+            const referenceHit =
+              p.referenceRaw && refNeedle.includes(p.referenceRaw.toLowerCase())
+                ? 1
+                : 0;
             const score = amountDiff + dateDiffDays * 0.2 - referenceHit * 3;
             return {
               kind: "payment" as const,
@@ -1336,12 +1629,17 @@ export function FinanceWorkspace({
           })
         : expenses.map((e) => {
             const amountDiff = Math.abs(e.amountValue - row.amountAbs);
-            const expenseDateMs = e.expenseDateValue ? new Date(e.expenseDateValue).getTime() : NaN;
+            const expenseDateMs = e.expenseDateValue
+              ? new Date(e.expenseDateValue).getTime()
+              : NaN;
             const dateDiffDays =
               Number.isFinite(dateMs) && Number.isFinite(expenseDateMs)
                 ? Math.abs(dateMs - expenseDateMs) / (1000 * 60 * 60 * 24)
                 : 99;
-            const referenceHit = e.referenceRaw && refNeedle.includes(e.referenceRaw.toLowerCase()) ? 1 : 0;
+            const referenceHit =
+              e.referenceRaw && refNeedle.includes(e.referenceRaw.toLowerCase())
+                ? 1
+                : 0;
             const score = amountDiff + dateDiffDays * 0.2 - referenceHit * 3;
             return {
               kind: "expense" as const,
@@ -1367,7 +1665,9 @@ export function FinanceWorkspace({
       row.direction === "credit"
         ? payments.map((p) => {
             const amountDiff = Math.abs(p.amountValue - row.amountAbs);
-            const paymentDateMs = p.paidAtValue ? new Date(p.paidAtValue).getTime() : NaN;
+            const paymentDateMs = p.paidAtValue
+              ? new Date(p.paidAtValue).getTime()
+              : NaN;
             const dateDiffDays =
               Number.isFinite(dateMs) && Number.isFinite(paymentDateMs)
                 ? Math.abs(dateMs - paymentDateMs) / (1000 * 60 * 60 * 24)
@@ -1383,7 +1683,9 @@ export function FinanceWorkspace({
           })
         : expenses.map((e) => {
             const amountDiff = Math.abs(e.amountValue - row.amountAbs);
-            const expenseDateMs = e.expenseDateValue ? new Date(e.expenseDateValue).getTime() : NaN;
+            const expenseDateMs = e.expenseDateValue
+              ? new Date(e.expenseDateValue).getTime()
+              : NaN;
             const dateDiffDays =
               Number.isFinite(dateMs) && Number.isFinite(expenseDateMs)
                 ? Math.abs(dateMs - expenseDateMs) / (1000 * 60 * 60 * 24)
@@ -1406,7 +1708,11 @@ export function FinanceWorkspace({
     const row = new Date(`${rowDate}T00:00:00`);
     if (Number.isNaN(row.getTime())) return false;
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
     if (filter === "today") return row.getTime() >= todayStart.getTime();
     if (filter === "7d") {
       const sevenDaysAgo = new Date(todayStart);
@@ -1437,7 +1743,10 @@ export function FinanceWorkspace({
     const payload = financeExportPayload();
     try {
       if (kind === "pnl") {
-        await downloadFinanceReportXlsx("pnl", meta, { ...payload, pnl: visiblePnlBreakdown });
+        await downloadFinanceReportXlsx("pnl", meta, {
+          ...payload,
+          pnl: visiblePnlBreakdown,
+        });
       } else if (kind === "cashflow") {
         await downloadFinanceReportXlsx("cashflow", meta, {
           ...payload,
@@ -1513,44 +1822,67 @@ export function FinanceWorkspace({
 
   const scopedBankRows = useMemo(() => {
     let rows = importedBankRows;
-    if (selectedImportId !== "all") rows = rows.filter((r) => r.importId === selectedImportId);
+    if (selectedImportId !== "all")
+      rows = rows.filter((r) => r.importId === selectedImportId);
     rows = rows.filter((r) => includesDateRange(r.date, bankDateFilter));
     return rows;
   }, [importedBankRows, selectedImportId, bankDateFilter]);
 
   const visibleBankRows = useMemo(() => {
     let rows = scopedBankRows;
-    if (showUnmatchedOnly) rows = rows.filter((r) => r.matchStatus !== "MATCHED");
-    if (bankStatusFilter === "matched") rows = rows.filter((r) => r.matchStatus === "MATCHED");
+    if (showUnmatchedOnly)
+      rows = rows.filter((r) => r.matchStatus !== "MATCHED");
+    if (bankStatusFilter === "matched")
+      rows = rows.filter((r) => r.matchStatus === "MATCHED");
     if (bankStatusFilter === "unmatched")
-      rows = rows.filter((r) => r.matchStatus === "UNMATCHED" || !r.matchStatus);
-    if (bankStatusFilter === "exception") rows = rows.filter((r) => r.matchStatus === "EXCEPTION");
+      rows = rows.filter(
+        (r) => r.matchStatus === "UNMATCHED" || !r.matchStatus,
+      );
+    if (bankStatusFilter === "exception")
+      rows = rows.filter((r) => r.matchStatus === "EXCEPTION");
     if (exceptionReasonFilter !== "all") {
       rows = rows.filter(
-        (r) => r.matchStatus === "EXCEPTION" && (r.exceptionReason || "OTHER") === exceptionReasonFilter,
+        (r) =>
+          r.matchStatus === "EXCEPTION" &&
+          (r.exceptionReason || "OTHER") === exceptionReasonFilter,
       );
     }
     return rows;
-  }, [scopedBankRows, showUnmatchedOnly, bankStatusFilter, exceptionReasonFilter]);
+  }, [
+    scopedBankRows,
+    showUnmatchedOnly,
+    bankStatusFilter,
+    exceptionReasonFilter,
+  ]);
 
   const reportProjectOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const x of invoices) if (x.projectId) map.set(x.projectId, x.projectLabel);
-    for (const x of payments) if (x.projectId) map.set(x.projectId, x.projectLabel);
-    for (const x of expenses) if (x.projectId) map.set(x.projectId, x.projectLabel);
+    const map = new Map(
+      allocationOptions.map((project) => [project.id, project.label]),
+    );
+    for (const x of invoices)
+      if (x.projectId) map.set(x.projectId, x.projectLabel);
+    for (const x of payments)
+      if (x.projectId) map.set(x.projectId, x.projectLabel);
+    for (const x of expenses)
+      if (x.projectId) map.set(x.projectId, x.projectLabel);
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [invoices, payments, expenses]);
+  }, [allocationOptions, invoices, payments, expenses]);
   const reportUnitOptions = useMemo(() => {
     const map = new Map<string, string>();
+    for (const project of allocationOptions) {
+      if (reportProjectFilter !== "all" && project.id !== reportProjectFilter)
+        continue;
+      for (const unit of project.units) map.set(unit.id, unit.label);
+    }
     for (const x of invoices) if (x.unitId) map.set(x.unitId, x.unitLabel);
     for (const x of payments) if (x.unitId) map.set(x.unitId, x.unitLabel);
     for (const x of expenses) if (x.unitId) map.set(x.unitId, x.unitLabel);
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [invoices, payments, expenses]);
+  }, [allocationOptions, reportProjectFilter, invoices, payments, expenses]);
   const reportDepartmentOptions = useMemo(
     () =>
       Array.from(
@@ -1569,9 +1901,18 @@ export function FinanceWorkspace({
   const filteredInvoices = useMemo(
     () =>
       invoices.filter((x) => {
-        if (reportProjectFilter !== "all" && x.projectId !== reportProjectFilter) return false;
-        if (reportUnitFilter !== "all" && x.unitId !== reportUnitFilter) return false;
-        if (reportDepartmentFilter !== "all" && x.department !== reportDepartmentFilter) return false;
+        if (
+          reportProjectFilter !== "all" &&
+          x.projectId !== reportProjectFilter
+        )
+          return false;
+        if (reportUnitFilter !== "all" && x.unitId !== reportUnitFilter)
+          return false;
+        if (
+          reportDepartmentFilter !== "all" &&
+          x.department !== reportDepartmentFilter
+        )
+          return false;
         return true;
       }),
     [invoices, reportProjectFilter, reportUnitFilter, reportDepartmentFilter],
@@ -1579,9 +1920,18 @@ export function FinanceWorkspace({
   const filteredPayments = useMemo(
     () =>
       payments.filter((x) => {
-        if (reportProjectFilter !== "all" && x.projectId !== reportProjectFilter) return false;
-        if (reportUnitFilter !== "all" && x.unitId !== reportUnitFilter) return false;
-        if (reportDepartmentFilter !== "all" && x.department !== reportDepartmentFilter) return false;
+        if (
+          reportProjectFilter !== "all" &&
+          x.projectId !== reportProjectFilter
+        )
+          return false;
+        if (reportUnitFilter !== "all" && x.unitId !== reportUnitFilter)
+          return false;
+        if (
+          reportDepartmentFilter !== "all" &&
+          x.department !== reportDepartmentFilter
+        )
+          return false;
         return true;
       }),
     [payments, reportProjectFilter, reportUnitFilter, reportDepartmentFilter],
@@ -1589,23 +1939,44 @@ export function FinanceWorkspace({
   const filteredExpenses = useMemo(
     () =>
       expenses.filter((x) => {
-        if (reportProjectFilter !== "all" && x.projectId !== reportProjectFilter) return false;
-        if (reportUnitFilter !== "all" && x.unitId !== reportUnitFilter) return false;
-        if (reportDepartmentFilter !== "all" && x.department !== reportDepartmentFilter) return false;
+        if (
+          reportProjectFilter !== "all" &&
+          x.projectId !== reportProjectFilter
+        )
+          return false;
+        if (reportUnitFilter !== "all" && x.unitId !== reportUnitFilter)
+          return false;
+        if (
+          reportDepartmentFilter !== "all" &&
+          x.department !== reportDepartmentFilter
+        )
+          return false;
         return true;
       }),
     [expenses, reportProjectFilter, reportUnitFilter, reportDepartmentFilter],
   );
 
   const visiblePnlBreakdown = useMemo(() => {
-    const keys = reportView.pnlBreakdown.map((x) => x.month).slice(-reportMonthWindow);
-    const rows = keys.map((month) => ({ month, invoiced: 0, collected: 0, expenses: 0, net: 0 }));
+    const keys = reportView.pnlBreakdown
+      .map((x) => x.month)
+      .slice(-reportMonthWindow);
+    const rows = keys.map((month) => ({
+      month,
+      invoiced: 0,
+      collected: 0,
+      expenses: 0,
+      net: 0,
+    }));
     const index = new Map(rows.map((x, i) => [x.month, i]));
-    const monthFmt = new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" });
+    const monthFmt = new Intl.DateTimeFormat("en-NG", {
+      month: "short",
+      year: "numeric",
+    });
     for (const x of filteredInvoices) {
       const key = monthFmt.format(new Date(`${x.issuedAtValue}T00:00:00`));
       const i = index.get(key);
-      if (i !== undefined && x.statusValue !== "VOID") rows[i].invoiced += x.amountValue;
+      if (i !== undefined && x.statusValue !== "VOID")
+        rows[i].invoiced += x.amountValue;
     }
     for (const x of filteredPayments) {
       const key = monthFmt.format(new Date(`${x.paidAtValue}T00:00:00`));
@@ -1615,26 +1986,52 @@ export function FinanceWorkspace({
     for (const x of filteredExpenses) {
       const key = monthFmt.format(new Date(`${x.expenseDateValue}T00:00:00`));
       const i = index.get(key);
-      if (i !== undefined) rows[i].expenses += x.amountValue;
+      if (i !== undefined) rows[i].expenses += x.pnlAmountValue;
     }
-    return rows.map((r) => ({ ...r, net: r.collected - r.expenses }));
-  }, [reportView.pnlBreakdown, reportMonthWindow, filteredInvoices, filteredPayments, filteredExpenses]);
-  const visibleCashflowBreakdown = useMemo(
-    () =>
-      visiblePnlBreakdown.map((x) => ({
-        month: x.month,
-        inflow: x.collected,
-        outflow: x.expenses,
-        net: x.collected - x.expenses,
-      })),
-    [visiblePnlBreakdown],
-  );
+    return rows.map((r) => ({ ...r, net: r.invoiced - r.expenses }));
+  }, [
+    reportView.pnlBreakdown,
+    reportMonthWindow,
+    filteredInvoices,
+    filteredPayments,
+    filteredExpenses,
+  ]);
+  const visibleCashflowBreakdown = useMemo(() => {
+    const rows = visiblePnlBreakdown.map((x) => ({
+      month: x.month,
+      inflow: 0,
+      outflow: 0,
+      net: 0,
+    }));
+    const index = new Map(rows.map((x, i) => [x.month, i]));
+    const monthFmt = new Intl.DateTimeFormat("en-NG", {
+      month: "short",
+      year: "numeric",
+    });
+    for (const payment of filteredPayments) {
+      const i = index.get(
+        monthFmt.format(new Date(`${payment.paidAtValue}T00:00:00`)),
+      );
+      if (i !== undefined) rows[i].inflow += payment.amountValue;
+    }
+    for (const expense of filteredExpenses) {
+      const i = index.get(
+        monthFmt.format(new Date(`${expense.expenseDateValue}T00:00:00`)),
+      );
+      if (i !== undefined) rows[i].outflow += expense.amountValue;
+    }
+    return rows.map((row) => ({ ...row, net: row.inflow - row.outflow }));
+  }, [visiblePnlBreakdown, filteredPayments, filteredExpenses]);
   const visibleExpenseBreakdown = useMemo(
     () =>
       Array.from(
         filteredExpenses.reduce((acc, row) => {
-          const current = acc.get(row.category) || { category: row.category, total: 0, count: 0 };
-          current.total += row.amountValue;
+          const current = acc.get(row.category) || {
+            category: row.category,
+            total: 0,
+            count: 0,
+          };
+          current.total += row.pnlAmountValue;
           current.count += 1;
           acc.set(row.category, current);
           return acc;
@@ -1644,6 +2041,78 @@ export function FinanceWorkspace({
         .sort((a, b) => b.total - a.total),
     [filteredExpenses],
   );
+  const dimensionalPnlRows = useMemo(() => {
+    const visibleMonths = new Set(visiblePnlBreakdown.map((row) => row.month));
+    const monthFmt = new Intl.DateTimeFormat("en-NG", {
+      month: "short",
+      year: "numeric",
+    });
+    const rows = new Map<
+      string,
+      { id: string; label: string; revenue: number; expenses: number }
+    >();
+    const isUnitDrilldown = reportProjectFilter !== "all";
+
+    const bucket = (id: string, label: string) => {
+      const current = rows.get(id) || { id, label, revenue: 0, expenses: 0 };
+      rows.set(id, current);
+      return current;
+    };
+    for (const invoice of filteredInvoices) {
+      if (invoice.statusValue === "VOID") continue;
+      if (
+        !visibleMonths.has(
+          monthFmt.format(new Date(`${invoice.issuedAtValue}T00:00:00`)),
+        )
+      )
+        continue;
+      const id = isUnitDrilldown
+        ? invoice.unitId || "__project"
+        : invoice.projectId || "__unassigned";
+      const label = isUnitDrilldown
+        ? invoice.unitId
+          ? invoice.unitLabel
+          : "Project-wide / unassigned"
+        : invoice.projectId
+          ? invoice.projectLabel
+          : "Unassigned project";
+      bucket(id, label).revenue += invoice.amountValue;
+    }
+    for (const expense of filteredExpenses) {
+      if (
+        !visibleMonths.has(
+          monthFmt.format(new Date(`${expense.expenseDateValue}T00:00:00`)),
+        )
+      )
+        continue;
+      const id = isUnitDrilldown
+        ? expense.unitId || "__project"
+        : expense.projectId || "__unassigned";
+      const label = isUnitDrilldown
+        ? expense.unitId
+          ? expense.unitLabel
+          : "Project-wide / unassigned"
+        : expense.projectId
+          ? expense.projectLabel
+          : "Unassigned project";
+      bucket(id, label).expenses += expense.pnlAmountValue;
+    }
+    return Array.from(rows.values())
+      .map((row) => ({
+        ...row,
+        profit: row.revenue - row.expenses,
+        margin:
+          row.revenue > 0
+            ? ((row.revenue - row.expenses) / row.revenue) * 100
+            : null,
+      }))
+      .sort((a, b) => b.revenue - b.expenses - (a.revenue - a.expenses));
+  }, [
+    visiblePnlBreakdown,
+    reportProjectFilter,
+    filteredInvoices,
+    filteredExpenses,
+  ]);
   const reportMonthLabel = useMemo(
     () => new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }),
     [],
@@ -1651,18 +2120,24 @@ export function FinanceWorkspace({
   const reportDrilldown = useMemo(() => {
     if (!reportDrilldownMonth) return null;
     const invoicesForMonth = filteredInvoices.filter(
-      (x) => reportMonthLabel.format(new Date(`${x.issuedAtValue}T00:00:00`)) === reportDrilldownMonth,
+      (x) =>
+        reportMonthLabel.format(new Date(`${x.issuedAtValue}T00:00:00`)) ===
+        reportDrilldownMonth,
     );
     const paymentsForMonth = filteredPayments.filter(
-      (x) => reportMonthLabel.format(new Date(`${x.paidAtValue}T00:00:00`)) === reportDrilldownMonth,
+      (x) =>
+        reportMonthLabel.format(new Date(`${x.paidAtValue}T00:00:00`)) ===
+        reportDrilldownMonth,
     );
     const expensesForMonth = filteredExpenses.filter(
-      (x) => reportMonthLabel.format(new Date(`${x.expenseDateValue}T00:00:00`)) === reportDrilldownMonth,
+      (x) =>
+        reportMonthLabel.format(new Date(`${x.expenseDateValue}T00:00:00`)) ===
+        reportDrilldownMonth,
     );
     const totals = {
       invoices: invoicesForMonth.reduce((sum, x) => sum + x.amountValue, 0),
       payments: paymentsForMonth.reduce((sum, x) => sum + x.amountValue, 0),
-      expenses: expensesForMonth.reduce((sum, x) => sum + x.amountValue, 0),
+      expenses: expensesForMonth.reduce((sum, x) => sum + x.pnlAmountValue, 0),
     };
     return {
       month: reportDrilldownMonth,
@@ -1671,60 +2146,98 @@ export function FinanceWorkspace({
       expenses: expensesForMonth,
       totals,
     };
-  }, [reportDrilldownMonth, filteredInvoices, filteredPayments, filteredExpenses, reportMonthLabel]);
+  }, [
+    reportDrilldownMonth,
+    filteredInvoices,
+    filteredPayments,
+    filteredExpenses,
+    reportMonthLabel,
+  ]);
   const filteredBalanceSnapshot = useMemo(() => {
     const receivables = filteredInvoices
       .filter((x) => x.statusValue !== "VOID" && x.statusValue !== "PAID")
       .reduce((sum, x) => sum + x.balanceValue, 0);
     const overdueReceivables = filteredInvoices
-      .filter((x) => x.isOverdue && x.statusValue !== "VOID" && x.statusValue !== "PAID")
+      .filter(
+        (x) =>
+          x.isOverdue && x.statusValue !== "VOID" && x.statusValue !== "PAID",
+      )
       .reduce((sum, x) => sum + x.balanceValue, 0);
     const cashIn = filteredPayments.reduce((sum, x) => sum + x.amountValue, 0);
     const cashOut = filteredExpenses.reduce((sum, x) => sum + x.amountValue, 0);
-    return { receivables, overdueReceivables, cashIn, cashOut, netCashflow: cashIn - cashOut };
+    return {
+      receivables,
+      overdueReceivables,
+      cashIn,
+      cashOut,
+      netCashflow: cashIn - cashOut,
+    };
   }, [filteredInvoices, filteredPayments, filteredExpenses]);
   const reportComparison = useMemo(() => {
     const now = new Date();
     const currentEnd = shiftMonthBoundary(now, 1);
     const currentStart = shiftMonthBoundary(currentEnd, -reportMonthWindow);
     const comparisonEnd =
-      reportCompareMode === "previous_period" ? currentStart : shiftMonthBoundary(currentEnd, -12);
-    const comparisonStart = shiftMonthBoundary(comparisonEnd, -reportMonthWindow);
+      reportCompareMode === "previous_period"
+        ? currentStart
+        : shiftMonthBoundary(currentEnd, -12);
+    const comparisonStart = shiftMonthBoundary(
+      comparisonEnd,
+      -reportMonthWindow,
+    );
 
     const inRange = (dateStr: string, start: Date, endExclusive: Date) => {
       if (!dateStr) return false;
       const d = new Date(`${dateStr}T00:00:00`);
       const t = d.getTime();
-      return Number.isFinite(t) && t >= start.getTime() && t < endExclusive.getTime();
+      return (
+        Number.isFinite(t) && t >= start.getTime() && t < endExclusive.getTime()
+      );
     };
 
     const current = {
       invoiced: filteredInvoices
-        .filter((x) => x.statusValue !== "VOID" && inRange(x.issuedAtValue, currentStart, currentEnd))
+        .filter(
+          (x) =>
+            x.statusValue !== "VOID" &&
+            inRange(x.issuedAtValue, currentStart, currentEnd),
+        )
         .reduce((sum, x) => sum + x.amountValue, 0),
       collected: filteredPayments
         .filter((x) => inRange(x.paidAtValue, currentStart, currentEnd))
         .reduce((sum, x) => sum + x.amountValue, 0),
       expenses: filteredExpenses
         .filter((x) => inRange(x.expenseDateValue, currentStart, currentEnd))
-        .reduce((sum, x) => sum + x.amountValue, 0),
+        .reduce((sum, x) => sum + x.pnlAmountValue, 0),
     };
     const previous = {
       invoiced: filteredInvoices
-        .filter((x) => x.statusValue !== "VOID" && inRange(x.issuedAtValue, comparisonStart, comparisonEnd))
+        .filter(
+          (x) =>
+            x.statusValue !== "VOID" &&
+            inRange(x.issuedAtValue, comparisonStart, comparisonEnd),
+        )
         .reduce((sum, x) => sum + x.amountValue, 0),
       collected: filteredPayments
         .filter((x) => inRange(x.paidAtValue, comparisonStart, comparisonEnd))
         .reduce((sum, x) => sum + x.amountValue, 0),
       expenses: filteredExpenses
-        .filter((x) => inRange(x.expenseDateValue, comparisonStart, comparisonEnd))
-        .reduce((sum, x) => sum + x.amountValue, 0),
+        .filter((x) =>
+          inRange(x.expenseDateValue, comparisonStart, comparisonEnd),
+        )
+        .reduce((sum, x) => sum + x.pnlAmountValue, 0),
     };
     return {
-      current: { ...current, net: current.collected - current.expenses },
-      previous: { ...previous, net: previous.collected - previous.expenses },
+      current: { ...current, net: current.invoiced - current.expenses },
+      previous: { ...previous, net: previous.invoiced - previous.expenses },
     };
-  }, [filteredInvoices, filteredPayments, filteredExpenses, reportMonthWindow, reportCompareMode]);
+  }, [
+    filteredInvoices,
+    filteredPayments,
+    filteredExpenses,
+    reportMonthWindow,
+    reportCompareMode,
+  ]);
   const reportComparisonCards = useMemo(() => {
     const rows = [
       {
@@ -1754,7 +2267,8 @@ export function FinanceWorkspace({
     ];
     return rows.map((row) => {
       const change = row.current - row.previous;
-      const changePct = row.previous !== 0 ? (change / row.previous) * 100 : null;
+      const changePct =
+        row.previous !== 0 ? (change / row.previous) * 100 : null;
       return { ...row, change, changePct };
     });
   }, [reportComparison]);
@@ -1768,14 +2282,27 @@ export function FinanceWorkspace({
   );
 
   const balanceSheetSections = useMemo(() => {
-    const assetsTotal = filteredBalanceSnapshot.receivables + filteredBalanceSnapshot.cashIn;
+    const assetsTotal =
+      filteredBalanceSnapshot.receivables + filteredBalanceSnapshot.cashIn;
     const liabilitiesTotal = openPayablesTotal;
     const equityTotal = assetsTotal - liabilitiesTotal;
     return {
       assets: [
-        { label: "Customer balances owed to you", amount: filteredBalanceSnapshot.receivables, sub: false },
-        { label: "Overdue customer balances", amount: filteredBalanceSnapshot.overdueReceivables, sub: true },
-        { label: "Cash collected (filtered period)", amount: filteredBalanceSnapshot.cashIn, sub: false },
+        {
+          label: "Customer balances owed to you",
+          amount: filteredBalanceSnapshot.receivables,
+          sub: false,
+        },
+        {
+          label: "Overdue customer balances",
+          amount: filteredBalanceSnapshot.overdueReceivables,
+          sub: true,
+        },
+        {
+          label: "Cash collected (filtered period)",
+          amount: filteredBalanceSnapshot.cashIn,
+          sub: false,
+        },
       ] as Array<{ label: string; amount: number; sub?: boolean }>,
       liabilities: [{ label: "Unpaid vendor bills", amount: liabilitiesTotal }],
       equity: [{ label: "What is left for the business", amount: equityTotal }],
@@ -1786,17 +2313,35 @@ export function FinanceWorkspace({
   }, [filteredBalanceSnapshot, openPayablesTotal]);
 
   const payablesAging = useMemo(() => {
-    const buckets = { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, noDueDate: 0 };
+    const buckets = {
+      current: 0,
+      d1_30: 0,
+      d31_60: 0,
+      d61_90: 0,
+      d90_plus: 0,
+      noDueDate: 0,
+    };
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
     for (const bill of vendorBills) {
-      if (bill.statusValue === "VOID" || bill.statusValue === "PAID" || bill.balanceValue <= 0) continue;
+      if (
+        bill.statusValue === "VOID" ||
+        bill.statusValue === "PAID" ||
+        bill.balanceValue <= 0
+      )
+        continue;
       if (!bill.dueDateValue) {
         buckets.noDueDate += bill.balanceValue;
         continue;
       }
       const due = new Date(`${bill.dueDateValue}T00:00:00`);
-      const days = Math.floor((startOfToday.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+      const days = Math.floor(
+        (startOfToday.getTime() - due.getTime()) / (1000 * 60 * 60 * 24),
+      );
       if (days <= 0) buckets.current += bill.balanceValue;
       else if (days <= 30) buckets.d1_30 += bill.balanceValue;
       else if (days <= 60) buckets.d31_60 += bill.balanceValue;
@@ -1808,8 +2353,12 @@ export function FinanceWorkspace({
 
   const bankingMetrics = useMemo(() => {
     const total = scopedBankRows.length;
-    const matched = scopedBankRows.filter((r) => r.matchStatus === "MATCHED").length;
-    const unmatchedRows = scopedBankRows.filter((r) => r.matchStatus !== "MATCHED");
+    const matched = scopedBankRows.filter(
+      (r) => r.matchStatus === "MATCHED",
+    ).length;
+    const unmatchedRows = scopedBankRows.filter(
+      (r) => r.matchStatus !== "MATCHED",
+    );
     const unmatched = unmatchedRows.length;
     const unmatchedAmount = unmatchedRows.reduce(
       (sum, r) => sum + (Number.isFinite(r.amountAbs) ? r.amountAbs : 0),
@@ -1854,7 +2403,8 @@ export function FinanceWorkspace({
           ? {
               ...r,
               matchStatus: "MATCHED",
-              matchedEntityType: match.kind === "payment" ? "PAYMENT" : "EXPENSE",
+              matchedEntityType:
+                match.kind === "payment" ? "PAYMENT" : "EXPENSE",
               matchedEntityId: match.id,
               exceptionReason: null,
             }
@@ -1900,10 +2450,21 @@ export function FinanceWorkspace({
         if (!match) return null;
         return { rowId: row.id, kind: match.kind, entityId: match.id };
       })
-      .filter((x): x is { rowId: string; kind: "payment" | "expense"; entityId: string } => Boolean(x));
+      .filter(
+        (
+          x,
+        ): x is {
+          rowId: string;
+          kind: "payment" | "expense";
+          entityId: string;
+        } => Boolean(x),
+      );
 
     if (proposals.length === 0) {
-      showSnackbar("No safe auto-match candidates in the current view.", "info");
+      showSnackbar(
+        "No safe auto-match candidates in the current view.",
+        "info",
+      );
       return;
     }
 
@@ -1920,14 +2481,19 @@ export function FinanceWorkspace({
       result.failed > 0 ? "info" : "success",
     );
     if (result.matched > 0) {
-      const matchedIds = new Set(result.details.filter((d) => d.status === "matched").map((d) => d.rowId));
+      const matchedIds = new Set(
+        result.details
+          .filter((d) => d.status === "matched")
+          .map((d) => d.rowId),
+      );
       setImportedBankRows((curr) =>
         curr.map((r) =>
           matchedIds.has(r.id)
             ? {
                 ...r,
                 matchStatus: "MATCHED",
-                matchedEntityType: r.direction === "credit" ? "PAYMENT" : "EXPENSE",
+                matchedEntityType:
+                  r.direction === "credit" ? "PAYMENT" : "EXPENSE",
                 exceptionReason: null,
               }
             : r,
@@ -1942,9 +2508,19 @@ export function FinanceWorkspace({
       showSnackbar("This batch is finalized and locked.", "info");
       return;
     }
-    const reasonCode = (exceptionReasonDrafts[row.id] ?? row.exceptionReason ?? "OTHER").trim() || "OTHER";
+    const reasonCode =
+      (
+        exceptionReasonDrafts[row.id] ??
+        row.exceptionReason ??
+        "OTHER"
+      ).trim() || "OTHER";
     const note = (noteDrafts[row.id] ?? row.reconciliationNote ?? "").trim();
-    const result = await markBankStatementRowException(tenantSlug, row.id, reasonCode, note);
+    const result = await markBankStatementRowException(
+      tenantSlug,
+      row.id,
+      reasonCode,
+      note,
+    );
     if (!result.ok) {
       showSnackbar(result.error, "error");
       return;
@@ -1996,7 +2572,9 @@ export function FinanceWorkspace({
     }
     showSnackbar("Reconciliation note saved.", "success");
     setImportedBankRows((curr) =>
-      curr.map((r) => (r.id === row.id ? { ...r, reconciliationNote: note } : r)),
+      curr.map((r) =>
+        r.id === row.id ? { ...r, reconciliationNote: note } : r,
+      ),
     );
     setNoteDrafts((curr) => ({ ...curr, [row.id]: note }));
     router.refresh();
@@ -2005,7 +2583,10 @@ export function FinanceWorkspace({
   async function handleFinalizeSelectedImport() {
     if (!selectedImport || selectedImport.finalized) return;
     setFinalizingImportId(selectedImport.id);
-    const result = await finalizeBankStatementImport(tenantSlug, selectedImport.id);
+    const result = await finalizeBankStatementImport(
+      tenantSlug,
+      selectedImport.id,
+    );
     setFinalizingImportId(null);
     if (!result.ok) {
       showSnackbar(result.error, "error");
@@ -2044,7 +2625,8 @@ export function FinanceWorkspace({
 
     const lines = [header.join(",")];
     for (const row of visibleBankRows) {
-      const suggested = row.matchStatus === "MATCHED" ? null : suggestMatch(row);
+      const suggested =
+        row.matchStatus === "MATCHED" ? null : suggestMatch(row);
       lines.push(
         [
           row.importSourceName || "",
@@ -2075,7 +2657,8 @@ export function FinanceWorkspace({
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const now = new Date().toISOString().slice(0, 10);
-    const scope = selectedImportId === "all" ? "all-imports" : selectedImportId.slice(0, 8);
+    const scope =
+      selectedImportId === "all" ? "all-imports" : selectedImportId.slice(0, 8);
     const a = document.createElement("a");
     a.href = url;
     a.download = `bank-reconciliation-export-${scope}-${now}.csv`;
@@ -2087,7 +2670,9 @@ export function FinanceWorkspace({
     <div className="w-full max-w-[1100px] px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{pageHeading.title}</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {pageHeading.title}
+          </h1>
           <p className="mt-1 text-sm text-muted">{pageHeading.subtitle}</p>
         </div>
         {isFinanceOverviewSurface ? (
@@ -2100,7 +2685,11 @@ export function FinanceWorkspace({
                 ? "border-foreground bg-foreground text-background"
                 : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground",
             ].join(" ")}
-            aria-label={showFinanceOverviewHelp ? "Hide workflow help" : "Show workflow help"}
+            aria-label={
+              showFinanceOverviewHelp
+                ? "Hide workflow help"
+                : "Show workflow help"
+            }
             title="How this workflow works"
           >
             i
@@ -2110,20 +2699,30 @@ export function FinanceWorkspace({
 
       {isFinanceOverviewSurface && showFinanceOverviewHelp ? (
         <section className="mt-4 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-          <h3 className="text-sm font-semibold text-foreground">How teams interact with this flow</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            How teams interact with this flow
+          </h3>
           <div className="mt-2 grid gap-2 text-sm text-muted">
             <p>
-              Sales team creates/updates deals and flags finance checks as pending; those deals appear in{" "}
-              <span className="font-medium text-foreground">Pending checks</span> below.
+              Sales team creates/updates deals and flags finance checks as
+              pending; those deals appear in{" "}
+              <span className="font-medium text-foreground">
+                Pending checks
+              </span>{" "}
+              below.
             </p>
             <p>
-              Finance Manager or Org Admin approves/rejects from queue. On approve, a{" "}
-              <span className="font-medium text-foreground">client record</span> is created automatically from
-              the deal (lead contact + unit link). Send a portal invite from Clients when ready.
+              Finance Manager or Org Admin approves/rejects from queue. On
+              approve, a{" "}
+              <span className="font-medium text-foreground">client record</span>{" "}
+              is created automatically from the deal (lead contact + unit link).
+              Send a portal invite from Clients when ready.
             </p>
             <p>
-              Open <span className="font-medium text-foreground">Audit Logs</span> from the sidebar for the
-              full searchable trail. Invoices, payments, and expenses each have their own pages.
+              Open{" "}
+              <span className="font-medium text-foreground">Audit Logs</span>{" "}
+              from the sidebar for the full searchable trail. Invoices,
+              payments, and expenses each have their own pages.
             </p>
           </div>
         </section>
@@ -2131,7 +2730,8 @@ export function FinanceWorkspace({
 
       {!canManageFinance && isFinanceOverviewSurface ? (
         <div className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 text-sm text-muted">
-          You can view this queue, but only Org Admin and Finance Manager can approve or reject items.
+          You can view this queue, but only Org Admin and Finance Manager can
+          approve or reject items.
         </div>
       ) : null}
 
@@ -2141,16 +2741,26 @@ export function FinanceWorkspace({
             href={`/${tenantSlug}/finance/receivables`}
             className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
           >
-            <p className="text-xs uppercase tracking-wide text-muted">Outstanding receivables</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.outstandingReceivables}</p>
-            <p className="mt-1 text-xs text-muted">{overviewStats.openInvoiceCount} open invoice(s)</p>
+            <p className="text-xs uppercase tracking-wide text-muted">
+              Outstanding receivables
+            </p>
+            <p className="mt-1 text-2xl font-bold text-foreground">
+              {overviewStats.outstandingReceivables}
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              {overviewStats.openInvoiceCount} open invoice(s)
+            </p>
           </Link>
           <Link
             href={`/${tenantSlug}/finance/receivables`}
             className="rounded-lg border border-[var(--danger-line)] bg-[var(--danger-wash)] p-4 transition-colors hover:bg-[var(--danger-wash)] dark:hover:bg-[var(--danger-wash)]"
           >
-            <p className="text-xs uppercase tracking-wide text-[var(--danger)]">Overdue receivables</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--danger)]">{overviewStats.overdueReceivables}</p>
+            <p className="text-xs uppercase tracking-wide text-[var(--danger)]">
+              Overdue receivables
+            </p>
+            <p className="mt-1 text-2xl font-bold text-[var(--danger)]">
+              {overviewStats.overdueReceivables}
+            </p>
             <p className="mt-1 text-xs text-[var(--danger)]">
               {overviewStats.overdueInvoiceCount} overdue invoice(s)
             </p>
@@ -2159,8 +2769,12 @@ export function FinanceWorkspace({
             href={`/${tenantSlug}/finance/payables`}
             className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
           >
-            <p className="text-xs uppercase tracking-wide text-muted">Open payables</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.openPayables}</p>
+            <p className="text-xs uppercase tracking-wide text-muted">
+              Open payables
+            </p>
+            <p className="mt-1 text-2xl font-bold text-foreground">
+              {overviewStats.openPayables}
+            </p>
             <p className="mt-1 text-xs text-muted">
               {overviewStats.openPayableCount} bill(s)
               {overviewStats.payablesOverdueCount > 0
@@ -2172,23 +2786,37 @@ export function FinanceWorkspace({
             href={`/${tenantSlug}/finance/payments`}
             className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4 transition-colors hover:bg-[var(--success-wash)] dark:hover:bg-[var(--success-wash)]"
           >
-            <p className="text-xs uppercase tracking-wide text-[var(--success)]">Collected this month</p>
+            <p className="text-xs uppercase tracking-wide text-[var(--success)]">
+              Collected this month
+            </p>
             <p className="mt-1 text-2xl font-bold text-[var(--success)]">
               {overviewStats.collectedThisMonth}
             </p>
-            <p className="mt-1 text-xs text-[var(--success)]">Invoice & direct payments</p>
+            <p className="mt-1 text-xs text-[var(--success)]">
+              Invoice & direct payments
+            </p>
           </Link>
           <Link
             href={`/${tenantSlug}/finance/expenses`}
             className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
           >
-            <p className="text-xs uppercase tracking-wide text-muted">Expenses this month</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{overviewStats.expensesThisMonth}</p>
-            <p className="mt-1 text-xs text-muted">Operational spend recorded</p>
+            <p className="text-xs uppercase tracking-wide text-muted">
+              Expenses this month
+            </p>
+            <p className="mt-1 text-2xl font-bold text-foreground">
+              {overviewStats.expensesThisMonth}
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Operational spend recorded
+            </p>
           </Link>
           <div className="rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] p-4">
-            <p className="text-xs uppercase tracking-wide text-[var(--warn)]">Pending finance checks</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--warn)]">{overviewStats.pendingFinanceChecks}</p>
+            <p className="text-xs uppercase tracking-wide text-[var(--warn)]">
+              Pending finance checks
+            </p>
+            <p className="mt-1 text-2xl font-bold text-[var(--warn)]">
+              {overviewStats.pendingFinanceChecks}
+            </p>
             <p className="mt-1 text-xs text-[var(--warn)]">
               {overviewStats.bankingUnmatched > 0
                 ? `${overviewStats.bankingUnmatched} unmatched bank row(s) · `
@@ -2233,7 +2861,9 @@ export function FinanceWorkspace({
                 <p>Action</p>
               </div>
               {items.length === 0 ? (
-                <div className="p-5 text-sm text-muted">No pending finance items right now.</div>
+                <div className="p-5 text-sm text-muted">
+                  No pending finance items right now.
+                </div>
               ) : (
                 <ul className="divide-y divide-foreground/10">
                   {items.map((deal) => {
@@ -2244,8 +2874,12 @@ export function FinanceWorkspace({
                         className="grid gap-3 px-4 py-4 md:grid-cols-[2.2fr_1fr_1fr_1fr_1.2fr] md:items-center"
                       >
                         <div>
-                          <p className="text-sm font-semibold text-foreground">{deal.title}</p>
-                          <p className="mt-0.5 text-xs text-muted">Submitted {deal.createdAtLabel}</p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {deal.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            Submitted {deal.createdAtLabel}
+                          </p>
                         </div>
                         <p className="text-sm text-muted">{deal.owner}</p>
                         <p className="text-sm text-muted">{deal.stage}</p>
@@ -2253,7 +2887,11 @@ export function FinanceWorkspace({
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            disabled={!canManageFinance || isPending || Boolean(pendingDealId)}
+                            disabled={
+                              !canManageFinance ||
+                              isPending ||
+                              Boolean(pendingDealId)
+                            }
                             onClick={() => handleDecision(deal.id, "APPROVE")}
                             className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
                           >
@@ -2261,7 +2899,11 @@ export function FinanceWorkspace({
                           </button>
                           <button
                             type="button"
-                            disabled={!canManageFinance || isPending || Boolean(pendingDealId)}
+                            disabled={
+                              !canManageFinance ||
+                              isPending ||
+                              Boolean(pendingDealId)
+                            }
                             onClick={() => handleDecision(deal.id, "REJECT")}
                             className="rounded-md border border-error/35 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/10 disabled:opacity-50"
                           >
@@ -2277,10 +2919,13 @@ export function FinanceWorkspace({
           ) : (
             <>
               <p className="border-b border-foreground/10 px-4 py-2 text-xs text-muted">
-                Latest approvals and rejections. Full history lives under Audit Logs.
+                Latest approvals and rejections. Full history lives under Audit
+                Logs.
               </p>
               {recentDecisions.length === 0 ? (
-                <p className="px-4 py-4 text-sm text-muted">No decisions recorded yet.</p>
+                <p className="px-4 py-4 text-sm text-muted">
+                  No decisions recorded yet.
+                </p>
               ) : (
                 <ul className="divide-y divide-foreground/10">
                   {recentDecisions.map((item) => (
@@ -2289,7 +2934,9 @@ export function FinanceWorkspace({
                       className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
                     >
                       <div>
-                        <p className="font-medium text-foreground">{item.title}</p>
+                        <p className="font-medium text-foreground">
+                          {item.title}
+                        </p>
                         <p className="text-xs text-muted">
                           {item.reviewedBy} - {item.reviewedAtLabel}
                         </p>
@@ -2330,6 +2977,7 @@ export function FinanceWorkspace({
                       type="button"
                       onClick={() => {
                         setExpenseAttachment(null);
+                        setExpenseProjectId("");
                         setIsCreateExpenseOpen(true);
                       }}
                       className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-90"
@@ -2392,6 +3040,8 @@ export function FinanceWorkspace({
                         <th className="px-3 py-2">Invoice</th>
                         <th className="px-3 py-2">Status</th>
                         <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Allocation</th>
+                        <th className="px-3 py-2">VAT</th>
                         <th className="px-3 py-2">Balance</th>
                         <th className="px-3 py-2">Due</th>
                         <th className="px-3 py-2">Aging</th>
@@ -2405,11 +3055,18 @@ export function FinanceWorkspace({
                         <tr
                           key={invoice.id}
                           data-focus-id={invoice.id}
-                          className={rowFocusClass(highlightFocusId, invoice.id)}
+                          className={rowFocusClass(
+                            highlightFocusId,
+                            invoice.id,
+                          )}
                         >
                           <td className="px-3 py-2">
-                            <p className="font-medium text-foreground">{invoice.invoiceNumber}</p>
-                            <p className="text-xs text-muted">{invoice.title}</p>
+                            <p className="font-medium text-foreground">
+                              {invoice.invoiceNumber}
+                            </p>
+                            <p className="text-xs text-muted">
+                              {invoice.title}
+                            </p>
                             <Link
                               href={`/${tenantSlug}/finance/invoices/${invoice.id}`}
                               className="mt-1 inline-block text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
@@ -2417,18 +3074,29 @@ export function FinanceWorkspace({
                               View
                             </Link>
                           </td>
-                          <td className="px-3 py-2 text-muted">{invoice.status}</td>
-                          <td className="px-3 py-2 text-foreground">{invoice.amountLabel}</td>
-                          <td className="px-3 py-2 text-foreground">{invoice.balanceLabel}</td>
-                          <td className="px-3 py-2 text-muted">{invoice.dueDateLabel}</td>
                           <td className="px-3 py-2 text-muted">
-                            {invoice.isOverdue ? `${invoice.overdueDays} day(s) overdue` : "Current"}
+                            {invoice.status}
+                          </td>
+                          <td className="px-3 py-2 text-foreground">
+                            {invoice.amountLabel}
+                          </td>
+                          <td className="px-3 py-2 text-foreground">
+                            {invoice.balanceLabel}
+                          </td>
+                          <td className="px-3 py-2 text-muted">
+                            {invoice.dueDateLabel}
+                          </td>
+                          <td className="px-3 py-2 text-muted">
+                            {invoice.isOverdue
+                              ? `${invoice.overdueDays} day(s) overdue`
+                              : "Current"}
                           </td>
                           <td className="px-3 py-2 text-muted">
                             {invoice.paymentsCount} - {invoice.lastPaymentLabel}
                           </td>
                           <td className="px-3 py-2 text-muted">
-                            {invoice.reminderCount} - {invoice.lastReminderLabel}
+                            {invoice.reminderCount} -{" "}
+                            {invoice.lastReminderLabel}
                           </td>
                           <td className="px-3 py-2">
                             {canManageFinance ? (
@@ -2443,7 +3111,11 @@ export function FinanceWorkspace({
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    openTimeline("INVOICE", invoice.id, `${invoice.invoiceNumber} timeline`)
+                                    openTimeline(
+                                      "INVOICE",
+                                      invoice.id,
+                                      `${invoice.invoiceNumber} timeline`,
+                                    )
                                   }
                                   className="text-xs text-muted underline decoration-foreground/20 underline-offset-2 hover:text-foreground"
                                 >
@@ -2478,7 +3150,9 @@ export function FinanceWorkspace({
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={!invoice.canSendReminder || actionPending}
+                                  disabled={
+                                    !invoice.canSendReminder || actionPending
+                                  }
                                   onClick={() => handleSendReminder(invoice)}
                                   className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
                                 >
@@ -2516,27 +3190,37 @@ export function FinanceWorkspace({
                         <th className="px-3 py-2">Deposit Account</th>
                         <th className="px-3 py-2">Issued</th>
                         <th className="px-3 py-2">Sent</th>
-                        {canManageFinance ? <th className="px-3 py-2">Actions</th> : null}
+                        {canManageFinance ? (
+                          <th className="px-3 py-2">Actions</th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
                       {salesReceipts.map((receipt) => (
                         <tr key={receipt.id}>
                           <td className="px-3 py-2">
-                            <p className="font-medium text-foreground">{receipt.receiptNumber}</p>
-                            <p className="text-xs text-muted">{receipt.title}</p>
+                            <p className="font-medium text-foreground">
+                              {receipt.receiptNumber}
+                            </p>
+                            <p className="text-xs text-muted">
+                              {receipt.title}
+                            </p>
                           </td>
                           <td className="px-3 py-2">{receipt.customerName}</td>
                           <td className="px-3 py-2">{receipt.amountLabel}</td>
                           <td className="px-3 py-2">{receipt.paymentMode}</td>
-                          <td className="px-3 py-2">{receipt.depositAccount}</td>
+                          <td className="px-3 py-2">
+                            {receipt.depositAccount}
+                          </td>
                           <td className="px-3 py-2">{receipt.issuedAtLabel}</td>
                           <td className="px-3 py-2 text-muted">
                             {receipt.sentAtLabel ? (
                               <>
                                 <p className="text-xs">{receipt.sentAtLabel}</p>
                                 {receipt.sentToEmail ? (
-                                  <p className="text-xs text-muted">{receipt.sentToEmail}</p>
+                                  <p className="text-xs text-muted">
+                                    {receipt.sentToEmail}
+                                  </p>
                                 ) : null}
                               </>
                             ) : (
@@ -2631,7 +3315,10 @@ export function FinanceWorkspace({
                           <tr
                             key={payment.id}
                             data-focus-id={payment.id}
-                            className={rowFocusClass(highlightFocusId, payment.id)}
+                            className={rowFocusClass(
+                              highlightFocusId,
+                              payment.id,
+                            )}
                           >
                             <td className="px-3 py-2">
                               <p>{payment.invoiceLabel}</p>
@@ -2654,7 +3341,9 @@ export function FinanceWorkspace({
                                 Open
                               </Link>
                               {payment.hasAttachment ? (
-                                <span className="ml-2 text-[11px] text-[var(--success)]">Attachment</span>
+                                <span className="ml-2 text-[11px] text-[var(--success)]">
+                                  Attachment
+                                </span>
                               ) : null}
                             </td>
                           </tr>
@@ -2679,6 +3368,9 @@ export function FinanceWorkspace({
                         <th className="px-3 py-2">Reference</th>
                         <th className="px-3 py-2">Date</th>
                         <th className="px-3 py-2">Attachment</th>
+                        {canManageFinance ? (
+                          <th className="px-3 py-2">Actions</th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
@@ -2686,15 +3378,79 @@ export function FinanceWorkspace({
                         <tr
                           key={expense.id}
                           data-focus-id={expense.id}
-                          className={rowFocusClass(highlightFocusId, expense.id)}
+                          className={rowFocusClass(
+                            highlightFocusId,
+                            expense.id,
+                          )}
                         >
                           <td className="px-3 py-2">{expense.category}</td>
                           <td className="px-3 py-2">{expense.vendorName}</td>
                           <td className="px-3 py-2">{expense.amountLabel}</td>
-                          <td className="px-3 py-2">{expense.paidThroughAccount}</td>
+                          <td className="px-3 py-2">
+                            <p className="text-foreground">
+                              {expense.projectLabel}
+                            </p>
+                            <p className="text-xs text-muted">
+                              {expense.unitLabel}
+                            </p>
+                          </td>
+                          <td className="px-3 py-2">
+                            {expense.vatAmountValue > 0 ? (
+                              <>
+                                <p>
+                                  {expense.currency}{" "}
+                                  {expense.vatAmountValue.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-muted">
+                                  {expense.vatRate}% ·{" "}
+                                  {expense.vatRecoverable
+                                    ? "Recoverable"
+                                    : "Non-recoverable"}
+                                </p>
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {expense.paidThroughAccount}
+                          </td>
                           <td className="px-3 py-2">{expense.reference}</td>
-                          <td className="px-3 py-2">{expense.expenseDateLabel}</td>
-                          <td className="px-3 py-2">{expense.hasAttachment ? "Yes" : "No"}</td>
+                          <td className="px-3 py-2">
+                            {expense.expenseDateLabel}
+                          </td>
+                          <td className="px-3 py-2">
+                            {expense.hasAttachment ? "Yes" : "No"}
+                          </td>
+                          {canManageFinance ? (
+                            <td className="px-3 py-2">
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExpenseProjectId(expense.projectId);
+                                    setEditingExpense(expense);
+                                  }}
+                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2"
+                                >
+                                  Correct
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openTimeline(
+                                      "EXPENSE",
+                                      expense.id,
+                                      `${expense.category} timeline`,
+                                    )
+                                  }
+                                  className="text-xs text-muted underline decoration-foreground/20 underline-offset-2"
+                                >
+                                  Timeline
+                                </button>
+                              </div>
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                     </tbody>
@@ -2705,11 +3461,15 @@ export function FinanceWorkspace({
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">Payment reminders</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      Payment reminders
+                    </p>
                     <p className="text-xs text-muted">
-                      First reminder after {financeControls.firstReminderAfterDays} day(s) overdue. Second
-                      wave after {financeControls.secondReminderAfterDays} day(s). One reminder per invoice
-                      per 24 hours.
+                      First reminder after{" "}
+                      {financeControls.firstReminderAfterDays} day(s) overdue.
+                      Second wave after{" "}
+                      {financeControls.secondReminderAfterDays} day(s). One
+                      reminder per invoice per 24 hours.
                     </p>
                   </div>
                   {canManageFinance ? (
@@ -2725,16 +3485,28 @@ export function FinanceWorkspace({
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Open invoices</p>
-                    <p className="mt-1 text-xl font-semibold text-foreground">{arView.totalOpenInvoices}</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Open invoices
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-foreground">
+                      {arView.totalOpenInvoices}
+                    </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Overdue</p>
-                    <p className="mt-1 text-xl font-semibold text-foreground">{arView.overdueInvoices}</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Overdue
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-foreground">
+                      {arView.overdueInvoices}
+                    </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Follow-ups needed</p>
-                    <p className="mt-1 text-xl font-semibold text-foreground">{arView.followUpsNeeded}</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Follow-ups needed
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-foreground">
+                      {arView.followUpsNeeded}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-1 border-b border-foreground/10">
@@ -2762,7 +3534,8 @@ export function FinanceWorkspace({
                 {receivablesViewTab === "aging" ? (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
                     <p className="border-b border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
-                      Open invoice balances grouped by how long they have been overdue.
+                      Open invoice balances grouped by how long they have been
+                      overdue.
                     </p>
                     <table className="w-full text-left text-sm">
                       <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
@@ -2777,18 +3550,32 @@ export function FinanceWorkspace({
                       </thead>
                       <tbody>
                         <tr className="border-t border-foreground/10">
-                          <td className="px-3 py-2">{arView.agingBuckets.current}</td>
-                          <td className="px-3 py-2">{arView.agingBuckets.d1_30}</td>
-                          <td className="px-3 py-2">{arView.agingBuckets.d31_60}</td>
-                          <td className="px-3 py-2">{arView.agingBuckets.d61_90}</td>
-                          <td className="px-3 py-2">{arView.agingBuckets.d90_plus}</td>
-                          <td className="px-3 py-2">{arView.agingBuckets.noDueDate}</td>
+                          <td className="px-3 py-2">
+                            {arView.agingBuckets.current}
+                          </td>
+                          <td className="px-3 py-2">
+                            {arView.agingBuckets.d1_30}
+                          </td>
+                          <td className="px-3 py-2">
+                            {arView.agingBuckets.d31_60}
+                          </td>
+                          <td className="px-3 py-2">
+                            {arView.agingBuckets.d61_90}
+                          </td>
+                          <td className="px-3 py-2">
+                            {arView.agingBuckets.d90_plus}
+                          </td>
+                          <td className="px-3 py-2">
+                            {arView.agingBuckets.noDueDate}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                 ) : arView.followUps.length === 0 ? (
-                  <p className="text-sm text-muted">No overdue follow-up queue right now.</p>
+                  <p className="text-sm text-muted">
+                    No overdue follow-up queue right now.
+                  </p>
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
                     <table className="w-full text-left text-sm">
@@ -2805,12 +3592,20 @@ export function FinanceWorkspace({
                         {arView.followUps.map((row) => (
                           <tr key={row.id}>
                             <td className="px-3 py-2">
-                              <p className="font-medium text-foreground">{row.invoiceNumber}</p>
+                              <p className="font-medium text-foreground">
+                                {row.invoiceNumber}
+                              </p>
                               <p className="text-xs text-muted">{row.title}</p>
                             </td>
-                            <td className="px-3 py-2 text-muted">{row.owner}</td>
-                            <td className="px-3 py-2 text-muted">{row.overdueDays} day(s)</td>
-                            <td className="px-3 py-2 text-foreground">{row.balanceLabel}</td>
+                            <td className="px-3 py-2 text-muted">
+                              {row.owner}
+                            </td>
+                            <td className="px-3 py-2 text-muted">
+                              {row.overdueDays} day(s)
+                            </td>
+                            <td className="px-3 py-2 text-foreground">
+                              {row.balanceLabel}
+                            </td>
                             <td className="px-3 py-2 text-muted">
                               {row.reminderCount} - {row.lastReminderLabel}
                             </td>
@@ -2825,19 +3620,31 @@ export function FinanceWorkspace({
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Open bills</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Open bills
+                    </p>
                     <p className="mt-1 text-xl font-semibold text-foreground">
-                      {vendorBills.filter((x) => x.statusValue !== "VOID" && x.statusValue !== "PAID").length}
+                      {
+                        vendorBills.filter(
+                          (x) =>
+                            x.statusValue !== "VOID" &&
+                            x.statusValue !== "PAID",
+                        ).length
+                      }
                     </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Total you still owe</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Total you still owe
+                    </p>
                     <p className="mt-1 text-xl font-semibold text-foreground">
                       {reportView.currency} {openPayablesTotal.toLocaleString()}
                     </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Overdue bills</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Overdue bills
+                    </p>
                     <p className="mt-1 text-xl font-semibold text-foreground">
                       {vendorBills.filter((x) => x.isOverdue).length}
                     </p>
@@ -2868,7 +3675,8 @@ export function FinanceWorkspace({
                 {payablesViewTab === "aging" ? (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
                     <p className="border-b border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
-                      Open balances by how long they have been due — same buckets as receivables aging.
+                      Open balances by how long they have been due — same
+                      buckets as receivables aging.
                     </p>
                     <table className="w-full text-left text-sm">
                       <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
@@ -2884,22 +3692,28 @@ export function FinanceWorkspace({
                       <tbody>
                         <tr className="border-t border-foreground/10">
                           <td className="px-3 py-2">
-                            {reportView.currency} {payablesAging.current.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {payablesAging.current.toLocaleString()}
                           </td>
                           <td className="px-3 py-2">
-                            {reportView.currency} {payablesAging.d1_30.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {payablesAging.d1_30.toLocaleString()}
                           </td>
                           <td className="px-3 py-2">
-                            {reportView.currency} {payablesAging.d31_60.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {payablesAging.d31_60.toLocaleString()}
                           </td>
                           <td className="px-3 py-2">
-                            {reportView.currency} {payablesAging.d61_90.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {payablesAging.d61_90.toLocaleString()}
                           </td>
                           <td className="px-3 py-2">
-                            {reportView.currency} {payablesAging.d90_plus.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {payablesAging.d90_plus.toLocaleString()}
                           </td>
                           <td className="px-3 py-2">
-                            {reportView.currency} {payablesAging.noDueDate.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {payablesAging.noDueDate.toLocaleString()}
                           </td>
                         </tr>
                       </tbody>
@@ -2907,7 +3721,8 @@ export function FinanceWorkspace({
                   </div>
                 ) : vendorBills.length === 0 ? (
                   <p className="text-sm text-muted">
-                    No vendor bills yet. Record a bill when a supplier invoices you.
+                    No vendor bills yet. Record a bill when a supplier invoices
+                    you.
                   </p>
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -2930,7 +3745,9 @@ export function FinanceWorkspace({
                             className={rowFocusClass(highlightFocusId, bill.id)}
                           >
                             <td className="px-3 py-2">
-                              <p className="font-medium text-foreground">{bill.billNumber}</p>
+                              <p className="font-medium text-foreground">
+                                {bill.billNumber}
+                              </p>
                               <p className="text-xs text-muted">{bill.title}</p>
                               {bill.isRecurring && bill.recurrenceLabel ? (
                                 <span className="mt-1 inline-block rounded bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -2939,10 +3756,14 @@ export function FinanceWorkspace({
                               ) : null}
                             </td>
                             <td className="px-3 py-2">{bill.vendorName}</td>
-                            <td className="px-3 py-2 text-muted">{bill.status}</td>
+                            <td className="px-3 py-2 text-muted">
+                              {bill.status}
+                            </td>
                             <td className="px-3 py-2">{bill.balanceLabel}</td>
                             <td className="px-3 py-2 text-muted">
-                              {bill.isOverdue ? `${bill.overdueDays} day(s) overdue` : bill.dueDateLabel}
+                              {bill.isOverdue
+                                ? `${bill.overdueDays} day(s) overdue`
+                                : bill.dueDateLabel}
                             </td>
                             <td className="px-3 py-2">
                               {canManageFinance ? (
@@ -2975,200 +3796,326 @@ export function FinanceWorkspace({
               </div>
             ) : recordsTab === "reports" ? (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                  <div className="flex items-center gap-3">
-                    {reportView.companyLogoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={reportView.companyLogoUrl}
-                        alt={`${reportView.companyName} logo`}
-                        className="h-10 w-auto object-contain"
-                      />
-                    ) : null}
-                    <p className="text-sm font-semibold text-foreground">Financial reports</p>
-                    <p className="text-xs text-muted">
-                      {reportView.companyName} • Generated {reportView.generatedAtLabel}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <UiSelect
-                      value={reportKind}
-                      onChange={(e) => setReportKind((e.target.value as ReportKind) || "pnl")}
-                    >
-                      <option value="pnl">Profit & Loss</option>
-                      <option value="cashflow">Cash Flow</option>
-                      <option value="balance">Balance Sheet</option>
-                    </UiSelect>
-                    <UiSelect
-                      value={String(reportMonthWindow)}
-                      onChange={(e) =>
-                        setReportMonthWindow((Number(e.target.value) as ReportMonthWindow) || 6)
-                      }
-                    >
-                      <option value="3">Last 3 months</option>
-                      <option value="6">Last 6 months</option>
-                      <option value="12">Last 12 months</option>
-                    </UiSelect>
-                    <UiSelect
-                      value={reportCompareMode}
-                      onChange={(e) =>
-                        setReportCompareMode((e.target.value as ReportCompareMode) || "previous_period")
-                      }
-                    >
-                      <option value="previous_period">Compared to last period</option>
-                      <option value="same_period_last_year">Compared to same months last year</option>
-                    </UiSelect>
+                <div className="rounded-xl border border-foreground/15 bg-background p-4 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {reportView.companyLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={reportView.companyLogoUrl}
+                          alt={`${reportView.companyName} logo`}
+                          className="h-11 w-11 rounded-lg border border-foreground/10 bg-white object-contain p-1.5"
+                        />
+                      ) : null}
+                      <div>
+                        <p className="text-base font-semibold text-foreground">
+                          Financial performance
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted">
+                          {reportView.companyName} · Updated{" "}
+                          {reportView.generatedAtLabel}
+                        </p>
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => void exportReportPack()}
-                      className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90"
+                      className="rounded-md border border-foreground bg-foreground px-3.5 py-2 text-xs font-semibold text-background hover:opacity-90"
                     >
                       Export report pack
                     </button>
                   </div>
+                  <div className="mt-4 grid gap-3 border-t border-foreground/10 pt-4 sm:grid-cols-3">
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                        Statement
+                      </span>
+                      <UiSelect
+                        value={reportKind}
+                        onChange={(e) =>
+                          setReportKind((e.target.value as ReportKind) || "pnl")
+                        }
+                      >
+                        <option value="pnl">Profit & Loss</option>
+                        <option value="cashflow">Cash Flow</option>
+                        <option value="balance">Balance Sheet</option>
+                      </UiSelect>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                        Period
+                      </span>
+                      <UiSelect
+                        value={String(reportMonthWindow)}
+                        onChange={(e) =>
+                          setReportMonthWindow(
+                            (Number(e.target.value) as ReportMonthWindow) || 6,
+                          )
+                        }
+                      >
+                        <option value="3">Last 3 months</option>
+                        <option value="6">Last 6 months</option>
+                        <option value="12">Last 12 months</option>
+                      </UiSelect>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                        Comparison
+                      </span>
+                      <UiSelect
+                        value={reportCompareMode}
+                        onChange={(e) =>
+                          setReportCompareMode(
+                            (e.target.value as ReportCompareMode) ||
+                              "previous_period",
+                          )
+                        }
+                      >
+                        <option value="previous_period">Previous period</option>
+                        <option value="same_period_last_year">
+                          Same period last year
+                        </option>
+                      </UiSelect>
+                    </label>
+                  </div>
                 </div>
-                <p className="text-xs text-muted">
-                  Excel exports include a Summary dashboard with KPIs and charts, plus detail sheets. Use CSV
-                  only when you need raw import data.
-                </p>
 
-                <div className="grid gap-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 md:grid-cols-3">
-                  <UiSelect
-                    value={reportProjectFilter}
-                    onChange={(e) => setReportProjectFilter(e.target.value)}
-                  >
-                    <option value="all">All projects</option>
-                    {reportProjectOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </UiSelect>
-                  <UiSelect value={reportUnitFilter} onChange={(e) => setReportUnitFilter(e.target.value)}>
-                    <option value="all">All units</option>
-                    {reportUnitOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </UiSelect>
-                  <UiSelect
-                    value={reportDepartmentFilter}
-                    onChange={(e) => setReportDepartmentFilter(e.target.value)}
-                  >
-                    <option value="all">All departments</option>
-                    {reportDepartmentOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </UiSelect>
+                <div className="rounded-xl border border-foreground/10 bg-foreground/[0.015] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Reporting scope
+                      </p>
+                      <p className="text-xs text-muted">
+                        Narrow the statement from company to project and
+                        apartment.
+                      </p>
+                    </div>
+                    {reportProjectFilter !== "all" ||
+                    reportUnitFilter !== "all" ||
+                    reportDepartmentFilter !== "all" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReportProjectFilter("all");
+                          setReportUnitFilter("all");
+                          setReportDepartmentFilter("all");
+                        }}
+                        className="text-xs font-semibold text-foreground underline decoration-foreground/25 underline-offset-2"
+                      >
+                        Clear filters
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                        Project
+                      </span>
+                      <UiSelect
+                        value={reportProjectFilter}
+                        onChange={(e) => {
+                          setReportProjectFilter(e.target.value);
+                          setReportUnitFilter("all");
+                        }}
+                      >
+                        <option value="all">All projects</option>
+                        {reportProjectOptions.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </UiSelect>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                        Apartment / unit
+                      </span>
+                      <UiSelect
+                        value={reportUnitFilter}
+                        onChange={(e) => setReportUnitFilter(e.target.value)}
+                        disabled={reportProjectFilter === "all"}
+                      >
+                        <option value="all">
+                          {reportProjectFilter === "all"
+                            ? "Choose a project first"
+                            : "All apartments / units"}
+                        </option>
+                        {reportUnitOptions.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </UiSelect>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                        Department
+                      </span>
+                      <UiSelect
+                        value={reportDepartmentFilter}
+                        onChange={(e) =>
+                          setReportDepartmentFilter(e.target.value)
+                        }
+                      >
+                        <option value="all">All departments</option>
+                        {reportDepartmentOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </UiSelect>
+                    </label>
+                  </div>
                 </div>
-                <p className="text-xs text-muted">
-                  Department filter applies across invoices, payments, and expenses.
-                </p>
 
                 <div className="grid gap-3 md:grid-cols-4">
                   {reportComparisonCards.map((card) => (
                     <div
                       key={card.id}
-                      className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3"
+                      className="rounded-xl border border-foreground/10 bg-background p-4 shadow-sm"
                     >
-                      <p className="text-xs uppercase tracking-wide text-muted">{card.label}</p>
-                      <p className="mt-1 text-lg font-semibold text-foreground">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                          {card.label}
+                        </p>
+                        <span
+                          className={[
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            (
+                              card.id === "expenses"
+                                ? card.change <= 0
+                                : card.change >= 0
+                            )
+                              ? "bg-[var(--success-wash)] text-[var(--success)]"
+                              : "bg-[var(--danger-wash)] text-[var(--danger)]",
+                          ].join(" ")}
+                        >
+                          {card.changePct == null
+                            ? "New"
+                            : `${card.changePct >= 0 ? "+" : ""}${card.changePct.toFixed(1)}%`}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-xl font-semibold tracking-tight text-foreground">
                         {reportView.currency} {card.current.toLocaleString()}
                       </p>
-                      <p className="text-xs text-muted">
-                        Comparison: {reportView.currency} {card.previous.toLocaleString()}
+                      <p className="mt-2 text-xs text-muted">
+                        Prior: {reportView.currency}{" "}
+                        {card.previous.toLocaleString()}
                       </p>
-                      <p className={["text-xs font-semibold", valueTone(card.change)].join(" ")}>
-                        Change: {card.change >= 0 ? "+" : ""}
+                      <p
+                        className={[
+                          "mt-0.5 text-xs font-medium",
+                          (
+                            card.id === "expenses"
+                              ? card.change <= 0
+                              : card.change >= 0
+                          )
+                            ? "text-[var(--success)]"
+                            : "text-[var(--danger)]",
+                        ].join(" ")}
+                      >
+                        {card.change >= 0 ? "+" : ""}
                         {reportView.currency} {card.change.toLocaleString()}
-                        {card.changePct != null ? ` (${card.changePct.toFixed(1)}%)` : ""}
                       </p>
-                      <p className="text-[11px] text-muted">Current minus comparison period</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Invoiced (all time)</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      {reportView.pnlLite.invoicedLabel}
+                <div className="grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-xl border border-foreground/10 bg-foreground/[0.015] p-4">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                      Receivables health
                     </p>
-                    <p className="mt-1 text-xs text-muted">Collected: {reportView.pnlLite.collectedLabel}</p>
-                    <p className="text-xs text-muted">Outstanding: {reportView.pnlLite.outstandingLabel}</p>
-                  </div>
-                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Monthly cash</p>
-                    <p className="mt-1 text-xs text-muted">
-                      This month: {reportView.cashflowLite.currentMonthLabel}
+                    <p className="mt-3 text-xl font-semibold text-foreground">
+                      {reportView.currency}{" "}
+                      {filteredBalanceSnapshot.receivables.toLocaleString()}
                     </p>
                     <p className="text-xs text-muted">
-                      Last month: {reportView.cashflowLite.previousMonthLabel}
+                      Open receivables in the selected scope
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      Change: {reportView.cashflowLite.changeLabel}
-                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-3 border-t border-foreground/10 pt-3 text-xs">
+                      <div>
+                        <p className="text-muted">Overdue</p>
+                        <p className="mt-0.5 font-semibold text-[var(--danger)]">
+                          {reportView.currency}{" "}
+                          {filteredBalanceSnapshot.overdueReceivables.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted">All-time invoiced</p>
+                        <p className="mt-0.5 font-semibold text-foreground">
+                          {reportView.pnlLite.invoicedLabel}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Collections performance</p>
-                    <p className="mt-1 text-lg font-semibold text-[var(--success)]">
-                      {reportView.collections.collectionRateLabel}
+                  <div className="rounded-xl border border-foreground/10 bg-foreground/[0.015] p-4">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                      Cash movement
                     </p>
-                    <p className="mt-1 text-xs text-muted">
-                      Overdue amount: {reportView.collections.overdueOutstandingLabel}
-                    </p>
-                    <p className="text-xs text-muted">
-                      Overdue invoices: {reportView.collections.overdueCount}
-                    </p>
-                    <p className="text-xs text-muted">
-                      Reminders sent: {reportView.collections.remindersSent}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-4">
-                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Receivables snapshot</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      {reportView.currency} {filteredBalanceSnapshot.receivables.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted">
-                      Overdue: {reportView.currency}{" "}
-                      {filteredBalanceSnapshot.overdueReceivables.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Cash in</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      {reportView.currency} {filteredBalanceSnapshot.cashIn.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Cash out</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      {reportView.currency} {filteredBalanceSnapshot.cashOut.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Net cashflow</p>
                     <p
                       className={[
-                        "mt-1 text-lg font-semibold",
+                        "mt-3 text-xl font-semibold",
                         valueTone(filteredBalanceSnapshot.netCashflow),
                       ].join(" ")}
                     >
-                      {reportView.currency} {filteredBalanceSnapshot.netCashflow.toLocaleString()}
+                      {reportView.currency}{" "}
+                      {filteredBalanceSnapshot.netCashflow.toLocaleString()}
                     </p>
+                    <p className="text-xs text-muted">
+                      Net cash flow in the selected scope
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-3 border-t border-foreground/10 pt-3 text-xs">
+                      <div>
+                        <p className="text-muted">Cash in</p>
+                        <p className="mt-0.5 font-semibold text-[var(--success)]">
+                          {reportView.currency}{" "}
+                          {filteredBalanceSnapshot.cashIn.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted">Cash out</p>
+                        <p className="mt-0.5 font-semibold text-[var(--danger)]">
+                          {reportView.currency}{" "}
+                          {filteredBalanceSnapshot.cashOut.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-foreground/10 bg-foreground/[0.015] p-4">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                      Collections control
+                    </p>
+                    <p className="mt-3 text-xl font-semibold text-[var(--success)]">
+                      {reportView.collections.collectionRateLabel}
+                    </p>
+                    <p className="text-xs text-muted">
+                      Collection rate across issued invoices
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-3 border-t border-foreground/10 pt-3 text-xs">
+                      <div>
+                        <p className="text-muted">Overdue invoices</p>
+                        <p className="mt-0.5 font-semibold text-foreground">
+                          {reportView.collections.overdueCount}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted">Reminders sent</p>
+                        <p className="mt-0.5 font-semibold text-foreground">
+                          {reportView.collections.remindersSent}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {reportKind === "balance" ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">Balance sheet</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        Balance sheet
+                      </p>
                       <button
                         type="button"
                         onClick={() => void exportReportExcel("balance")}
@@ -3186,7 +4133,11 @@ export function FinanceWorkspace({
                           {balanceSheetSections.assets.map((line) => (
                             <li
                               key={line.label}
-                              className={line.sub ? "pl-3 text-[var(--danger)] " : "text-foreground"}
+                              className={
+                                line.sub
+                                  ? "pl-3 text-[var(--danger)] "
+                                  : "text-foreground"
+                              }
                             >
                               <span>{line.label}</span>
                               <span
@@ -3195,7 +4146,8 @@ export function FinanceWorkspace({
                                   line.sub ? "text-[var(--danger)] " : "",
                                 ].join(" ")}
                               >
-                                {reportView.currency} {line.amount.toLocaleString()}
+                                {reportView.currency}{" "}
+                                {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
@@ -3203,7 +4155,8 @@ export function FinanceWorkspace({
                         <p className="mt-3 border-t border-[var(--success-line)] pt-2 text-sm font-semibold text-[var(--success)]">
                           Total{" "}
                           <span className="float-right">
-                            {reportView.currency} {balanceSheetSections.assetsTotal.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {balanceSheetSections.assetsTotal.toLocaleString()}
                           </span>
                         </p>
                       </div>
@@ -3216,7 +4169,8 @@ export function FinanceWorkspace({
                             <li key={line.label} className="text-foreground">
                               <span>{line.label}</span>
                               <span className="float-right font-semibold text-[var(--danger)]">
-                                {reportView.currency} {line.amount.toLocaleString()}
+                                {reportView.currency}{" "}
+                                {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
@@ -3224,7 +4178,8 @@ export function FinanceWorkspace({
                         <p className="mt-3 border-t border-[var(--danger-line)] pt-2 text-sm font-semibold text-[var(--danger)]">
                           Total{" "}
                           <span className="float-right">
-                            {reportView.currency} {balanceSheetSections.liabilitiesTotal.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {balanceSheetSections.liabilitiesTotal.toLocaleString()}
                           </span>
                         </p>
                       </div>
@@ -3237,9 +4192,13 @@ export function FinanceWorkspace({
                             <li key={line.label} className="text-foreground">
                               <span>{line.label}</span>
                               <span
-                                className={["float-right font-semibold", valueTone(line.amount)].join(" ")}
+                                className={[
+                                  "float-right font-semibold",
+                                  valueTone(line.amount),
+                                ].join(" ")}
                               >
-                                {reportView.currency} {line.amount.toLocaleString()}
+                                {reportView.currency}{" "}
+                                {line.amount.toLocaleString()}
                               </span>
                             </li>
                           ))}
@@ -3252,7 +4211,8 @@ export function FinanceWorkspace({
                         >
                           Total{" "}
                           <span className="float-right">
-                            {reportView.currency} {balanceSheetSections.equityTotal.toLocaleString()}
+                            {reportView.currency}{" "}
+                            {balanceSheetSections.equityTotal.toLocaleString()}
                           </span>
                         </p>
                       </div>
@@ -3291,22 +4251,32 @@ export function FinanceWorkspace({
                               <td className="px-3 py-2">
                                 <button
                                   type="button"
-                                  onClick={() => setReportDrilldownMonth(row.month)}
+                                  onClick={() =>
+                                    setReportDrilldownMonth(row.month)
+                                  }
                                   className="text-left font-medium text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
                                 >
                                   {row.month}
                                 </button>
                               </td>
                               <td className="px-3 py-2">
-                                {reportView.currency} {row.invoiced.toLocaleString()}
+                                {reportView.currency}{" "}
+                                {row.invoiced.toLocaleString()}
                               </td>
                               <td className="px-3 py-2">
-                                {reportView.currency} {row.collected.toLocaleString()}
+                                {reportView.currency}{" "}
+                                {row.collected.toLocaleString()}
                               </td>
                               <td className="px-3 py-2">
-                                {reportView.currency} {row.expenses.toLocaleString()}
+                                {reportView.currency}{" "}
+                                {row.expenses.toLocaleString()}
                               </td>
-                              <td className={["px-3 py-2 font-semibold", valueTone(row.net)].join(" ")}>
+                              <td
+                                className={[
+                                  "px-3 py-2 font-semibold",
+                                  valueTone(row.net),
+                                ].join(" ")}
+                              >
                                 {reportView.currency} {row.net.toLocaleString()}
                               </td>
                             </tr>
@@ -3317,11 +4287,84 @@ export function FinanceWorkspace({
                   </div>
                 ) : null}
 
+                {reportKind === "pnl" ? (
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                    <div className="mb-3">
+                      <p className="text-sm font-semibold text-foreground">
+                        {reportProjectFilter === "all"
+                          ? "Profit & loss by project"
+                          : "Project drilldown by apartment / unit"}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Accrual revenue uses non-void invoices. Recoverable
+                        input VAT is excluded from expenses. Project-wide costs
+                        remain separate rather than being allocated silently.
+                      </p>
+                    </div>
+                    {dimensionalPnlRows.length === 0 ? (
+                      <p className="text-sm text-muted">
+                        No allocated revenue or expense records in this period.
+                      </p>
+                    ) : (
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">
+                                {reportProjectFilter === "all"
+                                  ? "Project"
+                                  : "Apartment / unit"}
+                              </th>
+                              <th className="px-3 py-2">Revenue</th>
+                              <th className="px-3 py-2">Expenses</th>
+                              <th className="px-3 py-2">Profit / loss</th>
+                              <th className="px-3 py-2">Margin</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {dimensionalPnlRows.map((row) => (
+                              <tr key={row.id}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {row.label}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.revenue.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.expenses.toLocaleString()}
+                                </td>
+                                <td
+                                  className={[
+                                    "px-3 py-2 font-semibold",
+                                    valueTone(row.profit),
+                                  ].join(" ")}
+                                >
+                                  {reportView.currency}{" "}
+                                  {row.profit.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {row.margin === null
+                                    ? "—"
+                                    : `${row.margin.toFixed(1)}%`}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
                 <div className="grid gap-4 md:grid-cols-2">
                   {reportKind === "cashflow" ? (
                     <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                       <div className="mb-2 flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">Cash flow by month</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          Cash flow by month
+                        </p>
                         <button
                           type="button"
                           onClick={() => void exportReportExcel("cashflow")}
@@ -3346,20 +4389,30 @@ export function FinanceWorkspace({
                                 <td className="px-3 py-2">
                                   <button
                                     type="button"
-                                    onClick={() => setReportDrilldownMonth(row.month)}
+                                    onClick={() =>
+                                      setReportDrilldownMonth(row.month)
+                                    }
                                     className="text-left font-medium text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
                                   >
                                     {row.month}
                                   </button>
                                 </td>
                                 <td className="px-3 py-2">
-                                  {reportView.currency} {row.inflow.toLocaleString()}
+                                  {reportView.currency}{" "}
+                                  {row.inflow.toLocaleString()}
                                 </td>
                                 <td className="px-3 py-2">
-                                  {reportView.currency} {row.outflow.toLocaleString()}
+                                  {reportView.currency}{" "}
+                                  {row.outflow.toLocaleString()}
                                 </td>
-                                <td className={["px-3 py-2 font-semibold", valueTone(row.net)].join(" ")}>
-                                  {reportView.currency} {row.net.toLocaleString()}
+                                <td
+                                  className={[
+                                    "px-3 py-2 font-semibold",
+                                    valueTone(row.net),
+                                  ].join(" ")}
+                                >
+                                  {reportView.currency}{" "}
+                                  {row.net.toLocaleString()}
                                 </td>
                               </tr>
                             ))}
@@ -3371,7 +4424,9 @@ export function FinanceWorkspace({
 
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">Expense by category</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        Expense by category
+                      </p>
                       <button
                         type="button"
                         onClick={() => void exportReportExcel("expenses")}
@@ -3395,7 +4450,8 @@ export function FinanceWorkspace({
                               <td className="px-3 py-2">{row.category}</td>
                               <td className="px-3 py-2">{row.count}</td>
                               <td className="px-3 py-2 font-semibold">
-                                {reportView.currency} {row.total.toLocaleString()}
+                                {reportView.currency}{" "}
+                                {row.total.toLocaleString()}
                               </td>
                             </tr>
                           ))}
@@ -3421,30 +4477,39 @@ export function FinanceWorkspace({
                     </div>
                     <div className="grid gap-3 md:grid-cols-3">
                       <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted">Invoices</p>
+                        <p className="text-xs uppercase tracking-wide text-muted">
+                          Invoices
+                        </p>
                         <p className="mt-1 text-base font-semibold text-foreground">
                           {reportDrilldown.invoices.length}
                         </p>
                         <p className="text-xs text-muted">
-                          {reportView.currency} {reportDrilldown.totals.invoices.toLocaleString()}
+                          {reportView.currency}{" "}
+                          {reportDrilldown.totals.invoices.toLocaleString()}
                         </p>
                       </div>
                       <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted">Payments</p>
+                        <p className="text-xs uppercase tracking-wide text-muted">
+                          Payments
+                        </p>
                         <p className="mt-1 text-base font-semibold text-foreground">
                           {reportDrilldown.payments.length}
                         </p>
                         <p className="text-xs text-muted">
-                          {reportView.currency} {reportDrilldown.totals.payments.toLocaleString()}
+                          {reportView.currency}{" "}
+                          {reportDrilldown.totals.payments.toLocaleString()}
                         </p>
                       </div>
                       <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted">Expenses</p>
+                        <p className="text-xs uppercase tracking-wide text-muted">
+                          Expenses
+                        </p>
                         <p className="mt-1 text-base font-semibold text-foreground">
                           {reportDrilldown.expenses.length}
                         </p>
                         <p className="text-xs text-muted">
-                          {reportView.currency} {reportDrilldown.totals.expenses.toLocaleString()}
+                          {reportView.currency}{" "}
+                          {reportDrilldown.totals.expenses.toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -3455,16 +4520,21 @@ export function FinanceWorkspace({
                         </p>
                         <div className="max-h-56 overflow-y-auto px-3 py-2 text-xs">
                           {reportDrilldown.invoices.length === 0 ? (
-                            <p className="text-muted">No invoices for this month.</p>
+                            <p className="text-muted">
+                              No invoices for this month.
+                            </p>
                           ) : (
                             reportDrilldown.invoices.map((row) => (
                               <button
                                 key={row.id}
                                 type="button"
-                                onClick={() => openFinanceRecord("invoice", row.id)}
+                                onClick={() =>
+                                  openFinanceRecord("invoice", row.id)
+                                }
                                 className="block w-full py-1 text-left text-foreground underline decoration-foreground/20 underline-offset-2 hover:decoration-foreground/50"
                               >
-                                {row.invoiceNumber} — {reportView.currency} {row.amountValue.toLocaleString()}
+                                {row.invoiceNumber} — {reportView.currency}{" "}
+                                {row.amountValue.toLocaleString()}
                               </button>
                             ))
                           )}
@@ -3476,16 +4546,21 @@ export function FinanceWorkspace({
                         </p>
                         <div className="max-h-56 overflow-y-auto px-3 py-2 text-xs">
                           {reportDrilldown.payments.length === 0 ? (
-                            <p className="text-muted">No payments for this month.</p>
+                            <p className="text-muted">
+                              No payments for this month.
+                            </p>
                           ) : (
                             reportDrilldown.payments.map((row) => (
                               <button
                                 key={row.id}
                                 type="button"
-                                onClick={() => openFinanceRecord("payment", row.id)}
+                                onClick={() =>
+                                  openFinanceRecord("payment", row.id)
+                                }
                                 className="block w-full py-1 text-left text-foreground underline decoration-foreground/20 underline-offset-2 hover:decoration-foreground/50"
                               >
-                                {row.invoiceLabel} — {reportView.currency} {row.amountValue.toLocaleString()}
+                                {row.invoiceLabel} — {reportView.currency}{" "}
+                                {row.amountValue.toLocaleString()}
                               </button>
                             ))
                           )}
@@ -3497,16 +4572,21 @@ export function FinanceWorkspace({
                         </p>
                         <div className="max-h-56 overflow-y-auto px-3 py-2 text-xs">
                           {reportDrilldown.expenses.length === 0 ? (
-                            <p className="text-muted">No expenses for this month.</p>
+                            <p className="text-muted">
+                              No expenses for this month.
+                            </p>
                           ) : (
                             reportDrilldown.expenses.map((row) => (
                               <button
                                 key={row.id}
                                 type="button"
-                                onClick={() => openFinanceRecord("expense", row.id)}
+                                onClick={() =>
+                                  openFinanceRecord("expense", row.id)
+                                }
                                 className="block w-full py-1 text-left text-foreground underline decoration-foreground/20 underline-offset-2 hover:decoration-foreground/50"
                               >
-                                {row.category} — {reportView.currency} {row.amountValue.toLocaleString()}
+                                {row.category} — {reportView.currency}{" "}
+                                {row.amountValue.toLocaleString()}
                               </button>
                             ))
                           )}
@@ -3526,30 +4606,47 @@ export function FinanceWorkspace({
                     <p className="mt-1 text-xl font-semibold text-foreground">
                       {financeOptions.bankAccounts.length}
                     </p>
-                    <p className="mt-1 text-xs text-muted">Managed from Finance Settings.</p>
+                    <p className="mt-1 text-xs text-muted">
+                      Managed from Finance Settings.
+                    </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Captured payment modes</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Captured payment modes
+                    </p>
                     <p className="mt-1 text-xl font-semibold text-foreground">
                       {financeOptions.paymentModes.length}
                     </p>
-                    <p className="mt-1 text-xs text-muted">Available in payment and receipt forms.</p>
+                    <p className="mt-1 text-xs text-muted">
+                      Available in payment and receipt forms.
+                    </p>
                   </div>
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">Recorded payments</p>
-                    <p className="mt-1 text-xl font-semibold text-foreground">{payments.length}</p>
-                    <p className="mt-1 text-xs text-muted">Ready for account-level reconciliation.</p>
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Recorded payments
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-foreground">
+                      {payments.length}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Ready for account-level reconciliation.
+                    </p>
                   </div>
                 </div>
                 <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                   <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Statement import</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        Statement import
+                      </p>
                       <p className="text-xs text-muted">
-                        Upload bank CSV with columns like date, description, reference, debit, credit, amount.
+                        Upload bank CSV with columns like date, description,
+                        reference, debit, credit, amount.
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] text-muted">Sample templates:</span>
+                        <span className="text-[11px] text-muted">
+                          Sample templates:
+                        </span>
                         <button
                           type="button"
                           className="rounded-md border border-foreground/20 px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-foreground/[0.06]"
@@ -3575,15 +4672,26 @@ export function FinanceWorkspace({
                   </div>
                   {importedBankRows.length > 0 ? (
                     <div className="mb-4 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
-                      Imported file: <span className="font-medium text-foreground">{bankImportName}</span>{" "}
-                      with <span className="font-medium text-foreground">{importedBankRows.length}</span>{" "}
+                      Imported file:{" "}
+                      <span className="font-medium text-foreground">
+                        {bankImportName}
+                      </span>{" "}
+                      with{" "}
+                      <span className="font-medium text-foreground">
+                        {importedBankRows.length}
+                      </span>{" "}
                       transaction row(s).
                     </div>
                   ) : null}
-                  <p className="text-sm font-semibold text-foreground">Next in banking rollout</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    Next in banking rollout
+                  </p>
                   <ul className="mt-2 space-y-1 text-sm text-muted">
                     <li>CSV statement import flow</li>
-                    <li>Manual reconciliation queue (match bank lines to receipts/payments/expenses)</li>
+                    <li>
+                      Manual reconciliation queue (match bank lines to
+                      receipts/payments/expenses)
+                    </li>
                     <li>Bank transaction rule suggestions</li>
                   </ul>
                   <p className="mt-3 text-xs text-muted">
@@ -3600,7 +4708,9 @@ export function FinanceWorkspace({
                 {bankingImports.length > 0 ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-foreground">Import history</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        Import history
+                      </p>
                       <div className="flex items-center gap-2">
                         <UiSelect
                           value={selectedImportId}
@@ -3623,7 +4733,9 @@ export function FinanceWorkspace({
                           onClick={() => void handleFinalizeSelectedImport()}
                           className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
                         >
-                          {finalizingImportId === selectedImport?.id ? "Finalizing..." : "Finalize selected"}
+                          {finalizingImportId === selectedImport?.id
+                            ? "Finalizing..."
+                            : "Finalize selected"}
                         </button>
                       </div>
                     </div>
@@ -3644,10 +4756,16 @@ export function FinanceWorkspace({
                           {bankingImports.slice(0, 10).map((imp) => (
                             <tr key={imp.id}>
                               <td className="px-3 py-2">{imp.sourceName}</td>
-                              <td className="px-3 py-2 text-muted">{imp.importedAtLabel}</td>
+                              <td className="px-3 py-2 text-muted">
+                                {imp.importedAtLabel}
+                              </td>
                               <td className="px-3 py-2">{imp.totalRows}</td>
-                              <td className="px-3 py-2 text-[var(--success)]">{imp.matchedRows}</td>
-                              <td className="px-3 py-2 text-[var(--warn)]">{imp.unmatchedRows}</td>
+                              <td className="px-3 py-2 text-[var(--success)]">
+                                {imp.matchedRows}
+                              </td>
+                              <td className="px-3 py-2 text-[var(--warn)]">
+                                {imp.unmatchedRows}
+                              </td>
                               <td className="px-3 py-2">
                                 {imp.finalized ? (
                                   <span className="rounded-full border border-[var(--success-line)] px-2 py-0.5 text-xs text-[var(--success)]">
@@ -3679,26 +4797,37 @@ export function FinanceWorkspace({
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 grid gap-3 md:grid-cols-4">
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted">Match rate</p>
+                        <p className="text-xs uppercase tracking-wide text-muted">
+                          Match rate
+                        </p>
                         <p className="mt-1 text-lg font-semibold text-foreground">
                           {bankingMetrics.matchRate.toFixed(1)}%
                         </p>
                       </div>
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted">Rows in scope</p>
-                        <p className="mt-1 text-lg font-semibold text-foreground">{bankingMetrics.total}</p>
+                        <p className="text-xs uppercase tracking-wide text-muted">
+                          Rows in scope
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">
+                          {bankingMetrics.total}
+                        </p>
                         <p className="text-xs text-muted">
-                          Matched {bankingMetrics.matched} / Unmatched {bankingMetrics.unmatched}
+                          Matched {bankingMetrics.matched} / Unmatched{" "}
+                          {bankingMetrics.unmatched}
                         </p>
                       </div>
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted">Unmatched amount</p>
+                        <p className="text-xs uppercase tracking-wide text-muted">
+                          Unmatched amount
+                        </p>
                         <p className="mt-1 text-lg font-semibold text-foreground">
                           {bankingMetrics.unmatchedAmount.toLocaleString()}
                         </p>
                       </div>
                       <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted">Oldest unmatched</p>
+                        <p className="text-xs uppercase tracking-wide text-muted">
+                          Oldest unmatched
+                        </p>
                         <p className="mt-1 text-lg font-semibold text-foreground">
                           {bankingMetrics.oldestUnmatchedDays} day(s)
                         </p>
@@ -3710,7 +4839,8 @@ export function FinanceWorkspace({
                           Reconciliation queue (manual review)
                         </p>
                         <p className="mt-1 text-xs text-muted">
-                          Suggested matches are based on exact amount + nearest date + reference hint.
+                          Suggested matches are based on exact amount + nearest
+                          date + reference hint.
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -3718,7 +4848,9 @@ export function FinanceWorkspace({
                           <input
                             type="checkbox"
                             checked={showUnmatchedOnly}
-                            onChange={(e) => setShowUnmatchedOnly(e.target.checked)}
+                            onChange={(e) =>
+                              setShowUnmatchedOnly(e.target.checked)
+                            }
                           />
                           Show unmatched only
                         </label>
@@ -3728,7 +4860,9 @@ export function FinanceWorkspace({
                           onClick={() => void handleAutoMatchVisibleRows()}
                           className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
                         >
-                          {autoMatching ? "Auto-matching..." : "Auto-match visible"}
+                          {autoMatching
+                            ? "Auto-matching..."
+                            : "Auto-match visible"}
                         </button>
                         <button
                           type="button"
@@ -3766,7 +4900,11 @@ export function FinanceWorkspace({
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <UiSelect
                         value={bankStatusFilter}
-                        onChange={(e) => setBankStatusFilter(e.target.value as BankingStatusFilter)}
+                        onChange={(e) =>
+                          setBankStatusFilter(
+                            e.target.value as BankingStatusFilter,
+                          )
+                        }
                       >
                         <option value="all">All statuses</option>
                         <option value="unmatched">Unmatched</option>
@@ -3775,7 +4913,9 @@ export function FinanceWorkspace({
                       </UiSelect>
                       <UiSelect
                         value={exceptionReasonFilter}
-                        onChange={(e) => setExceptionReasonFilter(e.target.value)}
+                        onChange={(e) =>
+                          setExceptionReasonFilter(e.target.value)
+                        }
                       >
                         <option value="all">All exception reasons</option>
                         {BANK_EXCEPTION_REASON_OPTIONS.map((reason) => (
@@ -3800,8 +4940,12 @@ export function FinanceWorkspace({
                         <tbody className="divide-y divide-foreground/10">
                           {visibleBankRows.length === 0 ? (
                             <tr>
-                              <td className="px-3 py-3 text-sm text-muted" colSpan={6}>
-                                No rows match the current reconciliation filters.
+                              <td
+                                className="px-3 py-3 text-sm text-muted"
+                                colSpan={6}
+                              >
+                                No rows match the current reconciliation
+                                filters.
                               </td>
                             </tr>
                           ) : null}
@@ -3812,10 +4956,14 @@ export function FinanceWorkspace({
                             return (
                               <tr key={row.id}>
                                 <td className="px-3 py-2">
-                                  <p className="font-medium text-foreground">{row.date || "No date"}</p>
+                                  <p className="font-medium text-foreground">
+                                    {row.date || "No date"}
+                                  </p>
                                   <p className="text-xs text-muted">
                                     {row.description || "No description"}
-                                    {row.reference ? ` | Ref: ${row.reference}` : ""}
+                                    {row.reference
+                                      ? ` | Ref: ${row.reference}`
+                                      : ""}
                                   </p>
                                   {row.importIsFinalized ? (
                                     <p className="mt-1 text-[11px] text-[var(--success)]">
@@ -3840,12 +4988,17 @@ export function FinanceWorkspace({
                                 <td className="px-3 py-2 text-muted">
                                   {row.matchStatus === "MATCHED" ? (
                                     <p className="text-foreground">
-                                      Matched to {row.matchedEntityType || "record"}{" "}
-                                      {row.matchedEntityId ? `(${row.matchedEntityId.slice(0, 8)})` : ""}
+                                      Matched to{" "}
+                                      {row.matchedEntityType || "record"}{" "}
+                                      {row.matchedEntityId
+                                        ? `(${row.matchedEntityId.slice(0, 8)})`
+                                        : ""}
                                     </p>
                                   ) : row.matchStatus === "EXCEPTION" ? (
                                     <>
-                                      <p className="text-foreground">Exception bucket</p>
+                                      <p className="text-foreground">
+                                        Exception bucket
+                                      </p>
                                       <p className="text-xs text-muted">
                                         Reason: {row.exceptionReason || "OTHER"}
                                       </p>
@@ -3853,10 +5006,14 @@ export function FinanceWorkspace({
                                   ) : match ? (
                                     <>
                                       <p className="text-foreground">
-                                        {match.kind === "payment" ? "Payment" : "Expense"} - {match.label}
+                                        {match.kind === "payment"
+                                          ? "Payment"
+                                          : "Expense"}{" "}
+                                        - {match.label}
                                       </p>
                                       <p className="text-xs text-muted">
-                                        {match.amount.toLocaleString()} on {match.date || "n/a"}
+                                        {match.amount.toLocaleString()} on{" "}
+                                        {match.date || "n/a"}
                                       </p>
                                     </>
                                   ) : (
@@ -3889,7 +5046,9 @@ export function FinanceWorkspace({
                                         type="button"
                                         disabled={row.importIsFinalized}
                                         className="rounded-md border border-foreground/20 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
-                                        onClick={() => void handleUnmatchRow(row)}
+                                        onClick={() =>
+                                          void handleUnmatchRow(row)
+                                        }
                                       >
                                         Unmatch
                                       </button>
@@ -3897,7 +5056,9 @@ export function FinanceWorkspace({
                                       <button
                                         type="button"
                                         disabled={row.importIsFinalized}
-                                        onClick={() => void handleMarkMatched(row, match)}
+                                        onClick={() =>
+                                          void handleMarkMatched(row, match)
+                                        }
                                         className="rounded-md border border-foreground/20 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
                                       >
                                         Mark matched
@@ -3915,25 +5076,43 @@ export function FinanceWorkspace({
                                         >
                                           <option value="">Pick record</option>
                                           {candidates.map((c) => (
-                                            <option key={`${c.kind}:${c.id}`} value={`${c.kind}:${c.id}`}>
-                                              {c.kind === "payment" ? "Payment" : "Expense"} |{" "}
-                                              {c.amount.toLocaleString()} | {c.label}
+                                            <option
+                                              key={`${c.kind}:${c.id}`}
+                                              value={`${c.kind}:${c.id}`}
+                                            >
+                                              {c.kind === "payment"
+                                                ? "Payment"
+                                                : "Expense"}{" "}
+                                              | {c.amount.toLocaleString()} |{" "}
+                                              {c.label}
                                             </option>
                                           ))}
                                         </UiSelect>
                                         <button
                                           type="button"
-                                          disabled={!selected || row.importIsFinalized}
+                                          disabled={
+                                            !selected || row.importIsFinalized
+                                          }
                                           className="rounded-md border border-foreground/20 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
                                           onClick={() => {
                                             if (!selected) return;
-                                            const [kind, id] = selected.split(":");
-                                            if (!id || (kind !== "payment" && kind !== "expense")) return;
+                                            const [kind, id] =
+                                              selected.split(":");
+                                            if (
+                                              !id ||
+                                              (kind !== "payment" &&
+                                                kind !== "expense")
+                                            )
+                                              return;
                                             const candidate = candidates.find(
-                                              (c) => c.id === id && c.kind === kind,
+                                              (c) =>
+                                                c.id === id && c.kind === kind,
                                             );
                                             if (!candidate) return;
-                                            void handleMarkMatched(row, candidate);
+                                            void handleMarkMatched(
+                                              row,
+                                              candidate,
+                                            );
                                           }}
                                         >
                                           Match
@@ -3943,7 +5122,9 @@ export function FinanceWorkspace({
                                     <div className="flex items-center gap-2">
                                       <UiSelect
                                         value={
-                                          exceptionReasonDrafts[row.id] ?? row.exceptionReason ?? "OTHER"
+                                          exceptionReasonDrafts[row.id] ??
+                                          row.exceptionReason ??
+                                          "OTHER"
                                         }
                                         onChange={(e) =>
                                           setExceptionReasonDrafts((curr) => ({
@@ -3952,16 +5133,25 @@ export function FinanceWorkspace({
                                           }))
                                         }
                                       >
-                                        {BANK_EXCEPTION_REASON_OPTIONS.map((reason) => (
-                                          <option key={reason} value={reason}>
-                                            {reason}
-                                          </option>
-                                        ))}
+                                        {BANK_EXCEPTION_REASON_OPTIONS.map(
+                                          (reason) => (
+                                            <option key={reason} value={reason}>
+                                              {reason}
+                                            </option>
+                                          ),
+                                        )}
                                       </UiSelect>
                                       <input
-                                        value={noteDrafts[row.id] ?? row.reconciliationNote ?? ""}
+                                        value={
+                                          noteDrafts[row.id] ??
+                                          row.reconciliationNote ??
+                                          ""
+                                        }
                                         onChange={(e) =>
-                                          setNoteDrafts((curr) => ({ ...curr, [row.id]: e.target.value }))
+                                          setNoteDrafts((curr) => ({
+                                            ...curr,
+                                            [row.id]: e.target.value,
+                                          }))
                                         }
                                         placeholder="Exception note"
                                         className="w-40 rounded-md border border-foreground/20 bg-background px-2 py-1 text-xs"
@@ -3971,7 +5161,9 @@ export function FinanceWorkspace({
                                         type="button"
                                         disabled={row.importIsFinalized}
                                         className="rounded-md border border-foreground/20 px-2 py-1 text-xs text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
-                                        onClick={() => void handleSaveRowNote(row)}
+                                        onClick={() =>
+                                          void handleSaveRowNote(row)
+                                        }
                                       >
                                         Save note
                                       </button>
@@ -3979,7 +5171,9 @@ export function FinanceWorkspace({
                                         type="button"
                                         disabled={row.importIsFinalized}
                                         className="rounded-md border border-[var(--warn-line)] px-2 py-1 text-xs text-[var(--warn)] hover:bg-[var(--warn-wash)] disabled:opacity-50"
-                                        onClick={() => void handleMarkException(row)}
+                                        onClick={() =>
+                                          void handleMarkException(row)
+                                        }
                                       >
                                         Mark exception
                                       </button>
@@ -4005,10 +5199,18 @@ export function FinanceWorkspace({
                   className="grid gap-2 md:grid-cols-6"
                 >
                   {logFilters.logsEntityType ? (
-                    <input type="hidden" name="logsEntityType" value={logFilters.logsEntityType} />
+                    <input
+                      type="hidden"
+                      name="logsEntityType"
+                      value={logFilters.logsEntityType}
+                    />
                   ) : null}
                   {logFilters.logsEntityId ? (
-                    <input type="hidden" name="logsEntityId" value={logFilters.logsEntityId} />
+                    <input
+                      type="hidden"
+                      name="logsEntityId"
+                      value={logFilters.logsEntityId}
+                    />
                   ) : null}
                   <input
                     name="logsQ"
@@ -4016,7 +5218,10 @@ export function FinanceWorkspace({
                     placeholder="Search summary, actor, action..."
                     className="md:col-span-2 w-full border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   />
-                  <UiSelect name="logsModule" defaultValue={logFilters.logsModule}>
+                  <UiSelect
+                    name="logsModule"
+                    defaultValue={logFilters.logsModule}
+                  >
                     <option value="">All modules</option>
                     {logFilterOptions.modules.map((m) => (
                       <option key={m} value={m}>
@@ -4024,7 +5229,10 @@ export function FinanceWorkspace({
                       </option>
                     ))}
                   </UiSelect>
-                  <UiSelect name="logsAction" defaultValue={logFilters.logsAction}>
+                  <UiSelect
+                    name="logsAction"
+                    defaultValue={logFilters.logsAction}
+                  >
                     <option value="">All actions</option>
                     {logFilterOptions.actions.map((a) => (
                       <option key={a} value={a}>
@@ -4032,7 +5240,10 @@ export function FinanceWorkspace({
                       </option>
                     ))}
                   </UiSelect>
-                  <UiSelect name="logsActor" defaultValue={logFilters.logsActor}>
+                  <UiSelect
+                    name="logsActor"
+                    defaultValue={logFilters.logsActor}
+                  >
                     <option value="">All actors</option>
                     {logFilterOptions.actors.map((a) => (
                       <option key={a} value={a}>
@@ -4062,14 +5273,34 @@ export function FinanceWorkspace({
                   className="grid gap-2 md:grid-cols-6"
                 >
                   <input type="hidden" name="logsQ" value={logFilters.logsQ} />
-                  <input type="hidden" name="logsModule" value={logFilters.logsModule} />
-                  <input type="hidden" name="logsAction" value={logFilters.logsAction} />
-                  <input type="hidden" name="logsActor" value={logFilters.logsActor} />
+                  <input
+                    type="hidden"
+                    name="logsModule"
+                    value={logFilters.logsModule}
+                  />
+                  <input
+                    type="hidden"
+                    name="logsAction"
+                    value={logFilters.logsAction}
+                  />
+                  <input
+                    type="hidden"
+                    name="logsActor"
+                    value={logFilters.logsActor}
+                  />
                   {logFilters.logsEntityType ? (
-                    <input type="hidden" name="logsEntityType" value={logFilters.logsEntityType} />
+                    <input
+                      type="hidden"
+                      name="logsEntityType"
+                      value={logFilters.logsEntityType}
+                    />
                   ) : null}
                   {logFilters.logsEntityId ? (
-                    <input type="hidden" name="logsEntityId" value={logFilters.logsEntityId} />
+                    <input
+                      type="hidden"
+                      name="logsEntityId"
+                      value={logFilters.logsEntityId}
+                    />
                   ) : null}
                   <input
                     type="date"
@@ -4092,14 +5323,16 @@ export function FinanceWorkspace({
                     </button>
                     <button
                       type="button"
-                      onClick={() => router.push(`/${tenantSlug}/finance/audit-logs`)}
+                      onClick={() =>
+                        router.push(`/${tenantSlug}/finance/audit-logs`)
+                      }
                       className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold text-muted hover:text-foreground"
                     >
                       Clear filters
                     </button>
                     <p className="text-xs text-muted">
-                      {logPagination.total} total log(s), page {logFilters.logsPage} of{" "}
-                      {logPagination.totalPages}
+                      {logPagination.total} total log(s), page{" "}
+                      {logFilters.logsPage} of {logPagination.totalPages}
                     </p>
                   </div>
                 </form>
@@ -4131,7 +5364,11 @@ export function FinanceWorkspace({
                 </div>
                 <div className="flex items-center justify-between">
                   <Link
-                    href={financeAuditLogsUrl(tenantSlug, logFilters, Math.max(1, logFilters.logsPage - 1))}
+                    href={financeAuditLogsUrl(
+                      tenantSlug,
+                      logFilters,
+                      Math.max(1, logFilters.logsPage - 1),
+                    )}
                     className={[
                       "rounded-md border px-3 py-1.5 text-xs font-semibold",
                       logFilters.logsPage <= 1
@@ -4145,7 +5382,10 @@ export function FinanceWorkspace({
                     href={financeAuditLogsUrl(
                       tenantSlug,
                       logFilters,
-                      Math.min(logPagination.totalPages, logFilters.logsPage + 1),
+                      Math.min(
+                        logPagination.totalPages,
+                        logFilters.logsPage + 1,
+                      ),
                     )}
                     className={[
                       "rounded-md border px-3 py-1.5 text-xs font-semibold",
@@ -4166,17 +5406,25 @@ export function FinanceWorkspace({
       <ModalOverlay
         open={Boolean(isCreateInvoiceOpen)}
         onClose={() => setIsCreateInvoiceOpen(false)}
-        panelClassName={MODAL_PANEL_SM}
+        panelClassName={MODAL_PANEL_XL}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Create invoice</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Create invoice
+          </h2>
           <button
             type="button"
             onClick={() => setIsCreateInvoiceOpen(false)}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
             aria-label="Close modal"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
@@ -4193,7 +5441,9 @@ export function FinanceWorkspace({
             .
           </p>
           <div>
-            <label className="mb-1 block text-sm text-muted">Linked deal (optional)</label>
+            <label className="mb-1 block text-sm text-muted">
+              Linked deal (optional)
+            </label>
             <UiSelect name="dealId" defaultValue="">
               <option value="">None</option>
               {dealOptions.map((deal) => (
@@ -4204,7 +5454,9 @@ export function FinanceWorkspace({
             </UiSelect>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Invoice title</label>
+            <label className="mb-1 block text-sm text-muted">
+              Invoice title
+            </label>
             <input
               name="title"
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
@@ -4235,7 +5487,9 @@ export function FinanceWorkspace({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Due date (optional)</label>
+            <label className="mb-1 block text-sm text-muted">
+              Due date (optional)
+            </label>
             <input
               name="dueDate"
               type="date"
@@ -4243,8 +5497,13 @@ export function FinanceWorkspace({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-            <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
+            <label className="mb-1 block text-sm text-muted">
+              Department (optional)
+            </label>
+            <UiSelect
+              name="department"
+              defaultValue={financeOptions.departments[0] || "Finance"}
+            >
               <option value="">Select department</option>
               {financeOptions.departments.map((department) => (
                 <option key={department} value={department}>
@@ -4279,7 +5538,9 @@ export function FinanceWorkspace({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Create sales receipt</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              Create sales receipt
+            </h2>
             <p className="mt-1 text-xs text-muted">
               Capture customer payment instantly with account and mode details.
             </p>
@@ -4290,7 +5551,13 @@ export function FinanceWorkspace({
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
             aria-label="Close modal"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
@@ -4316,7 +5583,9 @@ export function FinanceWorkspace({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Customer (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Customer (optional)
+              </label>
               <input
                 name="customerName"
                 placeholder="Customer name"
@@ -4348,7 +5617,9 @@ export function FinanceWorkspace({
               </UiSelect>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Linked deal (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Linked deal (optional)
+              </label>
               <UiSelect name="dealId" defaultValue="">
                 <option value="">None</option>
                 {dealOptions.map((deal) => (
@@ -4361,7 +5632,9 @@ export function FinanceWorkspace({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-muted">Payment mode (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Payment mode (optional)
+              </label>
               <UiSelect
                 key={`sr-mode-${financeOptions.paymentModes.join("|")}`}
                 name="paymentMode"
@@ -4376,7 +5649,9 @@ export function FinanceWorkspace({
               </UiSelect>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Deposit account (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Deposit account (optional)
+              </label>
               <UiSelect
                 key={`sr-bank-${financeOptions.bankAccounts.join("|")}`}
                 name="depositAccount"
@@ -4393,14 +5668,18 @@ export function FinanceWorkspace({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Reference (optional)
+              </label>
               <input
                 name="reference"
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Notes (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Notes (optional)
+              </label>
               <input
                 name="note"
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
@@ -4429,21 +5708,30 @@ export function FinanceWorkspace({
       <ModalOverlay
         open={Boolean(isCreateExpenseOpen)}
         onClose={() => setIsCreateExpenseOpen(false)}
-        panelClassName={MODAL_PANEL_SM}
+        panelClassName={MODAL_PANEL_XL}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Create expense</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Create expense
+          </h2>
           <button
             type="button"
             onClick={() => {
               setIsCreateExpenseOpen(false);
               setExpenseVendorName("");
               setExpenseCategoryName("");
+              setExpenseProjectId("");
             }}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
             aria-label="Close modal"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
@@ -4451,8 +5739,9 @@ export function FinanceWorkspace({
         <form action={handleCreateExpense} className="mt-4 space-y-3">
           {financeControls.expenseApprovalThreshold ? (
             <p className="rounded-md border border-[var(--warn-line)] bg-[var(--warn-wash)] px-3 py-2 text-[11px] text-foreground">
-              Expenses above {financeControls.expenseApprovalThreshold.toLocaleString()} need manager approval
-              before you can record them here.
+              Expenses above{" "}
+              {financeControls.expenseApprovalThreshold.toLocaleString()} need
+              manager approval before you can record them here.
             </p>
           ) : null}
           {/* <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
@@ -4487,6 +5776,43 @@ export function FinanceWorkspace({
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
+              <label className="mb-1 block text-sm text-muted">
+                Project (optional)
+              </label>
+              <UiSelect
+                name="projectId"
+                value={expenseProjectId}
+                onChange={(event) => setExpenseProjectId(event.target.value)}
+              >
+                <option value="">Organization-wide expense</option>
+                {allocationOptions.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Apartment / unit (optional)
+              </label>
+              <UiSelect
+                key={expenseProjectId || "no-project"}
+                name="unitId"
+                defaultValue=""
+                disabled={!expenseProjectId}
+              >
+                <option value="">Project-wide expense</option>
+                {expenseUnitOptions.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
               <label className="mb-1 block text-sm text-muted">Amount</label>
               <input
                 name="amount"
@@ -4509,9 +5835,43 @@ export function FinanceWorkspace({
               </UiSelect>
             </div>
           </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                VAT treatment
+              </label>
+              <UiSelect name="vatTreatment" defaultValue="NONE">
+                <option value="NONE">No VAT</option>
+                <option value="EXCLUSIVE">VAT exclusive</option>
+                <option value="INCLUSIVE">VAT inclusive</option>
+                <option value="EXEMPT">VAT exempt</option>
+                <option value="ZERO_RATED">Zero-rated</option>
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                VAT rate (%)
+              </label>
+              <input
+                name="vatRate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                defaultValue="7.5"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+            <label className="flex items-center gap-2 self-end border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-sm text-foreground">
+              <input name="vatRecoverable" type="checkbox" />
+              Recoverable input VAT
+            </label>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-muted">Expense date</label>
+              <label className="mb-1 block text-sm text-muted">
+                Expense date
+              </label>
               <input
                 name="expenseDate"
                 type="date"
@@ -4520,7 +5880,9 @@ export function FinanceWorkspace({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Paid through (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Paid through (optional)
+              </label>
               <UiSelect
                 key={`exp-bank-${financeOptions.bankAccounts.join("|")}`}
                 name="paidThroughAccount"
@@ -4536,14 +5898,18 @@ export function FinanceWorkspace({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+            <label className="mb-1 block text-sm text-muted">
+              Reference (optional)
+            </label>
             <input
               name="reference"
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Note (optional)</label>
+            <label className="mb-1 block text-sm text-muted">
+              Note (optional)
+            </label>
             <textarea
               name="note"
               rows={3}
@@ -4551,8 +5917,13 @@ export function FinanceWorkspace({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-            <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
+            <label className="mb-1 block text-sm text-muted">
+              Department (optional)
+            </label>
+            <UiSelect
+              name="department"
+              defaultValue={financeOptions.departments[0] || "Finance"}
+            >
               <option value="">Select department</option>
               {financeOptions.departments.map((department) => (
                 <option key={department} value={department}>
@@ -4562,7 +5933,9 @@ export function FinanceWorkspace({
             </UiSelect>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Attachment (optional)</label>
+            <label className="mb-1 block text-sm text-muted">
+              Attachment (optional)
+            </label>
             <input
               type="file"
               accept="image/*,.pdf"
@@ -4600,6 +5973,283 @@ export function FinanceWorkspace({
         </form>
       </ModalOverlay>
 
+      {editingExpense ? (
+        <ModalOverlay
+          open
+          onClose={() => {
+            setEditingExpense(null);
+            setExpenseProjectId("");
+          }}
+          panelClassName={MODAL_PANEL_XL}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Correct expense
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                The original and corrected values, your reason, and your
+                identity will be retained in the master audit log.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingExpense(null)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06]"
+              aria-label="Close modal"
+            >
+              ×
+            </button>
+          </div>
+          <form action={handleEditExpense} className="mt-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Category
+                </label>
+                <input
+                  name="category"
+                  required
+                  defaultValue={editingExpense.category}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Vendor (optional)
+                </label>
+                <input
+                  name="vendorName"
+                  defaultValue={
+                    editingExpense.vendorName === "—"
+                      ? ""
+                      : editingExpense.vendorName
+                  }
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Project (optional)
+                </label>
+                <UiSelect
+                  name="projectId"
+                  value={expenseProjectId}
+                  onChange={(event) => setExpenseProjectId(event.target.value)}
+                >
+                  <option value="">Organization-wide expense</option>
+                  {allocationOptions.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.label}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Apartment / unit (optional)
+                </label>
+                <UiSelect
+                  key={`edit-${expenseProjectId || "none"}`}
+                  name="unitId"
+                  defaultValue={
+                    expenseProjectId === editingExpense.projectId
+                      ? editingExpense.unitId
+                      : ""
+                  }
+                  disabled={!expenseProjectId}
+                >
+                  <option value="">Project-wide expense</option>
+                  {expenseUnitOptions.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.label}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Amount</label>
+                <input
+                  name="amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  defaultValue={
+                    editingExpense.vatTreatment === "EXCLUSIVE"
+                      ? editingExpense.subtotalValue
+                      : editingExpense.amountValue
+                  }
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Currency
+                </label>
+                <UiSelect
+                  name="currency"
+                  defaultValue={editingExpense.currency}
+                >
+                  {Array.from(
+                    new Set([
+                      ...financeOptions.currencies,
+                      editingExpense.currency,
+                    ]),
+                  ).map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Expense date
+                </label>
+                <input
+                  name="expenseDate"
+                  type="date"
+                  required
+                  defaultValue={editingExpense.expenseDateValue}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  VAT treatment
+                </label>
+                <UiSelect
+                  name="vatTreatment"
+                  defaultValue={editingExpense.vatTreatment}
+                >
+                  <option value="NONE">No VAT</option>
+                  <option value="EXCLUSIVE">VAT exclusive</option>
+                  <option value="INCLUSIVE">VAT inclusive</option>
+                  <option value="EXEMPT">VAT exempt</option>
+                  <option value="ZERO_RATED">Zero-rated</option>
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  VAT rate (%)
+                </label>
+                <input
+                  name="vatRate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  defaultValue={editingExpense.vatRate || 7.5}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+              <label className="flex items-center gap-2 self-end border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-sm text-foreground">
+                <input
+                  name="vatRecoverable"
+                  type="checkbox"
+                  defaultChecked={editingExpense.vatRecoverable}
+                />
+                Recoverable input VAT
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Paid through
+                </label>
+                <UiSelect
+                  name="paidThroughAccount"
+                  defaultValue={
+                    editingExpense.paidThroughAccount === "—"
+                      ? ""
+                      : editingExpense.paidThroughAccount
+                  }
+                >
+                  <option value="">Select account</option>
+                  {financeOptions.bankAccounts.map((account) => (
+                    <option key={account} value={account}>
+                      {account}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Department
+                </label>
+                <UiSelect
+                  name="department"
+                  defaultValue={editingExpense.department}
+                >
+                  <option value="">Select department</option>
+                  {financeOptions.departments.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
+                </UiSelect>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Reference
+                </label>
+                <input
+                  name="reference"
+                  defaultValue={editingExpense.referenceRaw}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Note</label>
+                <textarea
+                  name="note"
+                  rows={3}
+                  defaultValue={editingExpense.note}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Reason for correction
+                </label>
+                <textarea
+                  name="editReason"
+                  rows={3}
+                  required
+                  placeholder="Explain why this finance record is being changed."
+                  className="w-full border border-[var(--warn-line)] bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingExpense(null)}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={actionPending}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+              >
+                {actionPending ? "Saving correction..." : "Save correction"}
+              </button>
+            </div>
+          </form>
+        </ModalOverlay>
+      ) : null}
+
       <RecordVendorBillModal
         open={isCreateBillOpen}
         onClose={() => setIsCreateBillOpen(false)}
@@ -4614,16 +6264,28 @@ export function FinanceWorkspace({
       />
 
       {paymentBill ? (
-        <ModalOverlay open onClose={() => setPaymentBill(null)} panelClassName={MODAL_PANEL_SM}>
+        <ModalOverlay
+          open
+          onClose={() => setPaymentBill(null)}
+          panelClassName={MODAL_PANEL_SM}
+        >
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Pay vendor bill</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              Pay vendor bill
+            </h2>
             <button
               type="button"
               onClick={() => setPaymentBill(null)}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
               aria-label="Close modal"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
@@ -4653,8 +6315,13 @@ export function FinanceWorkspace({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm text-muted">Payment method</label>
-                <UiSelect name="method" defaultValue={financeOptions.paymentModes[0] || ""}>
+                <label className="mb-1 block text-sm text-muted">
+                  Payment method
+                </label>
+                <UiSelect
+                  name="method"
+                  defaultValue={financeOptions.paymentModes[0] || ""}
+                >
                   <option value="">Select method</option>
                   {financeOptions.paymentModes.map((mode) => (
                     <option key={mode} value={mode}>
@@ -4664,7 +6331,9 @@ export function FinanceWorkspace({
                 </UiSelect>
               </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Paid from account</label>
+                <label className="mb-1 block text-sm text-muted">
+                  Paid from account
+                </label>
                 <UiSelect name="paidThroughAccount" defaultValue="">
                   <option value="">Select account</option>
                   {financeOptions.bankAccounts.map((account) => (
@@ -4676,7 +6345,9 @@ export function FinanceWorkspace({
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Reference (optional)
+              </label>
               <input
                 name="reference"
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
@@ -4703,9 +6374,15 @@ export function FinanceWorkspace({
       ) : null}
 
       {paymentInvoice ? (
-        <ModalOverlay open onClose={() => setPaymentInvoice(null)} panelClassName={MODAL_PANEL_SM}>
+        <ModalOverlay
+          open
+          onClose={() => setPaymentInvoice(null)}
+          panelClassName={MODAL_PANEL_SM}
+        >
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Record payment</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              Record payment
+            </h2>
             <button
               type="button"
               onClick={() => {
@@ -4715,13 +6392,20 @@ export function FinanceWorkspace({
               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
               aria-label="Close modal"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
           </div>
           <p className="mt-1 text-xs text-muted">
-            {paymentInvoice.invoiceNumber} - Balance: {paymentInvoice.balanceLabel}
+            {paymentInvoice.invoiceNumber} - Balance:{" "}
+            {paymentInvoice.balanceLabel}
           </p>
           <form action={handleRecordPayment} className="mt-4 space-y-3">
             <p className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-[11px] text-muted">
@@ -4753,7 +6437,9 @@ export function FinanceWorkspace({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm text-muted">Method (optional)</label>
+                <label className="mb-1 block text-sm text-muted">
+                  Method (optional)
+                </label>
                 <UiSelect
                   key={`pay-mode-${financeOptions.paymentModes.join("|")}`}
                   name="method"
@@ -4768,7 +6454,9 @@ export function FinanceWorkspace({
                 </UiSelect>
               </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+                <label className="mb-1 block text-sm text-muted">
+                  Reference (optional)
+                </label>
                 <input
                   name="reference"
                   className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
@@ -4776,10 +6464,16 @@ export function FinanceWorkspace({
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Department (optional)
+              </label>
               <UiSelect
                 name="department"
-                defaultValue={paymentInvoice.department || financeOptions.departments[0] || "Finance"}
+                defaultValue={
+                  paymentInvoice.department ||
+                  financeOptions.departments[0] ||
+                  "Finance"
+                }
               >
                 <option value="">Select department</option>
                 {financeOptions.departments.map((department) => (
@@ -4790,7 +6484,9 @@ export function FinanceWorkspace({
               </UiSelect>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Note (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Note (optional)
+              </label>
               <textarea
                 name="note"
                 rows={3}
@@ -4798,7 +6494,9 @@ export function FinanceWorkspace({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Receipt attachment (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Receipt attachment (optional)
+              </label>
               <input
                 type="file"
                 accept="image/*,.pdf"
@@ -4846,24 +6544,35 @@ export function FinanceWorkspace({
         panelClassName={MODAL_PANEL_SM}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Record direct payment</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Record direct payment
+          </h2>
           <button
             type="button"
             onClick={() => setIsCreateDirectPaymentOpen(false)}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
             aria-label="Close modal"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
         </div>
         <p className="mt-1 text-xs text-muted">
-          For walk-ins, reservation deposits, or other cash received without an invoice.
+          For walk-ins, reservation deposits, or other cash received without an
+          invoice.
         </p>
         <form action={handleRecordDirectPayment} className="mt-4 space-y-3">
           <div>
-            <label className="mb-1 block text-sm text-muted">Title / description</label>
+            <label className="mb-1 block text-sm text-muted">
+              Title / description
+            </label>
             <input
               name="title"
               required
@@ -4872,7 +6581,9 @@ export function FinanceWorkspace({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Payer name (optional)</label>
+            <label className="mb-1 block text-sm text-muted">
+              Payer name (optional)
+            </label>
             <input
               name="payerName"
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
@@ -4911,8 +6622,13 @@ export function FinanceWorkspace({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-muted">Method (optional)</label>
-              <UiSelect name="method" defaultValue={financeOptions.paymentModes[0] || ""}>
+              <label className="mb-1 block text-sm text-muted">
+                Method (optional)
+              </label>
+              <UiSelect
+                name="method"
+                defaultValue={financeOptions.paymentModes[0] || ""}
+              >
                 <option value="">Select method</option>
                 {financeOptions.paymentModes.map((mode) => (
                   <option key={mode} value={mode}>
@@ -4922,7 +6638,9 @@ export function FinanceWorkspace({
               </UiSelect>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Reference (optional)
+              </label>
               <input
                 name="reference"
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
@@ -4930,8 +6648,13 @@ export function FinanceWorkspace({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Department (optional)</label>
-            <UiSelect name="department" defaultValue={financeOptions.departments[0] || "Finance"}>
+            <label className="mb-1 block text-sm text-muted">
+              Department (optional)
+            </label>
+            <UiSelect
+              name="department"
+              defaultValue={financeOptions.departments[0] || "Finance"}
+            >
               <option value="">None</option>
               {financeOptions.departments.map((dept) => (
                 <option key={dept} value={dept}>
@@ -4941,7 +6664,9 @@ export function FinanceWorkspace({
             </UiSelect>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-muted">Note (optional)</label>
+            <label className="mb-1 block text-sm text-muted">
+              Note (optional)
+            </label>
             <textarea
               name="note"
               rows={2}
@@ -4968,16 +6693,28 @@ export function FinanceWorkspace({
       </ModalOverlay>
 
       {editingInvoice ? (
-        <ModalOverlay open onClose={() => setEditingInvoice(null)} panelClassName={MODAL_PANEL_SM}>
+        <ModalOverlay
+          open
+          onClose={() => setEditingInvoice(null)}
+          panelClassName={MODAL_PANEL_SM}
+        >
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Edit invoice</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              Edit invoice
+            </h2>
             <button
               type="button"
               onClick={() => setEditingInvoice(null)}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
               aria-label="Close modal"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
@@ -5002,10 +6739,16 @@ export function FinanceWorkspace({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-muted">Currency</label>
+                <label className="mb-1 block text-sm text-muted">
+                  Currency
+                </label>
                 <UiSelect
                   name="currency"
-                  defaultValue={editingInvoice.currency || financeOptions.currencies[0] || "NGN"}
+                  defaultValue={
+                    editingInvoice.currency ||
+                    financeOptions.currencies[0] ||
+                    "NGN"
+                  }
                 >
                   {financeOptions.currencies.map((currency) => (
                     <option key={currency} value={currency}>
@@ -5017,7 +6760,9 @@ export function FinanceWorkspace({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm text-muted">Due date</label>
+                <label className="mb-1 block text-sm text-muted">
+                  Due date
+                </label>
                 <input
                   name="dueDate"
                   type="date"
@@ -5044,10 +6789,16 @@ export function FinanceWorkspace({
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Department (optional)</label>
+              <label className="mb-1 block text-sm text-muted">
+                Department (optional)
+              </label>
               <UiSelect
                 name="department"
-                defaultValue={editingInvoice.department || financeOptions.departments[0] || "Finance"}
+                defaultValue={
+                  editingInvoice.department ||
+                  financeOptions.departments[0] ||
+                  "Finance"
+                }
               >
                 <option value="">Select department</option>
                 {financeOptions.departments.map((department) => (
@@ -5086,7 +6837,9 @@ export function FinanceWorkspace({
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Entity Timeline</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                Entity Timeline
+              </h2>
               <p className="text-xs text-muted">{timelineTarget.title}</p>
             </div>
             <button
@@ -5095,7 +6848,13 @@ export function FinanceWorkspace({
               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
               aria-label="Close timeline"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
@@ -5108,11 +6867,18 @@ export function FinanceWorkspace({
           ) : (
             <ul className="mt-4 space-y-2">
               {timelineLogs.map((log) => (
-                <li key={log.id} className="rounded-md border border-foreground/10 p-3">
+                <li
+                  key={log.id}
+                  className="rounded-md border border-foreground/10 p-3"
+                >
                   <p className="text-xs text-muted">{log.timestamp}</p>
-                  <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
+                  <p className="mt-0.5 text-sm font-medium text-foreground">
+                    {log.action}
+                  </p>
                   <p className="text-xs text-muted">By: {log.actor}</p>
-                  <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
+                  <p className="mt-1 text-sm text-foreground/90">
+                    {log.summary}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -5127,7 +6893,9 @@ export function FinanceWorkspace({
           mode="send"
           documentLabel="receipt"
           documentNumber={sendReceipt.receiptNumber}
-          customerName={sendReceipt.customerName === "—" ? "" : sendReceipt.customerName}
+          customerName={
+            sendReceipt.customerName === "—" ? "" : sendReceipt.customerName
+          }
           defaultEmail={sendReceipt.defaultEmail}
           tenantSlug={tenantSlug}
           hasBankAccounts={financeOptions.bankAccounts.length > 0}
@@ -5144,7 +6912,11 @@ export function FinanceWorkspace({
           documentLabel="invoice"
           documentNumber={emailInvoice.invoice.invoiceNumber}
           customerName={emailInvoice.invoice.customerName}
-          defaultEmail={emailInvoice.invoice.defaultEmail || emailInvoice.invoice.sentToEmail || ""}
+          defaultEmail={
+            emailInvoice.invoice.defaultEmail ||
+            emailInvoice.invoice.sentToEmail ||
+            ""
+          }
           tenantSlug={tenantSlug}
           hasBankAccounts={financeOptions.bankAccounts.length > 0}
           pending={actionPending}

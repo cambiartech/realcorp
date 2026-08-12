@@ -19,6 +19,7 @@ import { createTenantUploadSignature, uploadBufferToCloudinary } from "@/lib/clo
 import { ClientDocumentCategory, FinanceDocumentCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { parseFinanceControls } from "@/lib/finance-controls";
+import { calculateVatBreakdown } from "@/lib/finance-vat";
 import { normalizeFinanceExpenseCategory, expenseCategoryNamesMatch } from "@/lib/finance-expense-category";
 import { normalizeFinanceVendorName, vendorNamesMatch } from "@/lib/finance-vendor";
 import {
@@ -39,6 +40,7 @@ import {
   recordPaymentInputSchema,
   recordStandalonePaymentInputSchema,
   recordVendorBillPaymentInputSchema,
+  updateExpenseInputSchema,
   updateInvoiceInputSchema,
 } from "@/lib/validators/finance";
 import { revalidatePath } from "next/cache";
@@ -988,13 +990,47 @@ export async function getEntityTimelineLogs(
   return { ok: true, logs };
 }
 
+async function resolveExpenseAllocation(input: {
+  tenantId: string;
+  projectId?: string;
+  unitId?: string;
+}) {
+  if (input.unitId) {
+    const unit = await prisma.unit.findFirst({
+      where: { id: input.unitId, tenantId: input.tenantId },
+      select: { id: true, projectId: true },
+    });
+    if (!unit) return { ok: false as const, error: "The selected apartment could not be found." };
+    if (input.projectId && input.projectId !== unit.projectId) {
+      return { ok: false as const, error: "The selected apartment does not belong to this project." };
+    }
+    return { ok: true as const, projectId: unit.projectId, unitId: unit.id };
+  }
+
+  if (input.projectId) {
+    const project = await prisma.project.findFirst({
+      where: { id: input.projectId, tenantId: input.tenantId },
+      select: { id: true },
+    });
+    if (!project) return { ok: false as const, error: "The selected project could not be found." };
+    return { ok: true as const, projectId: project.id, unitId: null };
+  }
+
+  return { ok: true as const, projectId: null, unitId: null };
+}
+
 export async function createExpenseRecord(
   tenantSlug: string,
   input: {
+    projectId?: string;
+    unitId?: string;
     category: string;
     department?: string;
     vendorName?: string;
     amount: number;
+    vatTreatment?: "NONE" | "EXCLUSIVE" | "INCLUSIVE" | "EXEMPT" | "ZERO_RATED";
+    vatRate?: number;
+    vatRecoverable?: boolean;
     currency: string;
     expenseDate: string;
     paidThroughAccount?: string;
@@ -1022,7 +1058,18 @@ export async function createExpenseRecord(
     select: { financeControls: true },
   });
   const controls = parseFinanceControls(settings?.financeControls);
-  if (controls.expenseApprovalThreshold && parsed.data.amount > controls.expenseApprovalThreshold) {
+  const vat = calculateVatBreakdown({
+    amount: parsed.data.amount,
+    treatment: parsed.data.vatTreatment,
+    rate: parsed.data.vatRate,
+  });
+  const allocation = await resolveExpenseAllocation({
+    tenantId: tenant.id,
+    projectId: parsed.data.projectId,
+    unitId: parsed.data.unitId,
+  });
+  if (!allocation.ok) return allocation;
+  if (controls.expenseApprovalThreshold && vat.grossAmount > controls.expenseApprovalThreshold) {
     return {
       ok: false,
       error: `Expenses above ${controls.expenseApprovalThreshold.toLocaleString()} ${parsed.data.currency} need manager approval before recording.`,
@@ -1041,10 +1088,17 @@ export async function createExpenseRecord(
     const created = await prisma.expense.create({
       data: {
         tenantId: tenant.id,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
         category,
         department: parsed.data.department || null,
         vendorName: expenseVendorName,
-        amount: parsed.data.amount,
+        amount: vat.grossAmount,
+        subtotal: vat.subtotal,
+        vatAmount: vat.vatAmount,
+        vatRate: vat.vatRate,
+        vatTreatment: parsed.data.vatTreatment,
+        vatRecoverable: Boolean(parsed.data.vatRecoverable && vat.vatAmount > 0),
         currency: parsed.data.currency,
         expenseDate: new Date(parsed.data.expenseDate),
         paidThroughAccount: parsed.data.paidThroughAccount || null,
@@ -1069,12 +1123,176 @@ export async function createExpenseRecord(
       metadata: {
         category: parsed.data.category,
         department: parsed.data.department || null,
-        amount: parsed.data.amount,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        subtotal: vat.subtotal,
+        vatAmount: vat.vatAmount,
+        vatRate: vat.vatRate,
+        vatTreatment: parsed.data.vatTreatment,
+        vatRecoverable: Boolean(parsed.data.vatRecoverable && vat.vatAmount > 0),
+        amount: vat.grossAmount,
         currency: parsed.data.currency,
       },
     });
   } catch {
     return { ok: false, error: "Could not create expense right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function updateExpenseRecord(
+  tenantSlug: string,
+  expenseId: string,
+  input: z.input<typeof updateExpenseInputSchema>,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = updateExpenseInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to correct expenses." };
+  }
+
+  const [existing, matchedRow, settings] = await Promise.all([
+    prisma.expense.findFirst({ where: { id: expenseId, tenantId: tenant.id } }),
+    prisma.bankStatementRow.findFirst({
+      where: {
+        tenantId: tenant.id,
+        matchedEntityType: "EXPENSE",
+        matchedEntityId: expenseId,
+        matchStatus: BankMatchStatus.MATCHED,
+      },
+      select: { id: true },
+    }),
+    prisma.tenantSettings.findUnique({
+      where: { tenantId: tenant.id },
+      select: { financeControls: true },
+    }),
+  ]);
+  if (!existing) return { ok: false, error: "Expense not found." };
+  if (matchedRow) {
+    return {
+      ok: false,
+      error: "This expense is reconciled to a bank statement. Undo that match before correcting it.",
+    };
+  }
+
+  const vat = calculateVatBreakdown({
+    amount: parsed.data.amount,
+    treatment: parsed.data.vatTreatment,
+    rate: parsed.data.vatRate,
+  });
+  const allocation = await resolveExpenseAllocation({
+    tenantId: tenant.id,
+    projectId: parsed.data.projectId,
+    unitId: parsed.data.unitId,
+  });
+  if (!allocation.ok) return allocation;
+
+  const controls = parseFinanceControls(settings?.financeControls);
+  if (controls.expenseApprovalThreshold && vat.grossAmount > controls.expenseApprovalThreshold) {
+    return {
+      ok: false,
+      error: `Expenses above ${controls.expenseApprovalThreshold.toLocaleString()} ${parsed.data.currency} need manager approval before recording.`,
+    };
+  }
+
+  const actorLabel = session.user.name || session.user.email || "Unknown recorder";
+  const before = {
+    category: existing.category,
+    department: existing.department,
+    vendorName: existing.vendorName,
+    projectId: existing.projectId,
+    unitId: existing.unitId,
+    amount: existing.amount.toString(),
+    subtotal: existing.subtotal.toString(),
+    vatAmount: existing.vatAmount.toString(),
+    vatRate: existing.vatRate.toString(),
+    vatTreatment: existing.vatTreatment,
+    vatRecoverable: existing.vatRecoverable,
+    currency: existing.currency,
+    expenseDate: existing.expenseDate.toISOString(),
+    paidThroughAccount: existing.paidThroughAccount,
+    reference: existing.reference,
+    note: existing.note,
+  };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const category = await ensureFinanceExpenseCategory(tx, tenant.id, parsed.data.category);
+      const vendorName = parsed.data.vendorName
+        ? await ensureFinanceVendor(tx, tenant.id, parsed.data.vendorName)
+        : null;
+      const updated = await tx.expense.update({
+        where: { id: existing.id },
+        data: {
+          projectId: allocation.projectId,
+          unitId: allocation.unitId,
+          category,
+          department: parsed.data.department || null,
+          vendorName,
+          amount: vat.grossAmount,
+          subtotal: vat.subtotal,
+          vatAmount: vat.vatAmount,
+          vatRate: vat.vatRate,
+          vatTreatment: parsed.data.vatTreatment,
+          vatRecoverable: Boolean(parsed.data.vatRecoverable && vat.vatAmount > 0),
+          currency: parsed.data.currency,
+          expenseDate: new Date(parsed.data.expenseDate),
+          paidThroughAccount: parsed.data.paidThroughAccount || null,
+          reference: parsed.data.reference || null,
+          note: parsed.data.note || null,
+        },
+      });
+      const after = {
+        category: updated.category,
+        department: updated.department,
+        vendorName: updated.vendorName,
+        projectId: updated.projectId,
+        unitId: updated.unitId,
+        amount: updated.amount.toString(),
+        subtotal: updated.subtotal.toString(),
+        vatAmount: updated.vatAmount.toString(),
+        vatRate: updated.vatRate.toString(),
+        vatTreatment: updated.vatTreatment,
+        vatRecoverable: updated.vatRecoverable,
+        currency: updated.currency,
+        expenseDate: updated.expenseDate.toISOString(),
+        paidThroughAccount: updated.paidThroughAccount,
+        reference: updated.reference,
+        note: updated.note,
+      };
+      const changedFields = Object.keys(after).filter(
+        (key) => before[key as keyof typeof before] !== after[key as keyof typeof after],
+      );
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: tenant.id,
+          actorUserId: session.user.id,
+          actorLabel,
+          module: "FINANCE",
+          entityType: "EXPENSE",
+          entityId: updated.id,
+          action: "UPDATE",
+          summary: `Corrected expense ${updated.category}. Changed: ${changedFields.join(", ") || "no fields"}. Reason: ${parsed.data.editReason}`,
+          metadata: {
+            reason: parsed.data.editReason,
+            changedFields,
+            before,
+            after,
+          },
+        },
+      });
+    });
+  } catch {
+    return { ok: false, error: "Could not save the expense correction right now." };
   }
 
   revalidatePath(`/${tenantSlug}/finance`);

@@ -1,14 +1,7 @@
 "use client";
 
 import { ModalOverlay } from "@/components/modal-overlay";
-import {
-  MODAL_PANEL_LG,
-  MODAL_PANEL_MD,
-  MODAL_PANEL_SM,
-  MODAL_PANEL_XL,
-  MODAL_PANEL_XS,
-  MODAL_PANEL_2XL,
-} from "@/lib/modal-panel";
+import { MODAL_PANEL_LG } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +11,8 @@ import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
+import { PaginationControl } from "@/components/pagination";
+import type { Pagination, SearchParamValue } from "@/lib/pagination";
 import { createLead } from "./actions";
 
 type LeadRow = {
@@ -80,6 +75,8 @@ export function LeadsWorkspace({
   campaignOptions,
   sourceOptions,
   activeFilterChips,
+  pagination,
+  paginationSearchParams,
 }: {
   tenantSlug: string;
   tenantName: string;
@@ -90,6 +87,8 @@ export function LeadsWorkspace({
   campaignOptions: CampaignOption[];
   sourceOptions: string[];
   activeFilterChips?: ActiveFilterChip[];
+  pagination: Pagination;
+  paginationSearchParams: Record<string, SearchParamValue>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -173,7 +172,7 @@ export function LeadsWorkspace({
             reportTitle="Leads Report"
             companyName={tenantName}
             kpis={[
-              { label: "Total leads", value: leads.length, tone: "highlight" },
+              { label: "Leads on page", value: leads.length, tone: "highlight" },
               { label: "Hot (70+)", value: hotCount, tone: "positive" },
               { label: "Warm", value: warmCount },
               { label: "Cold", value: leads.length - hotCount - warmCount },
@@ -322,6 +321,13 @@ export function LeadsWorkspace({
             )}
           </tbody>
         </table>
+        <PaginationControl
+          pathname={`/${tenantSlug}/leads`}
+          searchParams={paginationSearchParams}
+          pageParam="leadsPage"
+          itemLabel="leads"
+          {...pagination}
+        />
       </div>
 
       <ModalOverlay

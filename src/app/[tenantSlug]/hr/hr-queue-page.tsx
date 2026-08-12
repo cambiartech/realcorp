@@ -3,7 +3,7 @@ import { MembershipStatus } from "@/generated/prisma";
 import { canManageHr, canViewHrModule } from "@/lib/hr-access";
 import { normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import prisma from "@/lib/db";
-import { calculateNigeriaPayslip } from "@/lib/hr-payslip";
+import { payslipCalculationFromStored } from "@/lib/hr-payslip";
 import { absoluteAppUrl } from "@/lib/app-url";
 import { HR_FORM_DELIVERY_LABELS, HR_FORM_TYPE_LABELS, hrFormFillPath } from "@/lib/hr-form-types";
 import { hrOfferSignPath } from "@/lib/hr-offer-path";
@@ -37,46 +37,6 @@ function bankField(bank: unknown, key: string): string {
   return typeof v === "string" ? v : "";
 }
 
-function normalizePayslipEarnings(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((row) => {
-      if (!row || typeof row !== "object") return null;
-      const item = row as Record<string, unknown>;
-      const code = typeof item.code === "string" ? item.code : "";
-      const label = typeof item.label === "string" ? item.label : "";
-      const percent = Number(item.percent);
-      const amount = Number(item.amount);
-      if (!code) return null;
-      return {
-        code,
-        label,
-        percent: Number.isFinite(percent) ? percent : 0,
-        amount: Number.isFinite(amount) ? amount : 0,
-      };
-    })
-    .filter((row): row is { code: string; label: string; percent: number; amount: number } => Boolean(row));
-}
-
-function normalizePayslipDeductions(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((row) => {
-      if (!row || typeof row !== "object") return null;
-      const item = row as Record<string, unknown>;
-      const code = typeof item.code === "string" ? item.code : "";
-      const label = typeof item.label === "string" ? item.label : "";
-      const amount = Number(item.amount);
-      if (!code) return null;
-      return {
-        code,
-        label,
-        amount: Number.isFinite(amount) ? amount : 0,
-      };
-    })
-    .filter((row): row is { code: string; label: string; amount: number } => Boolean(row));
-}
-
 export default async function HrQueuePage({
   params,
   tab,
@@ -106,6 +66,7 @@ export default async function HrQueuePage({
           moduleCommunity: true,
           moduleShortLets: true,
           moduleHr: true,
+          moduleAi: true,
           roleModuleGrants: true,
           logoUrl: true,
           primaryColor: true,
@@ -176,6 +137,7 @@ export default async function HrQueuePage({
   const [
     members,
     profiles,
+    payTemplates,
     appraisalActions,
     appraisalCycles,
     payslipRuns,
@@ -205,6 +167,10 @@ export default async function HrQueuePage({
       where: { tenantId: tenant.id },
       orderBy: { fullName: "asc" },
     }),
+    prisma.hrPayTemplate.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    }),
     prisma.hrAppraisalAction.findMany({
       where: { tenantId: tenant.id },
       orderBy: [{ cycleType: "asc" }, { sortOrder: "asc" }],
@@ -228,6 +194,7 @@ export default async function HrQueuePage({
       orderBy: [{ year: "desc" }, { month: "desc" }],
       take: 24,
       include: {
+        adjustments: { orderBy: { createdAt: "asc" } },
         payslips: {
           include: {
             profile: {
@@ -244,7 +211,7 @@ export default async function HrQueuePage({
       },
     }),
     prisma.hrDocument.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: tenant.id, deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 200,
       include: { profile: { select: { fullName: true } } },
@@ -282,7 +249,7 @@ export default async function HrQueuePage({
       .then((prof) =>
         prof
           ? prisma.hrDocument.findMany({
-              where: { tenantId: tenant.id, employeeProfileId: prof.id },
+              where: { tenantId: tenant.id, employeeProfileId: prof.id, deletedAt: null },
               orderBy: { createdAt: "desc" },
               take: 50,
             })
@@ -381,6 +348,32 @@ export default async function HrQueuePage({
   const myOnboardingSummary = myOnboardingStatus.summary;
 
   const profileByUserId = new Map(profiles.map((p) => [p.userId, p]));
+  const memberUserIds = new Set(members.map((m) => m.user.id));
+  const hrOnlyProfiles = profiles.filter((profile) => !memberUserIds.has(profile.userId));
+  const hrOnlyUsers = hrOnlyProfiles.length
+    ? await prisma.user.findMany({
+        where: { id: { in: hrOnlyProfiles.map((profile) => profile.userId) } },
+        select: { id: true, name: true, email: true },
+      })
+    : [];
+  const hrOnlyUserById = new Map(hrOnlyUsers.map((user) => [user.id, user]));
+  const directoryPeople = [
+    ...members.map((membership) => ({
+      userId: membership.user.id,
+      name: membership.user.name || membership.user.email || "User",
+      email: membership.user.email || "",
+      role: formatEnumLabel(membership.role),
+    })),
+    ...hrOnlyProfiles.map((profile) => {
+      const user = hrOnlyUserById.get(profile.userId);
+      return {
+        userId: profile.userId,
+        name: profile.fullName || user?.name || user?.email || "Employee",
+        email: profile.workEmail || user?.email || "",
+        role: "HR/payroll only · No login",
+      };
+    }),
+  ];
   const offerByUserId = Object.fromEntries(
     offerLetters.map((o) => [
       o.profile.userId,
@@ -443,16 +436,16 @@ export default async function HrQueuePage({
       p.grossMonthly != null &&
       Number(p.grossMonthly) > 0,
   ).length;
-  const profileOnboarding = members.map((m) => {
-    const p = profileByUserId.get(m.user.id);
+  const profileOnboarding = directoryPeople.map((person) => {
+    const p = profileByUserId.get(person.userId);
     const docs = p ? documents.filter((d) => d.employeeProfileId === p.id) : [];
     const items = buildProfileChecklist(
-      (p ?? { fullName: m.user.name, phoneMobile: null, position: null }) as EmployeeProfile,
+      (p ?? { fullName: person.name, phoneMobile: null, position: null }) as EmployeeProfile,
       docs,
     );
     const { percent } = checklistProgress(items);
     return {
-      userId: m.user.id,
+      userId: person.userId,
       profileId: p?.id ?? null,
       items,
       percent,
@@ -618,13 +611,11 @@ export default async function HrQueuePage({
       currency={tenant.defaultCurrency}
       activeTab={tab}
       canManageHr={canManage}
+      aiEnabled={Boolean(tenant.settings?.moduleAi)}
       currentUserId={session.user.id}
-      teamMembers={members.map((m) => ({
-        userId: m.user.id,
-        name: m.user.name || m.user.email || "User",
-        email: m.user.email || "",
-        role: formatEnumLabel(m.role),
-        hasProfile: profileByUserId.has(m.user.id),
+      teamMembers={directoryPeople.map((person) => ({
+        ...person,
+        hasProfile: profileByUserId.has(person.userId),
       }))}
       profiles={profiles.map((p) => {
         const bank = p.bankAccount;
@@ -646,6 +637,19 @@ export default async function HrQueuePage({
             : "—",
         };
       })}
+      payTemplates={payTemplates.map((template) => ({
+        id: template.id,
+        name: template.name,
+        countryCode: template.countryCode,
+        basicPercent: Number(template.basicPercent),
+        housingPercent: Number(template.housingPercent),
+        transportPercent: Number(template.transportPercent),
+        otherPercent: Number(template.otherPercent),
+        pensionEnabled: template.pensionEnabled,
+        employeePensionRate: Number(template.employeePensionRate),
+        employerPensionRate: Number(template.employerPensionRate),
+        isDefault: template.isDefault,
+      }))}
       appraisalActions={appraisalActions.map((a) => ({
         id: a.id,
         title: a.title,
@@ -705,11 +709,20 @@ export default async function HrQueuePage({
         status: formatEnumLabel(r.status),
         statusValue: r.status,
         payslipCount: r.payslips.length,
+        adjustments: r.adjustments.map((adjustment) => ({
+          id: adjustment.id,
+          employeeProfileId: adjustment.employeeProfileId,
+          type: adjustment.type,
+          label: adjustment.label,
+          amount: Number(adjustment.amount),
+          taxable: adjustment.taxable,
+          pensionable: adjustment.pensionable,
+          preTax: adjustment.preTax,
+        })),
         payslips: r.payslips.map((s) => {
-          const earnings = normalizePayslipEarnings(s.earningsBreakdown);
-          const deductions = normalizePayslipDeductions(s.deductionsBreakdown);
           return {
             id: s.id,
+            employeeProfileId: s.employeeProfileId,
             employeeName: s.profile.fullName || "Unnamed",
             jobRole: s.profile.position || "",
             paygroup: s.profile.paygroupName || "",
@@ -724,15 +737,7 @@ export default async function HrQueuePage({
               ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(s.paidAt)
               : "—",
             paymentReference: s.paymentReference || "",
-            calc: {
-              grossPay: Number(s.grossPay),
-              earnings,
-              deductions,
-              payeeTax: Number(s.payeeTax),
-              pensionDeduction: Number(s.pensionDeduction),
-              otherDeductions: Number(s.otherDeductions),
-              netPay: Number(s.netPay),
-            },
+            calc: payslipCalculationFromStored(s),
           };
         }),
       }))}
@@ -777,15 +782,7 @@ export default async function HrQueuePage({
       myView={{
         profile: myProfile ? profileToDetailRow(myProfile) : null,
         payslips: myPayslips.map((s) => {
-          const calc = calculateNigeriaPayslip({
-            grossMonthly: Number(s.grossPay),
-            payeeTax: Number(s.payeeTax),
-            otherDeductions: Number(s.otherDeductions),
-            basicPercent: Number(s.profile.basicPercent),
-            housingPercent: Number(s.profile.housingPercent),
-            transportPercent: Number(s.profile.transportPercent),
-            otherPercent: Number(s.profile.otherPercent),
-          });
+          const calc = payslipCalculationFromStored(s);
           return {
             id: s.id,
             periodLabel: s.run.label,
@@ -911,6 +908,12 @@ export default async function HrQueuePage({
             )
           : "—",
         hasFileUpload: Boolean(r.submittedFileUrl),
+        submittedFileUrl: r.submittedFileUrl,
+        submittedPayload:
+          r.submittedPayload && typeof r.submittedPayload === "object"
+            ? (r.submittedPayload as Record<string, unknown>)
+            : null,
+        reviewNote: r.hrNote,
       }))}
       profileDetails={profiles.map((p) => profileToDetailRow(p))}
       profileOnboarding={profileOnboarding}

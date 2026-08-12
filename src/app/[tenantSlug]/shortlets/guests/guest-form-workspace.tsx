@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { GlobalLocationFields } from "@/components/global-location-fields";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 import { getShortletGuestUploadSignature, saveShortletGuest } from "../actions";
 
@@ -221,26 +222,12 @@ export function GuestFormWorkspace({ tenantSlug, mode, guestId, initial, returnT
                 value={form.addressLine}
                 onChange={(e) => setForm((f) => ({ ...f, addressLine: e.target.value }))}
               />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <input
-                  className="rounded-md border px-3 py-2 text-sm"
-                  placeholder="City"
-                  value={form.city}
-                  onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                />
-                <input
-                  className="rounded-md border px-3 py-2 text-sm"
-                  placeholder="State"
-                  value={form.state}
-                  onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
-                />
-                <input
-                  className="rounded-md border px-3 py-2 text-sm"
-                  placeholder="Country"
-                  value={form.country}
-                  onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-                />
-              </div>
+              <GlobalLocationFields
+                defaultCountry={form.country}
+                defaultState={form.state}
+                defaultCity={form.city}
+                onLocationChange={(location) => setForm((current) => ({ ...current, ...location }))}
+              />
             </div>
           </section>
         </div>

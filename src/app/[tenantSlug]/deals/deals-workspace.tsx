@@ -1,14 +1,7 @@
 "use client";
 
 import { ModalOverlay } from "@/components/modal-overlay";
-import {
-  MODAL_PANEL_LG,
-  MODAL_PANEL_MD,
-  MODAL_PANEL_SM,
-  MODAL_PANEL_XL,
-  MODAL_PANEL_XS,
-  MODAL_PANEL_2XL,
-} from "@/lib/modal-panel";
+import { MODAL_PANEL_LG, MODAL_PANEL_SM } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { DataExportMenu } from "@/components/shortlets/data-export-menu";
@@ -29,6 +22,8 @@ import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
+import { PaginationControl } from "@/components/pagination";
+import { buildPageUrl, type Pagination, type SearchParamValue } from "@/lib/pagination";
 import { createDeal, moveDealStage, moveDealStageDirect } from "./actions";
 import { getEntityTimelineLogs } from "../finance/actions";
 
@@ -95,6 +90,8 @@ export function DealsWorkspace({
   defaultLeadId,
   activeFilterChips,
   initialView = "kanban",
+  pagination,
+  paginationSearchParams,
 }: {
   tenantSlug: string;
   tenantName: string;
@@ -105,8 +102,10 @@ export function DealsWorkspace({
   defaultLeadId?: string;
   activeFilterChips?: ActiveFilterChip[];
   initialView?: ViewMode;
+  pagination: Pagination;
+  paginationSearchParams: Record<string, SearchParamValue>;
 }) {
-  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
+  const viewMode = initialView;
   const [isCreateOpen, setIsCreateOpen] = useState(Boolean(defaultLeadId));
   const [activeDeal, setActiveDeal] = useState<DealCard | null>(null);
   const [boardDeals, setBoardDeals] = useState<DealCard[]>(deals);
@@ -302,10 +301,15 @@ export function DealsWorkspace({
         <div className="flex items-center gap-2">
           {/* View toggle */}
           <div className="flex overflow-hidden rounded-md border border-foreground/15">
-            <button
-              type="button"
-              onClick={() => setViewMode("kanban")}
+            <Link
+              href={buildPageUrl(
+                `/${tenantSlug}/deals`,
+                { ...paginationSearchParams, view: "kanban" },
+                "dealsPage",
+                1,
+              )}
               title="Kanban view"
+              aria-label="Show deals in Kanban view"
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]"}`}
             >
               <svg
@@ -319,11 +323,16 @@ export function DealsWorkspace({
                 <rect x="10" y="3" width="5" height="12" rx="1" />
                 <rect x="17" y="3" width="4" height="15" rx="1" />
               </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
+            </Link>
+            <Link
+              href={buildPageUrl(
+                `/${tenantSlug}/deals`,
+                { ...paginationSearchParams, view: "list" },
+                "dealsPage",
+                1,
+              )}
               title="List view"
+              aria-label="Show deals in list view"
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === "list" ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]"}`}
             >
               <svg
@@ -340,7 +349,7 @@ export function DealsWorkspace({
                 <line x1="3" y1="12" x2="3.01" y2="12" strokeLinecap="round" />
                 <line x1="3" y1="18" x2="3.01" y2="18" strokeLinecap="round" />
               </svg>
-            </button>
+            </Link>
           </div>
           <DataExportMenu
             filename={`sales-pipeline-${new Date().toISOString().slice(0, 10)}`}
@@ -354,7 +363,7 @@ export function DealsWorkspace({
               { label: "Open deals", value: openCount, tone: "highlight" },
               { label: "Closed won", value: wonCount, tone: "positive" },
               { label: "Pipeline value", value: pipelineValue, tone: "default" },
-              { label: "Total deals", value: boardDeals.length },
+              { label: "Deals on page", value: boardDeals.length },
             ]}
             breakdowns={[{ title: "Deals by stage", rows: stageBreakdown }]}
           />
@@ -488,6 +497,16 @@ export function DealsWorkspace({
           </DndContext>
         </div>
       )}
+
+      <div className="mt-3 overflow-hidden rounded-lg border border-foreground/10">
+        <PaginationControl
+          pathname={`/${tenantSlug}/deals`}
+          searchParams={paginationSearchParams}
+          pageParam="dealsPage"
+          itemLabel="deals"
+          {...pagination}
+        />
+      </div>
 
       <ModalOverlay
         open={Boolean(isCreateOpen)}

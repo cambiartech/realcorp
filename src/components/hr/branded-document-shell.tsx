@@ -7,26 +7,34 @@ export function BrandedDocumentShell({
   subtitle,
   children,
   footerNote,
+  variant = "brand",
 }: {
   brand: TenantBranding;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   footerNote?: string;
+  variant?: "brand" | "formal";
 }) {
   const address = formatOrgAddress(brand);
   const style = brandingCssVars(brand);
 
   return (
     <div
+      data-pdf-document="true"
       className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none"
       style={style}
     >
       <header
-        className="rounded-t-xl px-6 py-5 text-white print:rounded-none"
-        style={{
-          background: `linear-gradient(135deg, var(--hr-brand-primary) 0%, var(--hr-brand-accent) 100%)`,
-        }}
+        className={[
+          "rounded-t-xl px-6 py-5 print:rounded-none",
+          variant === "formal" ? "border-b border-t-4 border-slate-200 bg-white text-slate-900" : "text-white",
+        ].join(" ")}
+        style={
+          variant === "formal"
+            ? { borderTopColor: "var(--hr-brand-primary)" }
+            : { backgroundColor: "var(--hr-brand-primary)" }
+        }
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -35,17 +43,36 @@ export function BrandedDocumentShell({
               <img
                 src={brand.logoUrl}
                 alt=""
-                className="h-14 w-auto max-w-[140px] rounded bg-white/95 object-contain p-1"
+                className={[
+                  "h-14 w-auto max-w-[140px] rounded object-contain p-1",
+                  variant === "formal" ? "border border-slate-200 bg-white" : "bg-white/95",
+                ].join(" ")}
               />
             ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/15 text-lg font-bold">
+              <div
+                className={[
+                  "flex h-14 w-14 items-center justify-center rounded-lg text-lg font-bold",
+                  variant === "formal" ? "text-white" : "bg-white/15",
+                ].join(" ")}
+                style={variant === "formal" ? { backgroundColor: "var(--hr-brand-primary)" } : undefined}
+              >
                 {brand.companyName.slice(0, 2).toUpperCase()}
               </div>
             )}
             <div>
               <p className="text-lg font-bold tracking-tight">{brand.companyName}</p>
-              {address ? <p className="mt-1 text-xs text-white/85">{address}</p> : null}
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/90">
+              {address ? (
+                <p className={variant === "formal" ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-white/85"}>
+                  {address}
+                </p>
+              ) : null}
+              <div
+                className={
+                  variant === "formal"
+                    ? "mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500"
+                    : "mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/90"
+                }
+              >
                 {brand.orgPhone ? <span>Phone: {brand.orgPhone}</span> : null}
                 {brand.orgEmail ? <span>Email: {brand.orgEmail}</span> : null}
               </div>
@@ -53,7 +80,11 @@ export function BrandedDocumentShell({
           </div>
           <div className="text-right">
             <h1 className="text-base font-bold uppercase tracking-wide">{title}</h1>
-            {subtitle ? <p className="mt-1 text-xs text-white/85">{subtitle}</p> : null}
+            {subtitle ? (
+              <p className={variant === "formal" ? "mt-1 text-xs text-slate-500" : "mt-1 text-xs text-white/85"}>
+                {subtitle}
+              </p>
+            ) : null}
           </div>
         </div>
       </header>

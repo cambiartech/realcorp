@@ -62,6 +62,7 @@ export default async function ListingsPage({ params }: { params: Promise<{ tenan
         listingDescription: project.listingDescription,
         locationCity: project.locationCity,
         locationState: project.locationState,
+        locationCountry: project.locationCountry,
         locationAddress: project.locationAddress,
         coverImageUrl: project.coverImageUrl,
         galleryUrls: Array.isArray(project.galleryUrls)

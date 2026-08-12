@@ -126,7 +126,7 @@ export async function saveOrganizationBranding(tenantSlug: string, _prev: unknow
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true, settings: { select: { id: true } } },
+    select: { id: true, settings: { select: { id: true, payrollSettings: true } } },
   });
   if (!tenant) return { ok: false, error: "Organization not found." };
 
@@ -140,6 +140,28 @@ export async function saveOrganizationBranding(tenantSlug: string, _prev: unknow
 
   const primaryColor = (formData.get("primaryColor") as string)?.trim() || null;
   const accentColor = (formData.get("accentColor") as string)?.trim() || null;
+  const payrollCountryCode = String(formData.get("payrollCountryCode") || "NG")
+    .trim()
+    .toUpperCase();
+  if (!/^[A-Z]{2}$/.test(payrollCountryCode)) {
+    return { ok: false, error: "Payroll country must be a two-letter ISO code, such as NG, GH, GB, or US." };
+  }
+  const contributionRate = (key: string, fallback: number) => {
+    const raw = String(formData.get(key) ?? fallback).trim();
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+  };
+  const nsitfRate = contributionRate("nsitfRate", 1);
+  const itfRate = contributionRate("itfRate", 0);
+  if (nsitfRate === null || itfRate === null) {
+    return { ok: false, error: "Employer contribution rates must be between 0 and 100 percent." };
+  }
+  const currentPayrollSettings =
+    tenant.settings?.payrollSettings &&
+    typeof tenant.settings.payrollSettings === "object" &&
+    !Array.isArray(tenant.settings.payrollSettings)
+      ? (tenant.settings.payrollSettings as Record<string, unknown>)
+      : {};
 
   const data = {
     primaryColor,
@@ -150,6 +172,14 @@ export async function saveOrganizationBranding(tenantSlug: string, _prev: unknow
     orgCity: (formData.get("orgCity") as string)?.trim() || null,
     orgState: (formData.get("orgState") as string)?.trim() || null,
     orgCountry: (formData.get("orgCountry") as string)?.trim() || "Nigeria",
+    payrollCountryCode,
+    payrollSettings: {
+      ...currentPayrollSettings,
+      employerContributions: [
+        { code: "NSITF", label: "Employee Compensation contribution", rate: nsitfRate },
+        { code: "ITF", label: "Industrial Training Fund", rate: itfRate },
+      ],
+    },
     logoUrl: (formData.get("logoUrl") as string)?.trim() || null,
   };
 

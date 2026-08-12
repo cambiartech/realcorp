@@ -30,6 +30,8 @@ const moneyOptional = z
     return Number(s);
   });
 
+const percentOptional = z.coerce.number().min(0).max(100).optional();
+
 export const upsertEmployeeProfileSchema = z.object({
   userId: z.string().min(1, "Select a team member."),
   employeeNumber: z
@@ -93,6 +95,12 @@ export const upsertEmployeeProfileSchema = z.object({
     .max(80)
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
+  addressCountry: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
   position: z
     .string()
     .trim()
@@ -134,8 +142,27 @@ export const upsertEmployeeProfileSchema = z.object({
     .max(80)
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
+  payTemplateId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
   grossMonthly: moneyOptional,
   payeeTaxMonthly: moneyOptional,
+  payrollCountryCode: z.string().trim().toUpperCase().length(2).optional(),
+  payrollRegionCode: z.string().trim().max(20).optional(),
+  taxId: z.string().trim().max(80).optional(),
+  taxOverrideReason: z.string().trim().max(240).optional(),
+  pensionEnabled: z.coerce.boolean().optional(),
+  employeePensionRate: percentOptional,
+  employerPensionRate: percentOptional,
+  nhfMonthly: moneyOptional,
+  nhiaMonthly: moneyOptional,
+  annualRent: moneyOptional,
+  annualLifeInsurance: moneyOptional,
+  annualMortgageInterest: moneyOptional,
+  otherPreTaxMonthly: moneyOptional,
+  otherPostTaxMonthly: moneyOptional,
   basicPercent: z.coerce.number().min(0).max(100).optional(),
   housingPercent: z.coerce.number().min(0).max(100).optional(),
   transportPercent: z.coerce.number().min(0).max(100).optional(),
@@ -188,6 +215,43 @@ export const createPayslipRunSchema = z.object({
     .transform((v) => (v && v !== "" && v !== "ALL" ? v : undefined)),
 });
 
+export const createPayTemplateSchema = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    countryCode: z.string().trim().toUpperCase().length(2),
+    basicPercent: z.coerce.number().min(0).max(100),
+    housingPercent: z.coerce.number().min(0).max(100),
+    transportPercent: z.coerce.number().min(0).max(100),
+    otherPercent: z.coerce.number().min(0).max(100),
+    pensionEnabled: z.coerce.boolean().default(true),
+    employeePensionRate: z.coerce.number().min(0).max(100),
+    employerPensionRate: z.coerce.number().min(0).max(100),
+    isDefault: z.coerce.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const total =
+      value.basicPercent + value.housingPercent + value.transportPercent + value.otherPercent;
+    if (Math.abs(total - 100) > 0.01) {
+      ctx.addIssue({ code: "custom", message: "Salary allocation percentages must total 100%." });
+    }
+  });
+
+export const applyPayTemplateSchema = z.object({
+  employeeProfileId: z.string().min(1),
+  templateId: z.string().min(1),
+});
+
+export const savePayrollAdjustmentSchema = z.object({
+  runId: z.string().min(1),
+  employeeProfileId: z.string().min(1),
+  type: z.enum(["EARNING", "DEDUCTION"]),
+  label: z.string().trim().min(2).max(100),
+  amount: z.coerce.number().positive().max(1_000_000_000_000),
+  taxable: z.coerce.boolean().optional(),
+  pensionable: z.coerce.boolean().optional(),
+  preTax: z.coerce.boolean().optional(),
+});
+
 export const markPayslipPaymentsSchema = z.object({
   payslipIds: z.array(z.string().min(1)).min(1),
   paymentStatus: z.enum(["PENDING", "PAID"]),
@@ -206,6 +270,10 @@ export const addHrDocumentSchema = z
     category: z.enum([
       "BIODATA",
       "BANK_FORM",
+      "EMERGENCY_CONTACT",
+      "NEXT_OF_KIN",
+      "HEALTH_RECORD",
+      "EDUCATION",
       "OFFER_LETTER",
       "NDA",
       "GUARANTOR",

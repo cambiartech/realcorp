@@ -7,6 +7,7 @@ import { useSnackbar } from "@/components/snackbar";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ListingImageUpload } from "@/components/listing-image-upload";
 import { TagInput } from "@/components/tag-input";
+import { GlobalLocationFields } from "@/components/global-location-fields";
 import { MODAL_PANEL_LG } from "@/lib/modal-panel";
 import { updateProjectListing } from "@/app/[tenantSlug]/projects/actions";
 
@@ -17,6 +18,7 @@ export type ListingProject = {
   listingDescription: string | null;
   locationCity: string | null;
   locationState: string | null;
+  locationCountry?: string | null;
   locationAddress: string | null;
   coverImageUrl: string | null;
   galleryUrls: string[];
@@ -101,24 +103,15 @@ export function ListingEditorModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-sm text-muted">City</label>
-            <input
-              name="locationCity"
-              defaultValue={project.locationCity ?? ""}
-              placeholder="e.g. Lekki"
-              className={FIELD_CLASS}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">State</label>
-            <input
-              name="locationState"
-              defaultValue={project.locationState ?? ""}
-              placeholder="e.g. Lagos"
-              className={FIELD_CLASS}
-            />
-          </div>
+          <GlobalLocationFields
+            countryName="locationCountry"
+            stateName="locationState"
+            cityName="locationCity"
+            defaultCountry={project.locationCountry || "Nigeria"}
+            defaultState={project.locationState}
+            defaultCity={project.locationCity}
+            className="grid gap-3 sm:col-span-3 sm:grid-cols-3"
+          />
           <div>
             <label className="mb-1 block text-sm text-muted">Address (optional)</label>
             <input

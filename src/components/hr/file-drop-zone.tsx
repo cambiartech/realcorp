@@ -90,7 +90,7 @@ export function FileDropZone({
               ? "Drop files here"
               : "Drop file here"
             : multiple
-              ? "Drag & drop photos here"
+              ? "Drag & drop files here"
               : "Drag & drop a file here"}
       </p>
       <p className="mt-1 text-xs text-muted">or click to browse · {hint}</p>

@@ -12,6 +12,7 @@ import {
   HrFormRequestStatus,
   HrFormType,
   HrOfferLetterStatus,
+  HrPayrollAdjustmentType,
   HrPayslipPaymentStatus,
   HrPayslipRunStatus,
   MembershipStatus,
@@ -45,13 +46,16 @@ import {
 import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { ensureEmployeeNumber } from "@/lib/hr-employee-number";
-import { calculateNigeriaPayslip } from "@/lib/hr-payslip";
+import { calculatePayroll, PayrollConfigurationError } from "@/lib/payroll/engine";
 import {
   addHrDocumentSchema,
+  applyPayTemplateSchema,
   createAppraisalActionSchema,
   createAppraisalCycleSchema,
+  createPayTemplateSchema,
   createPayslipRunSchema,
   markPayslipPaymentsSchema,
+  savePayrollAdjustmentSchema,
   upsertEmployeeProfileSchema,
   updatePerformanceGoalSchema,
   upsertPerformanceGoalSchema,
@@ -65,7 +69,12 @@ type PayslipActionResult = ActionResult & { count?: number };
 async function getTenantAndMembership(tenantSlug: string, userId: string) {
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true, slug: true, defaultCurrency: true },
+    select: {
+      id: true,
+      slug: true,
+      defaultCurrency: true,
+      settings: { select: { payrollCountryCode: true, payrollSettings: true } },
+    },
   });
   if (!tenant) return { tenant: null, membership: null };
   const membership = await prisma.membership.findUnique({
@@ -88,7 +97,7 @@ function revalidateHr(tenantSlug: string) {
 
 export async function getHrUploadSignature(
   tenantSlug: string,
-  input?: { fileName?: string },
+  input?: { fileName?: string; resourceType?: "auto" | "raw" | "image" },
 ): Promise<CloudinaryUploadSignature | CloudinaryUploadError> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -102,6 +111,7 @@ export async function getHrUploadSignature(
     tenantSlug: tenant.slug,
     area: "hr",
     fileName: input?.fileName,
+    resourceType: input?.resourceType,
   });
 }
 
@@ -120,19 +130,40 @@ export async function upsertEmployeeProfile(
     return { ok: false, error: "You do not have permission to manage employee records." };
   }
 
-  const member = await prisma.membership.findFirst({
-    where: { tenantId: tenant.id, userId: parsed.data.userId, status: MembershipStatus.ACTIVE },
-  });
-  if (!member) return { ok: false, error: "User must be an active team member." };
-
   const existing = await prisma.employeeProfile.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: parsed.data.userId } },
   });
+  const member = await prisma.membership.findFirst({
+    where: { tenantId: tenant.id, userId: parsed.data.userId, status: MembershipStatus.ACTIVE },
+  });
+  if (!member && !existing) {
+    return { ok: false, error: "Choose an active team member or an existing HR/payroll-only record." };
+  }
 
   const inputKeys = new Set(Object.keys(input));
   const has = (k: string) => inputKeys.has(k);
 
   const existingRow = existing ?? null;
+  const selectedPayTemplate = parsed.data.payTemplateId
+    ? await prisma.hrPayTemplate.findFirst({
+        where: { id: parsed.data.payTemplateId, tenantId: tenant.id },
+        select: { id: true },
+      })
+    : null;
+  if (parsed.data.payTemplateId && !selectedPayTemplate) {
+    return { ok: false, error: "The selected pay template is not available in this organization." };
+  }
+  const resultingTaxOverride = has("payeeTaxMonthly")
+    ? parsed.data.payeeTaxMonthly
+    : existingRow?.payeeTaxMonthly != null
+      ? Number(existingRow.payeeTaxMonthly)
+      : undefined;
+  const resultingOverrideReason = has("taxOverrideReason")
+    ? parsed.data.taxOverrideReason
+    : existingRow?.taxOverrideReason || undefined;
+  if (resultingTaxOverride !== undefined && !resultingOverrideReason?.trim()) {
+    return { ok: false, error: "Add a reason for the manual PAYE tax override, or leave the override blank." };
+  }
 
   const strOrNull = (v: string | undefined) => (v && v !== "" ? v : null);
   const pickStr = (key: string, v: string | undefined) => {
@@ -183,6 +214,9 @@ export async function upsertEmployeeProfile(
     ...(pickStr("addressState", parsed.data.addressState) !== undefined
       ? { addressState: pickStr("addressState", parsed.data.addressState) }
       : {}),
+    ...(pickStr("addressCountry", parsed.data.addressCountry) !== undefined
+      ? { addressCountry: pickStr("addressCountry", parsed.data.addressCountry) }
+      : {}),
     ...(pickStr("position", parsed.data.position) !== undefined
       ? { position: pickStr("position", parsed.data.position) }
       : {}),
@@ -204,12 +238,31 @@ export async function upsertEmployeeProfile(
     ...(pickStr("paygroupName", parsed.data.paygroupName) !== undefined
       ? { paygroupName: pickStr("paygroupName", parsed.data.paygroupName) }
       : {}),
+    ...(has("payTemplateId")
+      ? { payTemplate: selectedPayTemplate ? { connect: { id: selectedPayTemplate.id } } : { disconnect: true } }
+      : {}),
     ...(pickMoney("grossMonthly", parsed.data.grossMonthly) !== undefined
       ? { grossMonthly: pickMoney("grossMonthly", parsed.data.grossMonthly) }
       : {}),
     ...(pickMoney("payeeTaxMonthly", parsed.data.payeeTaxMonthly) !== undefined
       ? { payeeTaxMonthly: pickMoney("payeeTaxMonthly", parsed.data.payeeTaxMonthly) }
       : {}),
+    ...(has("payrollCountryCode") ? { payrollCountryCode: parsed.data.payrollCountryCode || "NG" } : {}),
+    ...(has("payrollRegionCode") ? { payrollRegionCode: strOrNull(parsed.data.payrollRegionCode) } : {}),
+    ...(has("taxId") ? { taxId: strOrNull(parsed.data.taxId) } : {}),
+    ...(has("taxOverrideReason") ? { taxOverrideReason: strOrNull(parsed.data.taxOverrideReason) } : {}),
+    ...(has("pensionEnabled") ? { pensionEnabled: parsed.data.pensionEnabled ?? true } : {}),
+    ...(has("employeePensionRate") ? { employeePensionRate: parsed.data.employeePensionRate ?? 8 } : {}),
+    ...(has("employerPensionRate") ? { employerPensionRate: parsed.data.employerPensionRate ?? 10 } : {}),
+    ...(has("nhfMonthly") ? { nhfMonthly: parsed.data.nhfMonthly ?? 0 } : {}),
+    ...(has("nhiaMonthly") ? { nhiaMonthly: parsed.data.nhiaMonthly ?? 0 } : {}),
+    ...(has("annualRent") ? { annualRent: parsed.data.annualRent ?? 0 } : {}),
+    ...(has("annualLifeInsurance") ? { annualLifeInsurance: parsed.data.annualLifeInsurance ?? 0 } : {}),
+    ...(has("annualMortgageInterest")
+      ? { annualMortgageInterest: parsed.data.annualMortgageInterest ?? 0 }
+      : {}),
+    ...(has("otherPreTaxMonthly") ? { otherPreTaxMonthly: parsed.data.otherPreTaxMonthly ?? 0 } : {}),
+    ...(has("otherPostTaxMonthly") ? { otherPostTaxMonthly: parsed.data.otherPostTaxMonthly ?? 0 } : {}),
     ...(has("basicPercent") ? { basicPercent: parsed.data.basicPercent ?? 30 } : {}),
     ...(has("housingPercent") ? { housingPercent: parsed.data.housingPercent ?? 20 } : {}),
     ...(has("transportPercent") ? { transportPercent: parsed.data.transportPercent ?? 15 } : {}),
@@ -245,6 +298,7 @@ export async function upsertEmployeeProfile(
     addressStreet: parsed.data.addressStreet || null,
     addressCity: parsed.data.addressCity || null,
     addressState: parsed.data.addressState || null,
+    addressCountry: parsed.data.addressCountry || null,
     position: parsed.data.position || null,
     department: parsed.data.department || null,
     dateOfJoining: parsed.data.dateOfJoining ? new Date(parsed.data.dateOfJoining) : null,
@@ -252,8 +306,23 @@ export async function upsertEmployeeProfile(
     employmentType: parsed.data.employmentType || null,
     workSchedule: parsed.data.workSchedule || null,
     paygroupName: parsed.data.paygroupName || null,
+    payTemplateId: selectedPayTemplate?.id ?? null,
     grossMonthly: parsed.data.grossMonthly ?? null,
     payeeTaxMonthly: parsed.data.payeeTaxMonthly ?? null,
+    payrollCountryCode: parsed.data.payrollCountryCode || tenant.settings?.payrollCountryCode || "NG",
+    payrollRegionCode: parsed.data.payrollRegionCode || null,
+    taxId: parsed.data.taxId || null,
+    taxOverrideReason: parsed.data.taxOverrideReason || null,
+    pensionEnabled: parsed.data.pensionEnabled ?? true,
+    employeePensionRate: parsed.data.employeePensionRate ?? 8,
+    employerPensionRate: parsed.data.employerPensionRate ?? 10,
+    nhfMonthly: parsed.data.nhfMonthly ?? 0,
+    nhiaMonthly: parsed.data.nhiaMonthly ?? 0,
+    annualRent: parsed.data.annualRent ?? 0,
+    annualLifeInsurance: parsed.data.annualLifeInsurance ?? 0,
+    annualMortgageInterest: parsed.data.annualMortgageInterest ?? 0,
+    otherPreTaxMonthly: parsed.data.otherPreTaxMonthly ?? 0,
+    otherPostTaxMonthly: parsed.data.otherPostTaxMonthly ?? 0,
     basicPercent: parsed.data.basicPercent ?? 30,
     housingPercent: parsed.data.housingPercent ?? 20,
     transportPercent: parsed.data.transportPercent ?? 15,
@@ -283,6 +352,7 @@ export async function upsertEmployeeProfile(
     entityId: profile.id,
     action: existing ? "UPDATE" : "CREATE",
     summary: `${existing ? "Updated" : "Created"} employee record for ${parsed.data.fullName}.`,
+    metadata: { changedFields: Array.from(inputKeys).sort() },
   });
 
   revalidateHr(tenantSlug);
@@ -535,6 +605,259 @@ function paygroupProfileFilter(paygroupName?: string) {
   return { paygroupName };
 }
 
+function employerContributionsFromSettings(value: Prisma.JsonValue | null | undefined) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rows = (value as Record<string, unknown>).employerContributions;
+  if (!Array.isArray(rows)) return undefined;
+  return rows.flatMap((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return [];
+    const item = row as Record<string, unknown>;
+    if (typeof item.code !== "string" || typeof item.label !== "string") return [];
+    const rate = typeof item.rate === "number" && item.rate >= 0 ? item.rate : undefined;
+    const fixedAmount =
+      typeof item.fixedAmount === "number" && item.fixedAmount >= 0 ? item.fixedAmount : undefined;
+    if (rate === undefined && fixedAmount === undefined) return [];
+    return [{ code: item.code, label: item.label, rate, fixedAmount }];
+  });
+}
+
+export async function createPayTemplate(
+  tenantSlug: string,
+  input: unknown,
+): Promise<ActionResult & { templateId?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const parsed = createPayTemplateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+  const duplicate = await prisma.hrPayTemplate.findFirst({
+    where: {
+      tenantId: tenant.id,
+      countryCode: parsed.data.countryCode,
+      name: { equals: parsed.data.name, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
+  if (duplicate) return { ok: false, error: "A pay template with this name already exists for that country." };
+
+  const template = await prisma.$transaction(async (tx) => {
+    if (parsed.data.isDefault) {
+      await tx.hrPayTemplate.updateMany({
+        where: { tenantId: tenant.id, countryCode: parsed.data.countryCode, isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+    return tx.hrPayTemplate.create({
+      data: {
+        tenantId: tenant.id,
+        name: parsed.data.name,
+        countryCode: parsed.data.countryCode,
+        basicPercent: parsed.data.basicPercent,
+        housingPercent: parsed.data.housingPercent,
+        transportPercent: parsed.data.transportPercent,
+        otherPercent: parsed.data.otherPercent,
+        pensionEnabled: parsed.data.pensionEnabled,
+        employeePensionRate: parsed.data.employeePensionRate,
+        employerPensionRate: parsed.data.employerPensionRate,
+        isDefault: parsed.data.isDefault ?? false,
+      },
+    });
+  });
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email,
+    module: "HR",
+    entityType: "PAY_TEMPLATE",
+    entityId: template.id,
+    action: "CREATE",
+    summary: `Created payroll template ${template.name}.`,
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true, templateId: template.id };
+}
+
+export async function applyPayTemplate(
+  tenantSlug: string,
+  input: unknown,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const parsed = applyPayTemplateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+  const [template, profile] = await Promise.all([
+    prisma.hrPayTemplate.findFirst({
+      where: { id: parsed.data.templateId, tenantId: tenant.id },
+    }),
+    prisma.employeeProfile.findFirst({
+      where: { id: parsed.data.employeeProfileId, tenantId: tenant.id },
+      select: { id: true, fullName: true },
+    }),
+  ]);
+  if (!template || !profile) return { ok: false, error: "Template or employee record not found." };
+  await prisma.employeeProfile.update({
+    where: { id: profile.id },
+    data: {
+      payTemplateId: template.id,
+      payrollCountryCode: template.countryCode,
+      basicPercent: template.basicPercent,
+      housingPercent: template.housingPercent,
+      transportPercent: template.transportPercent,
+      otherPercent: template.otherPercent,
+      pensionEnabled: template.pensionEnabled,
+      employeePensionRate: template.employeePensionRate,
+      employerPensionRate: template.employerPensionRate,
+    },
+  });
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email,
+    module: "HR",
+    entityType: "EMPLOYEE_PROFILE",
+    entityId: profile.id,
+    action: "APPLY_PAY_TEMPLATE",
+    summary: `Applied ${template.name} to ${profile.fullName || "employee"}.`,
+    metadata: { templateId: template.id },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true };
+}
+
+function calculatedPayslipData(calc: ReturnType<typeof calculatePayroll>) {
+  return {
+    currency: calc.currency,
+    jurisdictionCode: calc.jurisdictionCode,
+    taxRuleVersion: calc.ruleVersion,
+    grossPay: calc.grossPay,
+    payeeTax: calc.tax,
+    pensionDeduction: calc.employeePension,
+    otherDeductions: calc.otherDeductions,
+    chargeableIncome: calc.chargeableIncome,
+    employerCost: calc.employerCost,
+    netPay: calc.netPay,
+    earningsBreakdown: calc.earnings as Prisma.InputJsonValue,
+    deductionsBreakdown: calc.deductions as Prisma.InputJsonValue,
+    employerContributions: calc.employerContributions as Prisma.InputJsonValue,
+    calculationBreakdown: calc.calculationBreakdown as Prisma.InputJsonValue,
+    taxOverrideApplied: calc.taxOverrideApplied,
+    taxOverrideReason: calc.taxOverrideReason,
+  };
+}
+
+async function calculateDraftProfilePayroll(input: {
+  tenantId: string;
+  tenantPayrollCountryCode?: string | null;
+  tenantPayrollSettings?: Prisma.JsonValue | null;
+  runId: string;
+  year: number;
+  month: number;
+  employeeProfileId: string;
+}) {
+  const [profile, history, adjustments] = await Promise.all([
+    prisma.employeeProfile.findFirst({
+      where: { id: input.employeeProfileId, tenantId: input.tenantId },
+    }),
+    prisma.hrPayslip.findMany({
+      where: {
+        tenantId: input.tenantId,
+        employeeProfileId: input.employeeProfileId,
+        run: {
+          status: HrPayslipRunStatus.FINALIZED,
+          year: input.year,
+          month: { lt: input.month },
+        },
+      },
+      select: {
+        grossPay: true,
+        payeeTax: true,
+        pensionDeduction: true,
+        chargeableIncome: true,
+        taxRuleVersion: true,
+        runId: true,
+      },
+    }),
+    prisma.hrPayrollAdjustment.findMany({
+      where: {
+        tenantId: input.tenantId,
+        runId: input.runId,
+        employeeProfileId: input.employeeProfileId,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+  if (!profile?.grossMonthly || Number(profile.grossMonthly) <= 0) {
+    throw new PayrollConfigurationError("Set this employee's recurring gross pay first.");
+  }
+  const priorYtd = {
+    chargeableIncome: history.reduce(
+      (sum, slip) =>
+        sum +
+        (slip.taxRuleVersion
+          ? Number(slip.chargeableIncome)
+          : Math.max(0, Number(slip.grossPay) - Number(slip.pensionDeduction))),
+      0,
+    ),
+    taxWithheld: history.reduce((sum, slip) => sum + Number(slip.payeeTax), 0),
+    monthsProcessed: new Set(history.map((slip) => slip.runId)).size,
+  };
+  return calculatePayroll({
+    countryCode:
+      profile.payrollCountryCode || input.tenantPayrollCountryCode || "NG",
+    regionCode: profile.payrollRegionCode,
+    year: input.year,
+    month: input.month,
+    grossMonthly: Number(profile.grossMonthly),
+    basicPercent: Number(profile.basicPercent),
+    housingPercent: Number(profile.housingPercent),
+    transportPercent: Number(profile.transportPercent),
+    otherPercent: Number(profile.otherPercent),
+    pensionEnabled: profile.pensionEnabled,
+    employeePensionRate: Number(profile.employeePensionRate),
+    employerPensionRate: Number(profile.employerPensionRate),
+    nhfMonthly: Number(profile.nhfMonthly),
+    nhiaMonthly: Number(profile.nhiaMonthly),
+    annualRent: Number(profile.annualRent),
+    annualLifeInsurance: Number(profile.annualLifeInsurance),
+    annualMortgageInterest: Number(profile.annualMortgageInterest),
+    otherPreTaxMonthly: Number(profile.otherPreTaxMonthly),
+    otherPostTaxMonthly: Number(profile.otherPostTaxMonthly),
+    employerStatutoryContributions: employerContributionsFromSettings(
+      input.tenantPayrollSettings,
+    ),
+    taxOverrideMonthly:
+      profile.payeeTaxMonthly == null ? undefined : Number(profile.payeeTaxMonthly),
+    taxOverrideReason: profile.taxOverrideReason,
+    priorYtd,
+    variableEarnings: adjustments
+      .filter((adjustment) => adjustment.type === HrPayrollAdjustmentType.EARNING)
+      .map((adjustment) => ({
+        code: `ADJ_${adjustment.id}`,
+        label: adjustment.label,
+        amount: Number(adjustment.amount),
+        taxable: adjustment.taxable,
+        pensionable: adjustment.pensionable,
+      })),
+    variableDeductions: adjustments
+      .filter((adjustment) => adjustment.type === HrPayrollAdjustmentType.DEDUCTION)
+      .map((adjustment) => ({
+        code: `ADJ_${adjustment.id}`,
+        label: adjustment.label,
+        amount: Number(adjustment.amount),
+        preTax: adjustment.preTax,
+      })),
+  });
+}
+
 export async function generatePayslipRun(
   tenantSlug: string,
   input: { year: number; month: number; paygroupName?: string },
@@ -554,7 +877,7 @@ export async function generatePayslipRun(
     new Date(parsed.data.year, parsed.data.month - 1, 1),
   );
 
-  const run = await prisma.hrPayslipRun.upsert({
+  const existingRun = await prisma.hrPayslipRun.findUnique({
     where: {
       tenantId_year_month: {
         tenantId: tenant.id,
@@ -562,15 +885,30 @@ export async function generatePayslipRun(
         month: parsed.data.month,
       },
     },
-    create: {
+  });
+  if (existingRun?.status === HrPayslipRunStatus.FINALIZED) {
+    return {
+      ok: false,
+      error: "This payroll run is finalized and immutable. Create an adjustment in a later draft period.",
+    };
+  }
+  const earlierDraft = await prisma.hrPayslipRun.findFirst({
+    where: {
       tenantId: tenant.id,
       year: parsed.data.year,
-      month: parsed.data.month,
-      label,
+      month: { lt: parsed.data.month },
       status: HrPayslipRunStatus.DRAFT,
+      payslips: { some: {} },
     },
-    update: { label },
+    orderBy: { month: "asc" },
+    select: { label: true },
   });
+  if (earlierDraft) {
+    return {
+      ok: false,
+      error: `Finalize ${earlierDraft.label} first so cumulative tax is calculated in chronological order.`,
+    };
+  }
 
   const profiles = await prisma.employeeProfile.findMany({
     where: {
@@ -580,53 +918,369 @@ export async function generatePayslipRun(
       ...paygroupProfileFilter(parsed.data.paygroupName),
     },
   });
+  const runAdjustments = existingRun
+    ? await prisma.hrPayrollAdjustment.findMany({
+        where: { tenantId: tenant.id, runId: existingRun.id },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+  const adjustmentsByProfile = new Map<string, typeof runAdjustments>();
+  for (const adjustment of runAdjustments) {
+    const rows = adjustmentsByProfile.get(adjustment.employeeProfileId) ?? [];
+    rows.push(adjustment);
+    adjustmentsByProfile.set(adjustment.employeeProfileId, rows);
+  }
 
-  let generatedCount = 0;
+  const priorSlips = profiles.length
+    ? await prisma.hrPayslip.findMany({
+        where: {
+          tenantId: tenant.id,
+          employeeProfileId: { in: profiles.map((profile) => profile.id) },
+          run: {
+            status: HrPayslipRunStatus.FINALIZED,
+            year: parsed.data.year,
+            month: { lt: parsed.data.month },
+          },
+        },
+        select: {
+          employeeProfileId: true,
+          grossPay: true,
+          payeeTax: true,
+          pensionDeduction: true,
+          chargeableIncome: true,
+          taxRuleVersion: true,
+          runId: true,
+        },
+      })
+    : [];
+  const priorByProfile = new Map<string, typeof priorSlips>();
+  for (const slip of priorSlips) {
+    const rows = priorByProfile.get(slip.employeeProfileId) ?? [];
+    rows.push(slip);
+    priorByProfile.set(slip.employeeProfileId, rows);
+  }
+
+  const employerStatutoryContributions = employerContributionsFromSettings(
+    tenant.settings?.payrollSettings,
+  );
+  const prepared: Array<{
+    profileId: string;
+    calc: ReturnType<typeof calculatePayroll>;
+  }> = [];
   for (const profile of profiles) {
     const gross = Number(profile.grossMonthly);
     if (!gross || gross <= 0) continue;
-    generatedCount += 1;
     const payeeOverride =
       profile.payeeTaxMonthly != null && Number(profile.payeeTaxMonthly) >= 0
         ? Number(profile.payeeTaxMonthly)
         : undefined;
-    const calc = calculateNigeriaPayslip({
-      grossMonthly: gross,
-      basicPercent: Number(profile.basicPercent),
-      housingPercent: Number(profile.housingPercent),
-      transportPercent: Number(profile.transportPercent),
-      otherPercent: Number(profile.otherPercent),
-      payeeTax: payeeOverride,
-    });
-    await prisma.hrPayslip.upsert({
-      where: { runId_employeeProfileId: { runId: run.id, employeeProfileId: profile.id } },
-      create: {
-        tenantId: tenant.id,
-        runId: run.id,
-        employeeProfileId: profile.id,
-        currency: tenant.defaultCurrency,
-        grossPay: calc.grossPay,
-        payeeTax: calc.payeeTax,
-        pensionDeduction: calc.pensionDeduction,
-        otherDeductions: calc.otherDeductions,
-        netPay: calc.netPay,
-        earningsBreakdown: calc.earnings as Prisma.InputJsonValue,
-        deductionsBreakdown: calc.deductions as Prisma.InputJsonValue,
-      },
-      update: {
-        grossPay: calc.grossPay,
-        payeeTax: calc.payeeTax,
-        pensionDeduction: calc.pensionDeduction,
-        otherDeductions: calc.otherDeductions,
-        netPay: calc.netPay,
-        earningsBreakdown: calc.earnings as Prisma.InputJsonValue,
-        deductionsBreakdown: calc.deductions as Prisma.InputJsonValue,
-      },
-    });
+    const history = priorByProfile.get(profile.id) ?? [];
+    const adjustments = adjustmentsByProfile.get(profile.id) ?? [];
+    const priorYtd = {
+      chargeableIncome: history.reduce(
+        (sum, slip) =>
+          sum +
+          (slip.taxRuleVersion
+            ? Number(slip.chargeableIncome)
+            : Math.max(0, Number(slip.grossPay) - Number(slip.pensionDeduction))),
+        0,
+      ),
+      taxWithheld: history.reduce((sum, slip) => sum + Number(slip.payeeTax), 0),
+      monthsProcessed: new Set(history.map((slip) => slip.runId)).size,
+    };
+    try {
+      prepared.push({
+        profileId: profile.id,
+        calc: calculatePayroll({
+          countryCode: profile.payrollCountryCode || tenant.settings?.payrollCountryCode || "NG",
+          regionCode: profile.payrollRegionCode,
+          year: parsed.data.year,
+          month: parsed.data.month,
+          grossMonthly: gross,
+          basicPercent: Number(profile.basicPercent),
+          housingPercent: Number(profile.housingPercent),
+          transportPercent: Number(profile.transportPercent),
+          otherPercent: Number(profile.otherPercent),
+          pensionEnabled: profile.pensionEnabled,
+          employeePensionRate: Number(profile.employeePensionRate),
+          employerPensionRate: Number(profile.employerPensionRate),
+          nhfMonthly: Number(profile.nhfMonthly),
+          nhiaMonthly: Number(profile.nhiaMonthly),
+          annualRent: Number(profile.annualRent),
+          annualLifeInsurance: Number(profile.annualLifeInsurance),
+          annualMortgageInterest: Number(profile.annualMortgageInterest),
+          otherPreTaxMonthly: Number(profile.otherPreTaxMonthly),
+          otherPostTaxMonthly: Number(profile.otherPostTaxMonthly),
+          variableEarnings: adjustments
+            .filter((adjustment) => adjustment.type === "EARNING")
+            .map((adjustment) => ({
+              code: `ADJ_${adjustment.id}`,
+              label: adjustment.label,
+              amount: Number(adjustment.amount),
+              taxable: adjustment.taxable,
+              pensionable: adjustment.pensionable,
+            })),
+          variableDeductions: adjustments
+            .filter((adjustment) => adjustment.type === "DEDUCTION")
+            .map((adjustment) => ({
+              code: `ADJ_${adjustment.id}`,
+              label: adjustment.label,
+              amount: Number(adjustment.amount),
+              preTax: adjustment.preTax,
+            })),
+          employerStatutoryContributions,
+          taxOverrideMonthly: payeeOverride,
+          taxOverrideReason: profile.taxOverrideReason,
+          priorYtd,
+        }),
+      });
+    } catch (error) {
+      const reason =
+        error instanceof PayrollConfigurationError ? error.message : "The payroll calculation failed validation.";
+      return { ok: false, error: `${profile.fullName || "An employee"}: ${reason}` };
+    }
   }
 
+  const actorLabel = session.user.name || session.user.email || "HR";
+  const run = await prisma.$transaction(async (tx) => {
+    const savedRun = existingRun
+      ? await tx.hrPayslipRun.update({
+          where: { id: existingRun.id },
+          data: {
+            label,
+            generatedAt: new Date(),
+            generatedByUserId: session.user.id,
+            generatedByLabel: actorLabel,
+          },
+        })
+      : await tx.hrPayslipRun.create({
+          data: {
+            tenantId: tenant.id,
+            year: parsed.data.year,
+            month: parsed.data.month,
+            label,
+            status: HrPayslipRunStatus.DRAFT,
+            generatedAt: new Date(),
+            generatedByUserId: session.user.id,
+            generatedByLabel: actorLabel,
+          },
+        });
+
+    for (const item of prepared) {
+      const calc = item.calc;
+      const data = calculatedPayslipData(calc);
+      await tx.hrPayslip.upsert({
+        where: {
+          runId_employeeProfileId: {
+            runId: savedRun.id,
+            employeeProfileId: item.profileId,
+          },
+        },
+        create: {
+          tenantId: tenant.id,
+          runId: savedRun.id,
+          employeeProfileId: item.profileId,
+          ...data,
+        },
+        update: data,
+      });
+    }
+    return savedRun;
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "HR",
+    entityType: "PAYROLL_RUN",
+    entityId: run.id,
+    action: existingRun ? "REGENERATE" : "GENERATE",
+    summary: `${existingRun ? "Regenerated" : "Generated"} ${label} payroll for ${prepared.length} employee(s).`,
+    metadata: {
+      year: parsed.data.year,
+      month: parsed.data.month,
+      paygroupName: parsed.data.paygroupName || "ALL",
+      employeeCount: prepared.length,
+      ruleVersions: Array.from(new Set(prepared.map((item) => item.calc.ruleVersion))),
+    },
+  });
   revalidateHr(tenantSlug);
-  return { ok: true, count: generatedCount };
+  return { ok: true, count: prepared.length };
+}
+
+export async function savePayrollAdjustment(
+  tenantSlug: string,
+  input: unknown,
+): Promise<ActionResult & { adjustmentId?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const parsed = savePayrollAdjustmentSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+  const run = await prisma.hrPayslipRun.findFirst({
+    where: {
+      id: parsed.data.runId,
+      tenantId: tenant.id,
+      status: HrPayslipRunStatus.DRAFT,
+      payslips: { some: { employeeProfileId: parsed.data.employeeProfileId } },
+    },
+    select: { id: true, year: true, month: true, label: true },
+  });
+  if (!run) return { ok: false, error: "Adjustments can only be added to an existing draft payslip." };
+
+  const actorLabel = session.user.name || session.user.email || "HR";
+  const adjustment = await prisma.hrPayrollAdjustment.create({
+    data: {
+      tenantId: tenant.id,
+      runId: run.id,
+      employeeProfileId: parsed.data.employeeProfileId,
+      type: parsed.data.type as HrPayrollAdjustmentType,
+      code: parsed.data.label
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        .slice(0, 40) || "ADJUSTMENT",
+      label: parsed.data.label,
+      amount: parsed.data.amount,
+      taxable: parsed.data.type === "EARNING" ? (parsed.data.taxable ?? true) : false,
+      pensionable: parsed.data.type === "EARNING" ? (parsed.data.pensionable ?? false) : false,
+      preTax: parsed.data.type === "DEDUCTION" ? (parsed.data.preTax ?? false) : false,
+      createdByUserId: session.user.id,
+      createdByLabel: actorLabel,
+    },
+  });
+
+  try {
+    const calc = await calculateDraftProfilePayroll({
+      tenantId: tenant.id,
+      tenantPayrollCountryCode: tenant.settings?.payrollCountryCode,
+      tenantPayrollSettings: tenant.settings?.payrollSettings,
+      runId: run.id,
+      year: run.year,
+      month: run.month,
+      employeeProfileId: parsed.data.employeeProfileId,
+    });
+    await prisma.hrPayslip.update({
+      where: {
+        runId_employeeProfileId: {
+          runId: run.id,
+          employeeProfileId: parsed.data.employeeProfileId,
+        },
+      },
+      data: calculatedPayslipData(calc),
+    });
+  } catch (error) {
+    await prisma.hrPayrollAdjustment.delete({ where: { id: adjustment.id } });
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not recalculate this draft payslip.",
+    };
+  }
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "HR",
+    entityType: "PAYROLL_ADJUSTMENT",
+    entityId: adjustment.id,
+    action: "CREATE",
+    summary: `Added ${adjustment.label} to ${run.label}.`,
+    metadata: {
+      runId: run.id,
+      employeeProfileId: parsed.data.employeeProfileId,
+      type: adjustment.type,
+      amount: Number(adjustment.amount),
+      taxable: adjustment.taxable,
+      pensionable: adjustment.pensionable,
+      preTax: adjustment.preTax,
+    },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true, adjustmentId: adjustment.id };
+}
+
+export async function deletePayrollAdjustment(
+  tenantSlug: string,
+  adjustmentId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+  const adjustment = await prisma.hrPayrollAdjustment.findFirst({
+    where: {
+      id: adjustmentId,
+      tenantId: tenant.id,
+      run: { status: HrPayslipRunStatus.DRAFT },
+    },
+    include: { run: { select: { id: true, year: true, month: true, label: true } } },
+  });
+  if (!adjustment) return { ok: false, error: "Draft payroll adjustment not found." };
+  await prisma.hrPayrollAdjustment.delete({ where: { id: adjustment.id } });
+  try {
+    const calc = await calculateDraftProfilePayroll({
+      tenantId: tenant.id,
+      tenantPayrollCountryCode: tenant.settings?.payrollCountryCode,
+      tenantPayrollSettings: tenant.settings?.payrollSettings,
+      runId: adjustment.run.id,
+      year: adjustment.run.year,
+      month: adjustment.run.month,
+      employeeProfileId: adjustment.employeeProfileId,
+    });
+    await prisma.hrPayslip.update({
+      where: {
+        runId_employeeProfileId: {
+          runId: adjustment.run.id,
+          employeeProfileId: adjustment.employeeProfileId,
+        },
+      },
+      data: calculatedPayslipData(calc),
+    });
+  } catch (error) {
+    await prisma.hrPayrollAdjustment.create({
+      data: {
+        id: adjustment.id,
+        tenantId: adjustment.tenantId,
+        runId: adjustment.runId,
+        employeeProfileId: adjustment.employeeProfileId,
+        type: adjustment.type,
+        code: adjustment.code,
+        label: adjustment.label,
+        amount: adjustment.amount,
+        taxable: adjustment.taxable,
+        pensionable: adjustment.pensionable,
+        preTax: adjustment.preTax,
+        createdByUserId: adjustment.createdByUserId,
+        createdByLabel: adjustment.createdByLabel,
+        createdAt: adjustment.createdAt,
+      },
+    });
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not recalculate this draft payslip.",
+    };
+  }
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email,
+    module: "HR",
+    entityType: "PAYROLL_ADJUSTMENT",
+    entityId: adjustment.id,
+    action: "DELETE",
+    summary: `Removed ${adjustment.label} from ${adjustment.run.label}.`,
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true };
 }
 
 export async function finalizePayslipRun(tenantSlug: string, runId: string): Promise<ActionResult> {
@@ -643,16 +1297,70 @@ export async function finalizePayslipRun(tenantSlug: string, runId: string): Pro
     include: { _count: { select: { payslips: true } } },
   });
   if (!run) return { ok: false, error: "Payroll run not found." };
+  if (run.status === HrPayslipRunStatus.FINALIZED) {
+    return { ok: false, error: "This payroll run is already finalized." };
+  }
   if (run._count.payslips === 0) {
     return {
       ok: false,
       error: "No payslips in this run. Generate payslips first (employees need gross pay on People → Job).",
     };
   }
+  const earlierDraft = await prisma.hrPayslipRun.findFirst({
+    where: {
+      tenantId: tenant.id,
+      year: run.year,
+      month: { lt: run.month },
+      status: HrPayslipRunStatus.DRAFT,
+      payslips: { some: {} },
+    },
+    orderBy: { month: "asc" },
+    select: { label: true },
+  });
+  if (earlierDraft) {
+    return {
+      ok: false,
+      error: `Finalize ${earlierDraft.label} first so cumulative tax remains chronologically correct.`,
+    };
+  }
 
-  await prisma.hrPayslipRun.update({
-    where: { id: runId },
-    data: { status: HrPayslipRunStatus.FINALIZED },
+  const invalidSnapshots = await prisma.hrPayslip.count({
+    where: {
+      runId: run.id,
+      OR: [
+        { taxRuleVersion: null },
+        { AND: [{ taxOverrideApplied: true }, { taxOverrideReason: null }] },
+      ],
+    },
+  });
+  if (invalidSnapshots > 0) {
+    return {
+      ok: false,
+      error: "Regenerate this draft with the current payroll engine before finalizing it.",
+    };
+  }
+
+  const actorLabel = session.user.name || session.user.email || "HR";
+  const result = await prisma.hrPayslipRun.updateMany({
+    where: { id: runId, tenantId: tenant.id, status: HrPayslipRunStatus.DRAFT },
+    data: {
+      status: HrPayslipRunStatus.FINALIZED,
+      finalizedAt: new Date(),
+      finalizedByUserId: session.user.id,
+      finalizedByLabel: actorLabel,
+    },
+  });
+  if (result.count !== 1) return { ok: false, error: "Payroll changed while publishing. Refresh and try again." };
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "HR",
+    entityType: "PAYROLL_RUN",
+    entityId: run.id,
+    action: "FINALIZE",
+    summary: `Finalized ${run.label} payroll with ${run._count.payslips} payslip(s).`,
+    metadata: { year: run.year, month: run.month, payslipCount: run._count.payslips },
   });
   revalidateHr(tenantSlug);
   return { ok: true };
@@ -697,6 +1405,19 @@ export async function markPayslipPayments(
     },
   });
 
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: label,
+    module: "HR",
+    entityType: "PAYSLIP",
+    action: paid ? "MARK_PAID" : "MARK_PENDING",
+    summary: `${paid ? "Marked" : "Reverted"} ${slips.length} payslip payment(s) ${paid ? "as paid" : "to pending"}.`,
+    metadata: {
+      payslipIds: slips.map((slip) => slip.id),
+      paymentReference: paid ? parsed.data.paymentReference || null : null,
+    },
+  });
   revalidateHr(tenantSlug);
   return { ok: true, count: slips.length };
 }
@@ -720,12 +1441,56 @@ export async function finalizeAllDraftPayslipRuns(
   if (publishable.length === 0) {
     return { ok: false, error: "No draft runs with payslips to publish. Generate payslips first." };
   }
+  if (publishable.length > 1) {
+    const oldest = [...publishable].sort((a, b) => a.year - b.year || a.month - b.month)[0];
+    return {
+      ok: false,
+      error: `Publish ${oldest.label} first, then regenerate later drafts so cumulative tax can true-up correctly.`,
+    };
+  }
 
+  const invalidRunIds = new Set(
+    (
+      await prisma.hrPayslip.findMany({
+        where: {
+          runId: { in: publishable.map((r) => r.id) },
+          OR: [
+            { taxRuleVersion: null },
+            { AND: [{ taxOverrideApplied: true }, { taxOverrideReason: null }] },
+          ],
+        },
+        select: { runId: true },
+        distinct: ["runId"],
+      })
+    ).map((slip) => slip.runId),
+  );
+  const safeRuns = publishable.filter((run) => !invalidRunIds.has(run.id));
+  if (safeRuns.length === 0) {
+    return { ok: false, error: "Regenerate draft payroll runs with the current engine before publishing." };
+  }
+  const actorLabel = session.user.name || session.user.email || "HR";
   const result = await prisma.hrPayslipRun.updateMany({
-    where: { id: { in: publishable.map((r) => r.id) } },
-    data: { status: HrPayslipRunStatus.FINALIZED },
+    where: { id: { in: safeRuns.map((r) => r.id) }, status: HrPayslipRunStatus.DRAFT },
+    data: {
+      status: HrPayslipRunStatus.FINALIZED,
+      finalizedAt: new Date(),
+      finalizedByUserId: session.user.id,
+      finalizedByLabel: actorLabel,
+    },
   });
 
+  for (const run of safeRuns) {
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel,
+      module: "HR",
+      entityType: "PAYROLL_RUN",
+      entityId: run.id,
+      action: "FINALIZE",
+      summary: `Finalized ${run.label} payroll with ${run._count.payslips} payslip(s).`,
+    });
+  }
   revalidateHr(tenantSlug);
   return { ok: true, count: result.count };
 }
@@ -797,6 +1562,48 @@ export async function addHrDocument(
       uploadedByUserId: session.user.id,
       uploadedByLabel: session.user.name || session.user.email || "HR",
     },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true };
+}
+
+export async function softDeleteHrDocument(tenantSlug: string, documentId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const parsedId = z.string().trim().min(1).safeParse(documentId);
+  if (!parsedId.success) return { ok: false, error: "Document not found." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to remove HR documents." };
+  }
+
+  const document = await prisma.hrDocument.findFirst({
+    where: { id: parsedId.data, tenantId: tenant.id, deletedAt: null },
+    select: { id: true, title: true, fileName: true, employeeProfileId: true },
+  });
+  if (!document) return { ok: false, error: "This document was already removed or could not be found." };
+
+  const actorLabel = session.user.name || session.user.email || "HR";
+  await prisma.hrDocument.update({
+    where: { id: document.id },
+    data: {
+      deletedAt: new Date(),
+      deletedByUserId: session.user.id,
+      deletedByLabel: actorLabel,
+    },
+  });
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "HR",
+    entityType: "HrDocument",
+    entityId: document.id,
+    action: "DOCUMENT_REMOVED",
+    summary: `${document.fileName || document.title} removed from the employee document library.`,
+    metadata: { employeeProfileId: document.employeeProfileId, softDeleted: true },
   });
   revalidateHr(tenantSlug);
   return { ok: true };
@@ -1063,12 +1870,75 @@ export async function approveHrFormRequest(tenantSlug: string, requestId: string
     return { ok: false, error: "Only submitted forms can be approved." };
   }
 
-  if (req.submittedPayload && req.employeeProfileId) {
+  let approvedProfileId = req.employeeProfileId;
+  if (!approvedProfileId && req.recipientName?.trim()) {
+    const recipientEmail = req.recipientEmail?.trim().toLowerCase() || null;
+    const externalUser = recipientEmail
+      ? await prisma.user.upsert({
+          where: { email: recipientEmail },
+          create: { name: req.recipientName.trim(), email: recipientEmail },
+          update: {},
+          select: { id: true },
+        })
+      : await prisma.user.create({ data: { name: req.recipientName.trim() }, select: { id: true } });
+    const externalProfile = await prisma.employeeProfile.upsert({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: externalUser.id } },
+      create: {
+        tenantId: tenant.id,
+        userId: externalUser.id,
+        fullName: req.recipientName.trim(),
+        workEmail: recipientEmail,
+        status: EmployeeProfileStatus.DRAFT,
+        hrNotes: "Created from an approved external onboarding submission; no login access granted.",
+      },
+      update: {},
+      select: { id: true },
+    });
+    approvedProfileId = externalProfile.id;
+    await prisma.hrFormRequest.update({
+      where: { id: req.id },
+      data: { employeeProfileId: approvedProfileId },
+    });
+  }
+
+  if (req.submittedPayload && approvedProfileId) {
     await prisma.employeeProfile.update({
-      where: { id: req.employeeProfileId },
+      where: { id: approvedProfileId },
       data: mergeHrFormIntoProfile(req.formType, req.submittedPayload),
     });
-    await ensureEmployeeNumber(req.employeeProfileId);
+    await ensureEmployeeNumber(approvedProfileId);
+  }
+
+  if (req.submittedFileUrl && approvedProfileId) {
+    const categoryLabel = req.hrNote?.match(/AI document intake · ([A-Z_]+) ·/)?.[1];
+    const category = Object.values(HrDocumentCategory).includes(categoryLabel as HrDocumentCategory)
+      ? (categoryLabel as HrDocumentCategory)
+      : req.formType === HrFormType.HEALTH
+        ? HrDocumentCategory.HEALTH_RECORD
+        : (req.formType as HrDocumentCategory);
+    const alreadyFiled = await prisma.hrDocument.findFirst({
+      where: {
+        tenantId: tenant.id,
+        employeeProfileId: approvedProfileId,
+        fileUrl: req.submittedFileUrl,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!alreadyFiled) {
+      await prisma.hrDocument.create({
+        data: {
+          tenantId: tenant.id,
+          employeeProfileId: approvedProfileId,
+          category,
+          title: `${HR_FORM_TYPE_LABELS[req.formType]} — approved document`,
+          fileUrl: req.submittedFileUrl,
+          fileName: req.submittedFileName,
+          uploadedByUserId: session.user.id,
+          uploadedByLabel: session.user.name || session.user.email || "HR",
+        },
+      });
+    }
   }
 
   await prisma.hrFormRequest.update({
@@ -1083,6 +1953,33 @@ export async function approveHrFormRequest(tenantSlug: string, requestId: string
 
   revalidateHr(tenantSlug);
   return { ok: true };
+}
+
+export async function approveHrFormRequestsBatch(
+  tenantSlug: string,
+  requestIds: string[],
+): Promise<ActionResult & { approvedCount?: number }> {
+  const parsed = z.array(z.string().min(1)).min(1).max(100).safeParse([...new Set(requestIds)]);
+  if (!parsed.success) return { ok: false, error: "Select between 1 and 100 submitted records." };
+
+  let approvedCount = 0;
+  const failures: string[] = [];
+  for (const requestId of parsed.data) {
+    try {
+      const result = await approveHrFormRequest(tenantSlug, requestId);
+      if (result.ok) approvedCount += 1;
+      else failures.push(result.error);
+    } catch (error) {
+      console.error("Bulk HR approval failed for a submitted record.", error);
+      failures.push("A record could not be approved because its database update failed.");
+    }
+  }
+  if (!approvedCount) return { ok: false, error: failures[0] || "No records were approved." };
+  return {
+    ok: true,
+    approvedCount,
+    ...(failures.length ? { error: `${failures.length} record${failures.length === 1 ? "" : "s"} skipped.` } : {}),
+  };
 }
 
 export async function cancelHrFormRequest(tenantSlug: string, requestId: string): Promise<ActionResult> {

@@ -20,45 +20,57 @@ export function mergeHrFormIntoProfile(
   switch (formType) {
     case "BIODATA": {
       const d = biodataPayloadForMerge(payload as Biodata);
+      const emergencyContact = {
+        name: d.emergencyName || "",
+        relationship: d.emergencyRelationship || "",
+        phone: d.emergencyPhone || "",
+        email: d.emergencyEmail || "",
+      };
+      const education = {
+        level: d.educationLevel || "",
+        institution: d.educationInstitution || "",
+        qualification: d.educationQualification || "",
+        year: d.educationYear || "",
+      };
+      const nextOfKin = {
+        name: d.nextOfKinName || "",
+        relationship: d.nextOfKinRelationship || "",
+        phone: d.nextOfKinPhone || "",
+        email: d.nextOfKinEmail || "",
+        street: d.nextOfKinStreet || "",
+        city: d.nextOfKinCity || "",
+        state: d.nextOfKinState || "",
+        occupation: d.nextOfKinOccupation || "",
+      };
+      const hasValue = (obj: Record<string, string>) => Object.values(obj).some(Boolean);
+      const money = (value?: string) =>
+        value && /^\d+(\.\d{1,2})?$/.test(value.trim()) ? Number(value.trim()) : undefined;
+      const grossMonthly = money(d.grossMonthly);
+      const payeeTaxMonthly = money(d.payeeTaxMonthly);
       return {
-        fullName: d.fullName,
-        gender: d.gender || null,
-        dateOfBirth: d.dateOfBirth ? new Date(d.dateOfBirth) : null,
-        maritalStatus: d.maritalStatus || null,
-        nationality: d.nationality || null,
-        phoneMobile: d.phoneMobile || null,
-        workEmail: d.workEmail || null,
-        addressStreet: d.addressStreet || null,
-        addressCity: d.addressCity || null,
-        addressState: d.addressState || null,
-        position: d.position || null,
-        department: d.department || null,
-        dateOfJoining: d.dateOfJoining ? new Date(d.dateOfJoining) : null,
-        reportingToLabel: d.reportingToLabel || null,
-        employmentType: d.employmentType || null,
-        workSchedule: d.workSchedule || null,
-        emergencyContact: {
-          name: d.emergencyName || "",
-          relationship: d.emergencyRelationship || "",
-          phone: d.emergencyPhone || "",
-          email: d.emergencyEmail || "",
-        },
-        education: {
-          level: d.educationLevel || "",
-          institution: d.educationInstitution || "",
-          qualification: d.educationQualification || "",
-          year: d.educationYear || "",
-        },
-        nextOfKin: {
-          name: d.nextOfKinName || "",
-          relationship: d.nextOfKinRelationship || "",
-          phone: d.nextOfKinPhone || "",
-          email: d.nextOfKinEmail || "",
-          street: d.nextOfKinStreet || "",
-          city: d.nextOfKinCity || "",
-          state: d.nextOfKinState || "",
-          occupation: d.nextOfKinOccupation || "",
-        },
+        ...(d.fullName ? { fullName: d.fullName } : {}),
+        ...(d.gender ? { gender: d.gender } : {}),
+        ...(d.dateOfBirth ? { dateOfBirth: new Date(d.dateOfBirth) } : {}),
+        ...(d.maritalStatus ? { maritalStatus: d.maritalStatus } : {}),
+        ...(d.nationality ? { nationality: d.nationality } : {}),
+        ...(d.phoneMobile ? { phoneMobile: d.phoneMobile } : {}),
+        ...(d.workEmail ? { workEmail: d.workEmail } : {}),
+        ...(d.addressStreet ? { addressStreet: d.addressStreet } : {}),
+        ...(d.addressCity ? { addressCity: d.addressCity } : {}),
+        ...(d.addressState ? { addressState: d.addressState } : {}),
+        ...(d.addressCountry ? { addressCountry: d.addressCountry } : {}),
+        ...(d.position ? { position: d.position } : {}),
+        ...(d.department ? { department: d.department } : {}),
+        ...(d.dateOfJoining ? { dateOfJoining: new Date(d.dateOfJoining) } : {}),
+        ...(d.reportingToLabel ? { reportingToLabel: d.reportingToLabel } : {}),
+        ...(d.employmentType ? { employmentType: d.employmentType } : {}),
+        ...(d.workSchedule ? { workSchedule: d.workSchedule } : {}),
+        ...(d.paygroupName ? { paygroupName: d.paygroupName } : {}),
+        ...(grossMonthly != null ? { grossMonthly } : {}),
+        ...(payeeTaxMonthly != null ? { payeeTaxMonthly } : {}),
+        ...(hasValue(emergencyContact) ? { emergencyContact } : {}),
+        ...(hasValue(education) ? { education } : {}),
+        ...(hasValue(nextOfKin) ? { nextOfKin } : {}),
       };
     }
     case "BANK_FORM": {

@@ -74,7 +74,9 @@ export function ListingsWorkspace({ tenantSlug, canManage, projects }: Props) {
               <div className="p-4">
                 <h2 className="font-semibold text-foreground">{project.name}</h2>
                 <p className="mt-1 line-clamp-2 text-xs text-muted">
-                  {[project.locationCity, project.locationState].filter(Boolean).join(", ") ||
+                  {[project.locationCity, project.locationState, project.locationCountry]
+                    .filter(Boolean)
+                    .join(", ") ||
                     project.listingDescription ||
                     "No location or description yet"}
                 </p>

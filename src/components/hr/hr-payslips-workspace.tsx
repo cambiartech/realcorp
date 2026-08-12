@@ -10,9 +10,12 @@ import {
   CircleDashed,
   FileText,
   Layers,
-  Printer,
+  Plus,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
+import { ModalOverlay } from "@/components/modal-overlay";
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 import { PayrollWorkflowGuide } from "@/components/hr/payroll-workflow-guide";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
 import { useSnackbar } from "@/components/snackbar";
@@ -24,7 +27,10 @@ import {
   finalizePayslipRun,
   generatePayslipRun,
   markPayslipPayments,
+  deletePayrollAdjustment,
+  savePayrollAdjustment,
 } from "@/app/[tenantSlug]/hr/actions";
+import { MODAL_PANEL_FORM } from "@/lib/modal-panel";
 
 const MONTHS = [
   "January",
@@ -49,8 +55,19 @@ export type PayslipRunView = {
   status: string;
   statusValue: string;
   payslipCount: number;
+  adjustments: Array<{
+    id: string;
+    employeeProfileId: string;
+    type: "EARNING" | "DEDUCTION";
+    label: string;
+    amount: number;
+    taxable: boolean;
+    pensionable: boolean;
+    preTax: boolean;
+  }>;
   payslips: Array<{
     id: string;
+    employeeProfileId: string;
     employeeName: string;
     jobRole: string;
     paygroup: string;
@@ -113,6 +130,8 @@ export function HrPayslipsWorkspace({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [paymentRef, setPaymentRef] = useState("");
   const [pending, setPending] = useState(false);
+  const [adjustmentTargetId, setAdjustmentTargetId] = useState<string | null>(null);
+  const [adjustmentType, setAdjustmentType] = useState<"EARNING" | "DEDUCTION">("EARNING");
 
   const selectedRun = useMemo(
     () => payslipRuns.find((r) => r.id === selectedRunId) ?? payslipRuns[0] ?? null,
@@ -138,6 +157,16 @@ export function HrPayslipsWorkspace({
   }, [filteredPayslips]);
 
   const viewPayslip = viewPayslipId ? filteredPayslips.find((p) => p.id === viewPayslipId) : null;
+  const adjustmentTarget =
+    adjustmentTargetId && selectedRun
+      ? selectedRun.payslips.find((p) => p.id === adjustmentTargetId) ?? null
+      : null;
+  const targetAdjustments =
+    adjustmentTarget && selectedRun
+      ? selectedRun.adjustments.filter(
+          (adjustment) => adjustment.employeeProfileId === adjustmentTarget.employeeProfileId,
+        )
+      : [];
 
   const generatePeriodRun = useMemo(
     () => payslipRuns.find((r) => r.year === year && r.month === month) ?? null,
@@ -182,16 +211,23 @@ export function HrPayslipsWorkspace({
     success: string | ((count?: number) => string),
   ) {
     setPending(true);
-    const result = await fn();
-    setPending(false);
-    if (!result.ok) {
-      showSnackbar(result.error || "Something went wrong.", "error");
-      return;
+    try {
+      const result = await fn();
+      if (!result.ok) {
+        showSnackbar(result.error || "Something went wrong.", "error");
+        return false;
+      }
+      const msg = typeof success === "function" ? success(result.count) : success;
+      showSnackbar(msg, "success");
+      setSelectedIds(new Set());
+      router.refresh();
+      return true;
+    } catch (error) {
+      showSnackbar(error instanceof Error ? error.message : "The payroll action failed.", "error");
+      return false;
+    } finally {
+      setPending(false);
     }
-    const msg = typeof success === "function" ? success(result.count) : success;
-    showSnackbar(msg, "success");
-    setSelectedIds(new Set());
-    router.refresh();
   }
 
   async function markPayments(payslipIds: string[], status: "PAID" | "PENDING") {
@@ -575,7 +611,7 @@ export function HrPayslipsWorkspace({
                           <th className="px-4 py-2.5 font-semibold">Employee</th>
                           <th className="px-4 py-2.5 font-semibold">Pay group</th>
                           <th className="px-4 py-2.5 font-semibold text-right">Gross</th>
-                          <th className="px-4 py-2.5 font-semibold text-right">Payee</th>
+                          <th className="px-4 py-2.5 font-semibold text-right">PAYE</th>
                           <th className="px-4 py-2.5 font-semibold text-right">Pension</th>
                           <th className="px-4 py-2.5 font-semibold text-right">Net</th>
                           <th className="px-4 py-2.5 font-semibold">Payment</th>
@@ -601,6 +637,18 @@ export function HrPayslipsWorkspace({
                             <td className="px-4 py-3">
                               <p className="font-medium text-foreground">{p.employeeName}</p>
                               <p className="text-xs text-muted">{p.jobRole || "—"}</p>
+                              {selectedRun.adjustments.some(
+                                (adjustment) => adjustment.employeeProfileId === p.employeeProfileId,
+                              ) ? (
+                                <p className="mt-0.5 text-[10px] font-medium text-[var(--info)]">
+                                  {
+                                    selectedRun.adjustments.filter(
+                                      (adjustment) => adjustment.employeeProfileId === p.employeeProfileId,
+                                    ).length
+                                  }{" "}
+                                  monthly adjustment(s)
+                                </p>
+                              ) : null}
                             </td>
                             <td className="px-4 py-3 text-muted">{p.paygroup || "—"}</td>
                             <td className="px-4 py-3 text-right tabular-nums">
@@ -659,6 +707,17 @@ export function HrPayslipsWorkspace({
                                     </button>
                                   )
                                 ) : null}
+                                {selectedRun.statusValue === "DRAFT" ? (
+                                  <button
+                                    type="button"
+                                    disabled={pending}
+                                    onClick={() => setAdjustmentTargetId(p.id)}
+                                    className="inline-flex items-center gap-1 rounded-md border border-foreground/15 px-2 py-1 text-xs font-semibold hover:bg-foreground/[0.06] disabled:opacity-50"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    Adjust
+                                  </button>
+                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() => setViewPayslipId(p.id)}
@@ -709,6 +768,167 @@ export function HrPayslipsWorkspace({
         </div>
       </div>
 
+      <ModalOverlay
+        open={Boolean(adjustmentTarget && selectedRun?.statusValue === "DRAFT")}
+        onClose={() => {
+          if (!pending) setAdjustmentTargetId(null);
+        }}
+        panelClassName={MODAL_PANEL_FORM}
+        aria-labelledby="payroll-adjustment-title"
+      >
+        {adjustmentTarget && selectedRun ? (
+          <>
+            <div>
+              <h2 id="payroll-adjustment-title" className="text-xl font-semibold text-foreground">
+                Adjust {adjustmentTarget.employeeName} · {selectedRun.label}
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                These items affect this month only. Contractual gross remains unchanged; gross and net pay recalculate
+                immediately.
+              </p>
+            </div>
+
+            {targetAdjustments.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                {targetAdjustments.map((adjustment) => (
+                  <div
+                    key={adjustment.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-foreground/10 px-3 py-2"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{adjustment.label}</p>
+                      <p className="text-[11px] text-muted">
+                        {adjustment.type === "EARNING" ? "Earning" : "Deduction"} · {currency}{" "}
+                        {adjustment.amount.toLocaleString("en-NG")}
+                        {adjustment.type === "EARNING"
+                          ? ` · ${adjustment.taxable ? "Taxable" : "Non-taxable"} · ${
+                              adjustment.pensionable ? "Pensionable" : "Not pensionable"
+                            }`
+                          : ` · ${adjustment.preTax ? "Pre-tax" : "Post-tax"}`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        void runAction(
+                          () => deletePayrollAdjustment(tenantSlug, adjustment.id),
+                          "Adjustment removed and payslip recalculated.",
+                        )
+                      }
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--danger-line)] px-2 py-1 text-xs font-semibold text-[var(--danger)] disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 rounded-lg border border-dashed border-foreground/15 p-3 text-xs text-muted">
+                No monthly adjustments yet.
+              </p>
+            )}
+
+            <form
+              className="mt-5 space-y-4 border-t border-foreground/10 pt-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const formData = new FormData(form);
+                void runAction(
+                  () =>
+                    savePayrollAdjustment(tenantSlug, {
+                      runId: selectedRun.id,
+                      employeeProfileId: adjustmentTarget.employeeProfileId,
+                      type: adjustmentType,
+                      label: String(formData.get("label") || ""),
+                      amount: Number(formData.get("amount")),
+                      taxable: formData.get("taxable") === "on",
+                      pensionable: formData.get("pensionable") === "on",
+                      preTax: formData.get("preTax") === "on",
+                    }),
+                  "Adjustment added and payslip recalculated.",
+                ).then((ok) => {
+                  if (ok) form.reset();
+                });
+              }}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs font-medium text-foreground">Adjustment type</span>
+                  <UiSelect
+                    value={adjustmentType}
+                    onChange={(event) => setAdjustmentType(event.target.value as "EARNING" | "DEDUCTION")}
+                  >
+                    <option value="EARNING">Additional earning</option>
+                    <option value="DEDUCTION">Deduction</option>
+                  </UiSelect>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs font-medium text-foreground">Amount ({currency})</span>
+                  <input
+                    name="amount"
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    required
+                    className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="text-sm sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-foreground">Description</span>
+                  <input
+                    name="label"
+                    required
+                    placeholder={
+                      adjustmentType === "EARNING"
+                        ? "Performance bonus, overtime, commission, reimbursement…"
+                        : "Loan repayment, salary advance, other deduction…"
+                    }
+                    className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+              {adjustmentType === "EARNING" ? (
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input name="taxable" type="checkbox" defaultChecked />
+                    Taxable
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input name="pensionable" type="checkbox" />
+                    Pensionable
+                  </label>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 text-sm">
+                  <input name="preTax" type="checkbox" />
+                  Deduct before tax
+                </label>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setAdjustmentTargetId(null)}
+                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+                >
+                  {pending ? "Recalculating…" : "Add and recalculate"}
+                </button>
+              </div>
+            </form>
+          </>
+        ) : null}
+      </ModalOverlay>
+
       {viewPayslip && selectedRun ? (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4 print:bg-white print:p-0">
           <div className="mx-auto max-w-3xl rounded-xl bg-background p-4 shadow-xl print:max-w-none print:shadow-none">
@@ -716,14 +936,9 @@ export function HrPayslipsWorkspace({
               <button type="button" className="text-sm underline" onClick={() => setViewPayslipId(null)}>
                 Close
               </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Print / Save PDF
-              </button>
+              <PdfDownloadButton filename={`payslip-${viewPayslip.employeeName}-${selectedRun.label}`}>
+                Download PDF
+              </PdfDownloadButton>
             </div>
             <PayslipPrintView
               companyName={companyName}

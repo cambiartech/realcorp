@@ -27,6 +27,7 @@ import {
 } from "./actions";
 import { FormAlert } from "@/components/form-message";
 import { OrgDepartmentsEditor } from "@/components/org-departments-editor";
+import { GlobalLocationFields } from "@/components/global-location-fields";
 import { isDefaultOrgDepartment } from "@/lib/org-departments";
 import { useSnackbar } from "@/components/snackbar";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
@@ -75,6 +76,9 @@ type SettingsWorkspaceProps = {
     orgCity: string | null;
     orgState: string | null;
     orgCountry: string | null;
+    payrollCountryCode: string;
+    nsitfRate: number;
+    itfRate: number;
   };
   integrations: {
     metaVerifyToken: string | null;
@@ -546,29 +550,58 @@ export function SettingsWorkspace({
                       className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
                     />
                   </div>
+                  <GlobalLocationFields
+                    countryName="orgCountry"
+                    stateName="orgState"
+                    cityName="orgCity"
+                    defaultCountry={branding.orgCountry ?? "Nigeria"}
+                    defaultState={branding.orgState}
+                    defaultCity={branding.orgCity}
+                    className="grid gap-3 sm:col-span-2 sm:grid-cols-3"
+                  />
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-muted">City</label>
+                    <label className="mb-1 block text-xs font-medium text-muted">
+                      Default payroll country code
+                    </label>
                     <input
-                      name="orgCity"
-                      defaultValue={branding.orgCity ?? ""}
+                      name="payrollCountryCode"
+                      defaultValue={branding.payrollCountryCode}
+                      maxLength={2}
+                      autoCapitalize="characters"
+                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm uppercase"
+                    />
+                    <p className="mt-1 text-[11px] text-muted">
+                      ISO code, for example NG, GH, GB, or US. Payroll runs only when a reviewed rule pack exists.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted">
+                      Employee Compensation / NSITF rate (%)
+                    </label>
+                    <input
+                      name="nsitfRate"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      defaultValue={branding.nsitfRate}
                       className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-muted">State</label>
+                    <label className="mb-1 block text-xs font-medium text-muted">ITF rate (%)</label>
                     <input
-                      name="orgState"
-                      defaultValue={branding.orgState ?? ""}
+                      name="itfRate"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      defaultValue={branding.itfRate}
                       className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted">Country</label>
-                    <input
-                      name="orgCountry"
-                      defaultValue={branding.orgCountry ?? "Nigeria"}
-                      className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
-                    />
+                    <p className="mt-1 text-[11px] text-muted">
+                      Keep at 0 unless the organization meets the applicable statutory threshold.
+                    </p>
                   </div>
                 </div>
                 <button

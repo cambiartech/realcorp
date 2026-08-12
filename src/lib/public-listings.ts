@@ -12,6 +12,7 @@ export type PublicListing = {
   description: string | null;
   city: string | null;
   state: string | null;
+  country: string | null;
   address: string | null;
   coverImageUrl: string | null;
   galleryUrls: string[];
@@ -86,6 +87,7 @@ export async function loadPublicListings(
             { listingDescription: { contains: filters.q, mode: "insensitive" as const } },
             { locationCity: { contains: filters.q, mode: "insensitive" as const } },
             { locationState: { contains: filters.q, mode: "insensitive" as const } },
+            { locationCountry: { contains: filters.q, mode: "insensitive" as const } },
           ],
         }
       : {}),
@@ -102,6 +104,7 @@ export async function loadPublicListings(
         listingDescription: true,
         locationCity: true,
         locationState: true,
+        locationCountry: true,
         locationAddress: true,
         coverImageUrl: true,
         galleryUrls: true,
@@ -133,6 +136,7 @@ export async function loadPublicListings(
       description: p.listingDescription,
       city: p.locationCity,
       state: p.locationState,
+      country: p.locationCountry,
       address: p.locationAddress,
       coverImageUrl: p.coverImageUrl,
       galleryUrls: jsonStringArray(p.galleryUrls),

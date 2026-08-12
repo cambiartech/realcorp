@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Sparkles } from "lucide-react";
 import { BrandedDocumentShell } from "@/components/hr/branded-document-shell";
 import { formatOfferDate, type OfferLetterFields } from "@/lib/offer-letter";
 import { defaultOfferLetterHtml, sanitizeOfferLetterHtml } from "@/lib/offer-letter-html";
@@ -8,8 +9,16 @@ import type { TenantBranding } from "@/lib/tenant-branding";
 import { saveOfferLetterDraft, sendOfferLetterForSignature } from "@/app/[tenantSlug]/hr/actions";
 import { useSnackbar } from "@/components/snackbar";
 
+const AI_REWRITE_ACTIONS = [
+  { label: "Warmer", instruction: "Make the tone warmer while preserving every fact and salary figure." },
+  { label: "More concise", instruction: "Make the letter more concise without removing important terms." },
+  { label: "More formal", instruction: "Rewrite the letter in a more formal and professional tone." },
+  { label: "Fix grammar", instruction: "Correct grammar and improve clarity without changing meaning." },
+];
+
 export function OfferLetterEditor({
   tenantSlug,
+  aiEnabled,
   brand,
   fields,
   employeeProfileId: initialProfileId,
@@ -20,6 +29,7 @@ export function OfferLetterEditor({
   issueDate,
 }: {
   tenantSlug: string;
+  aiEnabled: boolean;
   brand: TenantBranding;
   fields: OfferLetterFields;
   employeeProfileId?: string;
@@ -104,14 +114,11 @@ export function OfferLetterEditor({
       const res = await fetch("/api/hr/ai/offer-letter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html: readHtml(), instruction: aiInstruction }),
+        body: JSON.stringify({ tenantSlug, html: readHtml(), instruction: aiInstruction }),
       });
       const data = (await res.json()) as { html?: string; error?: string };
       if (!res.ok || !data.html) {
-        showSnackbar(
-          data.error || "AI edit unavailable. Add GEMINI_API_KEY or GROQ_API_KEY to .env.local.",
-          "error",
-        );
+        showSnackbar(data.error || "AI editing is currently unavailable.", "error");
         return;
       }
       const cleaned = sanitizeOfferLetterHtml(data.html);
@@ -169,28 +176,54 @@ export function OfferLetterEditor({
         ) : null}
       </div>
 
-      {editable ? (
-        <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3 print:hidden">
-          <p className="text-xs font-semibold text-foreground">Edit letter · AI assist (optional)</p>
-          <p className="mt-1 text-[11px] text-muted">
-            Click the letter body to edit text for this employee only. AI uses Gemini or Groq free tier when{" "}
-            <code className="text-xs">GEMINI_API_KEY</code> or <code className="text-xs">GROQ_API_KEY</code>{" "}
-            is set.
-          </p>
-          <textarea
-            value={aiInstruction}
-            onChange={(e) => setAiInstruction(e.target.value)}
-            rows={2}
-            className="mt-2 w-full rounded-md border border-foreground/15 bg-field px-2 py-1.5 text-xs"
-          />
-          <button
-            type="button"
-            disabled={aiPending || pending}
-            onClick={() => void handleAiEdit()}
-            className="mt-2 rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold hover:bg-foreground/[0.04] disabled:opacity-50"
-          >
-            {aiPending ? "Thinking…" : "Apply AI edit"}
-          </button>
+      {editable && aiEnabled ? (
+        <div className="rounded-xl border border-foreground/10 bg-background p-3 shadow-sm print:hidden">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background">
+              <Sparkles className="h-3.5 w-3.5" />
+            </span>
+            <div>
+              <p className="text-xs font-semibold text-foreground">Rewrite with AI</p>
+              <p className="text-[10px] text-muted">Review the result before saving or sending.</p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {AI_REWRITE_ACTIONS.map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                disabled={aiPending || pending}
+                onClick={() => setAiInstruction(action.instruction)}
+                className="rounded-full border border-foreground/10 bg-foreground/[0.025] px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:border-foreground/25 hover:bg-foreground/[0.05] disabled:opacity-50"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative mt-2 rounded-lg border border-foreground/15 bg-field focus-within:ring-2 focus-within:ring-foreground/10">
+            <textarea
+              value={aiInstruction}
+              onChange={(e) => setAiInstruction(e.target.value)}
+              rows={2}
+              placeholder="Ask AI to rewrite this letter…"
+              className="w-full resize-none bg-transparent px-3 py-2.5 pr-12 text-xs text-foreground outline-none"
+            />
+            <button
+              type="button"
+              disabled={aiPending || pending || !aiInstruction.trim()}
+              onClick={() => void handleAiEdit()}
+              aria-label="Apply AI rewrite"
+              className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-90 disabled:opacity-40"
+            >
+              {aiPending ? (
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-background/40 border-t-background" />
+              ) : (
+                <ArrowUp className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -199,6 +232,7 @@ export function OfferLetterEditor({
         title="Offer of employment"
         subtitle={`Issued ${issueDate ?? formatOfferDate()}${status === "SIGNED" ? " · Signed" : status === "AWAITING_SIGNATURE" ? " · Awaiting signature" : ""}`}
         footerNote="Confidential — for the candidate named above"
+        variant="formal"
       >
         <div
           ref={editorRef}

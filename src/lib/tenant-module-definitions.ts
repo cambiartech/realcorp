@@ -7,6 +7,7 @@ export type TenantModuleField =
   | "moduleRealtorPortal"
   | "moduleShortLets"
   | "moduleHr"
+  | "moduleAi"
   | "moduleTasks"
   | "moduleClients"
   | "moduleWhatsApp"
@@ -86,7 +87,16 @@ export const TENANT_MODULE_DEFINITIONS: TenantModuleDefinition[] = [
     key: "moduleHr",
     label: "People (HR)",
     description: "Employee profiles, payslips, and HR documents",
-    subpages: ["HR dashboard", "Employee records", "Payslips", "HR queue"],
+    subpages: ["HR dashboard", "Employee records", "Leave tracker", "Payslips", "HR queue"],
+    group: "people",
+    defaultOn: false,
+    platformOnly: true,
+  },
+  {
+    key: "moduleAi",
+    label: "AI Assistant",
+    description: "AI-assisted document reading, data extraction, and content editing",
+    subpages: ["HR document reader", "Employee record generation", "Offer-letter editing"],
     group: "people",
     defaultOn: false,
     platformOnly: true,

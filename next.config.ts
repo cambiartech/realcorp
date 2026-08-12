@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "22mb",
+    },
+  },
   /**
    * Lets a build target a scratch directory instead of `.next`, e.g.
    * `NEXT_DIST_DIR=.next-verify npm run build`. Useful for verifying a build

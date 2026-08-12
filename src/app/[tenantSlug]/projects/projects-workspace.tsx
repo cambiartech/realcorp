@@ -33,6 +33,7 @@ type ProjectRow = {
   listingDescription: string | null;
   locationCity: string | null;
   locationState: string | null;
+  locationCountry: string | null;
   locationAddress: string | null;
   coverImageUrl: string | null;
   galleryUrls: string[];
@@ -167,7 +168,7 @@ export function ProjectsWorkspace({
         name: p.name,
         units: p.unitsCount,
         basePrice: p.basePrice != null ? `${p.currency} ${p.basePrice.toLocaleString()}` : "—",
-        location: [p.locationCity, p.locationState].filter(Boolean).join(", ") || "—",
+        location: [p.locationCity, p.locationState, p.locationCountry].filter(Boolean).join(", ") || "—",
         published: p.isPublished ? "Yes" : "No",
         createdAt: p.createdAt,
       })),

@@ -85,7 +85,9 @@ export function PayslipPrintView({
           {earningsRows.map((row) => (
             <tr key={row.code}>
               <td className="border border-slate-200 px-3 py-2">{row.label.replace(/\s*\(\d+%\)/, "")}</td>
-              <td className="border border-slate-200 px-3 py-2 text-right text-slate-600">{row.percent}%</td>
+              <td className="border border-slate-200 px-3 py-2 text-right text-slate-600">
+                {row.percent == null ? "One-time" : `${row.percent}%`}
+              </td>
               <td className="border border-slate-200 px-3 py-2 text-right font-medium">
                 {money(row.amount)}
               </td>

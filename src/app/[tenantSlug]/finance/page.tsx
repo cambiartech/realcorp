@@ -2,8 +2,12 @@ import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
-import { mergeCurrencyOptions, normalizeFinanceOptionList } from "@/lib/finance-catalog";
+import {
+  mergeCurrencyOptions,
+  normalizeFinanceOptionList,
+} from "@/lib/finance-catalog";
 import { parseFinanceControls } from "@/lib/finance-controls";
+import { expensePnlAmount } from "@/lib/finance-vat";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { FinanceWorkspace } from "./finance-workspace";
@@ -17,8 +21,12 @@ function canManageFinance(
   membership: { status: MembershipStatus; role: MembershipRole } | null,
 ) {
   if (isPlatformAdmin) return true;
-  if (!membership || membership.status !== MembershipStatus.ACTIVE) return false;
-  return membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.FINANCE_MANAGER;
+  if (!membership || membership.status !== MembershipStatus.ACTIVE)
+    return false;
+  return (
+    membership.role === MembershipRole.ORG_ADMIN ||
+    membership.role === MembershipRole.FINANCE_MANAGER
+  );
 }
 
 export default async function FinanceQueuePage({
@@ -67,43 +75,87 @@ export default async function FinanceQueuePage({
           financeControls: true,
         },
       },
+      memberships: {
+        where: { userId: session.user.id },
+        take: 1,
+        select: { status: true, role: true },
+      },
     },
   });
   if (!tenant) notFound();
-  const financeControls = parseFinanceControls(tenant.settings?.financeControls);
+  const financeControls = parseFinanceControls(
+    tenant.settings?.financeControls,
+  );
 
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
-  });
+  const membership = tenant.memberships[0] || null;
 
   assertTenantNavAccess(session, membership, tenant.settings, "finance");
 
-  const canView = Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;
+  const canView =
+    Boolean(session.user.isPlatformAdmin) ||
+    membership?.status === MembershipStatus.ACTIVE;
   if (!canView) notFound();
 
-  const canManage = canManageFinance(Boolean(session.user.isPlatformAdmin), membership);
+  const canManage = canManageFinance(
+    Boolean(session.user.isPlatformAdmin),
+    membership,
+  );
+  const financeSurface = logsParams.recordsTab || "overview";
+  const isOverview = financeSurface === "overview";
+  const needsDeals = isOverview;
+  const needsDealOptions =
+    financeSurface === "invoices" || financeSurface === "receipts";
+  const needsDimensions = [
+    "reports",
+    "expenses",
+    "invoices",
+    "payments",
+  ].includes(financeSurface);
+  const needsInvoices =
+    isOverview ||
+    ["reports", "invoices", "ar", "payments"].includes(financeSurface);
+  const needsPayments =
+    isOverview || ["reports", "payments", "banking"].includes(financeSurface);
+  const needsExpenses =
+    isOverview || ["reports", "expenses", "banking"].includes(financeSurface);
+  const needsBills =
+    isOverview || financeSurface === "reports" || financeSurface === "payables";
+  const needsInvoiceEvents =
+    isOverview || ["reports", "invoices", "ar"].includes(financeSurface);
+  const needsBanking = isOverview || financeSurface === "banking";
+  const needsLogs = financeSurface === "logs";
 
-  const [activeFiscalGoal, financeVendors, financeExpenseCategories] = await Promise.all([
-    prisma.tenantGoal.findFirst({
-      where: { tenantId: tenant.id, isActive: true },
-      orderBy: { updatedAt: "desc" },
-      select: { label: true, fiscalYearStart: true, fiscalYearEnd: true },
-    }),
-    prisma.financeVendor.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    prisma.financeExpenseCategory.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-  ]);
+  const [activeFiscalGoal, financeVendors, financeExpenseCategories] =
+    await Promise.all([
+      financeSurface === "payables"
+        ? prisma.tenantGoal.findFirst({
+            where: { tenantId: tenant.id, isActive: true },
+            orderBy: { updatedAt: "desc" },
+            select: { label: true, fiscalYearStart: true, fiscalYearEnd: true },
+          })
+        : Promise.resolve(null),
+      ["expenses", "payables"].includes(financeSurface)
+        ? prisma.financeVendor.findMany({
+            where: { tenantId: tenant.id },
+            orderBy: { name: "asc" },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      financeSurface === "expenses"
+        ? prisma.financeExpenseCategory.findMany({
+            where: { tenantId: tenant.id },
+            orderBy: { name: "asc" },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
-  const savedBanks = normalizeFinanceOptionList(tenant.settings?.financeBankAccounts);
-  const savedModes = normalizeFinanceOptionList(tenant.settings?.financePaymentModes);
+  const savedBanks = normalizeFinanceOptionList(
+    tenant.settings?.financeBankAccounts,
+  );
+  const savedModes = normalizeFinanceOptionList(
+    tenant.settings?.financePaymentModes,
+  );
   const mergedModes =
     savedModes.length > 0
       ? Array.from(new Set([...DEFAULT_PAYMENT_MODES, ...savedModes]))
@@ -117,7 +169,9 @@ export default async function FinanceQueuePage({
     bankAccounts: savedBanks,
     paymentModes: mergedModes,
     currencies: currenciesMerged,
-    departments: mergeOrgDepartments(tenant.settings?.orgDepartments as string[] | null | undefined),
+    departments: mergeOrgDepartments(
+      tenant.settings?.orgDepartments as string[] | null | undefined,
+    ),
   };
 
   const logsPageSize = 50;
@@ -141,12 +195,17 @@ export default async function FinanceQueuePage({
   if (logsParams.logsModule) logsWhere.module = logsParams.logsModule;
   if (logsParams.logsAction) logsWhere.action = logsParams.logsAction;
   if (logsParams.logsActor) logsWhere.actorLabel = logsParams.logsActor;
-  if (logsParams.logsEntityType) logsWhere.entityType = logsParams.logsEntityType;
+  if (logsParams.logsEntityType)
+    logsWhere.entityType = logsParams.logsEntityType;
   if (logsParams.logsEntityId) logsWhere.entityId = logsParams.logsEntityId;
   if (logsParams.logsFrom || logsParams.logsTo) {
     logsWhere.createdAt = {};
-    if (logsParams.logsFrom) logsWhere.createdAt.gte = new Date(`${logsParams.logsFrom}T00:00:00.000Z`);
-    if (logsParams.logsTo) logsWhere.createdAt.lte = new Date(`${logsParams.logsTo}T23:59:59.999Z`);
+    if (logsParams.logsFrom)
+      logsWhere.createdAt.gte = new Date(
+        `${logsParams.logsFrom}T00:00:00.000Z`,
+      );
+    if (logsParams.logsTo)
+      logsWhere.createdAt.lte = new Date(`${logsParams.logsTo}T23:59:59.999Z`);
   }
   if (logsParams.logsQ?.trim()) {
     const q = logsParams.logsQ.trim();
@@ -177,168 +236,231 @@ export default async function FinanceQueuePage({
     bankImports,
     bankRowStats,
   ] = await Promise.all([
-    prisma.deal.findMany({
-      where: { tenantId: tenant.id, pendingFinance: true },
-      orderBy: { createdAt: "asc" },
-      include: {
-        lead: { select: { name: true, email: true } },
-      },
-      take: 500,
-    }),
-    prisma.deal.findMany({
-      where: {
-        tenantId: tenant.id,
-        pendingFinance: false,
-        financeReviewedAt: { not: null },
-      },
-      orderBy: { financeReviewedAt: "desc" },
-      include: {
-        lead: { select: { name: true, email: true } },
-      },
-      take: 30,
-    }),
-    prisma.membership.findMany({
-      where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
-      include: { user: { select: { id: true, name: true, email: true } } },
-      take: 200,
-    }),
-    prisma.deal.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      include: { lead: { select: { name: true, email: true } } },
-      take: 300,
-    }),
-    prisma.project.findMany({
-      where: { tenantId: tenant.id },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-      take: 400,
-    }),
-    prisma.unit.findMany({
-      where: { tenantId: tenant.id },
-      select: { id: true, label: true, projectId: true },
-      orderBy: [{ createdAt: "desc" }],
-      take: 1200,
-    }),
-    prisma.invoice.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      include: {
-        payments: { select: { id: true, amount: true, paidAt: true }, orderBy: { paidAt: "desc" } },
-        deal: {
-          select: {
-            id: true,
-            unitId: true,
-            unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } },
+    needsDeals
+      ? prisma.deal.findMany({
+          where: { tenantId: tenant.id, pendingFinance: true },
+          orderBy: { createdAt: "asc" },
+          include: {
             lead: { select: { name: true, email: true } },
-            propertyClient: { select: { fullName: true, email: true } },
           },
-        },
-      },
-      take: 300,
-    }),
-    prisma.paymentRecord.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { paidAt: "desc" },
-      include: {
-        invoice: {
-          select: {
-            invoiceNumber: true,
-            title: true,
-            department: true,
+          take: 500,
+        })
+      : Promise.resolve([]),
+    needsDeals
+      ? prisma.deal.findMany({
+          where: {
+            tenantId: tenant.id,
+            pendingFinance: false,
+            financeReviewedAt: { not: null },
+          },
+          orderBy: { financeReviewedAt: "desc" },
+          include: {
+            lead: { select: { name: true, email: true } },
+          },
+          take: 30,
+        })
+      : Promise.resolve([]),
+    needsDeals
+      ? prisma.membership.findMany({
+          where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
+          include: { user: { select: { id: true, name: true, email: true } } },
+          take: 200,
+        })
+      : Promise.resolve([]),
+    needsDealOptions
+      ? prisma.deal.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { createdAt: "desc" },
+          include: { lead: { select: { name: true, email: true } } },
+          take: 300,
+        })
+      : Promise.resolve([]),
+    needsDimensions
+      ? prisma.project.findMany({
+          where: { tenantId: tenant.id },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+          take: 400,
+        })
+      : Promise.resolve([]),
+    needsDimensions
+      ? prisma.unit.findMany({
+          where: { tenantId: tenant.id },
+          select: { id: true, label: true, projectId: true },
+          orderBy: [{ createdAt: "desc" }],
+          take: 1200,
+        })
+      : Promise.resolve([]),
+    needsInvoices
+      ? prisma.invoice.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { createdAt: "desc" },
+          include: {
+            payments: {
+              select: { id: true, amount: true, paidAt: true },
+              orderBy: { paidAt: "desc" },
+            },
             deal: {
               select: {
+                id: true,
                 unitId: true,
-                unit: { select: { id: true, label: true, project: { select: { id: true, name: true } } } },
+                unit: {
+                  select: {
+                    id: true,
+                    label: true,
+                    project: { select: { id: true, name: true } },
+                  },
+                },
+                lead: { select: { name: true, email: true } },
+                propertyClient: { select: { fullName: true, email: true } },
               },
             },
           },
-        },
-      },
-      take: 300,
-    }),
-    prisma.expense.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { expenseDate: "desc" },
-      take: 300,
-    }),
-    prisma.vendorBill.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { issuedAt: "desc" },
-      take: 300,
-    }),
-    prisma.salesReceipt.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { issuedAt: "desc" },
-      include: {
-        deal: {
-          select: {
-            lead: { select: { name: true, email: true } },
-            propertyClient: { select: { email: true, fullName: true } },
+          take: 300,
+        })
+      : Promise.resolve([]),
+    needsPayments
+      ? prisma.paymentRecord.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { paidAt: "desc" },
+          include: {
+            invoice: {
+              select: {
+                invoiceNumber: true,
+                title: true,
+                department: true,
+                deal: {
+                  select: {
+                    unitId: true,
+                    unit: {
+                      select: {
+                        id: true,
+                        label: true,
+                        project: { select: { id: true, name: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
-        },
-      },
-      take: 300,
-    }),
-    prisma.auditLog.findMany({
-      where: logsWhere,
-      orderBy: { createdAt: "desc" },
-      skip: (logsPage - 1) * logsPageSize,
-      take: logsPageSize,
-    }),
-    prisma.auditLog.count({ where: logsWhere }),
-    prisma.auditLog.findMany({
-      where: { tenantId: tenant.id },
-      select: { module: true, action: true, actorLabel: true },
-      take: 1500,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.auditLog.findMany({
-      where: {
-        tenantId: tenant.id,
-        module: "FINANCE",
-        entityType: "INVOICE",
-        action: { in: ["SEND", "SEND_REMINDER"] },
-      },
-      select: {
-        entityId: true,
-        action: true,
-        createdAt: true,
-      },
-      take: 3000,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.bankStatementRow.findMany({
-      where: { tenantId: tenant.id },
-      include: {
-        import: {
-          select: { id: true, sourceName: true, importedAt: true, finalizedAt: true },
-        },
-      },
-      orderBy: [{ createdAt: "desc" }],
-      take: 300,
-    }),
-    prisma.bankStatementImport.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { importedAt: "desc" },
-      take: 50,
-      select: {
-        id: true,
-        sourceName: true,
-        importedAt: true,
-        finalizedAt: true,
-      },
-    }),
-    prisma.bankStatementRow.groupBy({
-      by: ["importId", "matchStatus"],
-      where: { tenantId: tenant.id },
-      _count: { _all: true },
-    }),
+          take: 300,
+        })
+      : Promise.resolve([]),
+    needsExpenses
+      ? prisma.expense.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { expenseDate: "desc" },
+          take: 300,
+        })
+      : Promise.resolve([]),
+    needsBills
+      ? prisma.vendorBill.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { issuedAt: "desc" },
+          take: 300,
+        })
+      : Promise.resolve([]),
+    financeSurface === "receipts"
+      ? prisma.salesReceipt.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { issuedAt: "desc" },
+          include: {
+            deal: {
+              select: {
+                lead: { select: { name: true, email: true } },
+                propertyClient: { select: { email: true, fullName: true } },
+              },
+            },
+          },
+          take: 300,
+        })
+      : Promise.resolve([]),
+    needsLogs
+      ? prisma.auditLog.findMany({
+          where: logsWhere,
+          orderBy: { createdAt: "desc" },
+          skip: (logsPage - 1) * logsPageSize,
+          take: logsPageSize,
+        })
+      : Promise.resolve([]),
+    needsLogs
+      ? prisma.auditLog.count({ where: logsWhere })
+      : Promise.resolve(0),
+    needsLogs
+      ? prisma.auditLog.findMany({
+          where: { tenantId: tenant.id },
+          select: { module: true, action: true, actorLabel: true },
+          take: 1500,
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+    needsInvoiceEvents
+      ? prisma.auditLog.findMany({
+          where: {
+            tenantId: tenant.id,
+            module: "FINANCE",
+            entityType: "INVOICE",
+            action: { in: ["SEND", "SEND_REMINDER"] },
+          },
+          select: {
+            entityId: true,
+            action: true,
+            createdAt: true,
+          },
+          take: 3000,
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+    financeSurface === "banking"
+      ? prisma.bankStatementRow.findMany({
+          where: { tenantId: tenant.id },
+          include: {
+            import: {
+              select: {
+                id: true,
+                sourceName: true,
+                importedAt: true,
+                finalizedAt: true,
+              },
+            },
+          },
+          orderBy: [{ createdAt: "desc" }],
+          take: 300,
+        })
+      : Promise.resolve([]),
+    needsBanking
+      ? prisma.bankStatementImport.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { importedAt: "desc" },
+          take: 50,
+          select: {
+            id: true,
+            sourceName: true,
+            importedAt: true,
+            finalizedAt: true,
+          },
+        })
+      : Promise.resolve([]),
+    needsBanking
+      ? prisma.bankStatementRow.groupBy({
+          by: ["importId", "matchStatus"],
+          where: { tenantId: tenant.id },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
   ]);
 
-  const bankStatsMap = new Map<string, { total: number; matched: number; unmatched: number }>();
+  const bankStatsMap = new Map<
+    string,
+    { total: number; matched: number; unmatched: number }
+  >();
   for (const stat of bankRowStats) {
-    const current = bankStatsMap.get(stat.importId) || { total: 0, matched: 0, unmatched: 0 };
+    const current = bankStatsMap.get(stat.importId) || {
+      total: 0,
+      matched: 0,
+      unmatched: 0,
+    };
     current.total += stat._count._all;
     if (stat.matchStatus === "MATCHED") current.matched += stat._count._all;
     else current.unmatched += stat._count._all;
@@ -360,7 +482,11 @@ export default async function FinanceQueuePage({
   const userMap = new Map(users.map((u) => [u.user.id, u.user]));
   const invoiceEventMap = new Map<
     string,
-    { reminderCount: number; lastReminderAt: Date | null; lastSentAt: Date | null }
+    {
+      reminderCount: number;
+      lastReminderAt: Date | null;
+      lastSentAt: Date | null;
+    }
   >();
   for (const event of invoiceAuditEvents) {
     if (!event.entityId) continue;
@@ -382,12 +508,19 @@ export default async function FinanceQueuePage({
   }
 
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
   const invoiceRows = invoices.map((invoice) => {
     const dueDate = invoice.dueDate;
-    const isOpen = invoice.status !== "VOID" && invoice.status !== "PAID" && Number(invoice.balanceDue) > 0;
+    const isOpen =
+      invoice.status !== "VOID" &&
+      invoice.status !== "PAID" &&
+      Number(invoice.balanceDue) > 0;
     const overdueDays =
       isOpen && dueDate && dueDate.getTime() < startOfToday.getTime()
         ? Math.floor((startOfToday.getTime() - dueDate.getTime()) / MS_PER_DAY)
@@ -409,7 +542,9 @@ export default async function FinanceQueuePage({
       balanceLabel: `${invoice.currency} ${Number(invoice.balanceDue).toLocaleString()}`,
       balanceValue: Number(invoice.balanceDue),
       dueDateLabel: dueDate
-        ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(dueDate)
+        ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
+            dueDate,
+          )
         : "No due date",
       dueDateValue: dueDate ? dueDate.toISOString().slice(0, 10) : "",
       issuedAtValue: invoice.createdAt.toISOString().slice(0, 10),
@@ -423,18 +558,26 @@ export default async function FinanceQueuePage({
           ).format(invoice.payments[0].paidAt)}`
         : "No payments",
       canRecordPayment:
-        Number(invoice.balanceDue) > 0 && invoice.status !== "VOID" && invoice.status !== "DRAFT",
+        Number(invoice.balanceDue) > 0 &&
+        invoice.status !== "VOID" &&
+        invoice.status !== "DRAFT",
       canSend: invoice.status === "DRAFT",
       canResend:
         invoice.status !== "DRAFT" &&
         invoice.status !== "VOID" &&
         invoice.status !== "PAID" &&
         Number(invoice.balanceDue) > 0,
-      defaultEmail: invoice.deal?.propertyClient?.email || invoice.deal?.lead?.email || "",
-      customerName: invoice.deal?.propertyClient?.fullName || invoice.deal?.lead?.name || "",
+      defaultEmail:
+        invoice.deal?.propertyClient?.email || invoice.deal?.lead?.email || "",
+      customerName:
+        invoice.deal?.propertyClient?.fullName ||
+        invoice.deal?.lead?.name ||
+        "",
       pdfUrl: invoice.pdfUrl,
       sentToEmail: invoice.sentToEmail,
-      canVoid: invoice.status !== "VOID" && Number(invoice.amount) - Number(invoice.balanceDue) <= 0,
+      canVoid:
+        invoice.status !== "VOID" &&
+        Number(invoice.amount) - Number(invoice.balanceDue) <= 0,
       canSendReminder:
         invoice.status !== "DRAFT" &&
         invoice.status !== "VOID" &&
@@ -444,11 +587,15 @@ export default async function FinanceQueuePage({
       overdueDays,
       reminderCount: eventMeta.reminderCount,
       lastReminderLabel: eventMeta.lastReminderAt
-        ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
-            eventMeta.lastReminderAt,
-          )
+        ? new Intl.DateTimeFormat("en-NG", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          }).format(eventMeta.lastReminderAt)
         : "Never",
-      followUpOwner: invoice.deal?.lead?.name || invoice.deal?.lead?.email || "Unassigned contact",
+      followUpOwner:
+        invoice.deal?.lead?.name ||
+        invoice.deal?.lead?.email ||
+        "Unassigned contact",
       projectId: invoice.deal?.unit?.project?.id || "",
       projectLabel: invoice.deal?.unit?.project?.name || "Unassigned project",
       unitId: invoice.deal?.unit?.id || "",
@@ -458,13 +605,23 @@ export default async function FinanceQueuePage({
   });
 
   const openInvoices = invoiceRows.filter(
-    (x) => x.balanceValue > 0 && x.statusValue !== "VOID" && x.statusValue !== "PAID",
+    (x) =>
+      x.balanceValue > 0 &&
+      x.statusValue !== "VOID" &&
+      x.statusValue !== "PAID",
   );
   const overdueInvoices = openInvoices
     .filter((x) => x.isOverdue)
     .sort((a, b) => b.overdueDays - a.overdueDays)
     .slice(0, 150);
-  const agingBuckets = { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, noDueDate: 0 };
+  const agingBuckets = {
+    current: 0,
+    d1_30: 0,
+    d31_60: 0,
+    d61_90: 0,
+    d90_plus: 0,
+    noDueDate: 0,
+  };
   for (const row of openInvoices) {
     if (!row.dueDateValue) {
       agingBuckets.noDueDate += row.balanceValue;
@@ -481,9 +638,16 @@ export default async function FinanceQueuePage({
     .filter((x) => x.statusValue !== "VOID")
     .reduce((sum, row) => sum + row.amountValue, 0);
   const totalCollected = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const outstanding = openInvoices.reduce((sum, row) => sum + row.balanceValue, 0);
-  const overdueOutstanding = overdueInvoices.reduce((sum, row) => sum + row.balanceValue, 0);
-  const collectionRate = totalInvoiced > 0 ? (totalCollected / totalInvoiced) * 100 : 0;
+  const outstanding = openInvoices.reduce(
+    (sum, row) => sum + row.balanceValue,
+    0,
+  );
+  const overdueOutstanding = overdueInvoices.reduce(
+    (sum, row) => sum + row.balanceValue,
+    0,
+  );
+  const collectionRate =
+    totalInvoiced > 0 ? (totalCollected / totalInvoiced) * 100 : 0;
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -494,12 +658,14 @@ export default async function FinanceQueuePage({
     .filter((p) => p.paidAt >= prevMonthStart && p.paidAt < monthStart)
     .reduce((sum, p) => sum + Number(p.amount), 0);
 
-  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const monthKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const monthLabel = (key: string) => {
     const [y, m] = key.split("-").map((x) => Number(x));
-    return new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }).format(
-      new Date(y, (m || 1) - 1, 1),
-    );
+    return new Intl.DateTimeFormat("en-NG", {
+      month: "short",
+      year: "numeric",
+    }).format(new Date(y, (m || 1) - 1, 1));
   };
   const recentMonthKeys: string[] = [];
   for (let i = 11; i >= 0; i -= 1) {
@@ -511,17 +677,33 @@ export default async function FinanceQueuePage({
   for (const invoice of invoices) {
     if (invoice.status === "VOID") continue;
     const key = monthKey(invoice.createdAt);
-    invoicedByMonth.set(key, (invoicedByMonth.get(key) || 0) + Number(invoice.amount));
+    invoicedByMonth.set(
+      key,
+      (invoicedByMonth.get(key) || 0) + Number(invoice.amount),
+    );
   }
   const collectedByMonth = new Map<string, number>();
   for (const payment of payments) {
     const key = monthKey(payment.paidAt);
-    collectedByMonth.set(key, (collectedByMonth.get(key) || 0) + Number(payment.amount));
+    collectedByMonth.set(
+      key,
+      (collectedByMonth.get(key) || 0) + Number(payment.amount),
+    );
   }
   const expenseByMonth = new Map<string, number>();
+  const expenseCashByMonth = new Map<string, number>();
   for (const expense of expenses) {
     const key = monthKey(expense.expenseDate);
-    expenseByMonth.set(key, (expenseByMonth.get(key) || 0) + Number(expense.amount));
+    const pnlAmount = expensePnlAmount({
+      grossAmount: Number(expense.amount),
+      subtotal: Number(expense.subtotal),
+      vatRecoverable: expense.vatRecoverable,
+    });
+    expenseByMonth.set(key, (expenseByMonth.get(key) || 0) + pnlAmount);
+    expenseCashByMonth.set(
+      key,
+      (expenseCashByMonth.get(key) || 0) + Number(expense.amount),
+    );
   }
   const pnlBreakdown = recentMonthKeys.map((key) => {
     const invoiced = invoicedByMonth.get(key) || 0;
@@ -532,12 +714,12 @@ export default async function FinanceQueuePage({
       invoiced,
       collected,
       expenses: expenseTotal,
-      net: collected - expenseTotal,
+      net: invoiced - expenseTotal,
     };
   });
   const cashflowBreakdown = recentMonthKeys.map((key) => {
     const inflow = collectedByMonth.get(key) || 0;
-    const outflow = expenseByMonth.get(key) || 0;
+    const outflow = expenseCashByMonth.get(key) || 0;
     return {
       month: monthLabel(key),
       inflow,
@@ -545,11 +727,18 @@ export default async function FinanceQueuePage({
       net: inflow - outflow,
     };
   });
-  const expenseCategoryMap = new Map<string, { total: number; count: number }>();
+  const expenseCategoryMap = new Map<
+    string,
+    { total: number; count: number }
+  >();
   for (const expense of expenses) {
     const category = expense.category || "Uncategorized";
     const current = expenseCategoryMap.get(category) || { total: 0, count: 0 };
-    current.total += Number(expense.amount);
+    current.total += expensePnlAmount({
+      grossAmount: Number(expense.amount),
+      subtotal: Number(expense.subtotal),
+      vatRecoverable: expense.vatRecoverable,
+    });
     current.count += 1;
     expenseCategoryMap.set(category, current);
   }
@@ -559,16 +748,23 @@ export default async function FinanceQueuePage({
     .slice(0, 20);
 
   const openVendorBills = vendorBills.filter(
-    (b) => b.status !== "VOID" && b.status !== "PAID" && Number(b.balanceDue) > 0,
+    (b) =>
+      b.status !== "VOID" && b.status !== "PAID" && Number(b.balanceDue) > 0,
   );
-  const payablesOutstanding = openVendorBills.reduce((sum, b) => sum + Number(b.balanceDue), 0);
+  const payablesOutstanding = openVendorBills.reduce(
+    (sum, b) => sum + Number(b.balanceDue),
+    0,
+  );
   const payablesOverdueCount = openVendorBills.filter(
     (b) => b.dueDate && b.dueDate.getTime() < startOfToday.getTime(),
   ).length;
   const currentMonthExpenses = expenses
     .filter((e) => e.expenseDate >= monthStart)
     .reduce((sum, e) => sum + Number(e.amount), 0);
-  const bankingUnmatched = Array.from(bankStatsMap.values()).reduce((sum, s) => sum + s.unmatched, 0);
+  const bankingUnmatched = Array.from(bankStatsMap.values()).reduce(
+    (sum, s) => sum + s.unmatched,
+    0,
+  );
   const currency = tenant.defaultCurrency || "NGN";
   const money = (n: number) => `${currency} ${n.toLocaleString()}`;
 
@@ -593,11 +789,17 @@ export default async function FinanceQueuePage({
         id: deal.id,
         title: deal.lead?.name || deal.lead?.email || "Untitled deal",
         owner: deal.assignedUserId
-          ? userMap.get(deal.assignedUserId)?.name || userMap.get(deal.assignedUserId)?.email || "Unknown"
+          ? userMap.get(deal.assignedUserId)?.name ||
+            userMap.get(deal.assignedUserId)?.email ||
+            "Unknown"
           : "Unassigned",
         stage: formatEnumLabel(deal.stage),
-        value: deal.value ? `${tenant.defaultCurrency} ${Number(deal.value).toLocaleString()}` : "—",
-        createdAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(deal.createdAt),
+        value: deal.value
+          ? `${tenant.defaultCurrency} ${Number(deal.value).toLocaleString()}`
+          : "—",
+        createdAtLabel: new Intl.DateTimeFormat("en-NG", {
+          dateStyle: "medium",
+        }).format(deal.createdAt),
       }))}
       recentDecisions={recentDecisions.map((deal) => ({
         id: deal.id,
@@ -611,14 +813,16 @@ export default async function FinanceQueuePage({
               "Unknown"
             : "Unknown"),
         reviewedAtLabel: deal.financeReviewedAt
-          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
-              deal.financeReviewedAt,
-            )
+          ? new Intl.DateTimeFormat("en-NG", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(deal.financeReviewedAt)
           : "Unknown time",
       }))}
       dealOptions={dealOptions.map((deal) => ({
         id: deal.id,
-        label: deal.lead?.name || deal.lead?.email || `Deal ${deal.id.slice(0, 8)}`,
+        label:
+          deal.lead?.name || deal.lead?.email || `Deal ${deal.id.slice(0, 8)}`,
       }))}
       invoices={invoiceRows}
       payments={payments.map((payment) => {
@@ -637,12 +841,17 @@ export default async function FinanceQueuePage({
           method: canManage ? payment.method || "—" : "Restricted",
           reference: canManage ? payment.reference || "—" : "Restricted",
           referenceRaw: payment.reference || "",
-          paidAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(payment.paidAt),
+          paidAtLabel: new Intl.DateTimeFormat("en-NG", {
+            dateStyle: "medium",
+          }).format(payment.paidAt),
           paidAtValue: payment.paidAt.toISOString().slice(0, 10),
-          recordedBy: canManage ? payment.recordedByLabel || "Unknown" : "Restricted",
+          recordedBy: canManage
+            ? payment.recordedByLabel || "Unknown"
+            : "Restricted",
           hasAttachment: Boolean(payment.attachmentUrl),
           projectId: payment.invoice?.deal?.unit?.project?.id || "",
-          projectLabel: payment.invoice?.deal?.unit?.project?.name || "Unassigned project",
+          projectLabel:
+            payment.invoice?.deal?.unit?.project?.name || "Unassigned project",
           unitId: payment.invoice?.deal?.unit?.id || "",
           unitLabel: payment.invoice?.deal?.unit?.label || "Unassigned unit",
           department: payment.department || payment.invoice?.department || "",
@@ -654,12 +863,23 @@ export default async function FinanceQueuePage({
         vendorName: expense.vendorName || "—",
         amountLabel: `${expense.currency} ${Number(expense.amount).toLocaleString()}`,
         amountValue: Number(expense.amount),
+        pnlAmountValue: expensePnlAmount({
+          grossAmount: Number(expense.amount),
+          subtotal: Number(expense.subtotal),
+          vatRecoverable: expense.vatRecoverable,
+        }),
+        subtotalValue: Number(expense.subtotal),
+        vatAmountValue: Number(expense.vatAmount),
+        vatRate: Number(expense.vatRate),
+        vatTreatment: expense.vatTreatment,
+        vatRecoverable: expense.vatRecoverable,
+        currency: expense.currency,
         paidThroughAccount: expense.paidThroughAccount || "—",
         reference: expense.reference || "—",
         referenceRaw: expense.reference || "",
-        expenseDateLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
-          expense.expenseDate,
-        ),
+        expenseDateLabel: new Intl.DateTimeFormat("en-NG", {
+          dateStyle: "medium",
+        }).format(expense.expenseDate),
         expenseDateValue: expense.expenseDate.toISOString().slice(0, 10),
         hasAttachment: Boolean(expense.attachmentUrl),
         projectId: expense.projectId || "",
@@ -667,36 +887,52 @@ export default async function FinanceQueuePage({
           ? projectMap.get(expense.projectId) || "Unknown project"
           : "Unassigned project",
         unitId: expense.unitId || "",
-        unitLabel: expense.unitId ? unitMap.get(expense.unitId)?.label || "Unknown unit" : "Unassigned unit",
+        unitLabel: expense.unitId
+          ? unitMap.get(expense.unitId)?.label || "Unknown unit"
+          : "Unassigned unit",
         department: expense.department || "",
+        note: expense.note || "",
       }))}
       salesReceipts={salesReceipts.map((receipt) => ({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
         title: receipt.title,
         customerName:
-          receipt.customerName || receipt.deal?.propertyClient?.fullName || receipt.deal?.lead?.name || "—",
-        defaultEmail: receipt.deal?.propertyClient?.email || receipt.deal?.lead?.email || "",
+          receipt.customerName ||
+          receipt.deal?.propertyClient?.fullName ||
+          receipt.deal?.lead?.name ||
+          "—",
+        defaultEmail:
+          receipt.deal?.propertyClient?.email ||
+          receipt.deal?.lead?.email ||
+          "",
         amountLabel: `${receipt.currency} ${Number(receipt.amount).toLocaleString()}`,
         paymentMode: receipt.paymentMode || "—",
         depositAccount: receipt.depositAccount || "—",
-        issuedAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(receipt.issuedAt),
+        issuedAtLabel: new Intl.DateTimeFormat("en-NG", {
+          dateStyle: "medium",
+        }).format(receipt.issuedAt),
         sentToEmail: receipt.sentToEmail,
         sentAtLabel: receipt.sentAt
-          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(receipt.sentAt)
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
+              receipt.sentAt,
+            )
           : null,
         pdfUrl: receipt.pdfUrl,
       }))}
       masterLogs={masterLogs.map((log) => ({
         id: log.id,
-        timestamp: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
-          log.createdAt,
-        ),
+        timestamp: new Intl.DateTimeFormat("en-NG", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(log.createdAt),
         actor: canManage ? log.actorLabel || "System" : "Restricted",
         module: log.module,
         action: log.action,
         entityType: log.entityType,
-        summary: canManage ? log.summary || "No summary" : `${log.module} ${log.action}`,
+        summary: canManage
+          ? log.summary || "No summary"
+          : `${log.module} ${log.action}`,
       }))}
       logFilters={{
         activeTab: logsParams.activeTab || "",
@@ -717,18 +953,28 @@ export default async function FinanceQueuePage({
         pageSize: logsPageSize,
       }}
       logFilterOptions={{
-        modules: Array.from(new Set(allLogValues.map((x) => x.module))).sort((a, b) => a.localeCompare(b)),
-        actions: Array.from(new Set(allLogValues.map((x) => x.action))).sort((a, b) => a.localeCompare(b)),
+        modules: Array.from(new Set(allLogValues.map((x) => x.module))).sort(
+          (a, b) => a.localeCompare(b),
+        ),
+        actions: Array.from(new Set(allLogValues.map((x) => x.action))).sort(
+          (a, b) => a.localeCompare(b),
+        ),
         actors: canManage
-          ? Array.from(new Set(allLogValues.map((x) => x.actorLabel).filter(Boolean) as string[])).sort(
-              (a, b) => a.localeCompare(b),
-            )
+          ? Array.from(
+              new Set(
+                allLogValues
+                  .map((x) => x.actorLabel)
+                  .filter(Boolean) as string[],
+              ),
+            ).sort((a, b) => a.localeCompare(b))
           : [],
       }}
       arView={{
         totalOpenInvoices: openInvoices.length,
         overdueInvoices: overdueInvoices.length,
-        followUpsNeeded: overdueInvoices.filter((x) => x.reminderCount === 0 || x.overdueDays >= 14).length,
+        followUpsNeeded: overdueInvoices.filter(
+          (x) => x.reminderCount === 0 || x.overdueDays >= 14,
+        ).length,
         agingBuckets: {
           current: `${tenant.defaultCurrency} ${agingBuckets.current.toLocaleString()}`,
           d1_30: `${tenant.defaultCurrency} ${agingBuckets.d1_30.toLocaleString()}`,
@@ -770,7 +1016,10 @@ export default async function FinanceQueuePage({
           collectionRateLabel: `${collectionRate.toFixed(1)}%`,
           overdueOutstandingLabel: `${tenant.defaultCurrency} ${overdueOutstanding.toLocaleString()}`,
           overdueCount: overdueInvoices.length,
-          remindersSent: invoiceRows.reduce((sum, row) => sum + row.reminderCount, 0),
+          remindersSent: invoiceRows.reduce(
+            (sum, row) => sum + row.reminderCount,
+            0,
+          ),
         },
         pnlBreakdown,
         expenseBreakdown,
@@ -780,7 +1029,9 @@ export default async function FinanceQueuePage({
           overdueReceivables: overdueOutstanding,
           cashIn: totalCollected,
           cashOut: expenses.reduce((sum, x) => sum + Number(x.amount), 0),
-          netCashflow: totalCollected - expenses.reduce((sum, x) => sum + Number(x.amount), 0),
+          netCashflow:
+            totalCollected -
+            expenses.reduce((sum, x) => sum + Number(x.amount), 0),
         },
       }}
       bankingRows={bankRows.map((row) => ({
@@ -803,7 +1054,11 @@ export default async function FinanceQueuePage({
         importIsFinalized: Boolean(row.import.finalizedAt),
       }))}
       bankingImports={bankImports.map((x) => {
-        const s = bankStatsMap.get(x.id) || { total: 0, matched: 0, unmatched: 0 };
+        const s = bankStatsMap.get(x.id) || {
+          total: 0,
+          matched: 0,
+          unmatched: 0,
+        };
         return {
           id: x.id,
           sourceName: x.sourceName,
@@ -818,12 +1073,21 @@ export default async function FinanceQueuePage({
         };
       })}
       financeOptions={financeOptions}
+      allocationOptions={projects.map((project) => ({
+        id: project.id,
+        label: project.name,
+        units: units
+          .filter((unit) => unit.projectId === project.id)
+          .map((unit) => ({ id: unit.id, label: unit.label })),
+      }))}
       financeControls={financeControls}
       fiscalYear={
         activeFiscalGoal
           ? {
               label: activeFiscalGoal.label,
-              start: activeFiscalGoal.fiscalYearStart.toISOString().slice(0, 10),
+              start: activeFiscalGoal.fiscalYearStart
+                .toISOString()
+                .slice(0, 10),
               end: activeFiscalGoal.fiscalYearEnd.toISOString().slice(0, 10),
             }
           : null
@@ -832,10 +1096,15 @@ export default async function FinanceQueuePage({
       financeExpenseCategories={financeExpenseCategories}
       vendorBills={vendorBills.map((bill) => {
         const dueDate = bill.dueDate;
-        const isOpen = bill.status !== "VOID" && bill.status !== "PAID" && Number(bill.balanceDue) > 0;
+        const isOpen =
+          bill.status !== "VOID" &&
+          bill.status !== "PAID" &&
+          Number(bill.balanceDue) > 0;
         const overdueDays =
           isOpen && dueDate && dueDate.getTime() < startOfToday.getTime()
-            ? Math.floor((startOfToday.getTime() - dueDate.getTime()) / MS_PER_DAY)
+            ? Math.floor(
+                (startOfToday.getTime() - dueDate.getTime()) / MS_PER_DAY,
+              )
             : 0;
         return {
           id: bill.id,
@@ -850,14 +1119,19 @@ export default async function FinanceQueuePage({
           balanceValue: Number(bill.balanceDue),
           currency: bill.currency,
           dueDateLabel: dueDate
-            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(dueDate)
+            ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
+                dueDate,
+              )
             : "No due date",
           dueDateValue: dueDate ? dueDate.toISOString().slice(0, 10) : "",
           issuedAtValue: bill.issuedAt.toISOString().slice(0, 10),
           department: bill.department || "",
           isOverdue: overdueDays > 0,
           overdueDays,
-          canRecordPayment: Number(bill.balanceDue) > 0 && bill.status !== "VOID" && bill.status !== "PAID",
+          canRecordPayment:
+            Number(bill.balanceDue) > 0 &&
+            bill.status !== "VOID" &&
+            bill.status !== "PAID",
           canVoid: bill.status === "OPEN",
           isRecurring: Boolean(bill.isRecurring),
           recurrenceLabel: bill.recurrenceFrequency

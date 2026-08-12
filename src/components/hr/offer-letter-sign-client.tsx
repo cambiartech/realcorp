@@ -48,7 +48,12 @@ export function OfferLetterSignClient({
   return (
     <div className="min-h-screen bg-slate-50 py-6 px-4" style={brandingCssVars(brand)}>
       <div className="mx-auto max-w-3xl">
-        <BrandedDocumentShell brand={brand} title="Offer of employment" subtitle={`Hello, ${employeeName}`}>
+      <BrandedDocumentShell
+        brand={brand}
+        title="Offer of employment"
+        subtitle={`Hello, ${employeeName}`}
+        variant="formal"
+      >
           <div
             className="space-y-3 text-sm leading-relaxed text-slate-800"
             dangerouslySetInnerHTML={{ __html: bodyHtml }}

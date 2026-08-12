@@ -9,6 +9,20 @@ import { SettingsWorkspace } from "./settings-workspace";
 
 export const dynamic = "force-dynamic";
 
+function payrollContributionRate(value: unknown, code: string, fallback: number) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+  const rows = (value as Record<string, unknown>).employerContributions;
+  if (!Array.isArray(rows)) return fallback;
+  const match = rows.find(
+    (row) =>
+      row &&
+      typeof row === "object" &&
+      !Array.isArray(row) &&
+      (row as Record<string, unknown>).code === code,
+  ) as Record<string, unknown> | undefined;
+  return typeof match?.rate === "number" ? match.rate : fallback;
+}
+
 const settingsSelect = {
   logoUrl: true,
   primaryColor: true,
@@ -19,6 +33,8 @@ const settingsSelect = {
   orgCity: true,
   orgState: true,
   orgCountry: true,
+  payrollCountryCode: true,
+  payrollSettings: true,
   moduleSales: true,
   moduleFinance: true,
   moduleMarketing: true,
@@ -165,6 +181,9 @@ export default async function TenantSettingsPage({
             orgCity: tenant.settings?.orgCity ?? null,
             orgState: tenant.settings?.orgState ?? null,
             orgCountry: tenant.settings?.orgCountry ?? "Nigeria",
+            payrollCountryCode: tenant.settings?.payrollCountryCode ?? "NG",
+            nsitfRate: payrollContributionRate(tenant.settings?.payrollSettings, "NSITF", 1),
+            itfRate: payrollContributionRate(tenant.settings?.payrollSettings, "ITF", 0),
           }}
           integrations={{
             metaVerifyToken: tenant.settings?.metaVerifyToken ?? null,

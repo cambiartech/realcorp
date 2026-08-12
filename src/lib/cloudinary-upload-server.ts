@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "crypto";
 import { buildCloudinaryAttachmentSignature } from "@/lib/cloudinary";
 import {
   getPlatformCloudinaryConfig,
@@ -65,12 +66,21 @@ function safeUploadBasename(fileName?: string, fallback = "file") {
   );
 }
 
+function safeFileExtension(fileName?: string) {
+  return fileName?.match(/\.([a-z0-9]{1,10})$/i)?.[1]?.toLowerCase() || "";
+}
+
+function inferredResourceType(fileName?: string): "auto" | "raw" {
+  return /\.(pdf|docx?|xlsx?|csv|txt|rtf|zip)$/i.test(fileName || "") ? "raw" : "auto";
+}
+
 export async function createTenantUploadSignature(input: {
   tenantId: string;
   tenantSlug: string;
   area: CloudinaryArea;
   fileName?: string;
   publicIdPrefix?: string;
+  resourceType?: "auto" | "raw" | "image";
 }): Promise<CloudinaryUploadSignature | CloudinaryUploadError> {
   const creds = await resolveCloudinaryCredentials(input.tenantId);
   if (!creds) {
@@ -89,7 +99,10 @@ export async function createTenantUploadSignature(input: {
         )?.cloudinaryFolder?.trim() || `realcorp/${input.area}`;
 
   const safeName = safeUploadBasename(input.fileName);
-  const publicId = `${input.publicIdPrefix ?? input.tenantId}/${safeName}-${timestamp}`;
+  const resourceType = input.resourceType ?? inferredResourceType(input.fileName);
+  const extension = resourceType === "raw" ? safeFileExtension(input.fileName) : "";
+  const assetName = `${safeName}-${timestamp}-${randomUUID().slice(0, 8)}${extension ? `.${extension}` : ""}`;
+  const publicId = `${input.publicIdPrefix ?? input.tenantId}/${assetName}`;
   const signature = buildCloudinaryAttachmentSignature({
     apiSecret: creds.apiSecret,
     timestamp,
@@ -105,7 +118,7 @@ export async function createTenantUploadSignature(input: {
     timestamp,
     publicId,
     signature,
-    uploadUrl: `https://api.cloudinary.com/v1_1/${creds.cloudName}/auto/upload`,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${creds.cloudName}/${resourceType}/upload`,
     source: creds.source,
   };
 }
@@ -135,7 +148,10 @@ export async function uploadBufferToCloudinary(input: {
         )?.cloudinaryFolder?.trim() || `realcorp/${input.area}`;
 
   const safeName = safeUploadBasename(input.fileName, "document");
-  const publicId = `${input.tenantId}/${safeName}-${timestamp}`;
+  const resourceType = input.resourceType ?? "raw";
+  const extension = resourceType === "raw" ? safeFileExtension(input.fileName) : "";
+  const assetName = `${safeName}-${timestamp}-${randomUUID().slice(0, 8)}${extension ? `.${extension}` : ""}`;
+  const publicId = `${input.tenantId}/${assetName}`;
   const signature = buildCloudinaryAttachmentSignature({
     apiSecret: creds.apiSecret,
     timestamp,
@@ -143,7 +159,6 @@ export async function uploadBufferToCloudinary(input: {
     publicId,
   });
 
-  const resourceType = input.resourceType ?? "raw";
   const uploadUrl = `https://api.cloudinary.com/v1_1/${creds.cloudName}/${resourceType}/upload`;
   const body = new FormData();
   body.append("file", new Blob([Buffer.from(input.buffer)], { type: "application/pdf" }), input.fileName);

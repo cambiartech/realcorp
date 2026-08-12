@@ -1,5 +1,6 @@
 "use client";
 
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 import type { NightAuditSnapshot } from "@/lib/shortlets-night-audit";
 
 type Props = {
@@ -10,16 +11,16 @@ type Props = {
 
 export function NightAuditReport({ tenantName, audit, showPrintButton = true }: Props) {
   return (
-    <div className="night-audit-report space-y-6">
+    <div className="night-audit-report space-y-6" data-pdf-document="true">
       {showPrintButton ? (
-        <div className="flex justify-end print:hidden">
-          <button
-            type="button"
-            onClick={() => window.print()}
+        <div className="flex justify-end print:hidden" data-pdf-exclude="true">
+          <PdfDownloadButton
+            targetSelector=".night-audit-report"
+            filename={`night-audit-${audit.businessDateLabel}`}
             className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
           >
-            Print night audit
-          </button>
+            Download night audit PDF
+          </PdfDownloadButton>
         </div>
       ) : null}
 

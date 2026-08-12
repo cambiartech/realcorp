@@ -25,6 +25,7 @@ export function HrWorkspace(props: {
   currency: string;
   activeTab: HrTab;
   canManageHr: boolean;
+  aiEnabled: boolean;
   currentUserId: string;
   teamMembers: Array<{ userId: string; name: string; email: string; role: string; hasProfile: boolean }>;
   profiles: Array<{
@@ -41,6 +42,19 @@ export function HrWorkspace(props: {
     bankName: string;
     accountNumber: string;
     dateOfJoiningLabel: string;
+  }>;
+  payTemplates: Array<{
+    id: string;
+    name: string;
+    countryCode: string;
+    basicPercent: number;
+    housingPercent: number;
+    transportPercent: number;
+    otherPercent: number;
+    pensionEnabled: boolean;
+    employeePensionRate: number;
+    employerPensionRate: number;
+    isDefault: boolean;
   }>;
   profileDetails: import("@/lib/hr-profile-form").ProfileDetailRow[];
   profileOnboarding: Array<{
@@ -95,8 +109,19 @@ export function HrWorkspace(props: {
     status: string;
     statusValue: string;
     payslipCount: number;
+    adjustments: Array<{
+      id: string;
+      employeeProfileId: string;
+      type: "EARNING" | "DEDUCTION";
+      label: string;
+      amount: number;
+      taxable: boolean;
+      pensionable: boolean;
+      preTax: boolean;
+    }>;
     payslips: Array<{
       id: string;
+      employeeProfileId: string;
       employeeName: string;
       jobRole: string;
       paygroup: string;
@@ -136,6 +161,9 @@ export function HrWorkspace(props: {
     expiresLabel: string;
     submittedAtLabel: string;
     hasFileUpload: boolean;
+    submittedFileUrl: string | null;
+    submittedPayload: Record<string, unknown> | null;
+    reviewNote: string | null;
   }>;
   performanceGoals: PerformanceGoalRow[];
   profileOptions: Array<{ id: string; label: string; department: string }>;
@@ -268,8 +296,10 @@ export function HrWorkspace(props: {
     currency,
     activeTab,
     canManageHr,
+    aiEnabled,
     teamMembers,
     profiles,
+    payTemplates,
     profileDetails,
     profileOnboarding,
     appraisalActions,
@@ -354,12 +384,14 @@ export function HrWorkspace(props: {
             currency={currency}
             teamMembers={teamMembers}
             profiles={profiles}
+            payTemplates={payTemplates}
             profileDetails={profileDetails}
             profileOnboarding={profileOnboarding}
             ytdByUserId={ytdByUserId}
             formRequests={formRequests}
             initialOnboardUserId={peopleOnboardUserId}
             offerByUserId={offerByUserId}
+            aiEnabled={aiEnabled}
           />
         ) : null}
 
@@ -418,6 +450,8 @@ export function HrWorkspace(props: {
             documents={documents}
             preselectUserId={documentsForUserId}
             returnOnboardUserId={documentsReturnOnboardUserId}
+            pendingReviewCount={formRequests.filter((request) => request.statusValue === "SUBMITTED").length}
+            aiEnabled={aiEnabled}
           />
         ) : null}
 
