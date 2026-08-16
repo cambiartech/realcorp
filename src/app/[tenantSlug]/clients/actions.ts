@@ -20,6 +20,7 @@ import {
   parseCreatePropertyClientForm,
   parseLinkClientUnitForm,
   parseLinkClientShortletForm,
+  parseRecordClientDepositForm,
   parseUpdatePropertyClientForm,
 } from "@/lib/validators/clients";
 import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
@@ -412,6 +413,147 @@ export async function unlinkClientUnit(
 
   await prisma.clientUnitLink.delete({ where: { id: link.id } });
   revalidateClients(tenantSlug, clientId);
+  return { ok: true };
+}
+
+export async function deletePropertyClient(
+  tenantSlug: string,
+  clientId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to delete clients." };
+  }
+
+  const existing = await prisma.propertyClient.findFirst({
+    where: { id: clientId, tenantId: tenant.id },
+    select: { id: true, fullName: true },
+  });
+  if (!existing) return { ok: false, error: "Client not found." };
+
+  try {
+    await prisma.propertyClient.delete({ where: { id: existing.id } });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "CLIENTS",
+      entityType: "PROPERTY_CLIENT",
+      entityId: existing.id,
+      action: "DELETE",
+      summary: `Deleted client ${existing.fullName}.`,
+    });
+  } catch {
+    return { ok: false, error: "Could not delete this client right now." };
+  }
+
+  revalidateClients(tenantSlug);
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function recordClientDeposit(
+  tenantSlug: string,
+  clientId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = parseRecordClientDepositForm(formData);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+  }
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to record client payments." };
+  }
+
+  const tenantRecord = await prisma.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { defaultCurrency: true },
+  });
+
+  const client = await prisma.propertyClient.findFirst({
+    where: { id: clientId, tenantId: tenant.id },
+    select: { id: true, fullName: true },
+  });
+  if (!client) return { ok: false, error: "Client not found." };
+
+  const unit = await prisma.unit.findFirst({
+    where: { id: parsed.data.unitId, tenantId: tenant.id },
+    select: { id: true, label: true, projectId: true, pricingPlanId: true, project: { select: { name: true } } },
+  });
+  if (!unit) return { ok: false, error: "Unit not found." };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const existingLink = await tx.clientUnitLink.findFirst({
+        where: { tenantId: tenant.id, clientId: client.id, unitId: unit.id },
+        select: { id: true },
+      });
+      if (!existingLink) {
+        await tx.clientUnitLink.create({
+          data: {
+            tenantId: tenant.id,
+            clientId: client.id,
+            unitId: unit.id,
+            pricingPlanId: unit.pricingPlanId,
+          },
+        });
+      }
+
+      await tx.paymentRecord.create({
+        data: {
+          tenantId: tenant.id,
+          invoiceId: null,
+          propertyClientId: client.id,
+          projectId: unit.projectId,
+          unitId: unit.id,
+          incomeType: "CLIENT_DEPOSIT",
+          standaloneTitle: `Client deposit · ${client.fullName} · ${unit.project.name} ${unit.label}`,
+          payerName: client.fullName,
+          amount: parsed.data.amount,
+          currency: tenantRecord?.defaultCurrency || "NGN",
+          paidAt: new Date(parsed.data.paidAt),
+          method: parsed.data.method || null,
+          reference: parsed.data.reference || null,
+          note: parsed.data.note || null,
+          recordedByUserId: session.user.id,
+          recordedByLabel: session.user.name || session.user.email || "Unknown recorder",
+        },
+      });
+    });
+
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "FINANCE",
+      entityType: "PAYMENT",
+      entityId: client.id,
+      action: "CREATE",
+      summary: `Recorded client deposit for ${client.fullName} on ${unit.project.name} ${unit.label}.`,
+      metadata: {
+        amount: parsed.data.amount,
+        unitId: unit.id,
+        projectId: unit.projectId,
+        incomeType: "CLIENT_DEPOSIT",
+      },
+    });
+  } catch {
+    return { ok: false, error: "Could not record this payment right now." };
+  }
+
+  revalidateClients(tenantSlug, clientId);
+  revalidatePath(`/${tenantSlug}/finance`);
   return { ok: true };
 }
 

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import { canManageClients } from "@/lib/clients-access";
 import prisma from "@/lib/db";
+import { loadClientDepositRows, summarizeClientDeposits } from "@/lib/client-deposits";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { ClientDetailWorkspace } from "./client-detail-workspace";
@@ -22,6 +23,8 @@ export default async function ClientDetailPage({
     select: {
       id: true,
       slug: true,
+      name: true,
+      defaultCurrency: true,
       settings: {
         select: {
           moduleSales: true,
@@ -74,7 +77,7 @@ export default async function ClientDetailPage({
   });
   if (!client) notFound();
 
-  const [projects, linkedUnitIds, linkedShortletIds, shortletProperties, standaloneShortlets] =
+  const [projects, linkedUnitIds, linkedShortletIds, shortletProperties, standaloneShortlets, depositRows, payments] =
     await Promise.all([
       prisma.project.findMany({
         where: { tenantId: tenant.id },
@@ -137,6 +140,31 @@ export default async function ClientDetailPage({
             orderBy: { name: "asc" },
           })
         : Promise.resolve([]),
+      loadClientDepositRows(tenant.id, { clientId: client.id }),
+      prisma.paymentRecord.findMany({
+        where: {
+          tenantId: tenant.id,
+          voidedAt: null,
+          OR: [
+            { propertyClientId: client.id },
+            { invoice: { deal: { propertyClient: { id: client.id } } } },
+            { unitId: { in: client.unitLinks.map((link) => link.unitId) } },
+          ],
+        },
+        orderBy: { paidAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          paidAt: true,
+          method: true,
+          reference: true,
+          standaloneTitle: true,
+          incomeType: true,
+          unit: { select: { label: true, project: { select: { name: true } } } },
+        },
+      }),
     ]);
 
   const alreadyLinkedUnits = new Set(linkedUnitIds.map((l) => l.unitId));
@@ -191,9 +219,19 @@ export default async function ClientDetailPage({
       : []),
   ];
 
+  const depositSummary = summarizeClientDeposits(depositRows);
+  const paymentUnitOptions = projects.flatMap((project) =>
+    project.units.map((unit) => ({
+      id: unit.id,
+      label: `${project.name} · ${unit.label}`,
+    })),
+  );
+
   return (
     <ClientDetailWorkspace
       tenantSlug={tenant.slug}
+      companyName={tenant.name}
+      currency={tenant.defaultCurrency || "NGN"}
       canManage={canManageClients(Boolean(session.user.isPlatformAdmin), membership)}
       moduleShortLets={moduleShortLets}
       client={{
@@ -210,6 +248,28 @@ export default async function ClientDetailPage({
         statusValue: client.status,
         notes: client.notes ?? "",
       }}
+      depositSummary={depositSummary}
+      depositRows={depositRows.map((row) => ({
+        id: row.id,
+        projectLabel: row.projectLabel,
+        unitLabel: row.unitLabel,
+        contractValue: row.contractValue,
+        collected: row.collected,
+        remaining: row.remaining,
+      }))}
+      payments={payments.map((payment) => ({
+        id: payment.id,
+        title: payment.standaloneTitle || "Client deposit",
+        unitLabel: payment.unit
+          ? `${payment.unit.project.name} · ${payment.unit.label}`
+          : "Unassigned unit",
+        amount: Number(payment.amount),
+        currency: payment.currency,
+        paidAtLabel: payment.paidAt.toISOString().slice(0, 10),
+        method: payment.method ?? "",
+        reference: payment.reference ?? "",
+      }))}
+      paymentUnitOptions={paymentUnitOptions}
       unitLinks={client.unitLinks.map((link) => ({
         id: link.id,
         unitLabel: link.unit.label,

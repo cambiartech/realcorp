@@ -382,7 +382,7 @@ export function HrOnboardingWizard({
           <div className="text-sm text-muted">
             <p className="font-medium text-foreground">What to do now</p>
             <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs">
-              <li>If documents are already uploaded, use Prefill from uploaded docs.</li>
+              <li>If documents are already uploaded, use Prefill with AI.</li>
               <li>Generate and print the offer letter for signature.</li>
               <li>Send biodata, bank, and guarantor forms only if a file is missing or unreadable.</li>
               <li>When forms are submitted, approve them under Form requests.</li>

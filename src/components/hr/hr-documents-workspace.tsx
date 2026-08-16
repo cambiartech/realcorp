@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
+import { PrefillWithAiButton } from "@/components/hr/prefill-with-ai-button";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -594,9 +595,10 @@ export function HrDocumentsWorkspace({
               ))}
             </div>
             {aiEnabled && browseMode === "employee" && selectedEmployee ? (
-              <button
-                type="button"
-                disabled={prefillPending}
+              <PrefillWithAiButton
+                pending={prefillPending}
+                pendingLabel="Prefilling…"
+                className="w-auto"
                 onClick={() => {
                   void (async () => {
                     setPrefillPending(true);
@@ -621,10 +623,7 @@ export function HrDocumentsWorkspace({
                     router.refresh();
                   })();
                 }}
-                className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background disabled:opacity-50"
-              >
-                {prefillPending ? "Prefilling…" : "Prefill from uploaded docs"}
-              </button>
+              />
             ) : null}
           </div>
 

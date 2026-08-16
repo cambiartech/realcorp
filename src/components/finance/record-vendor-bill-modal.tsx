@@ -28,6 +28,7 @@ type Props = {
   onClose: () => void;
   onSubmit: (formData: FormData) => void;
   actionPending: boolean;
+  tenantSlug?: string;
   currencies: string[];
   departments: string[];
   defaultCurrency: string;
@@ -41,6 +42,7 @@ export function RecordVendorBillModal({
   onClose,
   onSubmit,
   actionPending,
+  tenantSlug,
   currencies,
   departments,
   defaultCurrency,
@@ -331,7 +333,12 @@ export function RecordVendorBillModal({
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
-            <OrgDepartmentSelect departments={departments} value={department} onChange={setDepartment} />
+            <OrgDepartmentSelect
+              tenantSlug={tenantSlug}
+              departments={departments}
+              value={department}
+              onChange={setDepartment}
+            />
           </div>
 
           <div>

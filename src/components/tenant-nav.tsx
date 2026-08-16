@@ -381,6 +381,12 @@ export function TenantSidebar({
         { id: "banking", label: "Banking", href: `${financeItem.href}/banking`, icon: Landmark },
         { id: "reports", label: "Reports", href: `${financeItem.href}/reports`, icon: BarChart2 },
         {
+          id: "shortlets",
+          label: "Income per project & shortlet",
+          href: `${financeItem.href}/shortlets`,
+          icon: BedDouble,
+        },
+        {
           id: "audit-logs",
           label: "Audit Logs",
           href: `${financeItem.href}/audit-logs`,

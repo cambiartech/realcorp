@@ -714,6 +714,7 @@ model PaymentRecord {
   id                 String             @id @default(cuid())
   tenantId           String
   invoiceId          String?
+  propertyClientId   String?
   projectId          String?
   unitId             String?
   standaloneTitle    String?
@@ -737,13 +738,15 @@ model PaymentRecord {
   voidReason         String?
   createdAt          DateTime           @default(now())
 
-  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  unit    Unit?    @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice        Invoice?        @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  propertyClient PropertyClient? @relation(fields: [propertyClientId], references: [id], onDelete: SetNull)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, paidAt])
   @@index([invoiceId])
+  @@index([tenantId, propertyClientId])
   @@index([tenantId, projectId, unitId])
   @@index([tenantId, voidedAt])
 }
@@ -1912,6 +1915,32 @@ model HrFormRequest {
   @@index([bundleToken])
 }
 
+// ——— World reference geography (prefilled by migration; shared platform-wide) ———
+
+model CountryRef {
+  code       String            @id
+  name       String
+  emoji      String?
+  catalogDir String?
+  states     CountryStateRef[]
+
+  @@index([name])
+}
+
+model CountryStateRef {
+  id          String     @id @default(cuid())
+  countryCode String
+  code        String
+  name        String
+  type        String?
+  catalogDir  String?
+  country     CountryRef @relation(fields: [countryCode], references: [code], onDelete: Cascade)
+
+  @@unique([countryCode, code])
+  @@index([countryCode])
+  @@index([name])
+}
+
 // ——— Nigeria reference geography (synced from open dataset, shared platform-wide) ———
 
 model NigeriaStateRef {
@@ -2091,6 +2120,7 @@ model PropertyClient {
   unitLinks            ClientUnitLink[]
   shortletLinks        ClientShortletLink[]
   documents            ClientDocument[]
+  payments             PaymentRecord[]
   shortletReservations ShortletReservation[]
   shortletGuests       ShortletGuest[]
 

@@ -13,9 +13,12 @@ import {
   ClientDocumentsWorkspace,
   type ClientDocumentItem,
 } from "@/components/clients/client-documents-workspace";
+import { downloadClientStatementXlsx } from "@/lib/client-report-xlsx";
 import {
+  deletePropertyClient,
   linkClientShortlet,
   linkClientUnit,
+  recordClientDeposit,
   unlinkClientShortlet,
   unlinkClientUnit,
   updatePropertyClient,
@@ -64,11 +67,21 @@ type ShortletPropertyOption = {
 type ActionResult = { ok: true } | { ok: false; error: string };
 const initial: ActionResult | null = null;
 
+function moneyLabel(currency: string, value: number) {
+  return `${currency} ${value.toLocaleString("en-NG")}`;
+}
+
 export function ClientDetailWorkspace({
   tenantSlug,
+  companyName,
+  currency,
   canManage,
   moduleShortLets,
   client,
+  depositSummary,
+  depositRows,
+  payments,
+  paymentUnitOptions,
   unitLinks,
   shortletLinks,
   projectOptions,
@@ -76,6 +89,8 @@ export function ClientDetailWorkspace({
   documents,
 }: {
   tenantSlug: string;
+  companyName: string;
+  currency: string;
   canManage: boolean;
   moduleShortLets: boolean;
   client: {
@@ -92,6 +107,26 @@ export function ClientDetailWorkspace({
     statusValue: string;
     notes: string;
   };
+  depositSummary: { contractValue: number; collected: number; remaining: number };
+  depositRows: Array<{
+    id: string;
+    projectLabel: string;
+    unitLabel: string;
+    contractValue: number;
+    collected: number;
+    remaining: number;
+  }>;
+  payments: Array<{
+    id: string;
+    title: string;
+    unitLabel: string;
+    amount: number;
+    currency: string;
+    paidAtLabel: string;
+    method: string;
+    reference: string;
+  }>;
+  paymentUnitOptions: Array<{ id: string; label: string }>;
   unitLinks: UnitLinkRow[];
   shortletLinks: ShortletLinkRow[];
   projectOptions: ProjectOption[];
@@ -103,6 +138,10 @@ export function ClientDetailWorkspace({
   const [tab, setTab] = useState<"overview" | "documents">("overview");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
+  const [isPayOpen, setIsPayOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [linkKind, setLinkKind] = useState<"project" | "shortlet">("project");
   const [projectSearch, setProjectSearch] = useState("");
   const [shortletSearch, setShortletSearch] = useState("");
@@ -123,6 +162,10 @@ export function ClientDetailWorkspace({
   );
   const [shortletLinkState, shortletLinkAction, shortletLinkPending] = useActionState(
     linkClientShortlet.bind(null, tenantSlug, client.id),
+    initial,
+  );
+  const [payState, payAction, payPending] = useActionState(
+    recordClientDeposit.bind(null, tenantSlug, client.id),
     initial,
   );
 
@@ -203,6 +246,15 @@ export function ClientDetailWorkspace({
     } else showSnackbar(shortletLinkState.error, "error");
   }, [shortletLinkState, router, showSnackbar]);
 
+  useEffect(() => {
+    if (!payState) return;
+    if (payState.ok) {
+      showSnackbar("Payment recorded.", "success");
+      setIsPayOpen(false);
+      router.refresh();
+    } else showSnackbar(payState.error, "error");
+  }, [payState, router, showSnackbar]);
+
   function openLinkModal() {
     setLinkKind("project");
     setProjectSearch("");
@@ -230,6 +282,19 @@ export function ClientDetailWorkspace({
     } else showSnackbar(result.error, "error");
   }
 
+  async function handleDeleteClient() {
+    setDeleting(true);
+    const result = await deletePropertyClient(tenantSlug, client.id);
+    setDeleting(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar(`${client.fullName} deleted.`, "success");
+    router.push(`/${tenantSlug}/clients`);
+    router.refresh();
+  }
+
   return (
     <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -243,8 +308,45 @@ export function ClientDetailWorkspace({
             {client.email ? ` · ${client.email}` : ""}
           </p>
         </div>
-        {canManage ? (
-          <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => {
+              setExporting(true);
+              void downloadClientStatementXlsx({
+                companyName,
+                currency,
+                clientName: client.fullName,
+                phone: client.phone,
+                email: client.email,
+                status: client.status,
+                contractValue: depositSummary.contractValue,
+                collected: depositSummary.collected,
+                remaining: depositSummary.remaining,
+                unitBalances: depositRows.map((row) => ({
+                  clientName: client.fullName,
+                  projectLabel: row.projectLabel,
+                  unitLabel: row.unitLabel,
+                  contractValue: row.contractValue,
+                  collected: row.collected,
+                  remaining: row.remaining,
+                })),
+                payments: payments.map((payment) => ({
+                  paidAtLabel: payment.paidAtLabel,
+                  unitLabel: payment.unitLabel,
+                  amount: payment.amount,
+                  method: payment.method,
+                  reference: payment.reference,
+                })),
+              }).finally(() => setExporting(false));
+            }}
+            className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            {exporting ? "Preparing…" : "Export Excel"}
+          </button>
+          {canManage ? (
+            <>
             <button
               type="button"
               onClick={() => setIsEditOpen(true)}
@@ -254,32 +356,49 @@ export function ClientDetailWorkspace({
             </button>
             <button
               type="button"
-              onClick={openLinkModal}
+              onClick={() => setIsPayOpen(true)}
               className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+            >
+              Add payment
+            </button>
+            <button
+              type="button"
+              onClick={openLinkModal}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
             >
               Link property
             </button>
-          </div>
-        ) : null}
+            <button
+              type="button"
+              onClick={() => setIsDeleteOpen(true)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-[var(--danger)]"
+            >
+              Delete
+            </button>
+            </>
+          ) : null}
+        </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Status</p>
           <p className="mt-1 font-semibold">{client.status}</p>
+          <p className="mt-1 text-xs text-muted">
+            {linkedCount} linked {linkedCount === 1 ? "property" : "properties"}
+          </p>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
-          <p className="text-xs uppercase text-muted">Linked properties</p>
-          <p className="mt-1 text-2xl font-bold">{linkedCount}</p>
-          {moduleShortLets ? (
-            <p className="mt-1 text-xs text-muted">
-              {unitLinks.length} project · {shortletLinks.length} short-let
-            </p>
-          ) : null}
+          <p className="text-xs uppercase text-muted">Unit amount</p>
+          <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.contractValue)}</p>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
-          <p className="text-xs uppercase text-muted">Documents</p>
-          <p className="mt-1 text-2xl font-bold">{documents.length}</p>
+          <p className="text-xs uppercase text-muted">Paid</p>
+          <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.collected)}</p>
+        </div>
+        <div className="rounded-lg border border-foreground/10 p-4">
+          <p className="text-xs uppercase text-muted">Remaining</p>
+          <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.remaining)}</p>
         </div>
       </div>
 
@@ -340,6 +459,85 @@ export function ClientDetailWorkspace({
                 <span className="font-medium text-foreground">Notes:</span> {client.notes}
               </p>
             ) : null}
+          </section>
+
+          <section className="overflow-hidden rounded-lg border border-foreground/10">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold">Payments & balance</h2>
+                <p className="mt-0.5 text-xs text-muted">
+                  Part payments for a project unit. Remaining is calculated automatically.
+                </p>
+              </div>
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPayOpen(true)}
+                  className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+                >
+                  Add payment
+                </button>
+              ) : null}
+            </div>
+            {depositRows.length === 0 && payments.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-muted">
+                No payments yet. Link a unit, then record a part payment.
+              </p>
+            ) : (
+              <div className="divide-y divide-foreground/10">
+                {depositRows.length > 0 ? (
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-foreground/[0.03] text-xs uppercase text-muted">
+                      <tr>
+                        <th className="px-4 py-2">Unit</th>
+                        <th className="px-4 py-2">Amount</th>
+                        <th className="px-4 py-2">Paid</th>
+                        <th className="px-4 py-2">Remaining</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-foreground/10">
+                      {depositRows.map((row) => (
+                        <tr key={row.id}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{row.unitLabel}</p>
+                            <p className="text-xs text-muted">{row.projectLabel}</p>
+                          </td>
+                          <td className="px-4 py-3">{moneyLabel(currency, row.contractValue)}</td>
+                          <td className="px-4 py-3">{moneyLabel(currency, row.collected)}</td>
+                          <td className="px-4 py-3 font-semibold">
+                            {moneyLabel(currency, row.remaining)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : null}
+                {payments.length > 0 ? (
+                  <div className="px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Payment history
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {payments.map((payment) => (
+                        <li key={payment.id} className="flex flex-wrap justify-between gap-2 text-sm">
+                          <div>
+                            <p className="font-medium">{payment.unitLabel}</p>
+                            <p className="text-xs text-muted">
+                              {payment.paidAtLabel}
+                              {payment.method ? ` · ${payment.method}` : ""}
+                              {payment.reference ? ` · ${payment.reference}` : ""}
+                            </p>
+                          </div>
+                          <p className="font-semibold">
+                            {moneyLabel(payment.currency || currency, payment.amount)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </section>
 
           <section className="overflow-hidden rounded-lg border border-foreground/10">
@@ -438,9 +636,10 @@ export function ClientDetailWorkspace({
             />
             <input
               name="email"
-              type="email"
+              type="text"
+              inputMode="email"
               defaultValue={client.email}
-              placeholder="Email"
+              placeholder="Email (optional)"
               className="w-full border border-foreground/15 bg-field px-3 py-2"
             />
           </div>
@@ -687,6 +886,122 @@ export function ClientDetailWorkspace({
             </div>
           </form>
         )}
+      </ModalOverlay>
+
+      <ModalOverlay open={isPayOpen} onClose={() => setIsPayOpen(false)} panelClassName={MODAL_PANEL_XL}>
+        <h2 className="text-lg font-semibold">Add payment</h2>
+        <p className="mt-1 text-sm text-muted">
+          Record a part payment for a project unit. Remaining balance updates automatically.
+        </p>
+        <form action={payAction} className="mt-4 space-y-3">
+          {payState && !payState.ok ? <FormAlert>{payState.error}</FormAlert> : null}
+          <div>
+            <label className="mb-1 block text-sm text-muted">Project unit</label>
+            <UiSelect name="unitId" defaultValue={paymentUnitOptions[0]?.id ?? ""}>
+              {paymentUnitOptions.length === 0 ? (
+                <option value="">No units available</option>
+              ) : (
+                paymentUnitOptions.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.label}
+                  </option>
+                ))
+              )}
+            </UiSelect>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                placeholder="0.00"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Date paid</label>
+              <input
+                name="paidAt"
+                type="date"
+                required
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Method</label>
+              <UiSelect name="method" defaultValue="Bank Transfer">
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cash">Cash</option>
+                <option value="POS">POS</option>
+                <option value="Cheque">Cheque</option>
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <input
+                name="reference"
+                placeholder="Transfer ref"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+          </div>
+          <textarea
+            name="note"
+            rows={2}
+            placeholder="Note (optional)"
+            className="w-full border border-foreground/15 bg-field px-3 py-2"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPayOpen(false)}
+              className="rounded-md border px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={payPending || paymentUnitOptions.length === 0}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            >
+              {payPending ? <ButtonSpinner /> : null}
+              Save payment
+            </button>
+          </div>
+        </form>
+      </ModalOverlay>
+
+      <ModalOverlay open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} panelClassName={MODAL_PANEL_XL}>
+        <h2 className="text-lg font-semibold">Delete this client?</h2>
+        <p className="mt-2 text-sm text-muted">
+          Are you sure you want to delete {client.fullName}? This cannot be undone. Payments already
+          recorded in Finance will stay on the books.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setIsDeleteOpen(false)}
+            className="rounded-md border px-4 py-2 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={() => void handleDeleteClient()}
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--danger)] bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {deleting ? <ButtonSpinner /> : null}
+            {deleting ? "Deleting…" : "Yes, delete"}
+          </button>
+        </div>
       </ModalOverlay>
     </div>
   );

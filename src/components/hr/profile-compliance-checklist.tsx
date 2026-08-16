@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CheckCircle2, Circle } from "lucide-react";
 import type { ProfileChecklistItem } from "@/lib/hr-profile-checklist";
+import { PrefillWithAiButton } from "@/components/hr/prefill-with-ai-button";
 
 export function ProfileComplianceChecklist({
   items,
@@ -59,16 +60,7 @@ export function ProfileComplianceChecklist({
         ))}
       </ul>
       <div className="mt-4 flex flex-col gap-2 border-t border-foreground/10 pt-3">
-        {onPrefillFromDocs ? (
-          <button
-            type="button"
-            disabled={prefillPending}
-            onClick={onPrefillFromDocs}
-            className="rounded-md border border-foreground bg-foreground px-3 py-2 text-left text-xs font-semibold text-background disabled:opacity-50"
-          >
-            {prefillPending ? "Reading uploaded documents…" : "Prefill from uploaded docs"}
-          </button>
-        ) : null}
+        {onPrefillFromDocs ? <PrefillWithAiButton pending={prefillPending} onClick={onPrefillFromDocs} /> : null}
         {onGenerateOffer ? (
           <button
             type="button"

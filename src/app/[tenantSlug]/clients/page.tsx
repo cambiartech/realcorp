@@ -5,6 +5,7 @@ import { canManageClients } from "@/lib/clients-access";
 import { batchResolveClientPortalStatus, type ClientPortalStatus } from "@/lib/client-portal-invite";
 import prisma from "@/lib/db";
 import { paginate, parsePage } from "@/lib/pagination";
+import { loadClientDepositRows, summarizeClientDeposits } from "@/lib/client-deposits";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { ClientsWorkspace } from "./clients-workspace";
@@ -34,6 +35,8 @@ export default async function ClientsPage({
     select: {
       id: true,
       slug: true,
+      name: true,
+      defaultCurrency: true,
       settings: {
         select: {
           moduleSales: true,
@@ -90,27 +93,56 @@ export default async function ClientsPage({
     tenant.id,
     clients.map((c) => ({ id: c.id, email: c.email, userId: c.userId })),
   );
+  const depositRows = await loadClientDepositRows(tenant.id);
+  const depositsByClient = new Map<string, ReturnType<typeof summarizeClientDeposits>>();
+  for (const row of depositRows) {
+    const current = depositsByClient.get(row.clientId) ?? {
+      contractValue: 0,
+      collected: 0,
+      remaining: 0,
+    };
+    depositsByClient.set(row.clientId, {
+      contractValue: current.contractValue + row.contractValue,
+      collected: current.collected + row.collected,
+      remaining: current.remaining + row.remaining,
+    });
+  }
 
   return (
     <ClientsWorkspace
       tenantSlug={tenant.slug}
+      companyName={tenant.name}
+      currency={tenant.defaultCurrency || "NGN"}
       canManage={canManageClients(Boolean(session.user.isPlatformAdmin), membership)}
+      unitBalances={depositRows.map((row) => ({
+        clientName: row.clientName,
+        projectLabel: row.projectLabel,
+        unitLabel: row.unitLabel,
+        contractValue: row.contractValue,
+        collected: row.collected,
+        remaining: row.remaining,
+      }))}
       activeTab={parseTab(tabRaw)}
       pagination={pagination}
       paginationSearchParams={query}
       clientStats={{ active: activeClients, totalUnits: totalUnitLinks }}
-      clients={clients.map((c) => ({
-        id: c.id,
-        fullName: c.fullName,
-        email: c.email ?? "",
-        phone: c.phone ?? "",
-        status: formatEnumLabel(c.status),
-        statusValue: c.status,
-        unitsCount: c._count.unitLinks,
-        documentsCount: c._count.documents,
-        createdAtLabel: c.createdAt.toISOString().slice(0, 10),
-        portalStatus: portalStatusByClient.get(c.id) ?? ("none" as ClientPortalStatus),
-      }))}
+      clients={clients.map((c) => {
+        const money = depositsByClient.get(c.id);
+        return {
+          id: c.id,
+          fullName: c.fullName,
+          email: c.email ?? "",
+          phone: c.phone ?? "",
+          status: formatEnumLabel(c.status),
+          statusValue: c.status,
+          unitsCount: c._count.unitLinks,
+          documentsCount: c._count.documents,
+          paid: money?.collected ?? 0,
+          remaining: money?.remaining ?? 0,
+          createdAtLabel: c.createdAt.toISOString().slice(0, 10),
+          portalStatus: portalStatusByClient.get(c.id) ?? ("none" as ClientPortalStatus),
+        };
+      })}
       documentClients={documentClients}
       documents={documents.map((doc) => ({
         id: doc.id,

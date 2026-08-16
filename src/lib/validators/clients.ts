@@ -1,13 +1,16 @@
 import { ClientDocumentCategory, ClientUnitLinkRole, PropertyClientStatus } from "@/generated/prisma";
 import { z } from "zod";
 
+const optionalEmail = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v !== "" ? v : undefined))
+  .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Enter a valid email, or leave it blank.");
+
 export const createPropertyClientSchema = z.object({
   fullName: z.string().trim().min(2, "Client name must be at least 2 characters.").max(120),
-  email: z
-    .string()
-    .trim()
-    .optional()
-    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Enter a valid email."),
+  email: optionalEmail,
   phone: z.string().trim().max(40).optional(),
   alternatePhone: z.string().trim().max(40).optional(),
   addressLine: z.string().trim().max(200).optional(),
@@ -91,6 +94,41 @@ export function parseLinkClientShortletForm(formData: FormData) {
     shortletUnitId: formData.get("shortletUnitId"),
     role,
     notes: formData.get("notes") || undefined,
+  });
+}
+
+export const recordClientDepositSchema = z.object({
+  unitId: z.string().trim().min(1, "Select a project unit."),
+  amount: z.coerce.number().positive("Payment amount must be greater than zero."),
+  paidAt: z.string().trim().min(1, "Payment date is required."),
+  method: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  reference: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  note: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+});
+
+export function parseRecordClientDepositForm(formData: FormData) {
+  return recordClientDepositSchema.safeParse({
+    unitId: formData.get("unitId"),
+    amount: formData.get("amount"),
+    paidAt: formData.get("paidAt"),
+    method: formData.get("method") || undefined,
+    reference: formData.get("reference") || undefined,
+    note: formData.get("note") || undefined,
   });
 }
 

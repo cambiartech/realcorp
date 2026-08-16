@@ -5,13 +5,23 @@ import { MembershipRole, MembershipStatus, Prisma } from "@/generated/prisma";
 import { createTenantUploadSignature, type CloudinaryUploadSignature } from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
 import { parseRoleModuleGrantsFromFormData } from "@/lib/role-module-grants-form";
-import { DEFAULT_ORG_DEPARTMENTS, mergeOrgDepartments } from "@/lib/org-departments";
+import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
+import { mergeOrgDepartments, normalizeOrgDepartmentName } from "@/lib/org-departments";
+import { canAccessNavKey, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 function canManageOrgModules(isPlatformAdmin: boolean, role: MembershipRole | undefined) {
   return isPlatformAdmin || role === MembershipRole.ORG_ADMIN;
+}
+
+function canAddOrgDepartment(isPlatformAdmin: boolean, role: MembershipRole | undefined) {
+  return (
+    isPlatformAdmin ||
+    role === MembershipRole.ORG_ADMIN ||
+    role === MembershipRole.FINANCE_MANAGER
+  );
 }
 
 function canRenameOrg(isPlatformAdmin: boolean, role: MembershipRole | undefined) {
@@ -309,6 +319,83 @@ export async function saveOrgDepartments(tenantSlug: string, _prev: unknown, for
   revalidatePath(`/${tenantSlug}/finance`);
   revalidatePath(`/${tenantSlug}/hr`);
   return { ok: true };
+}
+
+export async function addOrgDepartment(
+  tenantSlug: string,
+  rawName: string,
+): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const next = normalizeOrgDepartmentName(rawName);
+  if (!next) return { ok: false, error: "Enter a department name." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: {
+      id: true,
+      settings: {
+        select: {
+          id: true,
+          orgDepartments: true,
+          moduleSales: true,
+          moduleFinance: true,
+          moduleMarketing: true,
+          moduleCommunity: true,
+          moduleShortLets: true,
+          moduleHr: true,
+          moduleTasks: true,
+          moduleClients: true,
+          moduleListings: true,
+          moduleInvestorPortal: true,
+          roleModuleGrants: true,
+        },
+      },
+    },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true, modulePermissions: true },
+  });
+  const canAdd =
+    canAddOrgDepartment(Boolean(session.user.isPlatformAdmin), membership?.role) ||
+    canAccessNavKey("finance", {
+      role: membership?.role,
+      isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+      settings: normalizeSettingsNavSlice(tenant.settings),
+      userModulePermissions: parseMembershipModulePermissions(membership?.modulePermissions),
+    });
+  if (!canAdd) {
+    return { ok: false, error: "You do not have permission to add a department." };
+  }
+  if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
+    return { ok: false, error: "No access." };
+  }
+
+  const existing = mergeOrgDepartments(tenant.settings?.orgDepartments as string[] | null | undefined);
+  const already = existing.find((d) => d.toLowerCase() === next.toLowerCase());
+  if (already) return { ok: true, name: already };
+
+  const orgDepartments = mergeOrgDepartments([...existing, next]).slice(0, 50);
+  if (!tenant.settings) {
+    await prisma.tenantSettings.create({
+      data: { tenantId: tenant.id, orgDepartments: orgDepartments as Prisma.InputJsonValue },
+    });
+  } else {
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { orgDepartments: orgDepartments as Prisma.InputJsonValue },
+    });
+  }
+
+  revalidatePath(`/${tenantSlug}`);
+  revalidatePath(`/${tenantSlug}/settings`);
+  revalidatePath(`/${tenantSlug}/finance`);
+  revalidatePath(`/${tenantSlug}/hr`);
+  return { ok: true, name: next };
 }
 
 export async function updateOrgModules(tenantSlug: string, _prev: unknown, formData: FormData) {

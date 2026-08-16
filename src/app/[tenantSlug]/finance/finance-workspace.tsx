@@ -6,6 +6,7 @@ import {
   type FinanceEmailModalMode,
 } from "@/components/finance/send-finance-email-modal";
 import { ModalOverlay } from "@/components/modal-overlay";
+import { OrgDepartmentSelect } from "@/components/org-department-select";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -251,7 +252,7 @@ type BankingImportSummary = {
 type BankingDateFilter = "all" | "today" | "7d" | "month";
 type BankingStatusFilter = "all" | "unmatched" | "matched" | "exception";
 type ReportMonthWindow = 3 | 6 | 12;
-type ReportKind = "pnl" | "cashflow" | "balance";
+type ReportKind = "pnl" | "cashflow" | "balance" | "deposits";
 type ReportDrilldownKind = "invoices" | "payments" | "expenses";
 type ReportCompareMode = "previous_period" | "same_period_last_year";
 
@@ -429,6 +430,7 @@ type ReportView = {
   };
   clientBalances: Array<{
     id: string;
+    clientId?: string;
     clientName: string;
     projectId: string;
     projectLabel: string;
@@ -4173,6 +4175,7 @@ export function FinanceWorkspace({
                         <option value="pnl">Profit & Loss</option>
                         <option value="cashflow">Cash Flow</option>
                         <option value="balance">Balance Sheet</option>
+                        <option value="deposits">Client Deposit</option>
                       </UiSelect>
                     </label>
                     <label className="space-y-1">
@@ -4758,18 +4761,49 @@ export function FinanceWorkspace({
                   </div>
                 ) : null}
 
-                {reportKind === "pnl" ? (
+                {reportKind === "pnl" || reportKind === "deposits" ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3">
                       <p className="text-sm font-semibold text-foreground">
-                        Client deposits and remaining balance
+                        Client Deposit
                       </p>
                       <p className="text-xs text-muted">
-                        Remaining to pay is contract value minus all collected
-                        income on that project or room. Use the Client deposit
-                        income type when posting a deposit.
+                        Unit price, amount paid, and what is still outstanding for
+                        each client. Record part payments from the client profile
+                        or here as Client deposit.
                       </p>
                     </div>
+                    {reportKind === "deposits" && filteredClientBalances.length > 0 ? (
+                      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-md border border-foreground/10 bg-background px-3 py-2">
+                          <p className="text-[11px] uppercase text-muted">Unit amount</p>
+                          <p className="mt-1 text-sm font-semibold">
+                            {reportView.currency}{" "}
+                            {filteredClientBalances
+                              .reduce((sum, row) => sum + row.contractValue, 0)
+                              .toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-foreground/10 bg-background px-3 py-2">
+                          <p className="text-[11px] uppercase text-muted">Paid</p>
+                          <p className="mt-1 text-sm font-semibold">
+                            {reportView.currency}{" "}
+                            {filteredClientBalances
+                              .reduce((sum, row) => sum + row.collected, 0)
+                              .toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-foreground/10 bg-background px-3 py-2">
+                          <p className="text-[11px] uppercase text-muted">Remaining</p>
+                          <p className="mt-1 text-sm font-semibold">
+                            {reportView.currency}{" "}
+                            {filteredClientBalances
+                              .reduce((sum, row) => sum + row.remaining, 0)
+                              .toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
                     {filteredClientBalances.length === 0 ? (
                       <p className="text-sm text-muted">
                         No client balances for this project or room yet.
@@ -4780,11 +4814,10 @@ export function FinanceWorkspace({
                           <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
                             <tr>
                               <th className="px-3 py-2">Client</th>
-                              <th className="px-3 py-2">Project / room</th>
-                              <th className="px-3 py-2">Contract</th>
-                              <th className="px-3 py-2">Deposits paid</th>
-                              <th className="px-3 py-2">Collected</th>
-                              <th className="px-3 py-2">Left to pay</th>
+                              <th className="px-3 py-2">Unit</th>
+                              <th className="px-3 py-2">Amount</th>
+                              <th className="px-3 py-2">Paid</th>
+                              <th className="px-3 py-2">Remaining</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-foreground/10">
@@ -4802,10 +4835,6 @@ export function FinanceWorkspace({
                                 <td className="px-3 py-2">
                                   {reportView.currency}{" "}
                                   {row.contractValue.toLocaleString()}
-                                </td>
-                                <td className="px-3 py-2">
-                                  {reportView.currency}{" "}
-                                  {row.depositsPaid.toLocaleString()}
                                 </td>
                                 <td className="px-3 py-2">
                                   {reportView.currency}{" "}
@@ -6009,22 +6038,11 @@ export function FinanceWorkspace({
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">
-              Department (optional)
-            </label>
-            <UiSelect
-              name="department"
-              defaultValue={financeOptions.departments[0] || "Finance"}
-            >
-              <option value="">Select department</option>
-              {financeOptions.departments.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </UiSelect>
-          </div>
+          <OrgDepartmentSelect
+            tenantSlug={tenantSlug}
+            departments={financeOptions.departments}
+            defaultValue={financeOptions.departments[0] || "Finance"}
+          />
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -6476,22 +6494,11 @@ export function FinanceWorkspace({
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">
-              Department (optional)
-            </label>
-            <UiSelect
-              name="department"
-              defaultValue={financeOptions.departments[0] || "Finance"}
-            >
-              <option value="">Select department</option>
-              {financeOptions.departments.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </UiSelect>
-          </div>
+          <OrgDepartmentSelect
+            tenantSlug={tenantSlug}
+            departments={financeOptions.departments}
+            defaultValue={financeOptions.departments[0] || "Finance"}
+          />
           <div>
             <label className="mb-1 block text-sm text-muted">
               Attachment (optional)
@@ -6740,22 +6747,12 @@ export function FinanceWorkspace({
                   ))}
                 </UiSelect>
               </div>
-              <div>
-                <label className="mb-1 block text-sm text-muted">
-                  Department
-                </label>
-                <UiSelect
-                  name="department"
-                  defaultValue={editingExpense.department}
-                >
-                  <option value="">Select department</option>
-                  {financeOptions.departments.map((department) => (
-                    <option key={department} value={department}>
-                      {department}
-                    </option>
-                  ))}
-                </UiSelect>
-              </div>
+              <OrgDepartmentSelect
+                tenantSlug={tenantSlug}
+                departments={financeOptions.departments}
+                defaultValue={editingExpense.department}
+                label="Department"
+              />
               <div>
                 <label className="mb-1 block text-sm text-muted">
                   Reference
@@ -6816,6 +6813,7 @@ export function FinanceWorkspace({
         onSubmit={(formData) => void handleCreateBill(formData)}
         actionPending={actionPending}
         currencies={financeOptions.currencies}
+        tenantSlug={tenantSlug}
         departments={financeOptions.departments}
         defaultCurrency={reportView.currency}
         fiscalYear={fiscalYear}
@@ -7023,26 +7021,15 @@ export function FinanceWorkspace({
                 />
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted">
-                Department (optional)
-              </label>
-              <UiSelect
-                name="department"
-                defaultValue={
-                  paymentInvoice.department ||
-                  financeOptions.departments[0] ||
-                  "Finance"
-                }
-              >
-                <option value="">Select department</option>
-                {financeOptions.departments.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
-                  </option>
-                ))}
-              </UiSelect>
-            </div>
+            <OrgDepartmentSelect
+              tenantSlug={tenantSlug}
+              departments={financeOptions.departments}
+              defaultValue={
+                paymentInvoice.department ||
+                financeOptions.departments[0] ||
+                "Finance"
+              }
+            />
             <div>
               <label className="mb-1 block text-sm text-muted">
                 Note (optional)
@@ -7254,22 +7241,11 @@ export function FinanceWorkspace({
               />
             </div>
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-muted">
-              Department (optional)
-            </label>
-            <UiSelect
-              name="department"
-              defaultValue={financeOptions.departments[0] || "Finance"}
-            >
-              <option value="">None</option>
-              {financeOptions.departments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </UiSelect>
-          </div>
+          <OrgDepartmentSelect
+            tenantSlug={tenantSlug}
+            departments={financeOptions.departments}
+            defaultValue={financeOptions.departments[0] || "Finance"}
+          />
           <div>
             <label className="mb-1 block text-sm text-muted">
               Note (optional)
@@ -7395,26 +7371,15 @@ export function FinanceWorkspace({
                 </UiSelect>
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted">
-                Department (optional)
-              </label>
-              <UiSelect
-                name="department"
-                defaultValue={
-                  editingInvoice.department ||
-                  financeOptions.departments[0] ||
-                  "Finance"
-                }
-              >
-                <option value="">Select department</option>
-                {financeOptions.departments.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
-                  </option>
-                ))}
-              </UiSelect>
-            </div>
+            <OrgDepartmentSelect
+              tenantSlug={tenantSlug}
+              departments={financeOptions.departments}
+              defaultValue={
+                editingInvoice.department ||
+                financeOptions.departments[0] ||
+                "Finance"
+              }
+            />
             <div className="flex justify-end gap-2">
               <button
                 type="button"

@@ -7,7 +7,7 @@ import {
   normalizeFinanceOptionList,
 } from "@/lib/finance-catalog";
 import { parseFinanceControls } from "@/lib/finance-controls";
-import { remainingClientBalance } from "@/lib/finance-income";
+import { loadClientDepositRows } from "@/lib/client-deposits";
 import { expensePnlAmount } from "@/lib/finance-vat";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
@@ -527,30 +527,8 @@ export default async function FinanceQueuePage({
     (receipt) => !receipt.voidedAt && receipt.status !== "VOID",
   );
 
-  const clientBalanceDeals =
-    financeSurface === "reports"
-      ? await prisma.deal.findMany({
-          where: { tenantId: tenant.id },
-          select: {
-            id: true,
-            value: true,
-            unit: {
-              select: {
-                id: true,
-                label: true,
-                projectId: true,
-                project: { select: { id: true, name: true } },
-                pricingPlan: {
-                  select: { price: true, initialDeposit: true },
-                },
-              },
-            },
-            lead: { select: { name: true } },
-            propertyClient: { select: { fullName: true } },
-          },
-          take: 800,
-        })
-      : [];
+  const clientDepositRows =
+    financeSurface === "reports" ? await loadClientDepositRows(tenant.id) : [];
 
   const userMap = new Map(users.map((u) => [u.user.id, u.user]));
   const invoiceEventMap = new Map<
@@ -1135,107 +1113,7 @@ export default async function FinanceQueuePage({
             totalCollected -
             liveExpenses.reduce((sum, x) => sum + Number(x.amount), 0),
         },
-        clientBalances: (() => {
-          const cashByKey = new Map<
-            string,
-            {
-              collected: number;
-              deposits: number;
-              projectId: string;
-              projectLabel: string;
-              unitId: string;
-              unitLabel: string;
-            }
-          >();
-          const addCash = (
-            row: {
-              projectId?: string | null;
-              unitId?: string | null;
-              incomeType: string;
-              deal?: {
-                unit?: {
-                  id: string;
-                  label: string;
-                  project?: { id: string; name: string } | null;
-                } | null;
-              } | null;
-            },
-            amount: number,
-          ) => {
-            const allocation = resolveAllocation(row);
-            const key = `${allocation.projectId || "__none"}|${allocation.unitId || "__none"}`;
-            const current = cashByKey.get(key) || {
-              collected: 0,
-              deposits: 0,
-              ...allocation,
-            };
-            current.collected += amount;
-            if (row.incomeType === "CLIENT_DEPOSIT") current.deposits += amount;
-            cashByKey.set(key, current);
-          };
-          for (const payment of livePayments) {
-            addCash(
-              {
-                projectId: payment.projectId,
-                unitId: payment.unitId,
-                incomeType: payment.incomeType,
-                deal: payment.invoice?.deal,
-              },
-              Number(payment.amount),
-            );
-          }
-          for (const receipt of liveReceipts) {
-            addCash(receipt, Number(receipt.amount));
-          }
-
-          const rows = clientBalanceDeals.map((deal) => {
-            const projectId = deal.unit?.projectId || "";
-            const unitId = deal.unit?.id || "";
-            const key = `${projectId || "__none"}|${unitId || "__none"}`;
-            const cash = cashByKey.get(key);
-            const contractValue =
-              Number(deal.value) || Number(deal.unit?.pricingPlan?.price) || 0;
-            return {
-              id: deal.id,
-              clientName:
-                deal.propertyClient?.fullName ||
-                deal.lead?.name ||
-                "Unnamed client",
-              projectId,
-              projectLabel: deal.unit?.project?.name || "Unassigned project",
-              unitId,
-              unitLabel: deal.unit?.label || "Unassigned unit",
-              contractValue,
-              expectedDeposit: Number(deal.unit?.pricingPlan?.initialDeposit) || 0,
-              depositsPaid: cash?.deposits || 0,
-              collected: cash?.collected || 0,
-              remaining: remainingClientBalance({
-                contractValue,
-                collected: cash?.collected || 0,
-              }),
-            };
-          });
-          const seen = new Set(rows.map((row) => `${row.projectId || "__none"}|${row.unitId || "__none"}`));
-          for (const [key, cash] of cashByKey) {
-            if (seen.has(key)) continue;
-            rows.push({
-              id: key,
-              clientName: "No linked deal",
-              projectId: cash.projectId,
-              projectLabel: cash.projectLabel,
-              unitId: cash.unitId,
-              unitLabel: cash.unitLabel,
-              contractValue: 0,
-              expectedDeposit: 0,
-              depositsPaid: cash.deposits,
-              collected: cash.collected,
-              remaining: 0,
-            });
-          }
-          return rows
-            .filter((row) => row.contractValue > 0 || row.collected > 0)
-            .sort((a, b) => b.remaining - a.remaining);
-        })(),
+        clientBalances: clientDepositRows,
       }}
       bankingRows={bankRows.map((row) => ({
         id: row.id,

@@ -30,6 +30,20 @@ export function remainingClientBalance(input: {
   return Math.max(0, money(input.contractValue) - money(input.collected));
 }
 
+export function summarizeClientDeposits(
+  rows: Array<{ contractValue: number; collected: number; remaining: number }>,
+) {
+  return rows.reduce(
+    (acc, row) => {
+      acc.contractValue = money(acc.contractValue + row.contractValue);
+      acc.collected = money(acc.collected + row.collected);
+      acc.remaining = money(acc.remaining + row.remaining);
+      return acc;
+    },
+    { contractValue: 0, collected: 0, remaining: 0 },
+  );
+}
+
 function money(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }

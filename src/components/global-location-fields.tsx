@@ -53,9 +53,11 @@ export function GlobalLocationFields({
   const [stateValue, setStateValue] = useState(defaultState || "");
   const [cityValue, setCityValue] = useState(defaultCity || "");
   const [error, setError] = useState("");
+  const [countryReload, setCountryReload] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
+    setError("");
     locationRows<CountryOption>("type=countries", controller.signal)
       .then((rows) => {
         setCountries(rows);
@@ -74,7 +76,7 @@ export function GlobalLocationFields({
         if ((caught as Error).name !== "AbortError") setError("Could not load countries.");
       });
     return () => controller.abort();
-  }, [countryCode, defaultCountry]);
+  }, [countryCode, countryReload, defaultCountry]);
 
   useEffect(() => {
     if (!countryCode) return;
@@ -207,7 +209,21 @@ export function GlobalLocationFields({
         </select>
       </label>
 
-      {error ? <p className="text-xs text-[var(--danger)] sm:col-span-3">{error}</p> : null}
+      {error ? (
+        <p className="text-xs text-[var(--danger)] sm:col-span-3">
+          {error}{" "}
+          <button
+            type="button"
+            className="font-semibold underline"
+            onClick={() => {
+              setError("");
+              setCountryReload((n) => n + 1);
+            }}
+          >
+            Try again
+          </button>
+        </p>
+      ) : null}
     </div>
   );
 }

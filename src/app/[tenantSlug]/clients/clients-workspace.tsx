@@ -16,7 +16,14 @@ import {
 } from "@/components/clients/client-documents-workspace";
 import type { ClientPortalStatus } from "@/lib/client-portal-invite";
 import type { Pagination, SearchParamValue } from "@/lib/pagination";
-import { createPropertyClient, sendClientPortalInvite } from "./actions";
+import { Pencil, Trash2 } from "lucide-react";
+import { downloadClientPortfolioXlsx } from "@/lib/client-report-xlsx";
+import {
+  createPropertyClient,
+  deletePropertyClient,
+  sendClientPortalInvite,
+  updatePropertyClient,
+} from "./actions";
 
 type ClientRow = {
   id: string;
@@ -27,6 +34,8 @@ type ClientRow = {
   statusValue: string;
   unitsCount: number;
   documentsCount: number;
+  paid: number;
+  remaining: number;
   createdAtLabel: string;
   portalStatus: ClientPortalStatus;
 };
@@ -63,11 +72,18 @@ function statusBadgeClass(status: string) {
   return "bg-[var(--warn-wash)] text-[var(--warn)] ";
 }
 
+function moneyLabel(currency: string, value: number) {
+  return `${currency} ${value.toLocaleString("en-NG")}`;
+}
+
 export function ClientsWorkspace({
   tenantSlug,
+  companyName,
+  currency,
   canManage,
   activeTab,
   clients,
+  unitBalances,
   documents,
   documentClients,
   pagination,
@@ -75,9 +91,19 @@ export function ClientsWorkspace({
   clientStats,
 }: {
   tenantSlug: string;
+  companyName: string;
+  currency: string;
   canManage: boolean;
   activeTab: "clients" | "documents";
   clients: ClientRow[];
+  unitBalances: Array<{
+    clientName: string;
+    projectLabel: string;
+    unitLabel: string;
+    contractValue: number;
+    collected: number;
+    remaining: number;
+  }>;
   documents: ClientDocumentItem[];
   documentClients: Array<{ id: string; fullName: string }>;
   pagination: Pagination;
@@ -88,10 +114,19 @@ export function ClientsWorkspace({
   const { showSnackbar } = useSnackbar();
   const [tab, setTab] = useState(activeTab);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createPhone, setCreatePhone] = useState("");
   const [createEmail, setCreateEmail] = useState("");
-  const [sendPortalInvite, setSendPortalInvite] = useState(true);
+  const [createNotes, setCreateNotes] = useState("");
+  const [createStatus, setCreateStatus] = useState("PROSPECT");
+  const [sendPortalInvite, setSendPortalInvite] = useState(false);
   const [invitingClientId, setInvitingClientId] = useState<string | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<ClientRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [clientToEdit, setClientToEdit] = useState<ClientRow | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [state, formAction, pending] = useActionState(createPropertyClient.bind(null, tenantSlug), initial);
+  const [editPending, setEditPending] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
@@ -108,8 +143,12 @@ export function ClientsWorkspace({
       }
       formRef.current?.reset();
       queueMicrotask(() => {
+        setCreateName("");
+        setCreatePhone("");
         setCreateEmail("");
-        setSendPortalInvite(true);
+        setCreateNotes("");
+        setCreateStatus("PROSPECT");
+        setSendPortalInvite(false);
         setIsCreateOpen(false);
       });
       router.refresh();
@@ -117,6 +156,34 @@ export function ClientsWorkspace({
       showSnackbar(state.error, "error");
     }
   }, [router, showSnackbar, state]);
+
+  async function handleDeleteClient() {
+    if (!clientToDelete) return;
+    setDeleting(true);
+    const result = await deletePropertyClient(tenantSlug, clientToDelete.id);
+    setDeleting(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar(`${clientToDelete.fullName} deleted.`, "success");
+    setClientToDelete(null);
+    router.refresh();
+  }
+
+  async function handleEditClient(formData: FormData) {
+    if (!clientToEdit) return;
+    setEditPending(true);
+    const result = await updatePropertyClient(tenantSlug, clientToEdit.id, null, formData);
+    setEditPending(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar("Client updated.", "success");
+    setClientToEdit(null);
+    router.refresh();
+  }
 
   async function handleSendInvite(clientId: string) {
     setInvitingClientId(clientId);
@@ -146,21 +213,50 @@ export function ClientsWorkspace({
             Property owners and investors — track units, pricing plans, and client documents in one place.
           </p>
         </div>
-        {canManage && tab === "clients" ? (
+        {tab === "clients" ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/${tenantSlug}/clients/import`}
-              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.04]"
-            >
-              Import CSV
-            </Link>
             <button
               type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+              disabled={exporting}
+              onClick={() => {
+                setExporting(true);
+                void downloadClientPortfolioXlsx({
+                  companyName,
+                  currency,
+                  clients: clients.map((c) => ({
+                    fullName: c.fullName,
+                    email: c.email,
+                    phone: c.phone,
+                    status: c.status,
+                    unitsCount: c.unitsCount,
+                    paid: c.paid,
+                    remaining: c.remaining,
+                    createdAtLabel: c.createdAtLabel,
+                  })),
+                  unitBalances,
+                }).finally(() => setExporting(false));
+              }}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.04] disabled:opacity-50"
             >
-              Add client
+              {exporting ? "Preparing…" : "Export Excel"}
             </button>
+            {canManage ? (
+              <>
+                <Link
+                  href={`/${tenantSlug}/clients/import`}
+                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.04]"
+                >
+                  Import CSV
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+                >
+                  Add client
+                </button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -223,7 +319,8 @@ export function ClientsWorkspace({
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Portal</th>
                 <th className="px-4 py-3">Units</th>
-                <th className="px-4 py-3">Documents</th>
+                <th className="px-4 py-3">Paid</th>
+                <th className="px-4 py-3">Remaining</th>
                 <th className="px-4 py-3">Added</th>
                 {canManage ? <th className="px-4 py-3" /> : null}
               </tr>
@@ -231,7 +328,7 @@ export function ClientsWorkspace({
             <tbody className="divide-y divide-foreground/10">
               {clients.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 8 : 7} className="px-4 py-10 text-center text-sm text-muted">
+                  <td colSpan={canManage ? 10 : 9} className="px-4 py-10 text-center text-sm text-muted">
                     No clients yet.{" "}
                     {canManage ? (
                       <>
@@ -278,24 +375,45 @@ export function ClientsWorkspace({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-foreground">{client.unitsCount}</td>
-                    <td className="px-4 py-3 text-foreground">{client.documentsCount}</td>
+                    <td className="px-4 py-3 text-foreground">{moneyLabel(currency, client.paid)}</td>
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      {moneyLabel(currency, client.remaining)}
+                    </td>
                     <td className="px-4 py-3 text-muted">{client.createdAtLabel}</td>
                     {canManage ? (
-                      <td className="px-4 py-3 text-right">
-                        {client.portalStatus !== "active" && client.portalStatus !== "no_email" ? (
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          {client.portalStatus !== "active" && client.portalStatus !== "no_email" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSendInvite(client.id)}
+                              disabled={invitingClientId === client.id}
+                              className="text-xs font-semibold text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60 disabled:opacity-50"
+                            >
+                              {invitingClientId === client.id
+                                ? "Sending…"
+                                : client.portalStatus === "invited"
+                                  ? "Resend invite"
+                                  : "Send invite"}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
-                            onClick={() => handleSendInvite(client.id)}
-                            disabled={invitingClientId === client.id}
-                            className="text-xs font-semibold text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60 disabled:opacity-50"
+                            onClick={() => setClientToEdit(client)}
+                            className="inline-flex items-center gap-1 rounded-md border border-foreground/15 px-2 py-1 text-xs font-semibold hover:bg-foreground/[0.04]"
                           >
-                            {invitingClientId === client.id
-                              ? "Sending…"
-                              : client.portalStatus === "invited"
-                                ? "Resend invite"
-                                : "Send invite"}
+                            <Pencil className="h-3 w-3" />
+                            Edit
                           </button>
-                        ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setClientToDelete(client)}
+                            className="inline-flex items-center gap-1 rounded-md border border-foreground/15 px-2 py-1 text-xs font-semibold text-[var(--danger)] hover:bg-[var(--danger-wash)]"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     ) : null}
                   </tr>
@@ -342,6 +460,8 @@ export function ClientsWorkspace({
               id="client-name"
               name="fullName"
               required
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
               placeholder="e.g. Adebayo Okonkwo"
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
@@ -354,19 +474,24 @@ export function ClientsWorkspace({
               <input
                 id="client-phone"
                 name="phone"
+                value={createPhone}
+                onChange={(e) => setCreatePhone(e.target.value)}
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
             <div>
               <label htmlFor="client-email" className="mb-1 block text-sm text-muted">
-                Email
+                Email <span className="font-normal text-muted">(optional)</span>
               </label>
               <input
                 id="client-email"
                 name="email"
-                type="email"
+                type="text"
+                inputMode="email"
+                autoComplete="email"
                 value={createEmail}
                 onChange={(e) => setCreateEmail(e.target.value)}
+                placeholder="Leave blank if you do not have it"
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
@@ -392,7 +517,12 @@ export function ClientsWorkspace({
             <label htmlFor="client-status" className="mb-1 block text-sm text-muted">
               Status
             </label>
-            <UiSelect id="client-status" name="status" defaultValue="PROSPECT">
+            <UiSelect
+              id="client-status"
+              name="status"
+              value={createStatus}
+              onChange={(e) => setCreateStatus(e.target.value)}
+            >
               <option value="PROSPECT">Prospect</option>
               <option value="ACTIVE">Active</option>
               <option value="FORMER">Former</option>
@@ -406,6 +536,8 @@ export function ClientsWorkspace({
               id="client-notes"
               name="notes"
               rows={3}
+              value={createNotes}
+              onChange={(e) => setCreateNotes(e.target.value)}
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
             />
           </div>
@@ -428,6 +560,92 @@ export function ClientsWorkspace({
             </button>
           </div>
         </form>
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={Boolean(clientToEdit)}
+        onClose={() => setClientToEdit(null)}
+        panelClassName={MODAL_PANEL_XL}
+      >
+        <h2 className="text-lg font-semibold">Edit client</h2>
+        {clientToEdit ? (
+          <form action={handleEditClient} className="mt-4 space-y-3">
+            <input
+              name="fullName"
+              defaultValue={clientToEdit.fullName}
+              required
+              className="w-full border border-foreground/15 bg-field px-3 py-2"
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                name="phone"
+                defaultValue={clientToEdit.phone}
+                placeholder="Phone"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+              <input
+                name="email"
+                type="text"
+                inputMode="email"
+                defaultValue={clientToEdit.email}
+                placeholder="Email (optional)"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+            <UiSelect name="status" defaultValue={clientToEdit.statusValue}>
+              <option value="PROSPECT">Prospect</option>
+              <option value="ACTIVE">Active</option>
+              <option value="FORMER">Former</option>
+            </UiSelect>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setClientToEdit(null)}
+                className="rounded-md border px-4 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={editPending}
+                className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+              >
+                {editPending ? <ButtonSpinner /> : null}
+                Save
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={Boolean(clientToDelete)}
+        onClose={() => setClientToDelete(null)}
+        panelClassName={MODAL_PANEL_XL}
+      >
+        <h2 className="text-lg font-semibold">Delete this client?</h2>
+        <p className="mt-2 text-sm text-muted">
+          Are you sure you want to delete {clientToDelete?.fullName}? This cannot be undone. Payments
+          already recorded in Finance will stay on the books.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setClientToDelete(null)}
+            className="rounded-md border px-4 py-2 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={() => void handleDeleteClient()}
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--danger)] bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {deleting ? <ButtonSpinner /> : null}
+            {deleting ? "Deleting…" : "Yes, delete"}
+          </button>
+        </div>
       </ModalOverlay>
     </div>
   );
