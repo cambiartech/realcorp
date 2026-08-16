@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculatePayroll, PayrollConfigurationError } from "./engine";
-import { calculateNigeriaAnnualTax } from "./jurisdictions/ng/2026";
+import { calculateNigeriaAnnualTax, explainNigeriaAnnualTax } from "./jurisdictions/ng/2026";
 
 test("Nigeria 2026 PAYE bands calculate exact boundary tax", () => {
   assert.equal(calculateNigeriaAnnualTax(800_000), 0);
@@ -10,6 +10,17 @@ test("Nigeria 2026 PAYE bands calculate exact boundary tax", () => {
   assert.equal(calculateNigeriaAnnualTax(25_000_000), 4_680_000);
   assert.equal(calculateNigeriaAnnualTax(50_000_000), 10_430_000);
   assert.equal(calculateNigeriaAnnualTax(60_000_000), 12_930_000);
+});
+
+test("first 800k is untaxed and a 3m chargeable income taxes only the remaining 2.2m", () => {
+  const explained = explainNigeriaAnnualTax(3_000_000);
+  assert.equal(explained.bands.length, 2);
+  assert.equal(explained.bands[0].rate, 0);
+  assert.equal(explained.bands[0].incomeInBand, 800_000);
+  assert.equal(explained.bands[0].taxInBand, 0);
+  assert.equal(explained.bands[1].incomeInBand, 2_200_000);
+  assert.equal(explained.bands[1].taxInBand, 330_000);
+  assert.equal(explained.tax, 330_000);
 });
 
 test("Nigeria payroll applies pension, PAYE, employer pension, and NSITF", () => {

@@ -500,10 +500,15 @@ export async function prefillEmployeeFromUploadedDocs(
       skipped += 1;
       continue;
     }
-    const ext = document.fileName.toLowerCase().split(".").pop() || "";
+    const fileName = document.fileName?.trim() || document.title?.trim() || "";
+    if (!fileName) {
+      skipped += 1;
+      continue;
+    }
+    const ext = fileName.toLowerCase().split(".").pop() || "";
     if (ext === "doc" || ext === "xls") {
       failed.push({
-        fileName: document.fileName,
+        fileName,
         error: "Save this file as PDF, DOCX, or XLSX and upload again.",
       });
       continue;
@@ -511,7 +516,7 @@ export async function prefillEmployeeFromUploadedDocs(
     try {
       const extracted = await extractHrDocument({
         fileUrl: document.fileUrl,
-        fileName: document.fileName,
+        fileName,
         category: document.category === "OTHER" || document.category === "NDA" ? "AUTO" : document.category,
       });
       if (!extracted.formType || !payloadHasValues(extracted.payload)) {
@@ -532,12 +537,12 @@ export async function prefillEmployeeFromUploadedDocs(
           deliveryMode: HrFormDeliveryMode.PRINT_UPLOAD,
           status: HrFormRequestStatus.APPROVED,
           token: randomBytes(24).toString("base64url"),
-          hrNote: `Prefill from uploaded docs · ${extracted.category} · ${document.fileName} · confidence ${Math.round(
+          hrNote: `Prefill from uploaded docs · ${extracted.category} · ${fileName} · confidence ${Math.round(
             extracted.confidence * 100,
           )}%`,
           submittedPayload: extracted.payload,
           submittedFileUrl: document.fileUrl,
-          submittedFileName: document.fileName,
+          submittedFileName: fileName,
           submittedAt: new Date(),
           approvedAt: new Date(),
           approvedByUserId: ctx.session.user.id,
@@ -556,7 +561,7 @@ export async function prefillEmployeeFromUploadedDocs(
       applied += 1;
     } catch (error) {
       failed.push({
-        fileName: document.fileName,
+        fileName,
         error: error instanceof Error ? error.message : "Could not read this file.",
       });
     }

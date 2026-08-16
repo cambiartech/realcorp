@@ -13,14 +13,24 @@ const LEGAL_BASIS = [
   "Employee Compensation Act 2010",
 ];
 
-const TAX_BANDS = [
-  { width: 800_000, rate: 0 },
-  { width: 2_200_000, rate: 0.15 },
-  { width: 9_000_000, rate: 0.18 },
-  { width: 13_000_000, rate: 0.21 },
-  { width: 25_000_000, rate: 0.23 },
-  { width: Number.POSITIVE_INFINITY, rate: 0.25 },
+/** Progressive NTA 2026 bands. The first ₦800,000 of chargeable income is untaxed. */
+export const NIGERIA_TAX_BANDS = [
+  { from: 0, to: 800_000, rate: 0, label: "First ₦800,000 (untaxed)" },
+  { from: 800_000, to: 3_000_000, rate: 0.15, label: "₦800,001 – ₦3,000,000" },
+  { from: 3_000_000, to: 12_000_000, rate: 0.18, label: "₦3,000,001 – ₦12,000,000" },
+  { from: 12_000_000, to: 25_000_000, rate: 0.21, label: "₦12,000,001 – ₦25,000,000" },
+  { from: 25_000_000, to: 50_000_000, rate: 0.23, label: "₦25,000,001 – ₦50,000,000" },
+  { from: 50_000_000, to: null, rate: 0.25, label: "Above ₦50,000,000" },
 ] as const;
+
+export type NigeriaAppliedTaxBand = {
+  label: string;
+  from: number;
+  to: number | null;
+  rate: number;
+  incomeInBand: number;
+  taxInBand: number;
+};
 
 function round2(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -30,18 +40,36 @@ function nonNegative(value: number | undefined) {
   return Math.max(0, Number.isFinite(value) ? Number(value) : 0);
 }
 
-export function calculateNigeriaAnnualTax(chargeableIncome: number) {
+export function explainNigeriaAnnualTax(chargeableIncome: number): {
+  tax: number;
+  bands: NigeriaAppliedTaxBand[];
+} {
   let remaining = nonNegative(chargeableIncome);
   let tax = 0;
+  const bands: NigeriaAppliedTaxBand[] = [];
 
-  for (const band of TAX_BANDS) {
+  for (const band of NIGERIA_TAX_BANDS) {
     if (remaining <= 0) break;
-    const taxableInBand = Math.min(remaining, band.width);
-    tax += taxableInBand * band.rate;
-    remaining -= taxableInBand;
+    const width = band.to == null ? Number.POSITIVE_INFINITY : band.to - band.from;
+    const incomeInBand = Math.min(remaining, width);
+    const taxInBand = round2(incomeInBand * band.rate);
+    bands.push({
+      label: band.label,
+      from: band.from,
+      to: band.to,
+      rate: band.rate,
+      incomeInBand: round2(incomeInBand),
+      taxInBand,
+    });
+    tax += taxInBand;
+    remaining -= incomeInBand;
   }
 
-  return round2(tax);
+  return { tax: round2(tax), bands };
+}
+
+export function calculateNigeriaAnnualTax(chargeableIncome: number) {
+  return explainNigeriaAnnualTax(chargeableIncome).tax;
 }
 
 function earningLines(input: PayrollCalculationInput) {
@@ -135,10 +163,11 @@ function calculateNigeriaPayroll(input: PayrollCalculationInput): PayrollCalcula
   const elapsedMonths = Math.max(1, Math.min(12, (input.priorYtd?.monthsProcessed ?? 0) + 1));
   const cumulativeChargeable = round2(priorChargeable + chargeableIncome);
   const projectedAnnualChargeableIncome = round2((cumulativeChargeable / elapsedMonths) * 12);
-  const projectedAnnualTax =
+  const annualTax =
     taxableGross <= MINIMUM_WAGE_MONTHLY
-      ? 0
-      : calculateNigeriaAnnualTax(projectedAnnualChargeableIncome);
+      ? { tax: 0, bands: [] as NigeriaAppliedTaxBand[] }
+      : explainNigeriaAnnualTax(projectedAnnualChargeableIncome);
+  const projectedAnnualTax = annualTax.tax;
   const targetCumulativeTax = round2((projectedAnnualTax / 12) * elapsedMonths);
   const calculatedTax = round2(targetCumulativeTax - priorTax);
   const taxOverrideApplied = input.taxOverrideMonthly !== undefined;
@@ -211,10 +240,15 @@ function calculateNigeriaPayroll(input: PayrollCalculationInput): PayrollCalcula
     calculationBreakdown: {
       method: "cumulative-annualised",
       legalBasis: LEGAL_BASIS,
-      taxBands: TAX_BANDS.map((band) => ({
-        width: Number.isFinite(band.width) ? band.width : null,
+      taxBands: NIGERIA_TAX_BANDS.map((band) => ({
+        from: band.from,
+        to: band.to,
         rate: band.rate,
+        label: band.label,
       })),
+      appliedTaxBands: annualTax.bands,
+      projectedAnnualChargeableIncome,
+      projectedAnnualTax,
       minimumWageMonthly: MINIMUM_WAGE_MONTHLY,
       recurringGross,
       variableEarnings: variableEarnings.map(({ code, amount, taxable, pensionable }) => ({

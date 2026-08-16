@@ -15,7 +15,14 @@ export type PayslipCalculation = {
   ruleVersion?: string;
   chargeableIncome?: number;
   projectedAnnualTax?: number;
+  projectedAnnualChargeableIncome?: number;
   employerCost?: number;
+  appliedTaxBands?: Array<{
+    label: string;
+    rate: number;
+    incomeInBand: number;
+    taxInBand: number;
+  }>;
 };
 
 /**
@@ -63,7 +70,11 @@ export function calculateNigeriaPayslip(input: {
     ruleVersion: result.ruleVersion,
     chargeableIncome: result.chargeableIncome,
     projectedAnnualTax: result.projectedAnnualTax,
+    projectedAnnualChargeableIncome: result.projectedAnnualChargeableIncome,
     employerCost: result.employerCost,
+    appliedTaxBands: Array.isArray(result.calculationBreakdown.appliedTaxBands)
+      ? (result.calculationBreakdown.appliedTaxBands as PayslipCalculation["appliedTaxBands"])
+      : undefined,
   };
 }
 
@@ -80,6 +91,7 @@ export function payslipCalculationFromStored(input: {
   taxRuleVersion?: string | null;
   chargeableIncome?: { toString(): string } | number;
   employerCost?: { toString(): string } | number;
+  calculationBreakdown?: unknown;
 }): PayslipCalculation {
   return {
     grossPay: Number(input.grossPay),
@@ -98,5 +110,29 @@ export function payslipCalculationFromStored(input: {
     chargeableIncome:
       input.chargeableIncome === undefined ? undefined : Number(input.chargeableIncome),
     employerCost: input.employerCost === undefined ? undefined : Number(input.employerCost),
+    ...payslipTaxBandsFromBreakdown(input.calculationBreakdown),
+  };
+}
+
+function payslipTaxBandsFromBreakdown(raw: unknown): Pick<
+  PayslipCalculation,
+  "appliedTaxBands" | "projectedAnnualChargeableIncome" | "projectedAnnualTax"
+> {
+  if (!raw || typeof raw !== "object") return {};
+  const breakdown = raw as Record<string, unknown>;
+  const applied = Array.isArray(breakdown.appliedTaxBands)
+    ? breakdown.appliedTaxBands.filter(
+        (band): band is NonNullable<PayslipCalculation["appliedTaxBands"]>[number] =>
+          Boolean(band) && typeof band === "object",
+      )
+    : undefined;
+  return {
+    appliedTaxBands: applied,
+    projectedAnnualChargeableIncome:
+      typeof breakdown.projectedAnnualChargeableIncome === "number"
+        ? breakdown.projectedAnnualChargeableIncome
+        : undefined,
+    projectedAnnualTax:
+      typeof breakdown.projectedAnnualTax === "number" ? breakdown.projectedAnnualTax : undefined,
   };
 }

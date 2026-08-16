@@ -130,6 +130,46 @@ export function PayslipPrintView({
         </tbody>
       </table>
 
+      {calc.appliedTaxBands?.length ? (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">
+            PAYE tax by band
+          </p>
+          <p className="mb-2 text-[11px] text-slate-600">
+            The first ₦800,000 of annual chargeable income is untaxed. Only the amount above that
+            is taxed, band by band.
+            {calc.projectedAnnualChargeableIncome
+              ? ` Annual chargeable: ${money(calc.projectedAnnualChargeableIncome)}.`
+              : ""}
+            {calc.projectedAnnualTax != null ? ` Annual PAYE: ${money(calc.projectedAnnualTax)}.` : ""}
+          </p>
+          <table className="w-full border-collapse border border-slate-300 text-sm">
+            <thead>
+              <tr className="bg-slate-100 text-left">
+                <th className="border border-slate-300 px-3 py-2">Band</th>
+                <th className="border border-slate-300 px-3 py-2 text-right">Income in band</th>
+                <th className="border border-slate-300 px-3 py-2 text-right">Tax</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calc.appliedTaxBands.map((band) => (
+                <tr key={band.label}>
+                  <td className="border border-slate-200 px-3 py-2">
+                    {band.label} ({Math.round(band.rate * 100)}%)
+                  </td>
+                  <td className="border border-slate-200 px-3 py-2 text-right">
+                    {money(band.incomeInBand)}
+                  </td>
+                  <td className="border border-slate-200 px-3 py-2 text-right font-medium">
+                    {money(band.taxInBand)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       <p className="mt-4 text-center text-[10px] text-slate-500">
         This payslip is computer-generated. Please report discrepancies to HR within 5 working days.
       </p>
