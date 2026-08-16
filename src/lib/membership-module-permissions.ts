@@ -4,6 +4,7 @@ import type { TenantNavKey } from "@/lib/tenant-nav-access";
 /** Assignable module keys stored on Membership.modulePermissions */
 export type MembershipModuleKey =
   | "sales"
+  | "projects"
   | "finance"
   | "marketing"
   | "community"
@@ -30,9 +31,16 @@ export const MEMBERSHIP_ASSIGNABLE_MODULES: AssignableMemberModule[] = [
   {
     key: "sales",
     label: "Sales",
-    description: "Dashboard, projects, leads, deals, activities",
+    description: "Dashboard, leads, deals, activities",
     entitlement: "moduleSales",
-    navKeys: ["dashboard", "projects", "leads", "deals", "activities"],
+    navKeys: ["dashboard", "leads", "deals", "activities"],
+  },
+  {
+    key: "projects",
+    label: "Projects",
+    description: "Developments, inventory, apartments, and pricing",
+    entitlement: "moduleSales",
+    navKeys: ["projects"],
   },
   {
     key: "finance",
