@@ -29,7 +29,7 @@ import {
   createHrFormRequestsBatch,
   upsertEmployeeProfile,
 } from "@/app/[tenantSlug]/hr/actions";
-import { createHrOnlyEmployee } from "@/app/[tenantSlug]/hr/document-intake-actions";
+import { createHrOnlyEmployee, prefillEmployeeFromUploadedDocs } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { inviteTenantMembersBatch } from "@/app/[tenantSlug]/team/actions";
 import { HR_FORM_OPTIONS } from "@/lib/hr-form-types";
 import { INVITE_DEPARTMENT_OPTIONS } from "@/lib/team-membership-roles";
@@ -1217,6 +1217,34 @@ export function HrPeopleWorkspace({
               onGenerateOffer={() => setShowOfferLetter(true)}
               onSendForm={(ft) => openSendForm(ft)}
               onSendAllForms={openSendAllForms}
+              onPrefillFromDocs={() => {
+                void (async () => {
+                  setPending(true);
+                  const result = await prefillEmployeeFromUploadedDocs(
+                    tenantSlug,
+                    selectedMember.userId,
+                  );
+                  setPending(false);
+                  if (!result.ok) {
+                    showSnackbar(result.error, "error");
+                    return;
+                  }
+                  if (!result.applied) {
+                    showSnackbar(
+                      result.failed[0]?.error ||
+                        "Uploaded files were found, but no employee fields could be read.",
+                      "error",
+                    );
+                    return;
+                  }
+                  showSnackbar(
+                    `Filled ${result.filled.join(", ") || "employee fields"} from uploaded documents.`,
+                    "success",
+                  );
+                  router.refresh();
+                })();
+              }}
+              prefillPending={pending}
             />
           </div>
         )

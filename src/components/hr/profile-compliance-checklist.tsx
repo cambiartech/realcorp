@@ -13,6 +13,8 @@ export function ProfileComplianceChecklist({
   onGenerateOffer,
   onSendForm,
   onSendAllForms,
+  onPrefillFromDocs,
+  prefillPending,
 }: {
   items: ProfileChecklistItem[];
   percent: number;
@@ -22,6 +24,8 @@ export function ProfileComplianceChecklist({
   onGenerateOffer?: () => void;
   onSendForm?: (formType: "BIODATA" | "BANK_FORM" | "GUARANTOR" | "HEALTH") => void;
   onSendAllForms?: () => void;
+  onPrefillFromDocs?: () => void;
+  prefillPending?: boolean;
 }) {
   const nda = items.find((i) => i.id === "nda");
   const offer = items.find((i) => i.id === "offer");
@@ -55,6 +59,16 @@ export function ProfileComplianceChecklist({
         ))}
       </ul>
       <div className="mt-4 flex flex-col gap-2 border-t border-foreground/10 pt-3">
+        {onPrefillFromDocs ? (
+          <button
+            type="button"
+            disabled={prefillPending}
+            onClick={onPrefillFromDocs}
+            className="rounded-md border border-foreground bg-foreground px-3 py-2 text-left text-xs font-semibold text-background disabled:opacity-50"
+          >
+            {prefillPending ? "Reading uploaded documents…" : "Prefill from uploaded docs"}
+          </button>
+        ) : null}
         {onGenerateOffer ? (
           <button
             type="button"

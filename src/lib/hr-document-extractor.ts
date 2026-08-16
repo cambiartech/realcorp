@@ -165,6 +165,8 @@ async function documentParts(
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     webp: "image/webp",
+    heic: "image/heic",
+    heif: "image/heif",
   };
   const mimeType = mimeByExt[ext] || responseMimeType || "application/pdf";
   return [{ inline_data: { mime_type: mimeType, data: bytes.toString("base64") } }];

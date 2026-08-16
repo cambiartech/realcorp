@@ -10,6 +10,7 @@ import { type OnboardingStepId, writeStoredOnboardingStep } from "@/lib/hr-onboa
 import { mergeProfileDraftFromForm, profileDraftFingerprint } from "@/lib/hr-onboarding-draft";
 import { OnboardingProfileHiddenFields } from "@/components/hr/onboarding-profile-hidden-fields";
 import { upsertEmployeeProfile } from "@/app/[tenantSlug]/hr/actions";
+import { prefillEmployeeFromUploadedDocs } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { UiSelect } from "@/components/ui-select";
 
 const inputClass =
@@ -69,7 +70,9 @@ export function HrOnboardingWizard({
   const [draft, setDraft] = useState<ProfileDetailRow>(record);
   const [step, setStep] = useState<OnboardingStepId>(initialStep);
   const [pending, setPending] = useState(false);
+  const [prefillPending, setPrefillPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prefillNote, setPrefillNote] = useState<string | null>(null);
 
   useEffect(() => {
     setDraft(record);
@@ -98,6 +101,36 @@ export function HrOnboardingWizard({
       returnOnboard: record.userId,
     });
     router.push(`/${tenantSlug}/hr/documents?${q.toString()}`);
+  }
+
+  async function prefillFromUploadedDocs() {
+    if (prefillPending || pending) return;
+    setPrefillPending(true);
+    setError(null);
+    setPrefillNote(null);
+    const result = await prefillEmployeeFromUploadedDocs(tenantSlug, record.userId);
+    setPrefillPending(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    if (!result.applied) {
+      setError(
+        result.failed[0]
+          ? `Nothing could be read yet. ${result.failed[0].fileName}: ${result.failed[0].error}`
+          : "The uploaded files were found, but no employee fields could be read. Try PDF or JPG copies.",
+      );
+      return;
+    }
+    const failedHint = result.failed.length
+      ? ` ${result.failed.length} file${result.failed.length === 1 ? "" : "s"} could not be read.`
+      : "";
+    setPrefillNote(
+      `Filled ${result.filled.join(", ") || "employee fields"} from ${result.applied} document${
+        result.applied === 1 ? "" : "s"
+      }.${failedHint}`,
+    );
+    router.refresh();
   }
 
   async function saveForm(form: HTMLFormElement, status?: string) {
@@ -161,6 +194,11 @@ export function HrOnboardingWizard({
       {error ? (
         <p className="mb-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-xs text-[var(--danger)]">
           {error}
+        </p>
+      ) : null}
+      {prefillNote ? (
+        <p className="mb-3 rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] px-3 py-2 text-xs text-[var(--success)]">
+          {prefillNote}
         </p>
       ) : null}
 
@@ -338,12 +376,15 @@ export function HrOnboardingWizard({
             onGenerateOffer={onGenerateOffer}
             onSendForm={onSendForm}
             onSendAllForms={onSendAllForms}
+            onPrefillFromDocs={() => void prefillFromUploadedDocs()}
+            prefillPending={prefillPending}
           />
           <div className="text-sm text-muted">
             <p className="font-medium text-foreground">What to do now</p>
             <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs">
+              <li>If documents are already uploaded, use Prefill from uploaded docs.</li>
               <li>Generate and print the offer letter for signature.</li>
-              <li>Send biodata, bank, and guarantor forms (links on the left).</li>
+              <li>Send biodata, bank, and guarantor forms only if a file is missing or unreadable.</li>
               <li>When forms are submitted, approve them under Form requests.</li>
               <li>Upload signed NDA and offer letter under Documents.</li>
             </ol>

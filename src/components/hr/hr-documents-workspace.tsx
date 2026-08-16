@@ -22,7 +22,7 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { addHrDocument, getHrUploadSignature, softDeleteHrDocument } from "@/app/[tenantSlug]/hr/actions";
-import { ingestHrDocument } from "@/app/[tenantSlug]/hr/document-intake-actions";
+import { ingestHrDocument, prefillEmployeeFromUploadedDocs } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 import { MODAL_PANEL_XS } from "@/lib/modal-panel";
 
@@ -141,10 +141,11 @@ export function HrDocumentsWorkspace({
   const [selectedTypeFolder, setSelectedTypeFolder] = useState<string>("ALL");
   const [selectedEmployeeKey, setSelectedEmployeeKey] = useState<string | null>(initialEmployeeKey);
   const [uploadEmployeeId, setUploadEmployeeId] = useState(initialEmployeeKey || "");
-  const [uploadCategory, setUploadCategory] = useState(preselectUserId ? "NDA" : aiEnabled ? "AUTO" : "OTHER");
+  const [uploadCategory, setUploadCategory] = useState(aiEnabled ? "AUTO" : preselectUserId ? "NDA" : "OTHER");
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploading, setUploading] = useState(false);
   const [generatingDocumentId, setGeneratingDocumentId] = useState<string | null>(null);
+  const [prefillPending, setPrefillPending] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<HrDocumentItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showUploadPanel, setShowUploadPanel] = useState(Boolean(preselectUserId));
@@ -579,17 +580,52 @@ export function HrDocumentsWorkspace({
 
         {/* Main explorer */}
         <div className="min-w-0 flex-1 flex flex-col">
-          <div className="flex flex-wrap items-center gap-1 border-b border-foreground/10 px-3 py-2 text-xs">
-            {breadcrumb.map((part, i) => (
-              <span key={part} className="inline-flex items-center gap-1">
-                {i > 0 ? <ChevronRight className="h-3 w-3 text-muted" /> : null}
-                <span
-                  className={i === breadcrumb.length - 1 ? "font-semibold text-foreground" : "text-muted"}
-                >
-                  {part}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 px-3 py-2 text-xs">
+            <div className="flex flex-wrap items-center gap-1">
+              {breadcrumb.map((part, i) => (
+                <span key={part} className="inline-flex items-center gap-1">
+                  {i > 0 ? <ChevronRight className="h-3 w-3 text-muted" /> : null}
+                  <span
+                    className={i === breadcrumb.length - 1 ? "font-semibold text-foreground" : "text-muted"}
+                  >
+                    {part}
+                  </span>
                 </span>
-              </span>
-            ))}
+              ))}
+            </div>
+            {aiEnabled && browseMode === "employee" && selectedEmployee ? (
+              <button
+                type="button"
+                disabled={prefillPending}
+                onClick={() => {
+                  void (async () => {
+                    setPrefillPending(true);
+                    const result = await prefillEmployeeFromUploadedDocs(tenantSlug, selectedEmployee.userId);
+                    setPrefillPending(false);
+                    if (!result.ok) {
+                      showSnackbar(result.error, "error");
+                      return;
+                    }
+                    if (!result.applied) {
+                      showSnackbar(
+                        result.failed[0]?.error ||
+                          "Uploaded files were found, but no employee fields could be read.",
+                        "error",
+                      );
+                      return;
+                    }
+                    showSnackbar(
+                      `Filled ${result.filled.join(", ") || "employee fields"} from uploaded documents.`,
+                      "success",
+                    );
+                    router.refresh();
+                  })();
+                }}
+                className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background disabled:opacity-50"
+              >
+                {prefillPending ? "Prefilling…" : "Prefill from uploaded docs"}
+              </button>
+            ) : null}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">

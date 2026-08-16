@@ -7,6 +7,7 @@ import {
   HrDocumentCategory,
   HrFormDeliveryMode,
   HrFormRequestStatus,
+  HrFormType,
   MembershipStatus,
 } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -14,6 +15,7 @@ import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { extractHrDocument } from "@/lib/hr-document-extractor";
 import { ensureEmployeeNumber } from "@/lib/hr-employee-number";
+import { mergeHrFormIntoProfile } from "@/lib/hr-form-merge";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -410,4 +412,177 @@ export async function createHrOnlyEmployee(
   } catch {
     return { ok: false, error: "Could not add this employee. Their email may already be linked to a record." };
   }
+}
+
+function payloadHasValues(payload: Record<string, string>) {
+  return Object.values(payload).some((value) => value.trim().length > 0);
+}
+
+const PREFILL_FORM_LABELS: Record<HrFormType, string> = {
+  BIODATA: "Biodata",
+  BANK_FORM: "Bank account",
+  GUARANTOR: "Guarantor",
+  HEALTH: "Health",
+};
+
+export async function prefillEmployeeFromUploadedDocs(
+  tenantSlug: string,
+  userId: string,
+): Promise<
+  | {
+      ok: true;
+      applied: number;
+      skipped: number;
+      failed: Array<{ fileName: string; error: string }>;
+      filled: string[];
+    }
+  | { ok: false; error: string }
+> {
+  const ctx = await hrContext(tenantSlug, { requireAi: true });
+  if ("error" in ctx) return { ok: false, error: ctx.error || "You do not have permission." };
+
+  const profile = await prisma.employeeProfile.findUnique({
+    where: { tenantId_userId: { tenantId: ctx.tenant.id, userId } },
+    select: { id: true, fullName: true, userId: true, workEmail: true },
+  });
+  if (!profile) return { ok: false, error: "Create this employee record first, then prefill from their documents." };
+
+  const [documents, pendingRequests] = await Promise.all([
+    prisma.hrDocument.findMany({
+      where: { tenantId: ctx.tenant.id, employeeProfileId: profile.id, deletedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, fileUrl: true, fileName: true, category: true, title: true },
+    }),
+    prisma.hrFormRequest.findMany({
+      where: {
+        tenantId: ctx.tenant.id,
+        employeeProfileId: profile.id,
+        status: HrFormRequestStatus.SUBMITTED,
+      },
+      select: { id: true, formType: true, submittedPayload: true, submittedFileUrl: true },
+    }),
+  ]);
+
+  if (!documents.length && !pendingRequests.length) {
+    return { ok: false, error: "No uploaded documents were found for this employee." };
+  }
+
+  const filled = new Set<string>();
+  const failed: Array<{ fileName: string; error: string }> = [];
+  let applied = 0;
+  let skipped = 0;
+  const appliedFileUrls = new Set<string>();
+
+  for (const request of pendingRequests) {
+    if (!request.submittedPayload) {
+      skipped += 1;
+      continue;
+    }
+    await prisma.employeeProfile.update({
+      where: { id: profile.id },
+      data: mergeHrFormIntoProfile(request.formType, request.submittedPayload),
+    });
+    await prisma.hrFormRequest.update({
+      where: { id: request.id },
+      data: {
+        status: HrFormRequestStatus.APPROVED,
+        approvedAt: new Date(),
+        approvedByUserId: ctx.session.user.id,
+      },
+    });
+    filled.add(PREFILL_FORM_LABELS[request.formType]);
+    applied += 1;
+    if (request.submittedFileUrl) appliedFileUrls.add(request.submittedFileUrl);
+  }
+
+  for (const document of documents) {
+    if (appliedFileUrls.has(document.fileUrl)) {
+      skipped += 1;
+      continue;
+    }
+    const ext = document.fileName.toLowerCase().split(".").pop() || "";
+    if (ext === "doc" || ext === "xls") {
+      failed.push({
+        fileName: document.fileName,
+        error: "Save this file as PDF, DOCX, or XLSX and upload again.",
+      });
+      continue;
+    }
+    try {
+      const extracted = await extractHrDocument({
+        fileUrl: document.fileUrl,
+        fileName: document.fileName,
+        category: document.category === "OTHER" || document.category === "NDA" ? "AUTO" : document.category,
+      });
+      if (!extracted.formType || !payloadHasValues(extracted.payload)) {
+        skipped += 1;
+        continue;
+      }
+      await prisma.employeeProfile.update({
+        where: { id: profile.id },
+        data: mergeHrFormIntoProfile(extracted.formType, extracted.payload),
+      });
+      await prisma.hrFormRequest.create({
+        data: {
+          tenantId: ctx.tenant.id,
+          employeeProfileId: profile.id,
+          recipientName: profile.fullName || extracted.employeeName || "Employee",
+          recipientEmail: profile.workEmail || extracted.employeeEmail || null,
+          formType: extracted.formType,
+          deliveryMode: HrFormDeliveryMode.PRINT_UPLOAD,
+          status: HrFormRequestStatus.APPROVED,
+          token: randomBytes(24).toString("base64url"),
+          hrNote: `Prefill from uploaded docs · ${extracted.category} · ${document.fileName} · confidence ${Math.round(
+            extracted.confidence * 100,
+          )}%`,
+          submittedPayload: extracted.payload,
+          submittedFileUrl: document.fileUrl,
+          submittedFileName: document.fileName,
+          submittedAt: new Date(),
+          approvedAt: new Date(),
+          approvedByUserId: ctx.session.user.id,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          createdByUserId: ctx.session.user.id,
+          createdByLabel: ctx.session.user.name || ctx.session.user.email || "HR",
+        },
+      });
+      if (extracted.category !== document.category && document.category === "OTHER") {
+        await prisma.hrDocument.update({
+          where: { id: document.id },
+          data: { category: extracted.category },
+        });
+      }
+      filled.add(PREFILL_FORM_LABELS[extracted.formType]);
+      applied += 1;
+    } catch (error) {
+      failed.push({
+        fileName: document.fileName,
+        error: error instanceof Error ? error.message : "Could not read this file.",
+      });
+    }
+  }
+
+  await ensureEmployeeNumber(profile.id);
+  await writeAuditLog({
+    tenantId: ctx.tenant.id,
+    actorUserId: ctx.session.user.id,
+    actorLabel: ctx.session.user.name || ctx.session.user.email,
+    module: "HR",
+    entityType: "EmployeeProfile",
+    entityId: profile.id,
+    action: "PREFILL_FROM_DOCUMENTS",
+    summary: `Prefill from uploaded docs for ${profile.fullName || "employee"}: ${applied} applied, ${skipped} skipped, ${failed.length} failed.`,
+    metadata: { applied, skipped, failed: failed.length, filled: Array.from(filled) },
+  });
+  revalidatePath(`/${tenantSlug}/hr`);
+  revalidatePath(`/${tenantSlug}/hr/people`);
+  revalidatePath(`/${tenantSlug}/hr/documents`);
+
+  return {
+    ok: true,
+    applied,
+    skipped,
+    failed,
+    filled: Array.from(filled),
+  };
 }
