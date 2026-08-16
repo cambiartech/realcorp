@@ -14,6 +14,9 @@ export function PayslipPrintView({
   accountNumber,
   bankName,
   employeeId,
+  taxId,
+  rsaPin,
+  pensionAdministrator,
   currency,
   calc,
 }: {
@@ -26,6 +29,9 @@ export function PayslipPrintView({
   accountNumber: string;
   bankName: string;
   employeeId: string;
+  taxId?: string;
+  rsaPin?: string;
+  pensionAdministrator?: string;
   currency: string;
   calc: PayslipCalculation;
 }) {
@@ -70,6 +76,19 @@ export function PayslipPrintView({
           <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Account number</p>
           <p className="font-mono text-xs">{accountNumber || "—"}</p>
         </div>
+        {taxId ? (
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">TIN</p>
+            <p className="font-mono text-xs">{taxId}</p>
+          </div>
+        ) : null}
+        {rsaPin ? (
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">RSA PIN</p>
+            <p className="font-mono text-xs">{rsaPin}</p>
+            {pensionAdministrator ? <p className="text-xs text-slate-600">{pensionAdministrator}</p> : null}
+          </div>
+        ) : null}
       </div>
 
       <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Earnings</p>
@@ -129,6 +148,32 @@ export function PayslipPrintView({
           </tr>
         </tbody>
       </table>
+
+      {calc.employerContributions?.length ? (
+        <>
+          <p className="mb-2 mt-4 text-xs font-bold uppercase tracking-wide text-slate-600">
+            Employer contributions (not deducted from net)
+          </p>
+          <table className="w-full border-collapse border border-slate-300 text-sm">
+            <thead>
+              <tr className="bg-slate-100 text-left">
+                <th className="border border-slate-300 px-3 py-2">Description</th>
+                <th className="border border-slate-300 px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calc.employerContributions.map((row) => (
+                <tr key={row.code}>
+                  <td className="border border-slate-200 px-3 py-2">{row.label}</td>
+                  <td className="border border-slate-200 px-3 py-2 text-right font-medium">
+                    {money(row.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : null}
 
       {calc.appliedTaxBands?.length ? (
         <div className="mt-4">

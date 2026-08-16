@@ -6,6 +6,7 @@ import { HrAppraisalsWorkspace } from "@/components/hr/hr-appraisals-workspace";
 import { HrDocumentsWorkspace } from "@/components/hr/hr-documents-workspace";
 import { HrMyDashboard } from "@/components/hr/hr-my-dashboard";
 import { HrPayslipsWorkspace } from "@/components/hr/hr-payslips-workspace";
+import { HrRemittancesWorkspace } from "@/components/hr/hr-remittances-workspace";
 import { HrInsightsWorkspace } from "@/components/hr/hr-insights-workspace";
 import { HrPeopleWorkspace } from "@/components/hr/hr-people-workspace";
 import type { HrAnalyticsSnapshot } from "@/lib/hr-analytics";
@@ -16,7 +17,7 @@ import type { ProfileDetailRow } from "@/lib/hr-profile-form";
 import type { PayslipCalculation } from "@/lib/hr-payslip";
 import type { TenantBranding } from "@/lib/tenant-branding";
 
-type HrTab = "people" | "payslips" | "appraisals" | "documents" | "insights" | "my";
+type HrTab = "people" | "payslips" | "remittances" | "appraisals" | "documents" | "insights" | "my";
 
 export function HrWorkspace(props: {
   tenantSlug: string;
@@ -126,6 +127,11 @@ export function HrWorkspace(props: {
       jobRole: string;
       paygroup: string;
       employeeId: string;
+      department: string;
+      taxId: string;
+      rsaPin: string;
+      pensionAdministrator: string;
+      nhfMembershipNumber: string;
       accountNumber: string;
       bankName: string;
       grossPay: number;
@@ -340,6 +346,10 @@ export function HrWorkspace(props: {
       title: "Payslips",
       subtitle: "Generate monthly payslips. Employees download from My HR after you finalize.",
     },
+    remittances: {
+      title: "Statutory remittances",
+      subtitle: "PAYE, pension, NHF, and NSITF schedules for the payroll month — export and file.",
+    },
     appraisals: {
       title: "Appraisals",
       subtitle: "Monthly performance scores, manager reviews, and yearly archive.",
@@ -417,8 +427,21 @@ export function HrWorkspace(props: {
           />
         ) : null}
 
+        {activeTab === "remittances" && canManageHr ? (
+          <HrRemittancesWorkspace
+            tenantSlug={tenantSlug}
+            companyName={companyName}
+            currency={currency}
+            payslipRuns={payslipRuns}
+          />
+        ) : null}
+
         {activeTab === "payslips" && !canManageHr ? (
           <p className="text-sm text-muted">Payslip runs are managed by HR. Open My HR to download yours.</p>
+        ) : null}
+
+        {activeTab === "remittances" && !canManageHr ? (
+          <p className="text-sm text-muted">Remittance schedules are managed by HR.</p>
         ) : null}
 
         {activeTab === "appraisals" && canManageHr ? (

@@ -43,6 +43,7 @@ export default async function HrPage({
   if (tab === "people") redirect(`/${tenantSlug}/hr/people`);
   if (tab === "leave") redirect(`/${tenantSlug}/hr/leave`);
   if (tab === "payslips") redirect(`/${tenantSlug}/hr/payslips`);
+  if (tab === "remittances") redirect(`/${tenantSlug}/hr/remittances`);
   if (tab === "appraisals") redirect(`/${tenantSlug}/hr/appraisals`);
   if (tab === "documents") redirect(`/${tenantSlug}/hr/documents`);
   if (tab === "insights") redirect(`/${tenantSlug}/hr/insights`);

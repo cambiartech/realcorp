@@ -72,6 +72,11 @@ export type PayslipRunView = {
     jobRole: string;
     paygroup: string;
     employeeId: string;
+    department: string;
+    taxId: string;
+    rsaPin: string;
+    pensionAdministrator: string;
+    nhfMembershipNumber: string;
     accountNumber: string;
     bankName: string;
     grossPay: number;
@@ -362,8 +367,12 @@ export function HrPayslipsWorkspace({
               Generate monthly payslips
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Bo split: Basic 30%, Housing 20%, Transport 15%, Other 35%, Pension 8% of BHT, Payee per
-              employee.
+              Bo split: Basic 30%, Housing 20%, Transport 15%, Other 35%, Pension 8% of BHT, PAYE per
+              employee. After you publish, file statutory remittances from{" "}
+              <Link href={`/${tenantSlug}/hr/remittances`} className="font-semibold underline">
+                Remittances
+              </Link>
+              .
             </p>
           </div>
           <form
@@ -950,6 +959,9 @@ export function HrPayslipsWorkspace({
               accountNumber={viewPayslip.accountNumber}
               bankName={viewPayslip.bankName}
               employeeId={viewPayslip.employeeId}
+              taxId={viewPayslip.taxId}
+              rsaPin={viewPayslip.rsaPin}
+              pensionAdministrator={viewPayslip.pensionAdministrator}
               currency={currency}
               calc={viewPayslip.calc}
             />

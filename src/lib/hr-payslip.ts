@@ -17,6 +17,12 @@ export type PayslipCalculation = {
   projectedAnnualTax?: number;
   projectedAnnualChargeableIncome?: number;
   employerCost?: number;
+  employerContributions?: Array<{
+    code: string;
+    label: string;
+    amount: number;
+    paidBy: "EMPLOYER";
+  }>;
   appliedTaxBands?: Array<{
     label: string;
     rate: number;
@@ -72,6 +78,7 @@ export function calculateNigeriaPayslip(input: {
     projectedAnnualTax: result.projectedAnnualTax,
     projectedAnnualChargeableIncome: result.projectedAnnualChargeableIncome,
     employerCost: result.employerCost,
+    employerContributions: result.employerContributions,
     appliedTaxBands: Array.isArray(result.calculationBreakdown.appliedTaxBands)
       ? (result.calculationBreakdown.appliedTaxBands as PayslipCalculation["appliedTaxBands"])
       : undefined,
@@ -91,6 +98,7 @@ export function payslipCalculationFromStored(input: {
   taxRuleVersion?: string | null;
   chargeableIncome?: { toString(): string } | number;
   employerCost?: { toString(): string } | number;
+  employerContributions?: unknown;
   calculationBreakdown?: unknown;
 }): PayslipCalculation {
   return {
@@ -110,6 +118,9 @@ export function payslipCalculationFromStored(input: {
     chargeableIncome:
       input.chargeableIncome === undefined ? undefined : Number(input.chargeableIncome),
     employerCost: input.employerCost === undefined ? undefined : Number(input.employerCost),
+    employerContributions: Array.isArray(input.employerContributions)
+      ? (input.employerContributions as NonNullable<PayslipCalculation["employerContributions"]>)
+      : undefined,
     ...payslipTaxBandsFromBreakdown(input.calculationBreakdown),
   };
 }

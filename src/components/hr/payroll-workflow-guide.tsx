@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Banknote, FileCheck, Send } from "lucide-react";
+import { ArrowRight, Banknote, FileCheck, Landmark, Send } from "lucide-react";
 
 export function PayrollWorkflowGuide({
   tenantSlug,
@@ -51,12 +51,19 @@ export function PayrollWorkflowGuide({
               : "After publishing, record bank payments here. This is separate from publishing the payslip PDF."
           : "After you publish, mark each row Paid once salary hits their bank account.",
     },
+    {
+      icon: Landmark,
+      title: "4. File remittances",
+      body: "Export PAYE, pension (by PFA), NHF, and NSITF for the same month and file with the agencies.",
+      link: `/${tenantSlug}/hr/remittances`,
+      linkLabel: "Open remittances",
+    },
   ];
 
   return (
     <div className="rounded-xl border border-foreground/10 bg-gradient-to-br from-foreground/[0.03] to-transparent p-4">
       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">How payroll works</p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {steps.map((s) => (
           <div key={s.title} className="rounded-lg border border-foreground/10 bg-foreground/[0.02]/80 p-3">
             <div className="mb-1.5 flex items-center gap-2">

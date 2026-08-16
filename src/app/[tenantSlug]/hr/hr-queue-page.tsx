@@ -43,7 +43,7 @@ export default async function HrQueuePage({
   searchParams: searchParamsProp,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  tab: "people" | "payslips" | "appraisals" | "documents" | "insights" | "my";
+  tab: "people" | "payslips" | "remittances" | "appraisals" | "documents" | "insights" | "my";
   searchParams?: Promise<Record<string, string | undefined>>;
 }) {
   const { tenantSlug } = await params;
@@ -203,6 +203,11 @@ export default async function HrQueuePage({
                 position: true,
                 paygroupName: true,
                 employeeNumber: true,
+                department: true,
+                taxId: true,
+                rsaPin: true,
+                pensionAdministrator: true,
+                nhfMembershipNumber: true,
                 bankAccount: true,
               },
             },
@@ -727,6 +732,11 @@ export default async function HrQueuePage({
             jobRole: s.profile.position || "",
             paygroup: s.profile.paygroupName || "",
             employeeId: s.profile.employeeNumber || "",
+            department: s.profile.department || "",
+            taxId: s.profile.taxId || "",
+            rsaPin: s.profile.rsaPin || "",
+            pensionAdministrator: s.profile.pensionAdministrator || "",
+            nhfMembershipNumber: s.profile.nhfMembershipNumber || "",
             accountNumber: bankField(s.profile.bankAccount, "accountNumber"),
             bankName: bankField(s.profile.bankAccount, "bankName"),
             grossPay: Number(s.grossPay),

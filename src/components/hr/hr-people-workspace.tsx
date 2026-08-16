@@ -453,6 +453,9 @@ export function HrPeopleWorkspace({
       payrollRegionCode: "",
       taxId: "",
       taxOverrideReason: "",
+      rsaPin: "",
+      pensionAdministrator: "",
+      nhfMembershipNumber: "",
       pensionEnabled: "yes",
       employeePensionRate: "8",
       employerPensionRate: "10",
@@ -993,7 +996,24 @@ export function HrPeopleWorkspace({
                       name="payrollRegionCode"
                       defaultValue={record.payrollRegionCode}
                     />
-                    <Field label="Tax identification number" name="taxId" defaultValue={record.taxId} />
+                    <Field label="Tax identification number (TIN)" name="taxId" defaultValue={record.taxId} />
+                    <Field
+                      label="RSA PIN"
+                      name="rsaPin"
+                      defaultValue={record.rsaPin}
+                      hint="Pension Retirement Savings Account PIN for remittance schedules."
+                    />
+                    <Field
+                      label="Pension administrator (PFA)"
+                      name="pensionAdministrator"
+                      defaultValue={record.pensionAdministrator}
+                      hint="e.g. ARM Pension, Stanbic IBTC Pension. Type a name if it is not listed yet."
+                    />
+                    <Field
+                      label="NHF membership number"
+                      name="nhfMembershipNumber"
+                      defaultValue={record.nhfMembershipNumber}
+                    />
                     <Field
                       label="Tax override reason"
                       name="taxOverrideReason"

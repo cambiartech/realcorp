@@ -44,6 +44,9 @@ export function formDataToEmployeeProfilePayload(fd: FormData): Record<string, u
     "payrollRegionCode",
     "taxId",
     "taxOverrideReason",
+    "rsaPin",
+    "pensionAdministrator",
+    "nhfMembershipNumber",
     "hrNotes",
     "status",
   ] as const;
@@ -166,6 +169,9 @@ export type ProfileDetailRow = {
   payrollRegionCode: string;
   taxId: string;
   taxOverrideReason: string;
+  rsaPin: string;
+  pensionAdministrator: string;
+  nhfMembershipNumber: string;
   pensionEnabled: string;
   employeePensionRate: string;
   employerPensionRate: string;
@@ -235,6 +241,9 @@ export function profileToDetailRow(p: {
   payrollRegionCode?: string | null;
   taxId?: string | null;
   taxOverrideReason?: string | null;
+  rsaPin?: string | null;
+  pensionAdministrator?: string | null;
+  nhfMembershipNumber?: string | null;
   pensionEnabled?: boolean;
   employeePensionRate?: { toString(): string };
   employerPensionRate?: { toString(): string };
@@ -291,6 +300,9 @@ export function profileToDetailRow(p: {
     payrollRegionCode: p.payrollRegionCode || "",
     taxId: p.taxId || "",
     taxOverrideReason: p.taxOverrideReason || "",
+    rsaPin: p.rsaPin || "",
+    pensionAdministrator: p.pensionAdministrator || "",
+    nhfMembershipNumber: p.nhfMembershipNumber || "",
     pensionEnabled: p.pensionEnabled === false ? "no" : "yes",
     employeePensionRate: p.employeePensionRate ? String(Number(p.employeePensionRate)) : "8",
     employerPensionRate: p.employerPensionRate ? String(Number(p.employerPensionRate)) : "10",

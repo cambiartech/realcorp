@@ -251,6 +251,9 @@ export async function upsertEmployeeProfile(
     ...(has("payrollRegionCode") ? { payrollRegionCode: strOrNull(parsed.data.payrollRegionCode) } : {}),
     ...(has("taxId") ? { taxId: strOrNull(parsed.data.taxId) } : {}),
     ...(has("taxOverrideReason") ? { taxOverrideReason: strOrNull(parsed.data.taxOverrideReason) } : {}),
+    ...(has("rsaPin") ? { rsaPin: strOrNull(parsed.data.rsaPin) } : {}),
+    ...(has("pensionAdministrator") ? { pensionAdministrator: strOrNull(parsed.data.pensionAdministrator) } : {}),
+    ...(has("nhfMembershipNumber") ? { nhfMembershipNumber: strOrNull(parsed.data.nhfMembershipNumber) } : {}),
     ...(has("pensionEnabled") ? { pensionEnabled: parsed.data.pensionEnabled ?? true } : {}),
     ...(has("employeePensionRate") ? { employeePensionRate: parsed.data.employeePensionRate ?? 8 } : {}),
     ...(has("employerPensionRate") ? { employerPensionRate: parsed.data.employerPensionRate ?? 10 } : {}),
@@ -313,6 +316,9 @@ export async function upsertEmployeeProfile(
     payrollRegionCode: parsed.data.payrollRegionCode || null,
     taxId: parsed.data.taxId || null,
     taxOverrideReason: parsed.data.taxOverrideReason || null,
+    rsaPin: parsed.data.rsaPin || null,
+    pensionAdministrator: parsed.data.pensionAdministrator || null,
+    nhfMembershipNumber: parsed.data.nhfMembershipNumber || null,
     pensionEnabled: parsed.data.pensionEnabled ?? true,
     employeePensionRate: parsed.data.employeePensionRate ?? 8,
     employerPensionRate: parsed.data.employerPensionRate ?? 10,
@@ -1402,6 +1408,8 @@ export async function markPayslipPayments(
       paidAt: paid ? new Date() : null,
       paymentReference: paid ? parsed.data.paymentReference || null : null,
       paidByLabel: paid ? label : null,
+      disbursementChannel: paid ? "MANUAL" : null,
+      disbursementStatus: paid ? "SETTLED" : null,
     },
   });
 

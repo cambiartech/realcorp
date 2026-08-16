@@ -35,6 +35,12 @@ export function buildProfileChecklist(
       done: hasJson(profile.bankAccount),
     },
     {
+      id: "statutory",
+      label: "Statutory IDs (TIN / RSA PIN)",
+      done: Boolean(profile.taxId && profile.rsaPin),
+      hint: "Needed for PAYE and pension remittance schedules",
+    },
+    {
       id: "emergency",
       label: "Emergency contact",
       done: hasJson(profile.emergencyContact),

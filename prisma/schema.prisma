@@ -1527,6 +1527,9 @@ model EmployeeProfile {
   payrollRegionCode      String?
   taxId                  String?
   taxOverrideReason      String?
+  rsaPin                 String?
+  pensionAdministrator   String?
+  nhfMembershipNumber    String?
   pensionEnabled         Boolean               @default(true)
   employeePensionRate    Decimal               @default(8) @db.Decimal(5, 2)
   employerPensionRate    Decimal               @default(10) @db.Decimal(5, 2)
@@ -1847,6 +1850,10 @@ model HrPayslip {
   paidAt                DateTime?
   paymentReference      String?
   paidByLabel           String?
+  /// Settlement path for this slip. MANUAL is the product path today.
+  disbursementChannel   String?                @default("MANUAL")
+  disbursementBatchId   String?
+  disbursementStatus    String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 

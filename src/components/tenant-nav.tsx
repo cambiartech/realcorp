@@ -402,6 +402,7 @@ export function TenantSidebar({
           { id: "people", label: "People", href: `${hrItem.href}/people`, icon: Users },
           { id: "leave", label: "Leave tracker", href: `${hrItem.href}/leave`, icon: CalendarDays },
           { id: "payslips", label: "Payslips", href: `${hrItem.href}/payslips`, icon: Banknote },
+          { id: "remittances", label: "Remittances", href: `${hrItem.href}/remittances`, icon: Landmark },
           { id: "appraisals", label: "Appraisals", href: `${hrItem.href}/appraisals`, icon: Star },
           { id: "documents", label: "Documents", href: `${hrItem.href}/documents`, icon: FileText },
           { id: "insights", label: "Insights", href: `${hrItem.href}/insights`, icon: BarChart2 },
