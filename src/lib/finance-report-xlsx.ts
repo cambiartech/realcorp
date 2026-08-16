@@ -37,6 +37,24 @@ type TransactionRow = {
   category: string;
 };
 
+type IncomeDimensionRow = {
+  label: string;
+  collected: number;
+  deposits: number;
+  shortlet: number;
+  other: number;
+};
+
+type ClientBalanceRow = {
+  clientName: string;
+  projectLabel: string;
+  unitLabel: string;
+  contractValue: number;
+  depositsPaid: number;
+  collected: number;
+  remaining: number;
+};
+
 export type FinanceReportKpis = {
   totalInvoiced: number;
   totalCollected: number;
@@ -248,6 +266,69 @@ function addBalanceSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, lines
   autoWidth(sheet);
 }
 
+function addIncomeByProjectSheet(
+  sheet: ExcelJS.Worksheet,
+  meta: ReportExportMeta,
+  rows: IncomeDimensionRow[],
+) {
+  addReportBanner(sheet, metaToReport(meta, "Income by project / room"), 6);
+  const header = sheet.addRow([
+    "Project / room",
+    "Collected",
+    "Client deposits",
+    "Short let",
+    "Other income",
+  ]);
+  styleHeaderRow(header);
+  for (const row of rows) {
+    const excelRow = sheet.addRow([
+      row.label,
+      row.collected,
+      row.deposits,
+      row.shortlet,
+      row.other,
+    ]);
+    excelRow.getCell(2).numFmt = moneyFormat(meta.currency);
+    excelRow.getCell(3).numFmt = moneyFormat(meta.currency);
+    excelRow.getCell(4).numFmt = moneyFormat(meta.currency);
+    excelRow.getCell(5).numFmt = moneyFormat(meta.currency);
+  }
+  autoWidth(sheet);
+}
+
+function addClientBalancesSheet(
+  sheet: ExcelJS.Worksheet,
+  meta: ReportExportMeta,
+  rows: ClientBalanceRow[],
+) {
+  addReportBanner(sheet, metaToReport(meta, "Client deposits remaining"), 8);
+  const header = sheet.addRow([
+    "Client",
+    "Project",
+    "Apartment / room",
+    "Contract value",
+    "Deposits paid",
+    "Total collected",
+    "Remaining to pay",
+  ]);
+  styleHeaderRow(header);
+  for (const row of rows) {
+    const excelRow = sheet.addRow([
+      row.clientName,
+      row.projectLabel,
+      row.unitLabel,
+      row.contractValue,
+      row.depositsPaid,
+      row.collected,
+      row.remaining,
+    ]);
+    for (let i = 4; i <= 7; i += 1) {
+      excelRow.getCell(i).numFmt = moneyFormat(meta.currency);
+    }
+  }
+  autoWidth(sheet);
+}
+
 function addTransactionsSheet(
   sheet: ExcelJS.Worksheet,
   meta: ReportExportMeta,
@@ -292,6 +373,8 @@ export async function downloadFinanceReportXlsx(
     kpis?: FinanceReportKpis;
     incomeTransactions?: TransactionRow[];
     expenseTransactions?: TransactionRow[];
+    incomeByProject?: IncomeDimensionRow[];
+    clientBalances?: ClientBalanceRow[];
   },
 ) {
   const workbook = createWorkbook();
@@ -304,6 +387,20 @@ export async function downloadFinanceReportXlsx(
       kpis: data.kpis,
     });
     addPnlSheet(workbook.addWorksheet("Profit & Loss"), meta, data.pnl || []);
+    if (data.incomeByProject?.length) {
+      addIncomeByProjectSheet(
+        workbook.addWorksheet("Income by project"),
+        meta,
+        data.incomeByProject,
+      );
+    }
+    if (data.clientBalances?.length) {
+      addClientBalancesSheet(
+        workbook.addWorksheet("Client deposits"),
+        meta,
+        data.clientBalances,
+      );
+    }
   }
   if (kind === "cashflow") {
     addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
@@ -341,6 +438,8 @@ export async function downloadFinanceReportPackXlsx(
     kpis?: FinanceReportKpis;
     incomeTransactions?: TransactionRow[];
     expenseTransactions?: TransactionRow[];
+    incomeByProject?: IncomeDimensionRow[];
+    clientBalances?: ClientBalanceRow[];
   },
 ) {
   const workbook = createWorkbook();
@@ -360,6 +459,20 @@ export async function downloadFinanceReportPackXlsx(
     data.incomeTransactions || [],
     data.expenseTransactions || [],
   );
+  if (data.incomeByProject?.length) {
+    addIncomeByProjectSheet(
+      workbook.addWorksheet("Income by project"),
+      meta,
+      data.incomeByProject,
+    );
+  }
+  if (data.clientBalances?.length) {
+    addClientBalancesSheet(
+      workbook.addWorksheet("Client deposits"),
+      meta,
+      data.clientBalances,
+    );
+  }
 
   await downloadWorkbook(workbook, `finance-report-pack-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

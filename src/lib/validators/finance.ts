@@ -1,11 +1,26 @@
 import { z } from "zod";
 
+const optionalId = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v !== "" ? v : undefined));
+
+const financeIncomeTypeSchema = z
+  .enum(["CLIENT_DEPOSIT", "MILESTONE", "SHORTLET_REVENUE", "OTHER"])
+  .default("OTHER");
+
+const voidReasonSchema = z
+  .string()
+  .trim()
+  .min(3, "Give a reason for removing this entry.")
+  .max(500);
+
 export const createInvoiceInputSchema = z.object({
-  dealId: z
-    .string()
-    .trim()
-    .optional()
-    .transform((v) => (v && v !== "" ? v : undefined)),
+  dealId: optionalId,
+  projectId: optionalId,
+  unitId: optionalId,
+  incomeType: financeIncomeTypeSchema,
   title: z
     .string()
     .trim()
@@ -103,6 +118,9 @@ export const recordPaymentInputSchema = z.object({
 });
 
 export const recordStandalonePaymentInputSchema = recordPaymentInputSchema.extend({
+  projectId: optionalId,
+  unitId: optionalId,
+  incomeType: financeIncomeTypeSchema,
   title: z.string().trim().min(2, "Payment title is required.").max(120, "Title is too long."),
   payerName: z
     .string()
@@ -191,12 +209,15 @@ export const updateExpenseInputSchema = createExpenseInputSchema.extend({
   editReason: z.string().trim().min(3, "Give a reason for this correction.").max(500),
 });
 
+export const voidFinanceEntrySchema = z.object({
+  reason: voidReasonSchema,
+});
+
 export const createSalesReceiptInputSchema = z.object({
-  dealId: z
-    .string()
-    .trim()
-    .optional()
-    .transform((v) => (v && v !== "" ? v : undefined)),
+  dealId: optionalId,
+  projectId: optionalId,
+  unitId: optionalId,
+  incomeType: financeIncomeTypeSchema,
   title: z
     .string()
     .trim()

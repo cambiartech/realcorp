@@ -22,6 +22,22 @@ export async function syncShortletPaymentToFinance(
     actorLabel: string;
   },
 ) {
+  const payment = await tx.shortletPayment.findFirst({
+    where: { id: input.paymentId, tenantId: input.tenantId },
+    select: {
+      reservation: {
+        select: {
+          unit: {
+            select: {
+              projectUnit: { select: { id: true, projectId: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  const projectUnit = payment?.reservation.unit?.projectUnit;
+
   const receiptNumber = await nextSalesReceiptNumber(tx, input.tenantId);
   const receipt = await tx.salesReceipt.create({
     data: {
@@ -34,6 +50,9 @@ export async function syncShortletPaymentToFinance(
       paymentMode: input.method || "Short lets",
       reference: input.reference || null,
       note: "Auto-synced from short lets payment.",
+      projectId: projectUnit?.projectId || null,
+      unitId: projectUnit?.id || null,
+      incomeType: "SHORTLET_REVENUE",
       createdByUserId: input.actorUserId,
       createdByLabel: input.actorLabel,
       issuedAt: input.paidAt,

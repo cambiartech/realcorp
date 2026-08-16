@@ -17,7 +17,7 @@
     "db:studio": "prisma studio",
     "test:payroll": "tsx --test src/lib/payroll/**/*.test.ts",
     "test:leave": "tsx --test src/lib/hr-leave.test.ts",
-    "test:finance": "tsx --test src/lib/finance-vat.test.ts"
+    "test:finance": "tsx --test src/lib/finance-vat.test.ts src/lib/finance-income.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

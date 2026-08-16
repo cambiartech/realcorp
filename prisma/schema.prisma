@@ -353,10 +353,13 @@ model Project {
   amenities          Json? // string[]
 
   tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  units        Unit[]
-  expenses     Expense[]
-  pricingPlans ProjectPricingPlan[]
-  stakeholders ProjectStakeholder[]
+  units         Unit[]
+  expenses      Expense[]
+  invoices      Invoice[]
+  payments      PaymentRecord[]
+  salesReceipts SalesReceipt[]
+  pricingPlans  ProjectPricingPlan[]
+  stakeholders  ProjectStakeholder[]
 
   @@index([tenantId])
   @@index([tenantId, isPublished])
@@ -497,8 +500,11 @@ model Unit {
   pricingPlan  ProjectPricingPlan? @relation(fields: [pricingPlanId], references: [id], onDelete: SetNull)
   deal         Deal?
   shortletUnit ShortletUnit?
-  clientLinks  ClientUnitLink[]
-  expenses     Expense[]
+  clientLinks   ClientUnitLink[]
+  expenses      Expense[]
+  invoices      Invoice[]
+  payments      PaymentRecord[]
+  salesReceipts SalesReceipt[]
 
   @@index([tenantId])
   @@index([projectId])
@@ -660,16 +666,26 @@ enum FinanceVatTreatment {
   ZERO_RATED
 }
 
+enum FinanceIncomeType {
+  CLIENT_DEPOSIT
+  MILESTONE
+  SHORTLET_REVENUE
+  OTHER
+}
+
 model Invoice {
-  id              String        @id @default(cuid())
+  id              String            @id @default(cuid())
   tenantId        String
   dealId          String?
+  projectId       String?
+  unitId          String?
   invoiceNumber   String
   title           String
-  status          InvoiceStatus @default(SENT)
-  amount          Decimal       @db.Decimal(18, 2)
-  balanceDue      Decimal       @db.Decimal(18, 2)
-  currency        String        @default("NGN")
+  status          InvoiceStatus     @default(SENT)
+  incomeType      FinanceIncomeType @default(OTHER)
+  amount          Decimal           @db.Decimal(18, 2)
+  balanceDue      Decimal           @db.Decimal(18, 2)
+  currency        String            @default("NGN")
   department      String?
   dueDate         DateTime?
   issuedAt        DateTime      @default(now())
@@ -683,22 +699,28 @@ model Invoice {
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   deal            Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  unit            Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
   payments        PaymentRecord[]
   financeDocument FinanceDocument?
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, status])
   @@index([dealId])
+  @@index([tenantId, projectId, unitId])
 }
 
 model PaymentRecord {
-  id                 String   @id @default(cuid())
+  id                 String             @id @default(cuid())
   tenantId           String
   invoiceId          String?
+  projectId          String?
+  unitId             String?
   standaloneTitle    String?
   payerName          String?
-  amount             Decimal  @db.Decimal(18, 2)
-  currency           String   @default("NGN")
+  incomeType         FinanceIncomeType  @default(OTHER)
+  amount             Decimal            @db.Decimal(18, 2)
+  currency           String             @default("NGN")
   department         String?
   paidAt             DateTime
   method             String?
@@ -709,13 +731,21 @@ model PaymentRecord {
   attachmentPublicId String?
   recordedByUserId   String?
   recordedByLabel    String?
-  createdAt          DateTime @default(now())
+  voidedAt           DateTime?
+  voidedByUserId     String?
+  voidedByLabel      String?
+  voidReason         String?
+  createdAt          DateTime           @default(now())
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  unit    Unit?    @relation(fields: [unitId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, paidAt])
   @@index([invoiceId])
+  @@index([tenantId, projectId, unitId])
+  @@index([tenantId, voidedAt])
 }
 
 model Expense {
@@ -742,6 +772,10 @@ model Expense {
   attachmentPublicId String?
   createdByUserId    String?
   createdByLabel     String?
+  voidedAt           DateTime?
+  voidedByUserId     String?
+  voidedByLabel      String?
+  voidReason         String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -752,6 +786,7 @@ model Expense {
   @@index([tenantId, expenseDate])
   @@index([tenantId, category])
   @@index([tenantId, projectId, unitId])
+  @@index([tenantId, voidedAt])
 }
 
 model FinanceVendor {
@@ -849,30 +884,39 @@ model VendorBillPayment {
 }
 
 model SalesReceipt {
-  id              String    @id @default(cuid())
+  id              String            @id @default(cuid())
   tenantId        String
   dealId          String?
+  projectId       String?
+  unitId          String?
   receiptNumber   String
   title           String
   customerName    String?
-  amount          Decimal   @db.Decimal(18, 2)
-  currency        String    @default("NGN")
+  incomeType      FinanceIncomeType @default(OTHER)
+  amount          Decimal           @db.Decimal(18, 2)
+  currency        String            @default("NGN")
   paymentMode     String?
   depositAccount  String?
   reference       String?
   note            String?
-  status          String    @default("RECORDED")
+  status          String            @default("RECORDED")
   pdfUrl          String?
   sentAt          DateTime?
   sentToEmail     String?
-  issuedAt        DateTime  @default(now())
+  issuedAt        DateTime          @default(now())
   createdByUserId String?
   createdByLabel  String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  voidedAt        DateTime?
+  voidedByUserId  String?
+  voidedByLabel   String?
+  voidReason      String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   deal                 Deal?                 @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  project              Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  unit                 Unit?                 @relation(fields: [unitId], references: [id], onDelete: SetNull)
   financeDocument      FinanceDocument?
   shortletPayments     ShortletPayment[]
   shortletBusinessDays ShortletBusinessDay[]
@@ -880,6 +924,8 @@ model SalesReceipt {
   @@unique([tenantId, receiptNumber])
   @@index([tenantId, issuedAt])
   @@index([tenantId, dealId])
+  @@index([tenantId, projectId, unitId])
+  @@index([tenantId, status])
 }
 
 enum FinanceDocumentCategory {

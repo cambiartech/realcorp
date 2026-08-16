@@ -7,6 +7,7 @@ import {
   normalizeFinanceOptionList,
 } from "@/lib/finance-catalog";
 import { parseFinanceControls } from "@/lib/finance-controls";
+import { remainingClientBalance } from "@/lib/finance-income";
 import { expensePnlAmount } from "@/lib/finance-vat";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
@@ -110,7 +111,10 @@ export default async function FinanceQueuePage({
     "expenses",
     "invoices",
     "payments",
+    "receipts",
   ].includes(financeSurface);
+  const needsReceipts =
+    isOverview || ["reports", "receipts"].includes(financeSurface);
   const needsInvoices =
     isOverview ||
     ["reports", "invoices", "ar", "payments"].includes(financeSurface);
@@ -297,6 +301,7 @@ export default async function FinanceQueuePage({
           orderBy: { createdAt: "desc" },
           include: {
             payments: {
+              where: { voidedAt: null },
               select: { id: true, amount: true, paidAt: true },
               orderBy: { paidAt: "desc" },
             },
@@ -361,13 +366,21 @@ export default async function FinanceQueuePage({
           take: 300,
         })
       : Promise.resolve([]),
-    financeSurface === "receipts"
+    needsReceipts
       ? prisma.salesReceipt.findMany({
           where: { tenantId: tenant.id },
           orderBy: { issuedAt: "desc" },
           include: {
             deal: {
               select: {
+                unitId: true,
+                unit: {
+                  select: {
+                    id: true,
+                    label: true,
+                    project: { select: { id: true, name: true } },
+                  },
+                },
                 lead: { select: { name: true, email: true } },
                 propertyClient: { select: { email: true, fullName: true } },
               },
@@ -478,6 +491,66 @@ export default async function FinanceQueuePage({
       },
     ]),
   );
+
+  const resolveAllocation = (row: {
+    projectId?: string | null;
+    unitId?: string | null;
+    deal?: {
+      unit?: {
+        id: string;
+        label: string;
+        project?: { id: string; name: string } | null;
+      } | null;
+    } | null;
+  }) => {
+    const projectId = row.projectId || row.deal?.unit?.project?.id || "";
+    const unitId = row.unitId || row.deal?.unit?.id || "";
+    return {
+      projectId,
+      projectLabel: projectId
+        ? projectMap.get(projectId) ||
+          row.deal?.unit?.project?.name ||
+          "Unknown project"
+        : "Unassigned project",
+      unitId,
+      unitLabel: unitId
+        ? unitMap.get(unitId)?.label ||
+          row.deal?.unit?.label ||
+          "Unknown unit"
+        : "Unassigned unit",
+    };
+  };
+
+  const livePayments = payments.filter((payment) => !payment.voidedAt);
+  const liveExpenses = expenses.filter((expense) => !expense.voidedAt);
+  const liveReceipts = salesReceipts.filter(
+    (receipt) => !receipt.voidedAt && receipt.status !== "VOID",
+  );
+
+  const clientBalanceDeals =
+    financeSurface === "reports"
+      ? await prisma.deal.findMany({
+          where: { tenantId: tenant.id },
+          select: {
+            id: true,
+            value: true,
+            unit: {
+              select: {
+                id: true,
+                label: true,
+                projectId: true,
+                project: { select: { id: true, name: true } },
+                pricingPlan: {
+                  select: { price: true, initialDeposit: true },
+                },
+              },
+            },
+            lead: { select: { name: true } },
+            propertyClient: { select: { fullName: true } },
+          },
+          take: 800,
+        })
+      : [];
 
   const userMap = new Map(users.map((u) => [u.user.id, u.user]));
   const invoiceEventMap = new Map<
@@ -596,10 +669,8 @@ export default async function FinanceQueuePage({
         invoice.deal?.lead?.name ||
         invoice.deal?.lead?.email ||
         "Unassigned contact",
-      projectId: invoice.deal?.unit?.project?.id || "",
-      projectLabel: invoice.deal?.unit?.project?.name || "Unassigned project",
-      unitId: invoice.deal?.unit?.id || "",
-      unitLabel: invoice.deal?.unit?.label || "Unassigned unit",
+      ...resolveAllocation(invoice),
+      incomeType: invoice.incomeType,
       department: invoice.department || "",
     };
   });
@@ -637,7 +708,9 @@ export default async function FinanceQueuePage({
   const totalInvoiced = invoiceRows
     .filter((x) => x.statusValue !== "VOID")
     .reduce((sum, row) => sum + row.amountValue, 0);
-  const totalCollected = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const totalCollected =
+    livePayments.reduce((sum, p) => sum + Number(p.amount), 0) +
+    liveReceipts.reduce((sum, r) => sum + Number(r.amount), 0);
   const outstanding = openInvoices.reduce(
     (sum, row) => sum + row.balanceValue,
     0,
@@ -651,12 +724,20 @@ export default async function FinanceQueuePage({
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const currentMonthCash = payments
-    .filter((p) => p.paidAt >= monthStart)
-    .reduce((sum, p) => sum + Number(p.amount), 0);
-  const previousMonthCash = payments
-    .filter((p) => p.paidAt >= prevMonthStart && p.paidAt < monthStart)
-    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const currentMonthCash =
+    livePayments
+      .filter((p) => p.paidAt >= monthStart)
+      .reduce((sum, p) => sum + Number(p.amount), 0) +
+    liveReceipts
+      .filter((r) => r.issuedAt >= monthStart)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
+  const previousMonthCash =
+    livePayments
+      .filter((p) => p.paidAt >= prevMonthStart && p.paidAt < monthStart)
+      .reduce((sum, p) => sum + Number(p.amount), 0) +
+    liveReceipts
+      .filter((r) => r.issuedAt >= prevMonthStart && r.issuedAt < monthStart)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
 
   const monthKey = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -683,16 +764,23 @@ export default async function FinanceQueuePage({
     );
   }
   const collectedByMonth = new Map<string, number>();
-  for (const payment of payments) {
+  for (const payment of livePayments) {
     const key = monthKey(payment.paidAt);
     collectedByMonth.set(
       key,
       (collectedByMonth.get(key) || 0) + Number(payment.amount),
     );
   }
+  for (const receipt of liveReceipts) {
+    const key = monthKey(receipt.issuedAt);
+    collectedByMonth.set(
+      key,
+      (collectedByMonth.get(key) || 0) + Number(receipt.amount),
+    );
+  }
   const expenseByMonth = new Map<string, number>();
   const expenseCashByMonth = new Map<string, number>();
-  for (const expense of expenses) {
+  for (const expense of liveExpenses) {
     const key = monthKey(expense.expenseDate);
     const pnlAmount = expensePnlAmount({
       grossAmount: Number(expense.amount),
@@ -731,7 +819,7 @@ export default async function FinanceQueuePage({
     string,
     { total: number; count: number }
   >();
-  for (const expense of expenses) {
+  for (const expense of liveExpenses) {
     const category = expense.category || "Uncategorized";
     const current = expenseCategoryMap.get(category) || { total: 0, count: 0 };
     current.total += expensePnlAmount({
@@ -849,11 +937,15 @@ export default async function FinanceQueuePage({
             ? payment.recordedByLabel || "Unknown"
             : "Restricted",
           hasAttachment: Boolean(payment.attachmentUrl),
-          projectId: payment.invoice?.deal?.unit?.project?.id || "",
-          projectLabel:
-            payment.invoice?.deal?.unit?.project?.name || "Unassigned project",
-          unitId: payment.invoice?.deal?.unit?.id || "",
-          unitLabel: payment.invoice?.deal?.unit?.label || "Unassigned unit",
+          ...resolveAllocation({
+            projectId: payment.projectId,
+            unitId: payment.unitId,
+            deal: payment.invoice?.deal,
+          }),
+          incomeType: payment.incomeType,
+          voided: Boolean(payment.voidedAt),
+          voidReason: payment.voidReason || "",
+          canVoid: !payment.voidedAt,
           department: payment.department || payment.invoice?.department || "",
         };
       })}
@@ -892,6 +984,9 @@ export default async function FinanceQueuePage({
           : "Unassigned unit",
         department: expense.department || "",
         note: expense.note || "",
+        voided: Boolean(expense.voidedAt),
+        voidReason: expense.voidReason || "",
+        canVoid: !expense.voidedAt,
       }))}
       salesReceipts={salesReceipts.map((receipt) => ({
         id: receipt.id,
@@ -912,6 +1007,13 @@ export default async function FinanceQueuePage({
         issuedAtLabel: new Intl.DateTimeFormat("en-NG", {
           dateStyle: "medium",
         }).format(receipt.issuedAt),
+        issuedAtValue: receipt.issuedAt.toISOString().slice(0, 10),
+        amountValue: Number(receipt.amount),
+        ...resolveAllocation(receipt),
+        incomeType: receipt.incomeType,
+        voided: Boolean(receipt.voidedAt) || receipt.status === "VOID",
+        voidReason: receipt.voidReason || "",
+        canVoid: !receipt.voidedAt && receipt.status !== "VOID",
         sentToEmail: receipt.sentToEmail,
         sentAtLabel: receipt.sentAt
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(
@@ -1028,11 +1130,112 @@ export default async function FinanceQueuePage({
           receivables: outstanding,
           overdueReceivables: overdueOutstanding,
           cashIn: totalCollected,
-          cashOut: expenses.reduce((sum, x) => sum + Number(x.amount), 0),
+          cashOut: liveExpenses.reduce((sum, x) => sum + Number(x.amount), 0),
           netCashflow:
             totalCollected -
-            expenses.reduce((sum, x) => sum + Number(x.amount), 0),
+            liveExpenses.reduce((sum, x) => sum + Number(x.amount), 0),
         },
+        clientBalances: (() => {
+          const cashByKey = new Map<
+            string,
+            {
+              collected: number;
+              deposits: number;
+              projectId: string;
+              projectLabel: string;
+              unitId: string;
+              unitLabel: string;
+            }
+          >();
+          const addCash = (
+            row: {
+              projectId?: string | null;
+              unitId?: string | null;
+              incomeType: string;
+              deal?: {
+                unit?: {
+                  id: string;
+                  label: string;
+                  project?: { id: string; name: string } | null;
+                } | null;
+              } | null;
+            },
+            amount: number,
+          ) => {
+            const allocation = resolveAllocation(row);
+            const key = `${allocation.projectId || "__none"}|${allocation.unitId || "__none"}`;
+            const current = cashByKey.get(key) || {
+              collected: 0,
+              deposits: 0,
+              ...allocation,
+            };
+            current.collected += amount;
+            if (row.incomeType === "CLIENT_DEPOSIT") current.deposits += amount;
+            cashByKey.set(key, current);
+          };
+          for (const payment of livePayments) {
+            addCash(
+              {
+                projectId: payment.projectId,
+                unitId: payment.unitId,
+                incomeType: payment.incomeType,
+                deal: payment.invoice?.deal,
+              },
+              Number(payment.amount),
+            );
+          }
+          for (const receipt of liveReceipts) {
+            addCash(receipt, Number(receipt.amount));
+          }
+
+          const rows = clientBalanceDeals.map((deal) => {
+            const projectId = deal.unit?.projectId || "";
+            const unitId = deal.unit?.id || "";
+            const key = `${projectId || "__none"}|${unitId || "__none"}`;
+            const cash = cashByKey.get(key);
+            const contractValue =
+              Number(deal.value) || Number(deal.unit?.pricingPlan?.price) || 0;
+            return {
+              id: deal.id,
+              clientName:
+                deal.propertyClient?.fullName ||
+                deal.lead?.name ||
+                "Unnamed client",
+              projectId,
+              projectLabel: deal.unit?.project?.name || "Unassigned project",
+              unitId,
+              unitLabel: deal.unit?.label || "Unassigned unit",
+              contractValue,
+              expectedDeposit: Number(deal.unit?.pricingPlan?.initialDeposit) || 0,
+              depositsPaid: cash?.deposits || 0,
+              collected: cash?.collected || 0,
+              remaining: remainingClientBalance({
+                contractValue,
+                collected: cash?.collected || 0,
+              }),
+            };
+          });
+          const seen = new Set(rows.map((row) => `${row.projectId || "__none"}|${row.unitId || "__none"}`));
+          for (const [key, cash] of cashByKey) {
+            if (seen.has(key)) continue;
+            rows.push({
+              id: key,
+              clientName: "No linked deal",
+              projectId: cash.projectId,
+              projectLabel: cash.projectLabel,
+              unitId: cash.unitId,
+              unitLabel: cash.unitLabel,
+              contractValue: 0,
+              expectedDeposit: 0,
+              depositsPaid: cash.deposits,
+              collected: cash.collected,
+              remaining: 0,
+            });
+          }
+          return rows
+            .filter((row) => row.contractValue > 0 || row.collected > 0)
+            .sort((a, b) => b.remaining - a.remaining);
+        })(),
       }}
       bankingRows={bankRows.map((row) => ({
         id: row.id,

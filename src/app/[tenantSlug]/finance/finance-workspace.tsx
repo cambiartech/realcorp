@@ -40,7 +40,15 @@ import {
   updateInvoiceRecord,
   updateExpenseRecord,
   voidInvoiceRecord,
+  voidExpenseRecord,
+  voidPaymentRecord,
+  voidSalesReceiptRecord,
 } from "./actions";
+import {
+  FINANCE_INCOME_TYPES,
+  FINANCE_INCOME_TYPE_LABELS,
+  type FinanceIncomeType,
+} from "@/lib/finance-income";
 import {
   RecordVendorBillModal,
   type TenantFiscalYear,
@@ -123,6 +131,7 @@ type InvoiceRecordItem = {
   unitId: string;
   unitLabel: string;
   department: string;
+  incomeType: FinanceIncomeType;
 };
 
 type PaymentRow = {
@@ -143,6 +152,10 @@ type PaymentRow = {
   unitId: string;
   unitLabel: string;
   department: string;
+  incomeType: FinanceIncomeType;
+  voided: boolean;
+  voidReason: string;
+  canVoid: boolean;
 };
 
 type ExpenseRow = {
@@ -170,6 +183,9 @@ type ExpenseRow = {
   unitLabel: string;
   department: string;
   note: string;
+  voided: boolean;
+  voidReason: string;
+  canVoid: boolean;
 };
 
 type FinanceAllocationOption = {
@@ -268,6 +284,16 @@ type SalesReceiptRow = {
   paymentMode: string;
   depositAccount: string;
   issuedAtLabel: string;
+  issuedAtValue: string;
+  amountValue: number;
+  projectId: string;
+  projectLabel: string;
+  unitId: string;
+  unitLabel: string;
+  incomeType: FinanceIncomeType;
+  voided: boolean;
+  voidReason: string;
+  canVoid: boolean;
   sentToEmail: string | null;
   sentAtLabel: string | null;
   pdfUrl: string | null;
@@ -401,6 +427,19 @@ type ReportView = {
     cashOut: number;
     netCashflow: number;
   };
+  clientBalances: Array<{
+    id: string;
+    clientName: string;
+    projectId: string;
+    projectLabel: string;
+    unitId: string;
+    unitLabel: string;
+    contractValue: number;
+    expectedDeposit: number;
+    depositsPaid: number;
+    collected: number;
+    remaining: number;
+  }>;
 };
 
 function financeAuditLogsUrl(
@@ -572,6 +611,15 @@ export function FinanceWorkspace({
   const [isCreateExpenseOpen, setIsCreateExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseRow | null>(null);
   const [expenseProjectId, setExpenseProjectId] = useState("");
+  const [invoiceProjectId, setInvoiceProjectId] = useState("");
+  const [receiptProjectId, setReceiptProjectId] = useState("");
+  const [incomeProjectId, setIncomeProjectId] = useState("");
+  const [voidTarget, setVoidTarget] = useState<{
+    kind: "expense" | "payment" | "receipt";
+    id: string;
+    label: string;
+  } | null>(null);
+  const [voidReason, setVoidReason] = useState("");
   const [expenseVendorName, setExpenseVendorName] = useState("");
   const [expenseCategoryName, setExpenseCategoryName] = useState("");
   const [editingInvoice, setEditingInvoice] =
@@ -663,6 +711,24 @@ export function FinanceWorkspace({
       allocationOptions.find((project) => project.id === expenseProjectId)
         ?.units || [],
     [allocationOptions, expenseProjectId],
+  );
+  const invoiceUnitOptions = useMemo(
+    () =>
+      allocationOptions.find((project) => project.id === invoiceProjectId)
+        ?.units || [],
+    [allocationOptions, invoiceProjectId],
+  );
+  const receiptUnitOptions = useMemo(
+    () =>
+      allocationOptions.find((project) => project.id === receiptProjectId)
+        ?.units || [],
+    [allocationOptions, receiptProjectId],
+  );
+  const incomeUnitOptions = useMemo(
+    () =>
+      allocationOptions.find((project) => project.id === incomeProjectId)
+        ?.units || [],
+    [allocationOptions, incomeProjectId],
   );
   const [highlightFocusId, setHighlightFocusId] = useState<string | null>(null);
   const [autoMatching, setAutoMatching] = useState(false);
@@ -924,6 +990,9 @@ export function FinanceWorkspace({
     setActionPending(true);
     const result = await createInvoiceRecord(tenantSlug, {
       dealId: String(formData.get("dealId") || ""),
+      projectId: String(formData.get("projectId") || ""),
+      unitId: String(formData.get("unitId") || ""),
+      incomeType: String(formData.get("incomeType") || "OTHER") as FinanceIncomeType,
       title: String(formData.get("title") || ""),
       amount: Number(formData.get("amount") || 0),
       currency: String(formData.get("currency") || "NGN"),
@@ -937,6 +1006,7 @@ export function FinanceWorkspace({
     }
     showSnackbar("Invoice created.", "success");
     setIsCreateInvoiceOpen(false);
+    setInvoiceProjectId("");
     setActionPending(false);
     router.refresh();
   }
@@ -1134,6 +1204,9 @@ export function FinanceWorkspace({
     setActionPending(true);
     const result = await createSalesReceiptRecord(tenantSlug, {
       dealId: String(formData.get("dealId") || ""),
+      projectId: String(formData.get("projectId") || ""),
+      unitId: String(formData.get("unitId") || ""),
+      incomeType: String(formData.get("incomeType") || "OTHER") as FinanceIncomeType,
       title: String(formData.get("title") || ""),
       customerName: String(formData.get("customerName") || ""),
       amount: Number(formData.get("amount") || 0),
@@ -1150,6 +1223,7 @@ export function FinanceWorkspace({
     }
     showSnackbar("Sales receipt created.", "success");
     setIsCreateReceiptOpen(false);
+    setReceiptProjectId("");
     setActionPending(false);
     router.refresh();
   }
@@ -1300,6 +1374,27 @@ export function FinanceWorkspace({
     router.refresh();
   }
 
+  async function handleVoidFinanceEntry() {
+    if (!voidTarget || actionPending) return;
+    setActionPending(true);
+    const payload = { reason: voidReason };
+    const result =
+      voidTarget.kind === "expense"
+        ? await voidExpenseRecord(tenantSlug, voidTarget.id, payload)
+        : voidTarget.kind === "payment"
+          ? await voidPaymentRecord(tenantSlug, voidTarget.id, payload)
+          : await voidSalesReceiptRecord(tenantSlug, voidTarget.id, payload);
+    setActionPending(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar("Entry removed and added to the audit log.", "success");
+    setVoidTarget(null);
+    setVoidReason("");
+    router.refresh();
+  }
+
   function handleSendReminder(invoice: InvoiceRecordItem) {
     if (actionPending || !invoice.canSendReminder) return;
     setEmailInvoice({ invoice, mode: "remind" });
@@ -1361,6 +1456,9 @@ export function FinanceWorkspace({
     const result = await recordStandalonePayment(tenantSlug, {
       title: String(formData.get("title") || ""),
       payerName: String(formData.get("payerName") || "") || undefined,
+      projectId: String(formData.get("projectId") || ""),
+      unitId: String(formData.get("unitId") || ""),
+      incomeType: String(formData.get("incomeType") || "OTHER") as FinanceIncomeType,
       amount: Number(formData.get("amount") || 0),
       currency: String(formData.get("currency") || reportView.currency),
       paidAt: String(formData.get("paidAt") || ""),
@@ -1376,6 +1474,7 @@ export function FinanceWorkspace({
     }
     showSnackbar("Direct payment recorded.", "success");
     setIsCreateDirectPaymentOpen(false);
+    setIncomeProjectId("");
     setActionPending(false);
     router.refresh();
   }
@@ -1788,12 +1887,22 @@ export function FinanceWorkspace({
         receivables: filteredBalanceSnapshot.receivables,
         overdueReceivables: filteredBalanceSnapshot.overdueReceivables,
       },
-      incomeTransactions: filteredPayments.map((p) => ({
-        date: p.paidAtLabel,
-        amount: p.amountValue,
-        description: p.isDirect ? p.invoiceLabel : p.invoiceLabel,
-        category: p.department || "Collections",
-      })),
+      incomeByProject: incomeByDimension,
+      clientBalances: filteredClientBalances,
+      incomeTransactions: [
+        ...filteredPayments.map((p) => ({
+          date: p.paidAtLabel,
+          amount: p.amountValue,
+          description: p.invoiceLabel,
+          category: FINANCE_INCOME_TYPE_LABELS[p.incomeType],
+        })),
+        ...filteredReceipts.map((r) => ({
+          date: r.issuedAtLabel,
+          amount: r.amountValue,
+          description: `${r.receiptNumber} · ${r.title}`,
+          category: FINANCE_INCOME_TYPE_LABELS[r.incomeType],
+        })),
+      ],
       expenseTransactions: filteredExpenses.map((e) => ({
         date: e.expenseDateLabel,
         amount: e.amountValue,
@@ -1865,10 +1974,12 @@ export function FinanceWorkspace({
       if (x.projectId) map.set(x.projectId, x.projectLabel);
     for (const x of expenses)
       if (x.projectId) map.set(x.projectId, x.projectLabel);
+    for (const x of salesReceipts)
+      if (x.projectId) map.set(x.projectId, x.projectLabel);
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [allocationOptions, invoices, payments, expenses]);
+  }, [allocationOptions, invoices, payments, expenses, salesReceipts]);
   const reportUnitOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const project of allocationOptions) {
@@ -1879,10 +1990,11 @@ export function FinanceWorkspace({
     for (const x of invoices) if (x.unitId) map.set(x.unitId, x.unitLabel);
     for (const x of payments) if (x.unitId) map.set(x.unitId, x.unitLabel);
     for (const x of expenses) if (x.unitId) map.set(x.unitId, x.unitLabel);
+    for (const x of salesReceipts) if (x.unitId) map.set(x.unitId, x.unitLabel);
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [allocationOptions, reportProjectFilter, invoices, payments, expenses]);
+  }, [allocationOptions, reportProjectFilter, invoices, payments, expenses, salesReceipts]);
   const reportDepartmentOptions = useMemo(
     () =>
       Array.from(
@@ -1901,6 +2013,7 @@ export function FinanceWorkspace({
   const filteredInvoices = useMemo(
     () =>
       invoices.filter((x) => {
+        if (x.statusValue === "VOID") return false;
         if (
           reportProjectFilter !== "all" &&
           x.projectId !== reportProjectFilter
@@ -1920,6 +2033,7 @@ export function FinanceWorkspace({
   const filteredPayments = useMemo(
     () =>
       payments.filter((x) => {
+        if (x.voided) return false;
         if (
           reportProjectFilter !== "all" &&
           x.projectId !== reportProjectFilter
@@ -1939,6 +2053,7 @@ export function FinanceWorkspace({
   const filteredExpenses = useMemo(
     () =>
       expenses.filter((x) => {
+        if (x.voided) return false;
         if (
           reportProjectFilter !== "all" &&
           x.projectId !== reportProjectFilter
@@ -1954,6 +2069,21 @@ export function FinanceWorkspace({
         return true;
       }),
     [expenses, reportProjectFilter, reportUnitFilter, reportDepartmentFilter],
+  );
+  const filteredReceipts = useMemo(
+    () =>
+      salesReceipts.filter((x) => {
+        if (x.voided) return false;
+        if (
+          reportProjectFilter !== "all" &&
+          x.projectId !== reportProjectFilter
+        )
+          return false;
+        if (reportUnitFilter !== "all" && x.unitId !== reportUnitFilter)
+          return false;
+        return true;
+      }),
+    [salesReceipts, reportProjectFilter, reportUnitFilter],
   );
 
   const visiblePnlBreakdown = useMemo(() => {
@@ -1983,6 +2113,11 @@ export function FinanceWorkspace({
       const i = index.get(key);
       if (i !== undefined) rows[i].collected += x.amountValue;
     }
+    for (const x of filteredReceipts) {
+      const key = monthFmt.format(new Date(`${x.issuedAtValue}T00:00:00`));
+      const i = index.get(key);
+      if (i !== undefined) rows[i].collected += x.amountValue;
+    }
     for (const x of filteredExpenses) {
       const key = monthFmt.format(new Date(`${x.expenseDateValue}T00:00:00`));
       const i = index.get(key);
@@ -1994,6 +2129,7 @@ export function FinanceWorkspace({
     reportMonthWindow,
     filteredInvoices,
     filteredPayments,
+    filteredReceipts,
     filteredExpenses,
   ]);
   const visibleCashflowBreakdown = useMemo(() => {
@@ -2014,6 +2150,12 @@ export function FinanceWorkspace({
       );
       if (i !== undefined) rows[i].inflow += payment.amountValue;
     }
+    for (const receipt of filteredReceipts) {
+      const i = index.get(
+        monthFmt.format(new Date(`${receipt.issuedAtValue}T00:00:00`)),
+      );
+      if (i !== undefined) rows[i].inflow += receipt.amountValue;
+    }
     for (const expense of filteredExpenses) {
       const i = index.get(
         monthFmt.format(new Date(`${expense.expenseDateValue}T00:00:00`)),
@@ -2021,7 +2163,7 @@ export function FinanceWorkspace({
       if (i !== undefined) rows[i].outflow += expense.amountValue;
     }
     return rows.map((row) => ({ ...row, net: row.inflow - row.outflow }));
-  }, [visiblePnlBreakdown, filteredPayments, filteredExpenses]);
+  }, [visiblePnlBreakdown, filteredPayments, filteredReceipts, filteredExpenses]);
   const visibleExpenseBreakdown = useMemo(
     () =>
       Array.from(
@@ -2113,6 +2255,106 @@ export function FinanceWorkspace({
     filteredInvoices,
     filteredExpenses,
   ]);
+  const incomeByDimension = useMemo(() => {
+    const visibleMonths = new Set(visiblePnlBreakdown.map((row) => row.month));
+    const monthFmt = new Intl.DateTimeFormat("en-NG", {
+      month: "short",
+      year: "numeric",
+    });
+    const isUnitDrilldown = reportProjectFilter !== "all";
+    const rows = new Map<
+      string,
+      {
+        id: string;
+        label: string;
+        collected: number;
+        deposits: number;
+        shortlet: number;
+        other: number;
+      }
+    >();
+    const bucket = (id: string, label: string) => {
+      const current = rows.get(id) || {
+        id,
+        label,
+        collected: 0,
+        deposits: 0,
+        shortlet: 0,
+        other: 0,
+      };
+      rows.set(id, current);
+      return current;
+    };
+    const addIncome = (
+      projectId: string,
+      projectLabel: string,
+      unitId: string,
+      unitLabel: string,
+      incomeType: FinanceIncomeType,
+      amount: number,
+      dateValue: string,
+    ) => {
+      if (!visibleMonths.has(monthFmt.format(new Date(`${dateValue}T00:00:00`))))
+        return;
+      const id = isUnitDrilldown
+        ? unitId || "__project"
+        : projectId || "__unassigned";
+      const label = isUnitDrilldown
+        ? unitId
+          ? unitLabel
+          : "Project-wide / unassigned"
+        : projectId
+          ? projectLabel
+          : "Unassigned project";
+      const current = bucket(id, label);
+      current.collected += amount;
+      if (incomeType === "CLIENT_DEPOSIT") current.deposits += amount;
+      else if (incomeType === "SHORTLET_REVENUE") current.shortlet += amount;
+      else current.other += amount;
+    };
+    for (const payment of filteredPayments) {
+      addIncome(
+        payment.projectId,
+        payment.projectLabel,
+        payment.unitId,
+        payment.unitLabel,
+        payment.incomeType,
+        payment.amountValue,
+        payment.paidAtValue,
+      );
+    }
+    for (const receipt of filteredReceipts) {
+      addIncome(
+        receipt.projectId,
+        receipt.projectLabel,
+        receipt.unitId,
+        receipt.unitLabel,
+        receipt.incomeType,
+        receipt.amountValue,
+        receipt.issuedAtValue,
+      );
+    }
+    return Array.from(rows.values()).sort((a, b) => b.collected - a.collected);
+  }, [
+    visiblePnlBreakdown,
+    reportProjectFilter,
+    filteredPayments,
+    filteredReceipts,
+  ]);
+  const filteredClientBalances = useMemo(
+    () =>
+      (reportView.clientBalances || []).filter((row) => {
+        if (
+          reportProjectFilter !== "all" &&
+          row.projectId !== reportProjectFilter
+        )
+          return false;
+        if (reportUnitFilter !== "all" && row.unitId !== reportUnitFilter)
+          return false;
+        return true;
+      }),
+    [reportView.clientBalances, reportProjectFilter, reportUnitFilter],
+  );
   const reportMonthLabel = useMemo(
     () => new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }),
     [],
@@ -3205,6 +3447,17 @@ export function FinanceWorkspace({
                             <p className="text-xs text-muted">
                               {receipt.title}
                             </p>
+                            <p className="text-xs text-muted">
+                              {FINANCE_INCOME_TYPE_LABELS[receipt.incomeType]}
+                              {receipt.projectLabel !== "Unassigned project"
+                                ? ` · ${receipt.projectLabel}`
+                                : ""}
+                            </p>
+                            {receipt.voided ? (
+                              <span className="mt-0.5 inline-block rounded-full border border-error/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
+                                Removed
+                              </span>
+                            ) : null}
                           </td>
                           <td className="px-3 py-2">{receipt.customerName}</td>
                           <td className="px-3 py-2">{receipt.amountLabel}</td>
@@ -3248,12 +3501,29 @@ export function FinanceWorkspace({
                                 ) : null}
                                 <button
                                   type="button"
-                                  disabled={actionPending}
+                                  disabled={actionPending || receipt.voided}
                                   onClick={() => setSendReceipt(receipt)}
                                   className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
                                 >
                                   {receipt.sentAtLabel ? "Resend" : "Send"}
                                 </button>
+                                {receipt.canVoid ? (
+                                  <button
+                                    type="button"
+                                    disabled={actionPending}
+                                    onClick={() => {
+                                      setVoidReason("");
+                                      setVoidTarget({
+                                        kind: "receipt",
+                                        id: receipt.id,
+                                        label: `${receipt.receiptNumber} · ${receipt.title}`,
+                                      });
+                                    }}
+                                    className="text-xs text-error underline decoration-error/40 underline-offset-2 disabled:opacity-40"
+                                  >
+                                    Delete
+                                  </button>
+                                ) : null}
                               </div>
                             </td>
                           ) : null}
@@ -3308,6 +3578,9 @@ export function FinanceWorkspace({
                           <th className="px-3 py-2">Paid At</th>
                           <th className="px-3 py-2">Recorded By</th>
                           <th className="px-3 py-2">Receipt</th>
+                          {canManageFinance ? (
+                            <th className="px-3 py-2">Actions</th>
+                          ) : null}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-foreground/10">
@@ -3322,9 +3595,20 @@ export function FinanceWorkspace({
                           >
                             <td className="px-3 py-2">
                               <p>{payment.invoiceLabel}</p>
+                              <p className="text-xs text-muted">
+                                {FINANCE_INCOME_TYPE_LABELS[payment.incomeType]}
+                                {payment.projectLabel !== "Unassigned project"
+                                  ? ` · ${payment.projectLabel}`
+                                  : ""}
+                              </p>
                               {payment.isDirect ? (
                                 <span className="mt-0.5 inline-block rounded-full border border-[var(--info-line)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--info)]">
                                   Direct
+                                </span>
+                              ) : null}
+                              {payment.voided ? (
+                                <span className="ml-1 inline-block rounded-full border border-error/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
+                                  Removed
                                 </span>
                               ) : null}
                             </td>
@@ -3346,6 +3630,31 @@ export function FinanceWorkspace({
                                 </span>
                               ) : null}
                             </td>
+                            {canManageFinance ? (
+                              <td className="px-3 py-2">
+                                {payment.canVoid ? (
+                                  <button
+                                    type="button"
+                                    disabled={actionPending}
+                                    onClick={() => {
+                                      setVoidReason("");
+                                      setVoidTarget({
+                                        kind: "payment",
+                                        id: payment.id,
+                                        label: payment.invoiceLabel,
+                                      });
+                                    }}
+                                    className="text-xs text-error underline decoration-error/40 underline-offset-2 disabled:opacity-40"
+                                  >
+                                    Delete
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-muted">
+                                    {payment.voidReason || "Removed"}
+                                  </span>
+                                )}
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                       </tbody>
@@ -3383,7 +3692,14 @@ export function FinanceWorkspace({
                             expense.id,
                           )}
                         >
-                          <td className="px-3 py-2">{expense.category}</td>
+                          <td className="px-3 py-2">
+                            <p>{expense.category}</p>
+                            {expense.voided ? (
+                              <span className="mt-0.5 inline-block rounded-full border border-error/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-error">
+                                Removed
+                              </span>
+                            ) : null}
+                          </td>
                           <td className="px-3 py-2">{expense.vendorName}</td>
                           <td className="px-3 py-2">{expense.amountLabel}</td>
                           <td className="px-3 py-2">
@@ -3427,14 +3743,32 @@ export function FinanceWorkspace({
                               <div className="flex gap-2">
                                 <button
                                   type="button"
+                                  disabled={expense.voided}
                                   onClick={() => {
                                     setExpenseProjectId(expense.projectId);
                                     setEditingExpense(expense);
                                   }}
-                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2"
+                                  className="text-xs text-foreground underline decoration-foreground/30 underline-offset-2 disabled:opacity-40"
                                 >
                                   Correct
                                 </button>
+                                {expense.canVoid ? (
+                                  <button
+                                    type="button"
+                                    disabled={actionPending}
+                                    onClick={() => {
+                                      setVoidReason("");
+                                      setVoidTarget({
+                                        kind: "expense",
+                                        id: expense.id,
+                                        label: expense.category,
+                                      });
+                                    }}
+                                    className="text-xs text-error underline decoration-error/40 underline-offset-2 disabled:opacity-40"
+                                  >
+                                    Delete
+                                  </button>
+                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -4348,6 +4682,138 @@ export function FinanceWorkspace({
                                   {row.margin === null
                                     ? "—"
                                     : `${row.margin.toFixed(1)}%`}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {reportKind === "pnl" ? (
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                    <div className="mb-3">
+                      <p className="text-sm font-semibold text-foreground">
+                        {reportProjectFilter === "all"
+                          ? "Income collected by project"
+                          : "Income collected by apartment / room"}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Cash in from payments and sales receipts, including
+                        short-let syncs. Client deposits are shown separately
+                        from other income.
+                      </p>
+                    </div>
+                    {incomeByDimension.length === 0 ? (
+                      <p className="text-sm text-muted">
+                        No collected income in this period for the selected
+                        project or room.
+                      </p>
+                    ) : (
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">
+                                {reportProjectFilter === "all"
+                                  ? "Project"
+                                  : "Apartment / room"}
+                              </th>
+                              <th className="px-3 py-2">Collected</th>
+                              <th className="px-3 py-2">Client deposits</th>
+                              <th className="px-3 py-2">Short let</th>
+                              <th className="px-3 py-2">Other</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {incomeByDimension.map((row) => (
+                              <tr key={row.id}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {row.label}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.collected.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.deposits.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.shortlet.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.other.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {reportKind === "pnl" ? (
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                    <div className="mb-3">
+                      <p className="text-sm font-semibold text-foreground">
+                        Client deposits and remaining balance
+                      </p>
+                      <p className="text-xs text-muted">
+                        Remaining to pay is contract value minus all collected
+                        income on that project or room. Use the Client deposit
+                        income type when posting a deposit.
+                      </p>
+                    </div>
+                    {filteredClientBalances.length === 0 ? (
+                      <p className="text-sm text-muted">
+                        No client balances for this project or room yet.
+                      </p>
+                    ) : (
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">Client</th>
+                              <th className="px-3 py-2">Project / room</th>
+                              <th className="px-3 py-2">Contract</th>
+                              <th className="px-3 py-2">Deposits paid</th>
+                              <th className="px-3 py-2">Collected</th>
+                              <th className="px-3 py-2">Left to pay</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {filteredClientBalances.map((row) => (
+                              <tr key={row.id}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {row.clientName}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <p>{row.projectLabel}</p>
+                                  <p className="text-xs text-muted">
+                                    {row.unitLabel}
+                                  </p>
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.contractValue.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.depositsPaid.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.collected.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2 font-semibold">
+                                  {reportView.currency}{" "}
+                                  {row.remaining.toLocaleString()}
                                 </td>
                               </tr>
                             ))}
@@ -5454,6 +5920,53 @@ export function FinanceWorkspace({
             </UiSelect>
           </div>
           <div>
+            <label className="mb-1 block text-sm text-muted">Income type</label>
+            <UiSelect name="incomeType" defaultValue="OTHER">
+              {FINANCE_INCOME_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {FINANCE_INCOME_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Project (optional)
+              </label>
+              <UiSelect
+                name="projectId"
+                value={invoiceProjectId}
+                onChange={(event) => setInvoiceProjectId(event.target.value)}
+              >
+                <option value="">Unassigned / from deal</option>
+                {allocationOptions.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Apartment / room (optional)
+              </label>
+              <UiSelect
+                key={invoiceProjectId || "no-invoice-project"}
+                name="unitId"
+                defaultValue=""
+                disabled={!invoiceProjectId}
+              >
+                <option value="">Project-wide</option>
+                {invoiceUnitOptions.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div>
             <label className="mb-1 block text-sm text-muted">
               Invoice title
             </label>
@@ -5625,6 +6138,53 @@ export function FinanceWorkspace({
                 {dealOptions.map((deal) => (
                   <option key={deal.id} value={deal.id}>
                     {deal.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Income type</label>
+            <UiSelect name="incomeType" defaultValue="CLIENT_DEPOSIT">
+              {FINANCE_INCOME_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {FINANCE_INCOME_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Project (optional)
+              </label>
+              <UiSelect
+                name="projectId"
+                value={receiptProjectId}
+                onChange={(event) => setReceiptProjectId(event.target.value)}
+              >
+                <option value="">Unassigned / from deal</option>
+                {allocationOptions.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Apartment / room (optional)
+              </label>
+              <UiSelect
+                key={receiptProjectId || "no-receipt-project"}
+                name="unitId"
+                defaultValue=""
+                disabled={!receiptProjectId}
+              >
+                <option value="">Project-wide</option>
+                {receiptUnitOptions.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.label}
                   </option>
                 ))}
               </UiSelect>
@@ -6589,6 +7149,53 @@ export function FinanceWorkspace({
               className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Income type</label>
+            <UiSelect name="incomeType" defaultValue="CLIENT_DEPOSIT">
+              {FINANCE_INCOME_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {FINANCE_INCOME_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </UiSelect>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Project (optional)
+              </label>
+              <UiSelect
+                name="projectId"
+                value={incomeProjectId}
+                onChange={(event) => setIncomeProjectId(event.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {allocationOptions.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">
+                Apartment / room (optional)
+              </label>
+              <UiSelect
+                key={incomeProjectId || "no-income-project"}
+                name="unitId"
+                defaultValue=""
+                disabled={!incomeProjectId}
+              >
+                <option value="">Project-wide</option>
+                {incomeUnitOptions.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.label}
+                  </option>
+                ))}
+              </UiSelect>
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Amount</label>
@@ -6923,6 +7530,79 @@ export function FinanceWorkspace({
           onSend={handleSendInvoiceEmail}
         />
       ) : null}
+
+      <ModalOverlay
+        open={Boolean(voidTarget)}
+        onClose={() => {
+          setVoidTarget(null);
+          setVoidReason("");
+        }}
+        panelClassName={MODAL_PANEL_SM}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">
+            Remove this entry
+          </h2>
+          <button
+            type="button"
+            onClick={() => {
+              setVoidTarget(null);
+              setVoidReason("");
+            }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+            aria-label="Close modal"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <p className="mt-2 text-sm text-muted">
+          This keeps an audit trail instead of erasing the record. Bank-matched
+          entries must be unmatched first.
+        </p>
+        {voidTarget ? (
+          <p className="mt-2 text-sm font-medium text-foreground">
+            {voidTarget.label}
+          </p>
+        ) : null}
+        <label className="mt-4 mb-1 block text-sm text-muted">
+          Reason for removal
+        </label>
+        <textarea
+          value={voidReason}
+          onChange={(event) => setVoidReason(event.target.value)}
+          rows={3}
+          placeholder="e.g. Posted the wrong amount"
+          className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setVoidTarget(null);
+              setVoidReason("");
+            }}
+            className="rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={actionPending || voidReason.trim().length < 3}
+            onClick={() => void handleVoidFinanceEntry()}
+            className="rounded-md border border-error bg-error px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {actionPending ? "Removing..." : "Remove entry"}
+          </button>
+        </div>
+      </ModalOverlay>
     </div>
   );
 }

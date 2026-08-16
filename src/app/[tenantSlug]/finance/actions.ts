@@ -42,6 +42,7 @@ import {
   recordVendorBillPaymentInputSchema,
   updateExpenseInputSchema,
   updateInvoiceInputSchema,
+  voidFinanceEntrySchema,
 } from "@/lib/validators/finance";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -318,14 +319,7 @@ export async function resolvePendingFinance(
 
 export async function createInvoiceRecord(
   tenantSlug: string,
-  input: {
-    dealId?: string;
-    title: string;
-    amount: number;
-    currency: string;
-    dueDate?: string;
-    department?: string;
-  },
+  input: z.input<typeof createInvoiceInputSchema>,
 ): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -339,13 +333,13 @@ export async function createInvoiceRecord(
     return { ok: false, error: "You do not have permission to create invoice records." };
   }
 
-  if (parsed.data.dealId) {
-    const deal = await prisma.deal.findFirst({
-      where: { id: parsed.data.dealId, tenantId: tenant.id },
-      select: { id: true },
-    });
-    if (!deal) return { ok: false, error: "Selected deal is invalid." };
-  }
+  const allocation = await resolveIncomeAllocation({
+    tenantId: tenant.id,
+    dealId: parsed.data.dealId,
+    projectId: parsed.data.projectId,
+    unitId: parsed.data.unitId,
+  });
+  if (!allocation.ok) return allocation;
 
   const seq = await prisma.invoice.count({ where: { tenantId: tenant.id } });
   const invoiceNumber = `INV-${String(seq + 1).padStart(5, "0")}`;
@@ -355,6 +349,9 @@ export async function createInvoiceRecord(
       data: {
         tenantId: tenant.id,
         dealId: parsed.data.dealId || null,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        incomeType: parsed.data.incomeType,
         invoiceNumber,
         title: parsed.data.title,
         amount: parsed.data.amount,
@@ -382,6 +379,9 @@ export async function createInvoiceRecord(
         amount: parsed.data.amount,
         currency: parsed.data.currency,
         department: parsed.data.department || null,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        incomeType: parsed.data.incomeType,
       },
     });
   } catch {
@@ -421,7 +421,16 @@ export async function recordInvoicePayment(
 
   const invoice = await prisma.invoice.findFirst({
     where: { id: invoiceId, tenantId: tenant.id },
-    select: { id: true, currency: true, amount: true, balanceDue: true, status: true },
+    select: {
+      id: true,
+      currency: true,
+      amount: true,
+      balanceDue: true,
+      status: true,
+      projectId: true,
+      unitId: true,
+      incomeType: true,
+    },
   });
   if (!invoice) return { ok: false, error: "Invoice not found." };
   if (invoice.status === InvoiceStatus.VOID)
@@ -440,6 +449,9 @@ export async function recordInvoicePayment(
         data: {
           tenantId: tenant.id,
           invoiceId: invoice.id,
+          projectId: invoice.projectId,
+          unitId: invoice.unitId,
+          incomeType: invoice.incomeType,
           amount: parsed.data.amount,
           currency: invoice.currency,
           department: parsed.data.department || null,
@@ -490,20 +502,7 @@ export async function recordInvoicePayment(
 
 export async function recordStandalonePayment(
   tenantSlug: string,
-  input: {
-    title: string;
-    payerName?: string;
-    amount: number;
-    currency: string;
-    paidAt: string;
-    department?: string;
-    method?: string;
-    reference?: string;
-    note?: string;
-    attachmentUrl?: string;
-    attachmentName?: string;
-    attachmentPublicId?: string;
-  },
+  input: z.input<typeof recordStandalonePaymentInputSchema>,
 ): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -517,11 +516,21 @@ export async function recordStandalonePayment(
     return { ok: false, error: "You do not have permission to record payments." };
   }
 
+  const allocation = await resolveIncomeAllocation({
+    tenantId: tenant.id,
+    projectId: parsed.data.projectId,
+    unitId: parsed.data.unitId,
+  });
+  if (!allocation.ok) return allocation;
+
   try {
     const created = await prisma.paymentRecord.create({
       data: {
         tenantId: tenant.id,
         invoiceId: null,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        incomeType: parsed.data.incomeType,
         standaloneTitle: parsed.data.title,
         payerName: parsed.data.payerName || null,
         amount: parsed.data.amount,
@@ -551,6 +560,9 @@ export async function recordStandalonePayment(
         amount: parsed.data.amount,
         currency: parsed.data.currency,
         payerName: parsed.data.payerName || null,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        incomeType: parsed.data.incomeType,
       },
     });
   } catch {
@@ -768,6 +780,257 @@ export async function voidInvoiceRecord(tenantSlug: string, invoiceId: string): 
     });
   } catch {
     return { ok: false, error: "Could not void invoice right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+async function findMatchedBankRow(tenantId: string, entityType: string, entityId: string) {
+  return prisma.bankStatementRow.findFirst({
+    where: {
+      tenantId,
+      matchedEntityType: entityType,
+      matchedEntityId: entityId,
+      matchStatus: BankMatchStatus.MATCHED,
+    },
+    select: { id: true },
+  });
+}
+
+export async function voidExpenseRecord(
+  tenantSlug: string,
+  expenseId: string,
+  input: { reason: string },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = voidFinanceEntrySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to remove expenses." };
+  }
+
+  const expense = await prisma.expense.findFirst({
+    where: { id: expenseId, tenantId: tenant.id },
+  });
+  if (!expense) return { ok: false, error: "Expense not found." };
+  if (expense.voidedAt) return { ok: false, error: "This expense is already removed." };
+
+  const matchedRow = await findMatchedBankRow(tenant.id, "EXPENSE", expense.id);
+  if (matchedRow) {
+    return {
+      ok: false,
+      error: "This expense is reconciled to a bank statement. Undo that match before removing it.",
+    };
+  }
+
+  const actorLabel = session.user.name || session.user.email || "Unknown user";
+  try {
+    await prisma.expense.update({
+      where: { id: expense.id },
+      data: {
+        voidedAt: new Date(),
+        voidedByUserId: session.user.id,
+        voidedByLabel: actorLabel,
+        voidReason: parsed.data.reason,
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel,
+      module: "FINANCE",
+      entityType: "EXPENSE",
+      entityId: expense.id,
+      action: "VOID",
+      summary: `Removed expense ${expense.category}. Reason: ${parsed.data.reason}`,
+      metadata: {
+        reason: parsed.data.reason,
+        before: {
+          category: expense.category,
+          amount: expense.amount.toString(),
+          currency: expense.currency,
+          projectId: expense.projectId,
+          unitId: expense.unitId,
+          expenseDate: expense.expenseDate.toISOString(),
+        },
+      },
+    });
+  } catch {
+    return { ok: false, error: "Could not remove this expense right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function voidPaymentRecord(
+  tenantSlug: string,
+  paymentId: string,
+  input: { reason: string },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = voidFinanceEntrySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to remove payments." };
+  }
+
+  const payment = await prisma.paymentRecord.findFirst({
+    where: { id: paymentId, tenantId: tenant.id },
+    include: {
+      invoice: {
+        select: { id: true, amount: true, balanceDue: true, status: true, invoiceNumber: true },
+      },
+    },
+  });
+  if (!payment) return { ok: false, error: "Payment not found." };
+  if (payment.voidedAt) return { ok: false, error: "This payment is already removed." };
+
+  const matchedRow = await findMatchedBankRow(tenant.id, "PAYMENT", payment.id);
+  if (matchedRow) {
+    return {
+      ok: false,
+      error: "This payment is reconciled to a bank statement. Undo that match before removing it.",
+    };
+  }
+
+  const actorLabel = session.user.name || session.user.email || "Unknown user";
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.paymentRecord.update({
+        where: { id: payment.id },
+        data: {
+          voidedAt: new Date(),
+          voidedByUserId: session.user.id,
+          voidedByLabel: actorLabel,
+          voidReason: parsed.data.reason,
+        },
+      });
+
+      if (payment.invoice && payment.invoice.status !== InvoiceStatus.VOID) {
+        const nextBalance = Number(payment.invoice.balanceDue) + Number(payment.amount);
+        const nextStatus =
+          nextBalance <= 0
+            ? InvoiceStatus.PAID
+            : nextBalance >= Number(payment.invoice.amount)
+              ? InvoiceStatus.SENT
+              : InvoiceStatus.PARTIALLY_PAID;
+        await tx.invoice.update({
+          where: { id: payment.invoice.id },
+          data: { balanceDue: nextBalance, status: nextStatus },
+        });
+      }
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel,
+      module: "FINANCE",
+      entityType: "PAYMENT",
+      entityId: payment.id,
+      action: "VOID",
+      summary: `Removed payment${payment.invoice ? ` on ${payment.invoice.invoiceNumber}` : ""}. Reason: ${parsed.data.reason}`,
+      metadata: {
+        reason: parsed.data.reason,
+        amount: Number(payment.amount),
+        invoiceId: payment.invoiceId,
+        projectId: payment.projectId,
+        unitId: payment.unitId,
+      },
+    });
+  } catch {
+    return { ok: false, error: "Could not remove this payment right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function voidSalesReceiptRecord(
+  tenantSlug: string,
+  receiptId: string,
+  input: { reason: string },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = voidFinanceEntrySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to remove receipts." };
+  }
+
+  const receipt = await prisma.salesReceipt.findFirst({
+    where: { id: receiptId, tenantId: tenant.id },
+  });
+  if (!receipt) return { ok: false, error: "Receipt not found." };
+  if (receipt.voidedAt || receipt.status === "VOID") {
+    return { ok: false, error: "This receipt is already removed." };
+  }
+
+  const matchedRow = await findMatchedBankRow(tenant.id, "SALES_RECEIPT", receipt.id);
+  if (matchedRow) {
+    return {
+      ok: false,
+      error: "This receipt is reconciled to a bank statement. Undo that match before removing it.",
+    };
+  }
+
+  const actorLabel = session.user.name || session.user.email || "Unknown user";
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.salesReceipt.update({
+        where: { id: receipt.id },
+        data: {
+          status: "VOID",
+          voidedAt: new Date(),
+          voidedByUserId: session.user.id,
+          voidedByLabel: actorLabel,
+          voidReason: parsed.data.reason,
+        },
+      });
+      await tx.shortletPayment.updateMany({
+        where: { tenantId: tenant.id, financeReceiptId: receipt.id },
+        data: { financeReceiptId: null },
+      });
+      await tx.shortletBusinessDay.updateMany({
+        where: { tenantId: tenant.id, financeReceiptId: receipt.id },
+        data: { financeReceiptId: null },
+      });
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel,
+      module: "FINANCE",
+      entityType: "SALES_RECEIPT",
+      entityId: receipt.id,
+      action: "VOID",
+      summary: `Removed sales receipt ${receipt.receiptNumber}. Reason: ${parsed.data.reason}`,
+      metadata: {
+        reason: parsed.data.reason,
+        amount: Number(receipt.amount),
+        projectId: receipt.projectId,
+        unitId: receipt.unitId,
+        incomeType: receipt.incomeType,
+      },
+    });
+  } catch {
+    return { ok: false, error: "Could not remove this receipt right now." };
   }
 
   revalidatePath(`/${tenantSlug}/finance`);
@@ -1019,6 +1282,31 @@ async function resolveExpenseAllocation(input: {
   return { ok: true as const, projectId: null, unitId: null };
 }
 
+async function resolveIncomeAllocation(input: {
+  tenantId: string;
+  projectId?: string;
+  unitId?: string;
+  dealId?: string;
+}) {
+  let dealProjectId: string | undefined;
+  let dealUnitId: string | undefined;
+  if (input.dealId) {
+    const deal = await prisma.deal.findFirst({
+      where: { id: input.dealId, tenantId: input.tenantId },
+      select: { id: true, unit: { select: { id: true, projectId: true } } },
+    });
+    if (!deal) return { ok: false as const, error: "Selected deal is invalid." };
+    dealProjectId = deal.unit?.projectId;
+    dealUnitId = deal.unit?.id;
+  }
+
+  return resolveExpenseAllocation({
+    tenantId: input.tenantId,
+    projectId: input.projectId || dealProjectId,
+    unitId: input.unitId || dealUnitId,
+  });
+}
+
 export async function createExpenseRecord(
   tenantSlug: string,
   input: {
@@ -1176,6 +1464,7 @@ export async function updateExpenseRecord(
     }),
   ]);
   if (!existing) return { ok: false, error: "Expense not found." };
+  if (existing.voidedAt) return { ok: false, error: "This expense has been removed and cannot be corrected." };
   if (matchedRow) {
     return {
       ok: false,
@@ -1707,17 +1996,7 @@ export async function getFinanceUploadSignature(
 
 export async function createSalesReceiptRecord(
   tenantSlug: string,
-  input: {
-    dealId?: string;
-    title: string;
-    customerName?: string;
-    amount: number;
-    currency: string;
-    paymentMode?: string;
-    depositAccount?: string;
-    reference?: string;
-    note?: string;
-  },
+  input: z.input<typeof createSalesReceiptInputSchema>,
 ): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -1731,13 +2010,13 @@ export async function createSalesReceiptRecord(
     return { ok: false, error: "You do not have permission to create sales receipts." };
   }
 
-  if (parsed.data.dealId) {
-    const deal = await prisma.deal.findFirst({
-      where: { id: parsed.data.dealId, tenantId: tenant.id },
-      select: { id: true },
-    });
-    if (!deal) return { ok: false, error: "Selected deal is invalid." };
-  }
+  const allocation = await resolveIncomeAllocation({
+    tenantId: tenant.id,
+    dealId: parsed.data.dealId,
+    projectId: parsed.data.projectId,
+    unitId: parsed.data.unitId,
+  });
+  if (!allocation.ok) return allocation;
 
   const seq = await prisma.salesReceipt.count({ where: { tenantId: tenant.id } });
   const receiptNumber = `SR-${String(seq + 1).padStart(5, "0")}`;
@@ -1747,6 +2026,9 @@ export async function createSalesReceiptRecord(
       data: {
         tenantId: tenant.id,
         dealId: parsed.data.dealId || null,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        incomeType: parsed.data.incomeType,
         receiptNumber,
         title: parsed.data.title,
         customerName: parsed.data.customerName || null,
@@ -1773,6 +2055,9 @@ export async function createSalesReceiptRecord(
         receiptNumber,
         amount: parsed.data.amount,
         currency: parsed.data.currency,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        incomeType: parsed.data.incomeType,
       },
     });
   } catch {
@@ -1839,6 +2124,9 @@ export async function sendSalesReceiptRecord(
     },
   });
   if (!receipt) return { ok: false, error: "Receipt not found." };
+  if (receipt.voidedAt || receipt.status === "VOID") {
+    return { ok: false, error: "Cannot send a removed receipt." };
+  }
 
   const pdfBytes = await buildSalesReceiptPdf({
     brand: financePdfBrandFromSettings(tenant.name, tenant.settings),
