@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { ButtonSpinner } from "@/components/button-spinner";
@@ -14,6 +14,7 @@ import {
   type ClientDocumentItem,
 } from "@/components/clients/client-documents-workspace";
 import { downloadClientStatementXlsx } from "@/lib/client-report-xlsx";
+import { formatEnumLabel } from "@/lib/ui-format";
 import {
   deletePropertyClient,
   linkClientShortlet,
@@ -69,6 +70,69 @@ const initial: ActionResult | null = null;
 
 function moneyLabel(currency: string, value: number) {
   return `${currency} ${value.toLocaleString("en-NG")}`;
+}
+
+const PAGE_SIZE = 8;
+
+type ClientTab = "overview" | "payments" | "properties" | "documents";
+
+function usePaged<T>(items: T[], resetKey: string) {
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [resetKey]);
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  return {
+    page: safePage,
+    setPage,
+    totalPages,
+    total: items.length,
+    rows: items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+  };
+}
+
+function LocalPager({
+  page,
+  totalPages,
+  total,
+  itemLabel,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  itemLabel: string;
+  onPage: (page: number) => void;
+}) {
+  if (total <= PAGE_SIZE) return null;
+  const first = (page - 1) * PAGE_SIZE + 1;
+  const last = Math.min(page * PAGE_SIZE, total);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-foreground/10 px-4 py-3">
+      <p className="text-xs text-muted">
+        Showing {first}–{last} of {total} {itemLabel}
+      </p>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+          className="rounded-md border border-foreground/15 px-2.5 py-1 text-xs font-medium disabled:opacity-40"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onPage(page + 1)}
+          className="rounded-md border border-foreground/15 px-2.5 py-1 text-xs font-medium disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function ClientDetailWorkspace({
@@ -135,7 +199,17 @@ export function ClientDetailWorkspace({
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
-  const [tab, setTab] = useState<"overview" | "documents">("overview");
+  const [tab, setTab] = useState<ClientTab>("overview");
+  const [profile, setProfile] = useState(client);
+  const [editDraft, setEditDraft] = useState({
+    fullName: client.fullName,
+    phone: client.phone,
+    email: client.email,
+    status: client.statusValue,
+    notes: client.notes,
+  });
+  const editDraftRef = useRef(editDraft);
+  editDraftRef.current = editDraft;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [isPayOpen, setIsPayOpen] = useState(false);
@@ -190,6 +264,20 @@ export function ClientDetailWorkspace({
   const selectedShortletUnit = shortletUnitsForProperty.find((u) => u.id === linkShortletUnitId);
 
   const linkedCount = unitLinks.length + shortletLinks.length;
+  const linkedRows = useMemo(
+    () => [
+      ...unitLinks.map((link) => ({ kind: "project" as const, link })),
+      ...shortletLinks.map((link) => ({ kind: "shortlet" as const, link })),
+    ],
+    [unitLinks, shortletLinks],
+  );
+  const pagedBalances = usePaged(depositRows, `${client.id}-balances-${depositRows.length}`);
+  const pagedPayments = usePaged(payments, `${client.id}-payments-${payments.length}`);
+  const pagedLinks = usePaged(linkedRows, `${client.id}-links-${linkedRows.length}`);
+
+  useEffect(() => {
+    setProfile(client);
+  }, [client]);
 
   useEffect(() => {
     if (!filteredProjects.some((p) => p.id === linkProjectId)) {
@@ -222,6 +310,16 @@ export function ClientDetailWorkspace({
   useEffect(() => {
     if (!editState) return;
     if (editState.ok) {
+      const draft = editDraftRef.current;
+      setProfile((current) => ({
+        ...current,
+        fullName: draft.fullName,
+        phone: draft.phone,
+        email: draft.email,
+        notes: draft.notes,
+        statusValue: draft.status,
+        status: formatEnumLabel(draft.status),
+      }));
       showSnackbar("Client updated.", "success");
       setIsEditOpen(false);
       router.refresh();
@@ -254,6 +352,17 @@ export function ClientDetailWorkspace({
       router.refresh();
     } else showSnackbar(payState.error, "error");
   }, [payState, router, showSnackbar]);
+
+  function openEditModal() {
+    setEditDraft({
+      fullName: profile.fullName,
+      phone: profile.phone,
+      email: profile.email,
+      status: profile.statusValue,
+      notes: profile.notes,
+    });
+    setIsEditOpen(true);
+  }
 
   function openLinkModal() {
     setLinkKind("project");
@@ -302,10 +411,10 @@ export function ClientDetailWorkspace({
           <Link href={`/${tenantSlug}/clients`} className="text-xs text-muted hover:text-foreground">
             ← All clients
           </Link>
-          <h1 className="mt-2 text-2xl font-bold text-foreground">{client.fullName}</h1>
+          <h1 className="mt-2 text-2xl font-bold text-foreground">{profile.fullName}</h1>
           <p className="mt-1 text-sm text-muted">
-            {client.phone || "No phone"}
-            {client.email ? ` · ${client.email}` : ""}
+            {profile.phone || "No phone"}
+            {profile.email ? ` · ${profile.email}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -317,15 +426,15 @@ export function ClientDetailWorkspace({
               void downloadClientStatementXlsx({
                 companyName,
                 currency,
-                clientName: client.fullName,
-                phone: client.phone,
-                email: client.email,
-                status: client.status,
+                clientName: profile.fullName,
+                phone: profile.phone,
+                email: profile.email,
+                status: profile.status,
                 contractValue: depositSummary.contractValue,
                 collected: depositSummary.collected,
                 remaining: depositSummary.remaining,
                 unitBalances: depositRows.map((row) => ({
-                  clientName: client.fullName,
+                  clientName: profile.fullName,
                   projectLabel: row.projectLabel,
                   unitLabel: row.unitLabel,
                   contractValue: row.contractValue,
@@ -349,7 +458,7 @@ export function ClientDetailWorkspace({
             <>
             <button
               type="button"
-              onClick={() => setIsEditOpen(true)}
+              onClick={openEditModal}
               className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
             >
               Edit profile
@@ -383,7 +492,7 @@ export function ClientDetailWorkspace({
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Status</p>
-          <p className="mt-1 font-semibold">{client.status}</p>
+          <p className="mt-1 font-semibold">{profile.status}</p>
           <p className="mt-1 text-xs text-muted">
             {linkedCount} linked {linkedCount === 1 ? "property" : "properties"}
           </p>
@@ -403,22 +512,29 @@ export function ClientDetailWorkspace({
       </div>
 
       <div className="mt-6 border-b border-foreground/10">
-        <div className="flex gap-5">
-          {(["overview", "documents"] as const).map((key) => (
+        <div className="flex flex-wrap gap-5">
+          {(
+            [
+              { id: "overview", label: "Overview" },
+              { id: "payments", label: `Payments${payments.length ? ` (${payments.length})` : ""}` },
+              { id: "properties", label: `Properties${linkedCount ? ` (${linkedCount})` : ""}` },
+              { id: "documents", label: `Documents${documents.length ? ` (${documents.length})` : ""}` },
+            ] as const
+          ).map((item) => (
             <button
-              key={key}
+              key={item.id}
               type="button"
-              onClick={() => setTab(key)}
+              onClick={() => setTab(item.id)}
               className={[
-                "relative py-2 text-sm font-medium capitalize",
-                tab === key ? "text-foreground" : "text-muted",
+                "relative py-2 text-sm font-medium",
+                tab === item.id ? "text-foreground" : "text-muted",
               ].join(" ")}
             >
-              {key}
+              {item.label}
               <span
                 className={[
                   "absolute -bottom-px left-0 h-0.5 w-full",
-                  tab === key ? "bg-foreground" : "bg-transparent",
+                  tab === item.id ? "bg-foreground" : "bg-transparent",
                 ].join(" ")}
               />
             </button>
@@ -426,66 +542,60 @@ export function ClientDetailWorkspace({
         </div>
       </div>
 
-      {tab === "documents" ? (
+      {tab === "overview" ? (
         <div className="mt-5">
-          <ClientDocumentsWorkspace
-            tenantSlug={tenantSlug}
-            canManage={canManage}
-            clients={[{ id: client.id, fullName: client.fullName }]}
-            documents={documents}
-            preselectClientId={client.id}
-          />
-        </div>
-      ) : (
-        <div className="mt-5 space-y-6">
           <section className="rounded-lg border border-foreground/10 p-4">
             <h2 className="text-sm font-semibold">Contact & address</h2>
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-muted">Alternate phone</dt>
-                <dd>{client.alternatePhone || "—"}</dd>
+                <dd>{profile.alternatePhone || "—"}</dd>
               </div>
               <div>
                 <dt className="text-muted">Address</dt>
                 <dd>
-                  {[client.addressLine, client.city, client.state, client.country]
+                  {[profile.addressLine, profile.city, profile.state, profile.country]
                     .filter(Boolean)
                     .join(", ") || "—"}
                 </dd>
               </div>
             </dl>
-            {client.notes ? (
+            {profile.notes ? (
               <p className="mt-3 text-sm text-muted">
-                <span className="font-medium text-foreground">Notes:</span> {client.notes}
+                <span className="font-medium text-foreground">Notes:</span> {profile.notes}
               </p>
             ) : null}
           </section>
+        </div>
+      ) : null}
 
-          <section className="overflow-hidden rounded-lg border border-foreground/10">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold">Payments & balance</h2>
-                <p className="mt-0.5 text-xs text-muted">
-                  Part payments for a project unit. Remaining is calculated automatically.
-                </p>
-              </div>
-              {canManage ? (
-                <button
-                  type="button"
-                  onClick={() => setIsPayOpen(true)}
-                  className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
-                >
-                  Add payment
-                </button>
-              ) : null}
-            </div>
-            {depositRows.length === 0 && payments.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-muted">
-                No payments yet. Link a unit, then record a part payment.
+      {tab === "payments" ? (
+        <section className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Payments & balance</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Part payments for a project unit. Remaining is calculated automatically.
               </p>
-            ) : (
-              <div className="divide-y divide-foreground/10">
-                {depositRows.length > 0 ? (
+            </div>
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => setIsPayOpen(true)}
+                className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+              >
+                Add payment
+              </button>
+            ) : null}
+          </div>
+          {depositRows.length === 0 && payments.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted">
+              No payments yet. Link a unit, then record a part payment.
+            </p>
+          ) : (
+            <div className="divide-y divide-foreground/10">
+              {depositRows.length > 0 ? (
+                <>
                   <table className="w-full text-left text-sm">
                     <thead className="bg-foreground/[0.03] text-xs uppercase text-muted">
                       <tr>
@@ -496,7 +606,7 @@ export function ClientDetailWorkspace({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
-                      {depositRows.map((row) => (
+                      {pagedBalances.rows.map((row) => (
                         <tr key={row.id}>
                           <td className="px-4 py-3">
                             <p className="font-medium">{row.unitLabel}</p>
@@ -511,45 +621,74 @@ export function ClientDetailWorkspace({
                       ))}
                     </tbody>
                   </table>
-                ) : null}
-                {payments.length > 0 ? (
-                  <div className="px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                      Payment history
-                    </p>
-                    <ul className="mt-2 space-y-2">
-                      {payments.map((payment) => (
-                        <li key={payment.id} className="flex flex-wrap justify-between gap-2 text-sm">
-                          <div>
-                            <p className="font-medium">{payment.unitLabel}</p>
-                            <p className="text-xs text-muted">
-                              {payment.paidAtLabel}
-                              {payment.method ? ` · ${payment.method}` : ""}
-                              {payment.reference ? ` · ${payment.reference}` : ""}
-                            </p>
-                          </div>
-                          <p className="font-semibold">
-                            {moneyLabel(payment.currency || currency, payment.amount)}
+                  <LocalPager
+                    page={pagedBalances.page}
+                    totalPages={pagedBalances.totalPages}
+                    total={pagedBalances.total}
+                    itemLabel="units"
+                    onPage={pagedBalances.setPage}
+                  />
+                </>
+              ) : null}
+              {payments.length > 0 ? (
+                <div>
+                  <p className="px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Payment history
+                  </p>
+                  <ul className="space-y-2 px-4 py-3">
+                    {pagedPayments.rows.map((payment) => (
+                      <li key={payment.id} className="flex flex-wrap justify-between gap-2 text-sm">
+                        <div>
+                          <p className="font-medium">{payment.unitLabel}</p>
+                          <p className="text-xs text-muted">
+                            {payment.paidAtLabel}
+                            {payment.method ? ` · ${payment.method}` : ""}
+                            {payment.reference ? ` · ${payment.reference}` : ""}
                           </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </section>
+                        </div>
+                        <p className="font-semibold">
+                          {moneyLabel(payment.currency || currency, payment.amount)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  <LocalPager
+                    page={pagedPayments.page}
+                    totalPages={pagedPayments.totalPages}
+                    total={pagedPayments.total}
+                    itemLabel="payments"
+                    onPage={pagedPayments.setPage}
+                  />
+                </div>
+              ) : null}
+            </div>
+          )}
+        </section>
+      ) : null}
 
-          <section className="overflow-hidden rounded-lg border border-foreground/10">
-            <div className="border-b border-foreground/10 px-4 py-3">
+      {tab === "properties" ? (
+        <section className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 px-4 py-3">
+            <div>
               <h2 className="text-sm font-semibold">Linked properties</h2>
               <p className="mt-0.5 text-xs text-muted">
                 Project units and short-let apartments are tracked separately.
               </p>
             </div>
-            {linkedCount === 0 ? (
-              <p className="px-4 py-6 text-sm text-muted">No properties linked yet.</p>
-            ) : (
+            {canManage ? (
+              <button
+                type="button"
+                onClick={openLinkModal}
+                className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold"
+              >
+                Link property
+              </button>
+            ) : null}
+          </div>
+          {linkedCount === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted">No properties linked yet.</p>
+          ) : (
+            <>
               <table className="w-full text-left text-sm">
                 <thead className="bg-foreground/[0.03] text-xs uppercase text-muted">
                   <tr>
@@ -562,60 +701,80 @@ export function ClientDetailWorkspace({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-foreground/10">
-                  {unitLinks.map((link) => (
-                    <tr key={`unit-${link.id}`}>
-                      <td className="px-4 py-3">
-                        <span className="rounded bg-foreground/5 px-2 py-0.5 text-xs font-medium">
-                          Project
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted">{link.projectName}</td>
-                      <td className="px-4 py-3 font-medium">{link.unitLabel}</td>
-                      <td className="px-4 py-3 text-muted">{link.pricingPlanName}</td>
-                      <td className="px-4 py-3">{link.role}</td>
-                      {canManage ? (
+                  {pagedLinks.rows.map((row) =>
+                    row.kind === "project" ? (
+                      <tr key={`unit-${row.link.id}`}>
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleUnlinkUnit(link.id)}
-                            className="text-xs text-error underline"
-                          >
-                            Unlink
-                          </button>
+                          <span className="rounded bg-foreground/5 px-2 py-0.5 text-xs font-medium">
+                            Project
+                          </span>
                         </td>
-                      ) : null}
-                    </tr>
-                  ))}
-                  {shortletLinks.map((link) => (
-                    <tr key={`shortlet-${link.id}`}>
-                      <td className="px-4 py-3">
-                        <span className="rounded bg-[var(--warn-wash)] px-2 py-0.5 text-xs font-medium text-[var(--warn)]">
-                          Short-let
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted">{link.propertyName}</td>
-                      <td className="px-4 py-3 font-medium">{link.unitName}</td>
-                      <td className="px-4 py-3 text-muted">{link.nightlyRateLabel}</td>
-                      <td className="px-4 py-3">{link.role}</td>
-                      {canManage ? (
+                        <td className="px-4 py-3 text-muted">{row.link.projectName}</td>
+                        <td className="px-4 py-3 font-medium">{row.link.unitLabel}</td>
+                        <td className="px-4 py-3 text-muted">{row.link.pricingPlanName}</td>
+                        <td className="px-4 py-3">{row.link.role}</td>
+                        {canManage ? (
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleUnlinkUnit(row.link.id)}
+                              className="text-xs text-error underline"
+                            >
+                              Unlink
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ) : (
+                      <tr key={`shortlet-${row.link.id}`}>
                         <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleUnlinkShortlet(link.id)}
-                            className="text-xs text-error underline"
-                          >
-                            Unlink
-                          </button>
+                          <span className="rounded bg-[var(--warn-wash)] px-2 py-0.5 text-xs font-medium text-[var(--warn)]">
+                            Short-let
+                          </span>
                         </td>
-                      ) : null}
-                    </tr>
-                  ))}
+                        <td className="px-4 py-3 text-muted">{row.link.propertyName}</td>
+                        <td className="px-4 py-3 font-medium">{row.link.unitName}</td>
+                        <td className="px-4 py-3 text-muted">{row.link.nightlyRateLabel}</td>
+                        <td className="px-4 py-3">{row.link.role}</td>
+                        {canManage ? (
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleUnlinkShortlet(row.link.id)}
+                              className="text-xs text-error underline"
+                            >
+                              Unlink
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ),
+                  )}
                 </tbody>
               </table>
-            )}
-          </section>
+              <LocalPager
+                page={pagedLinks.page}
+                totalPages={pagedLinks.totalPages}
+                total={pagedLinks.total}
+                itemLabel="properties"
+                onPage={pagedLinks.setPage}
+              />
+            </>
+          )}
+        </section>
+      ) : null}
+
+      {tab === "documents" ? (
+        <div className="mt-5">
+          <ClientDocumentsWorkspace
+            tenantSlug={tenantSlug}
+            canManage={canManage}
+            clients={[{ id: client.id, fullName: profile.fullName }]}
+            documents={documents}
+            preselectClientId={client.id}
+          />
         </div>
-      )}
+      ) : null}
 
       <ModalOverlay open={isEditOpen} onClose={() => setIsEditOpen(false)} panelClassName={MODAL_PANEL_XL}>
         <h2 className="text-lg font-semibold">Edit client</h2>
@@ -623,14 +782,16 @@ export function ClientDetailWorkspace({
           {editState && !editState.ok ? <FormAlert>{editState.error}</FormAlert> : null}
           <input
             name="fullName"
-            defaultValue={client.fullName}
+            value={editDraft.fullName}
+            onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
             required
             className="w-full border border-foreground/15 bg-field px-3 py-2"
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <input
               name="phone"
-              defaultValue={client.phone}
+              value={editDraft.phone}
+              onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
               placeholder="Phone"
               className="w-full border border-foreground/15 bg-field px-3 py-2"
             />
@@ -638,12 +799,17 @@ export function ClientDetailWorkspace({
               name="email"
               type="text"
               inputMode="email"
-              defaultValue={client.email}
+              value={editDraft.email}
+              onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
               placeholder="Email (optional)"
               className="w-full border border-foreground/15 bg-field px-3 py-2"
             />
           </div>
-          <UiSelect name="status" defaultValue={client.statusValue}>
+          <UiSelect
+            name="status"
+            value={editDraft.status}
+            onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value }))}
+          >
             <option value="PROSPECT">Prospect</option>
             <option value="ACTIVE">Active</option>
             <option value="FORMER">Former</option>
@@ -651,7 +817,8 @@ export function ClientDetailWorkspace({
           <textarea
             name="notes"
             rows={3}
-            defaultValue={client.notes}
+            value={editDraft.notes}
+            onChange={(e) => setEditDraft((d) => ({ ...d, notes: e.target.value }))}
             className="w-full border border-foreground/15 bg-field px-3 py-2"
           />
           <div className="flex justify-end gap-2">

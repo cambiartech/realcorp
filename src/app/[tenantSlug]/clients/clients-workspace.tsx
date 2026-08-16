@@ -18,6 +18,7 @@ import type { ClientPortalStatus } from "@/lib/client-portal-invite";
 import type { Pagination, SearchParamValue } from "@/lib/pagination";
 import { Pencil, Trash2 } from "lucide-react";
 import { downloadClientPortfolioXlsx } from "@/lib/client-report-xlsx";
+import { formatEnumLabel } from "@/lib/ui-format";
 import {
   createPropertyClient,
   deletePropertyClient,
@@ -124,10 +125,34 @@ export function ClientsWorkspace({
   const [clientToDelete, setClientToDelete] = useState<ClientRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<ClientRow | null>(null);
+  const [editDraft, setEditDraft] = useState({
+    fullName: "",
+    phone: "",
+    email: "",
+    status: "PROSPECT",
+  });
+  const [rowOverrides, setRowOverrides] = useState<Record<string, Partial<ClientRow>>>({});
   const [exporting, setExporting] = useState(false);
   const [state, formAction, pending] = useActionState(createPropertyClient.bind(null, tenantSlug), initial);
   const [editPending, setEditPending] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const visibleClients = clients.map((row) => ({ ...row, ...rowOverrides[row.id] }));
+
+  useEffect(() => {
+    setRowOverrides((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const row of clients) {
+        const override = next[row.id];
+        if (!override) continue;
+        if (!override.statusValue || override.statusValue === row.statusValue) {
+          delete next[row.id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [clients]);
 
   useEffect(() => {
     if (!state) return;
@@ -181,6 +206,16 @@ export function ClientsWorkspace({
       return;
     }
     showSnackbar("Client updated.", "success");
+    setRowOverrides((prev) => ({
+      ...prev,
+      [clientToEdit.id]: {
+        fullName: editDraft.fullName,
+        phone: editDraft.phone,
+        email: editDraft.email,
+        statusValue: editDraft.status,
+        status: formatEnumLabel(editDraft.status),
+      },
+    }));
     setClientToEdit(null);
     router.refresh();
   }
@@ -346,7 +381,7 @@ export function ClientsWorkspace({
                   </td>
                 </tr>
               ) : (
-                clients.map((client) => (
+                visibleClients.map((client) => (
                   <tr key={client.id} className="hover:bg-foreground/[0.02]">
                     <td className="px-4 py-3">
                       <Link
@@ -399,7 +434,15 @@ export function ClientsWorkspace({
                           ) : null}
                           <button
                             type="button"
-                            onClick={() => setClientToEdit(client)}
+                            onClick={() => {
+                              setEditDraft({
+                                fullName: client.fullName,
+                                phone: client.phone,
+                                email: client.email,
+                                status: client.statusValue,
+                              });
+                              setClientToEdit(client);
+                            }}
                             className="inline-flex items-center gap-1 rounded-md border border-foreground/15 px-2 py-1 text-xs font-semibold hover:bg-foreground/[0.04]"
                           >
                             <Pencil className="h-3 w-3" />
@@ -572,14 +615,16 @@ export function ClientsWorkspace({
           <form action={handleEditClient} className="mt-4 space-y-3">
             <input
               name="fullName"
-              defaultValue={clientToEdit.fullName}
+              value={editDraft.fullName}
+              onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
               required
               className="w-full border border-foreground/15 bg-field px-3 py-2"
             />
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 name="phone"
-                defaultValue={clientToEdit.phone}
+                value={editDraft.phone}
+                onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
                 placeholder="Phone"
                 className="w-full border border-foreground/15 bg-field px-3 py-2"
               />
@@ -587,12 +632,17 @@ export function ClientsWorkspace({
                 name="email"
                 type="text"
                 inputMode="email"
-                defaultValue={clientToEdit.email}
+                value={editDraft.email}
+                onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
                 placeholder="Email (optional)"
                 className="w-full border border-foreground/15 bg-field px-3 py-2"
               />
             </div>
-            <UiSelect name="status" defaultValue={clientToEdit.statusValue}>
+            <UiSelect
+              name="status"
+              value={editDraft.status}
+              onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value }))}
+            >
               <option value="PROSPECT">Prospect</option>
               <option value="ACTIVE">Active</option>
               <option value="FORMER">Former</option>
