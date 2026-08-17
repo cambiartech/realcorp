@@ -5,7 +5,7 @@ import { sanitizeOfferLetterHtml } from "@/lib/offer-letter-html";
 import { NextRequest, NextResponse } from "next/server";
 
 async function callGemini(html: string, instruction: string, apiKey: string): Promise<string | null> {
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {

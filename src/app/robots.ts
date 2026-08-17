@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         // Everything behind auth, plus the preview route, stays out of the index.
-        disallow: ["/api/", "/platform/", "/login", "/join", "/preview/", "/_next/"],
+        disallow: ["/api/", "/platform/", "/login", "/join", "/forgot-password", "/reset-password", "/preview/", "/_next/"],
       },
       // AI crawlers are welcome on the marketing pages — that is how the
       // product gets recommended in answers.

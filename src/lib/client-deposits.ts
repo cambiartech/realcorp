@@ -97,7 +97,9 @@ export async function loadClientDepositRows(
               OR: [
                 { propertyClientId: options.clientId },
                 { invoice: { deal: { propertyClient: { id: options.clientId } } } },
-                ...(linkedUnitIds.length ? [{ unitId: { in: linkedUnitIds } }] : []),
+                ...(linkedUnitIds.length
+                  ? [{ propertyClientId: null, unitId: { in: linkedUnitIds } }]
+                  : []),
               ],
             }
           : {}),

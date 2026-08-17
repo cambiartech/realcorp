@@ -134,7 +134,7 @@ async function documentParts(
   if (fileBase64) {
     bytes = Buffer.from(fileBase64, "base64");
   } else {
-    const response = await fetch(fileUrl);
+    const response = await fetch(fileUrl, { signal: AbortSignal.timeout(15_000) });
     if (!response.ok) throw new Error("The uploaded file could not be read.");
     bytes = Buffer.from(await response.arrayBuffer());
     responseMimeType = response.headers.get("content-type") || undefined;
@@ -174,6 +174,111 @@ async function documentParts(
   };
   const mimeType = mimeByExt[ext] || responseMimeType || "application/pdf";
   return [{ inline_data: { mime_type: mimeType, data: bytes.toString("base64") } }];
+}
+
+const GEMINI_TIMEOUT_MS = 22_000;
+const GEMINI_MODELS = [
+  process.env.GEMINI_MODEL?.trim(),
+  "gemini-1.5-flash",
+  "gemini-2.5-flash",
+  "gemini-3.5-flash-lite",
+].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
+
+export class GeminiRateLimitError extends Error {
+  constructor() {
+    super("Gemini is rate-limited right now. Try Prefill with AI in a few minutes.");
+    this.name = "GeminiRateLimitError";
+  }
+}
+
+function isThinkingModel(model: string) {
+  return /gemini-([23]\.|2\.5)/.test(model);
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateGeminiJson(apiKey: string, parts: unknown[]) {
+  let lastError: Error | null = null;
+  for (const model of GEMINI_MODELS) {
+    const thinkingPasses = isThinkingModel(model) ? [true, false] : [false];
+    for (const includeThinkingOff of thinkingPasses) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: {
+                responseMimeType: "application/json",
+                ...(includeThinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+              },
+            }),
+          },
+        );
+        if (response.status === 429 || response.status === 503) {
+          const retryAfter = Number(response.headers.get("retry-after"));
+          const waitMs =
+            Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 12_000) : 8_000;
+          await sleep(waitMs);
+          const retry = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+              body: JSON.stringify({
+                contents: [{ parts }],
+                generationConfig: { responseMimeType: "application/json" },
+              }),
+            },
+          );
+          if (retry.status === 429 || retry.status === 503 || !retry.ok) {
+            throw new GeminiRateLimitError();
+          }
+          return (await retry.json()) as {
+            candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
+          };
+        }
+        if (response.status === 404) {
+          const failure = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+          lastError = new Error(failure?.error?.message || `Model ${model} was not found.`);
+          break;
+        }
+        if (response.status === 400 && includeThinkingOff) {
+          continue;
+        }
+        if (!response.ok) {
+          const failure = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+          const detail = failure?.error?.message?.replace(/\s+/g, " ").trim();
+          console.error("AI document extraction provider error.", { model, status: response.status, detail });
+          lastError = new Error("AI document processing failed. Please try again.");
+          break;
+        }
+        return (await response.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
+        };
+      } catch (error) {
+        if (error instanceof GeminiRateLimitError) throw error;
+        if (error instanceof Error && error.name === "AbortError") {
+          lastError = new Error("AI document processing timed out.");
+          break;
+        }
+        lastError = error instanceof Error ? error : new Error("AI document processing failed.");
+        break;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  }
+  console.error("AI document extraction exhausted models.", { lastError: lastError?.message });
+  throw lastError || new Error("AI document processing failed. Please try again.");
 }
 
 function cleanJson(text: string): unknown {
@@ -222,27 +327,7 @@ export async function extractHrDocument(input: {
     "confidence is a number from 0 to 1 representing overall extraction certainty.",
   ].join("\n");
 
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }, ...parts] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    },
-  );
-  if (!response.ok) {
-    const failure = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
-    const detail = failure?.error?.message?.replace(/\s+/g, " ").trim();
-    console.error("AI document extraction provider error.", { status: response.status, detail });
-    throw new Error("AI document processing failed. Please try again.");
-  }
-  const body = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
-  };
+  const body = await generateGeminiJson(apiKey, [{ text: prompt }, ...parts]);
   const text = body.candidates?.[0]?.content?.parts?.find((part) => part.text && !part.thought)?.text;
   if (!text) throw new Error("AI extraction returned no readable fields.");
   const raw = cleanJson(text) as Record<string, unknown>;

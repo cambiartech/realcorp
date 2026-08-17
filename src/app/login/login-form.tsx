@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -31,6 +32,7 @@ function LoginFormInner() {
 
   const [email, setEmail] = useState("");
   const [postInviteMessage, setPostInviteMessage] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<LoginFieldName, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -47,6 +49,7 @@ function LoginFormInner() {
     const hadSensitiveInQuery = params.has("password") || params.has("passwd") || params.has("pwd");
     const emailParam = params.get("email");
     const callbackRaw = params.get("callbackUrl");
+    const resetOk = params.get("reset") === "1";
 
     let nextEmail = "";
     let fromInviteFlow = false;
@@ -79,6 +82,7 @@ function LoginFormInner() {
     queueMicrotask(() => {
       if (nextEmail) setEmail(nextEmail);
       setPostInviteMessage(fromInviteFlow);
+      setResetSuccess(resetOk);
       setCallbackPath(safeCb);
       if (needsReplace) {
         router.replace(`${pathname}${nextQuery ? `?${nextQuery}` : ""}`);
@@ -120,6 +124,11 @@ function LoginFormInner() {
       {postInviteMessage ? (
         <div className="border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground/80">
           You&apos;re almost in — sign in with the password you just set.
+        </div>
+      ) : null}
+      {resetSuccess ? (
+        <div className="border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground/80">
+          Password updated. Sign in with your new password.
         </div>
       ) : null}
       {formError ? <FormAlert>{formError}</FormAlert> : null}
@@ -175,6 +184,12 @@ function LoginFormInner() {
         {fieldErrors.password ? (
           <FormFieldError id="login-password-error">{fieldErrors.password}</FormFieldError>
         ) : null}
+      </div>
+
+      <div className="flex justify-end">
+        <Link href="/forgot-password" className="text-sm text-muted hover:text-foreground">
+          Forgot password?
+        </Link>
       </div>
 
       <button

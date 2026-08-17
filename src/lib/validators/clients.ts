@@ -145,13 +145,6 @@ export const recordClientDepositSchema = z
         path: ["agreedPrice"],
       });
     }
-    if (adjustment !== "none" && !data.adjustmentReason) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Add a short reason for the promo, discount, or waived balance.",
-        path: ["adjustmentReason"],
-      });
-    }
   });
 
 export function parseRecordClientDepositForm(formData: FormData) {

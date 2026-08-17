@@ -27,6 +27,10 @@ function getResendClient() {
   return new Resend(apiKey);
 }
 
+export function isTransactionalEmailConfigured() {
+  return Boolean(getResendClient());
+}
+
 function parseResendSendResult(result: { data: unknown; error: unknown }) {
   if (result.error) {
     const err = result.error as { message?: string };
@@ -86,6 +90,50 @@ export async function sendInviteEmail(input: {
 
 export function getInviteBaseUrl() {
   return getBaseUrl();
+}
+
+export async function sendPasswordResetEmail(input: { to: string; resetUrl: string; name?: string | null }) {
+  const resend = getResendClient();
+  if (!resend) {
+    return {
+      ok: false as const,
+      error: "RESEND_API_KEY is missing or invalid. Use your real key starting with re_.",
+    };
+  }
+
+  const from = `${getFromName()} <${getFromAddress()}>`;
+  const replyTo = getReplyToAddress();
+  const greeting = input.name ? `Hi ${input.name},` : "Hi,";
+  const subject = "Reset your Realcorp password";
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111">
+      <h2 style="margin:0 0 12px;">Reset your password</h2>
+      <p style="margin:0 0 12px;">${greeting}</p>
+      <p style="margin:0 0 16px;">Someone asked to reset the Realcorp password for this email. Use the button below to choose a new one. The link expires in 1 hour.</p>
+      <p style="margin:0 0 16px;">
+        <a href="${input.resetUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600;">
+          Set a new password
+        </a>
+      </p>
+      <p style="margin:0 0 8px;font-size:13px;color:#555;">Or copy this link into your browser:</p>
+      <p style="margin:0 0 12px;font-size:13px;word-break:break-all;color:#333;">${input.resetUrl}</p>
+      <p style="margin:0;font-size:12px;color:#666;">If you did not ask for this, you can ignore the email. Your password stays the same.</p>
+    </div>
+  `;
+
+  try {
+    const result = await resend.emails.send({
+      from,
+      to: input.to,
+      subject,
+      html,
+      ...(replyTo ? { replyTo } : {}),
+    });
+    return parseResendSendResult(result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to send email.";
+    return { ok: false as const, error: msg };
+  }
 }
 
 export async function sendSalesReceiptEmail(input: {

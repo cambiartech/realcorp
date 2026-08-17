@@ -13,7 +13,7 @@ import {
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
-import { extractHrDocument } from "@/lib/hr-document-extractor";
+import { extractHrDocument, GeminiRateLimitError } from "@/lib/hr-document-extractor";
 import { ensureEmployeeNumber } from "@/lib/hr-employee-number";
 import { mergeHrFormIntoProfile } from "@/lib/hr-form-merge";
 import { revalidatePath } from "next/cache";
@@ -27,6 +27,7 @@ const intakeSchema = z.object({
   category: z.union([z.nativeEnum(HrDocumentCategory), z.literal("AUTO")]),
   preferredProfileId: z.string().trim().optional(),
   preferredUserId: z.string().trim().optional(),
+  skipDocumentCreate: z.boolean().optional(),
 });
 
 const createHrOnlySchema = z.object({
@@ -99,6 +100,7 @@ async function matchProfile(
   extracted: { employeeName: string; employeeEmail: string; employeeNumber: string },
   preferredProfileId?: string,
   preferredUserId?: string,
+  skipStrictMatch?: boolean,
 ): Promise<ProfileMatch | { conflict: string } | null> {
   const profiles = await prisma.employeeProfile.findMany({
     where: { tenantId },
@@ -163,21 +165,23 @@ async function matchProfile(
   }
 
   if (preferred) {
-    if (detected && detected.profile.id !== preferred.id) {
-      return {
-        conflict: `This file appears to belong to ${detected.profile.fullName || "another employee"}, not ${
-          preferred.fullName || "the selected employee"
-        }. Nothing was filed. Check the file or change the employee selection.`,
-      } as const;
-    }
-    if (
-      extracted.employeeName.trim() &&
-      preferred.fullName &&
-      nameScore(preferred.fullName, extracted.employeeName) < 0.4
-    ) {
-      return {
-        conflict: `The name detected in this file (${extracted.employeeName}) does not match the selected employee (${preferred.fullName}). Nothing was filed.`,
-      } as const;
+    if (!skipStrictMatch) {
+      if (detected && detected.profile.id !== preferred.id) {
+        return {
+          conflict: `This file appears to belong to ${detected.profile.fullName || "another employee"}, not ${
+            preferred.fullName || "the selected employee"
+          }. Nothing was filed. Check the file or change the employee selection.`,
+        } as const;
+      }
+      if (
+        extracted.employeeName.trim() &&
+        preferred.fullName &&
+        nameScore(preferred.fullName, extracted.employeeName) < 0.4
+      ) {
+        return {
+          conflict: `The name detected in this file (${extracted.employeeName}) does not match the selected employee (${preferred.fullName}). Nothing was filed.`,
+        } as const;
+      }
     }
     return { profile: preferred, matchedBy: "HR selection" } as const;
   }
@@ -245,6 +249,7 @@ export async function ingestHrDocument(
       extracted,
       parsed.data.preferredProfileId,
       parsed.data.preferredUserId,
+      parsed.data.skipDocumentCreate,
     );
     if (match && "conflict" in match) return { ok: false, error: match.conflict };
     if (!match) {
@@ -259,6 +264,17 @@ export async function ingestHrDocument(
     }
 
     if (!extracted.formType) {
+      if (parsed.data.skipDocumentCreate) {
+        revalidatePath(`/${tenantSlug}/hr`);
+        return {
+          ok: true,
+          personName: match.profile.fullName || extracted.employeeName,
+          matchedBy: match.matchedBy,
+          confidence: extracted.confidence,
+          requestId: match.profile.id,
+          category: extracted.category,
+        };
+      }
       const document = await prisma.hrDocument.create({
         data: {
           tenantId: ctx.tenant.id,
@@ -343,6 +359,7 @@ export async function ingestHrDocument(
       category: extracted.category,
     };
   } catch (error) {
+    if (error instanceof GeminiRateLimitError) return { ok: false, error: error.message };
     return { ok: false, error: error instanceof Error ? error.message : "Could not extract this document." };
   }
 }
@@ -523,6 +540,9 @@ export async function prefillEmployeeFromUploadedDocs(
       continue;
     }
     try {
+      if (applied + failed.length > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
       const extracted = await extractHrDocument({
         fileUrl: document.fileUrl,
         fileName,
@@ -574,6 +594,10 @@ export async function prefillEmployeeFromUploadedDocs(
         fileName,
         error: error instanceof Error ? error.message : "Could not read this file.",
       });
+      if (error instanceof GeminiRateLimitError) {
+        skipped += documents.length - documents.indexOf(document) - 1;
+        break;
+      }
     }
   }
 

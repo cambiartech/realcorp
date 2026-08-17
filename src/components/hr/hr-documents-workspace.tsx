@@ -103,20 +103,6 @@ function FileIcon({ fileName, className }: { fileName: string; className?: strin
   return <File className={className} strokeWidth={1.5} />;
 }
 
-function fileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("The selected file could not be read."));
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === "string" ? reader.result : "";
-      const base64 = dataUrl.split(",", 2)[1];
-      if (!base64) reject(new Error("The selected file could not be read."));
-      else resolve(base64);
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 export function HrDocumentsWorkspace({
   tenantSlug,
   employees,
@@ -197,13 +183,12 @@ export function HrDocumentsWorkspace({
     return ["Employees", selectedEmployee.fullName];
   }, [browseMode, selectedTypeFolder, selectedEmployee]);
 
-  async function processFile(file: File) {
-    const extractsProfileData = aiEnabled && EXTRACTABLE_CATEGORIES.has(uploadCategory);
-    if (!extractsProfileData && !uploadEmployeeId) throw new Error("Select which employee this document belongs to.");
-    if (extractsProfileData && file.size > 15 * 1024 * 1024) {
-      throw new Error("AI extraction supports files up to 15 MB.");
+  async function processFile(file: File, options?: { deferAi?: boolean }) {
+    const wantsAi = aiEnabled && EXTRACTABLE_CATEGORIES.has(uploadCategory) && !options?.deferAi;
+    if (!uploadEmployeeId && !wantsAi) {
+      throw new Error("Select which employee this document belongs to.");
     }
-    const fileBase64 = extractsProfileData ? await fileAsBase64(file) : undefined;
+
     const title = uploadTitle.trim() || file.name.replace(/\.[^/.]+$/, "");
     const resourceType = /\.(pdf|docx?|xlsx?)$/i.test(file.name) ? "raw" : "auto";
     const sig = await getHrUploadSignature(tenantSlug, { fileName: file.name, resourceType });
@@ -211,33 +196,60 @@ export function HrDocumentsWorkspace({
     const uploaded = await uploadViaCloudinarySignature(file, sig);
     if (!uploaded.ok) throw new Error(uploaded.error);
 
-    if (extractsProfileData) {
+    const saveCategory = uploadCategory === "AUTO" ? "OTHER" : uploadCategory;
+    let saved = false;
+    if (uploadEmployeeId) {
+      const result = await addHrDocument(tenantSlug, {
+        ...parseEmployeeSelection(uploadEmployeeId),
+        category: saveCategory,
+        title,
+        fileUrl: uploaded.secureUrl,
+        fileName: file.name,
+      });
+      if (!result.ok) throw new Error(result.error || "Could not save document.");
+      saved = true;
+    }
+
+    if (!wantsAi) return `${file.name} uploaded`;
+
+    const tooLargeForAi = file.size > 15 * 1024 * 1024;
+    if (tooLargeForAi) {
+      if (saved) {
+        return `${file.name} uploaded. File is over 15 MB, so AI could not read it — use a smaller scan or Prefill with AI later.`;
+      }
+      throw new Error("Select the employee to save this file. AI extraction supports files up to 15 MB.");
+    }
+
+    try {
       const selection = parseEmployeeSelection(uploadEmployeeId);
       const result = await ingestHrDocument(tenantSlug, {
         fileUrl: uploaded.secureUrl,
         fileName: file.name,
-        fileBase64,
         fileMimeType: file.type || undefined,
         category: uploadCategory,
         preferredProfileId: selection.employeeProfileId,
         preferredUserId: selection.userId,
+        skipDocumentCreate: saved,
       });
-      if (!result.ok) throw new Error(result.error);
+      if (!result.ok) {
+        if (saved) {
+          return `${file.name} uploaded. AI could not read it yet — use Prefill with AI.`;
+        }
+        throw new Error(`${result.error} Select the employee to save the file without waiting on AI.`);
+      }
       const categoryLabel =
         DOC_CATEGORIES.find((category) => category.value === result.category)?.label || result.category;
-      return `${file.name} → ${categoryLabel} → ${result.personName} (${result.matchedBy}, ${Math.round(
-        result.confidence * 100,
-      )}% confidence)`;
+      return saved
+        ? `${file.name} uploaded · AI read ${categoryLabel} for ${result.personName}`
+        : `${file.name} → ${categoryLabel} → ${result.personName} (${result.matchedBy}, ${Math.round(
+            result.confidence * 100,
+          )}% confidence)`;
+    } catch (error) {
+      if (saved) {
+        return `${file.name} uploaded. AI could not read it yet — use Prefill with AI.`;
+      }
+      throw error instanceof Error ? error : new Error("Upload failed.");
     }
-    const result = await addHrDocument(tenantSlug, {
-      ...parseEmployeeSelection(uploadEmployeeId),
-      category: uploadCategory,
-      title,
-      fileUrl: uploaded.secureUrl,
-      fileName: file.name,
-    });
-    if (!result.ok) throw new Error(result.error || "Could not save document.");
-    return `${file.name} uploaded`;
   }
 
   async function generateRecords(document: HrDocumentItem) {
@@ -288,9 +300,10 @@ export function HrDocumentsWorkspace({
     setUploading(true);
     const completed: string[] = [];
     const failed: string[] = [];
+    const deferAi = files.length > 1;
     for (const file of files) {
       try {
-        completed.push(await processFile(file));
+        completed.push(await processFile(file, { deferAi }));
       } catch (error) {
         failed.push(`${file.name}: ${error instanceof Error ? error.message : "Upload failed."}`);
       }
@@ -298,12 +311,22 @@ export function HrDocumentsWorkspace({
     setUploading(false);
     setLastUploadResults([...completed, ...failed.map((message) => `Failed: ${message}`)]);
     if (completed.length) {
-      showSnackbar(
-        aiCategorySelected
-          ? `${completed.length} document${completed.length === 1 ? "" : "s"} extracted and staged for HR review.`
-          : `${completed.length} document${completed.length === 1 ? "" : "s"} uploaded.`,
-        "success",
-      );
+      const aiLater = completed.filter((message) => message.includes("AI could not read"));
+      const fullyOk = completed.filter((message) => !message.includes("AI could not read"));
+      if (fullyOk.length) {
+        showSnackbar(
+          `${fullyOk.length} document${fullyOk.length === 1 ? "" : "s"} uploaded.`,
+          "success",
+        );
+      }
+      if (aiLater.length || deferAi) {
+        showSnackbar(
+          deferAi
+            ? "Files are saved. Gemini is rate-limited if we extract every file at once — open the employee folder and use Prefill with AI."
+            : "Files are saved. AI could not read them yet — open the employee folder and use Prefill with AI.",
+          "info",
+        );
+      }
     }
     if (failed.length) showSnackbar(failed.join(" "), "error");
     setUploadTitle("");
@@ -411,7 +434,7 @@ export function HrDocumentsWorkspace({
             />
             <div className="flex flex-col gap-3">
               <label className="text-xs font-medium text-muted">
-                Employee {aiCategorySelected ? "(optional)" : null}
+                Employee {aiCategorySelected ? "(recommended)" : null}
               </label>
               <UiSelect value={uploadEmployeeId} onChange={(e) => setUploadEmployeeId(e.target.value)}>
                 <option value="">

@@ -2,7 +2,9 @@
 
 import { auth } from "@/auth";
 import {
+  BankMatchStatus,
   ClientDocumentCategory,
+  InvoiceStatus,
   MembershipRole,
   MembershipStatus,
   PropertyClientStatus,
@@ -523,6 +525,9 @@ export async function recordClientDeposit(
 
       if (adjustment !== "none") {
         let agreedPrice = parsed.data.agreedPrice || 0;
+        const adjustmentReason =
+          parsed.data.adjustmentReason ||
+          (adjustment === "waive_remaining" ? "Balance waived" : "Discounted sale price");
         if (adjustment === "waive_remaining") {
           const paidAgg = await tx.paymentRecord.aggregate({
             where: {
@@ -542,7 +547,7 @@ export async function recordClientDeposit(
           where: { id: link.id },
           data: {
             agreedPrice,
-            priceAdjustmentReason: parsed.data.adjustmentReason || null,
+            priceAdjustmentReason: adjustmentReason,
             priceAdjustedAt: new Date(),
             priceAdjustedByUserId: session.user.id,
           },
@@ -612,6 +617,124 @@ export async function recordClientDeposit(
   }
   if (paymentAmount > 0) return { ok: true, message: "Payment recorded." };
   return { ok: true, message: "Sale price updated. Remaining balance no longer uses the full unit price." };
+}
+
+export async function voidClientPayment(
+  tenantSlug: string,
+  clientId: string,
+  paymentId: string,
+  input?: { reason?: string },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to remove client payments." };
+  }
+
+  const payment = await prisma.paymentRecord.findFirst({
+    where: { id: paymentId, tenantId: tenant.id },
+    include: {
+      invoice: {
+        select: {
+          id: true,
+          amount: true,
+          balanceDue: true,
+          status: true,
+          invoiceNumber: true,
+          deal: { select: { propertyClient: { select: { id: true } } } },
+        },
+      },
+    },
+  });
+  if (!payment) return { ok: false, error: "Payment not found." };
+  if (payment.voidedAt) return { ok: false, error: "This payment is already removed." };
+
+  const belongsToClient =
+    payment.propertyClientId === clientId ||
+    payment.invoice?.deal?.propertyClient?.id === clientId;
+  if (!belongsToClient) {
+    const linked = payment.unitId
+      ? await prisma.clientUnitLink.findFirst({
+          where: { tenantId: tenant.id, clientId, unitId: payment.unitId },
+          select: { id: true },
+        })
+      : null;
+    if (!linked || payment.propertyClientId) {
+      return { ok: false, error: "This payment does not belong to this client." };
+    }
+  }
+
+  const matchedRow = await prisma.bankStatementRow.findFirst({
+    where: {
+      tenantId: tenant.id,
+      matchedEntityType: "PAYMENT",
+      matchedEntityId: payment.id,
+      matchStatus: BankMatchStatus.MATCHED,
+    },
+    select: { id: true },
+  });
+  if (matchedRow) {
+    return {
+      ok: false,
+      error: "This payment is reconciled to a bank statement. Undo that match in Finance before removing it.",
+    };
+  }
+
+  const reason = (input?.reason || "").trim() || "Incorrect payment";
+  const actorLabel = session.user.name || session.user.email || "Unknown user";
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.paymentRecord.update({
+        where: { id: payment.id },
+        data: {
+          voidedAt: new Date(),
+          voidedByUserId: session.user.id,
+          voidedByLabel: actorLabel,
+          voidReason: reason,
+        },
+      });
+
+      if (payment.invoice && payment.invoice.status !== InvoiceStatus.VOID) {
+        const nextBalance = Number(payment.invoice.balanceDue) + Number(payment.amount);
+        const nextStatus =
+          nextBalance <= 0
+            ? InvoiceStatus.PAID
+            : nextBalance >= Number(payment.invoice.amount)
+              ? InvoiceStatus.SENT
+              : InvoiceStatus.PARTIALLY_PAID;
+        await tx.invoice.update({
+          where: { id: payment.invoice.id },
+          data: { balanceDue: nextBalance, status: nextStatus },
+        });
+      }
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel,
+      module: "FINANCE",
+      entityType: "PAYMENT",
+      entityId: payment.id,
+      action: "VOID",
+      summary: `Removed client payment for ${Number(payment.amount).toLocaleString()}. Reason: ${reason}`,
+      metadata: {
+        reason,
+        amount: Number(payment.amount),
+        clientId,
+        unitId: payment.unitId,
+        projectId: payment.projectId,
+      },
+    });
+  } catch {
+    return { ok: false, error: "Could not remove this payment right now." };
+  }
+
+  revalidateClients(tenantSlug, clientId);
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true, message: "Payment removed. Totals no longer include it; the audit log keeps the record." };
 }
 
 export async function sendClientPortalInvite(

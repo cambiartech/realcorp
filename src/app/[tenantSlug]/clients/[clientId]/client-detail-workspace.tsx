@@ -23,6 +23,7 @@ import {
   unlinkClientShortlet,
   unlinkClientUnit,
   updatePropertyClient,
+  voidClientPayment,
 } from "../actions";
 
 type UnitLinkRow = {
@@ -222,6 +223,15 @@ export function ClientDetailWorkspace({
     "none",
   );
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [voidPayment, setVoidPayment] = useState<{
+    id: string;
+    unitLabel: string;
+    amount: number;
+    currency: string;
+    paidAtLabel: string;
+  } | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [voiding, setVoiding] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [linkKind, setLinkKind] = useState<"project" | "shortlet">("project");
@@ -418,6 +428,23 @@ export function ClientDetailWorkspace({
     }
     showSnackbar(`${client.fullName} deleted.`, "success");
     router.push(`/${tenantSlug}/clients`);
+    router.refresh();
+  }
+
+  async function handleVoidPayment() {
+    if (!voidPayment || voiding) return;
+    setVoiding(true);
+    const result = await voidClientPayment(tenantSlug, client.id, voidPayment.id, {
+      reason: voidReason,
+    });
+    setVoiding(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar(result.message || "Payment removed.", "success");
+    setVoidPayment(null);
+    setVoidReason("");
     router.refresh();
   }
 
@@ -663,7 +690,7 @@ export function ClientDetailWorkspace({
                   </p>
                   <ul className="space-y-2 px-4 py-3">
                     {pagedPayments.rows.map((payment) => (
-                      <li key={payment.id} className="flex flex-wrap justify-between gap-2 text-sm">
+                      <li key={payment.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
                         <div>
                           <p className="font-medium">{payment.unitLabel}</p>
                           <p className="text-xs text-muted">
@@ -672,9 +699,23 @@ export function ClientDetailWorkspace({
                             {payment.reference ? ` · ${payment.reference}` : ""}
                           </p>
                         </div>
-                        <p className="font-semibold">
-                          {moneyLabel(payment.currency || currency, payment.amount)}
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <p className="font-semibold">
+                            {moneyLabel(payment.currency || currency, payment.amount)}
+                          </p>
+                          {canManage ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVoidReason("");
+                                setVoidPayment(payment);
+                              }}
+                              className="text-xs font-semibold text-[var(--danger)] hover:underline"
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -1204,12 +1245,11 @@ export function ClientDetailWorkspace({
             ) : null}
             {balanceAdjustment !== "none" ? (
               <div className="mt-3">
-                <label className="mb-1 block text-sm text-muted">Reason</label>
+                <label className="mb-1 block text-sm text-muted">Reason (optional)</label>
                 <input
                   name="adjustmentReason"
-                  required
                   maxLength={240}
-                  placeholder="e.g. Launch promo, staff discount, goodwill write-off"
+                  placeholder="Leave blank — we’ll log this as a discounted sale price"
                   className="w-full border border-foreground/15 bg-field px-3 py-2"
                 />
               </div>
@@ -1233,6 +1273,58 @@ export function ClientDetailWorkspace({
             </button>
           </div>
         </form>
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={Boolean(voidPayment)}
+        onClose={() => {
+          if (voiding) return;
+          setVoidPayment(null);
+          setVoidReason("");
+        }}
+        panelClassName={MODAL_PANEL_XL}
+      >
+        <h2 className="text-lg font-semibold">Remove this payment?</h2>
+        <p className="mt-2 text-sm text-muted">
+          It leaves this list and the paid / remaining totals. The audit log keeps the original record — nothing
+          is hard-deleted.
+        </p>
+        {voidPayment ? (
+          <p className="mt-3 text-sm font-medium text-foreground">
+            {voidPayment.unitLabel} · {voidPayment.paidAtLabel} ·{" "}
+            {moneyLabel(voidPayment.currency || currency, voidPayment.amount)}
+          </p>
+        ) : null}
+        <label className="mt-4 mb-1 block text-sm text-muted">Reason (optional)</label>
+        <textarea
+          value={voidReason}
+          onChange={(event) => setVoidReason(event.target.value)}
+          rows={2}
+          placeholder="We’ll log “Incorrect payment” if you leave this blank"
+          className="w-full border border-foreground/15 bg-field px-3 py-2"
+        />
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={voiding}
+            onClick={() => {
+              setVoidPayment(null);
+              setVoidReason("");
+            }}
+            className="rounded-md border px-4 py-2 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={voiding}
+            onClick={() => void handleVoidPayment()}
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--danger)] bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {voiding ? <ButtonSpinner /> : null}
+            {voiding ? "Removing…" : "Remove payment"}
+          </button>
+        </div>
       </ModalOverlay>
 
       <ModalOverlay open={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} panelClassName={MODAL_PANEL_XL}>

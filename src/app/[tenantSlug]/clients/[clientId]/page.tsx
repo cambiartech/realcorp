@@ -148,7 +148,9 @@ export default async function ClientDetailPage({
           OR: [
             { propertyClientId: client.id },
             { invoice: { deal: { propertyClient: { id: client.id } } } },
-            { unitId: { in: client.unitLinks.map((link) => link.unitId) } },
+            ...(client.unitLinks.length
+              ? [{ propertyClientId: null, unitId: { in: client.unitLinks.map((link) => link.unitId) } }]
+              : []),
           ],
         },
         orderBy: { paidAt: "desc" },
