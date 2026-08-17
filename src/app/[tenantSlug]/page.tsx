@@ -218,7 +218,7 @@ export default async function TenantHomePage({
       take: 2000,
     }),
     prisma.paymentRecord.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: tenant.id, voidedAt: null },
       select: {
         id: true,
         invoiceId: true,

@@ -1706,7 +1706,7 @@ export async function runShortletEndOfDay(tenantSlug: string): Promise<ActionRes
       },
     }),
     prisma.shortletPayment.findMany({
-      where: { tenantId: tenant.id, paidAt: { gte: businessDate } },
+      where: { tenantId: tenant.id, voidedAt: null, paidAt: { gte: businessDate } },
       select: { amount: true },
     }),
     prisma.shortletFolioLine.findMany({

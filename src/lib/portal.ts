@@ -159,13 +159,13 @@ async function loadClientLinkedProjects(
         : Promise.resolve([]),
       dealIds.length
         ? prisma.paymentRecord.findMany({
-            where: { tenantId, invoice: { dealId: { in: dealIds } } },
+            where: { tenantId, voidedAt: null, invoice: { dealId: { in: dealIds } } },
             select: { amount: true },
           })
         : Promise.resolve([]),
       dealIds.length
         ? prisma.salesReceipt.findMany({
-            where: { tenantId, dealId: { in: dealIds } },
+            where: { tenantId, dealId: { in: dealIds }, voidedAt: null, status: { not: "VOID" } },
             select: { amount: true },
           })
         : Promise.resolve([]),
@@ -298,7 +298,7 @@ export async function loadStakeholderPortfolio(
       : Promise.resolve([]),
     dealIds.length
       ? prisma.paymentRecord.findMany({
-          where: { tenantId, invoice: { dealId: { in: dealIds } } },
+          where: { tenantId, voidedAt: null, invoice: { dealId: { in: dealIds } } },
           select: {
             id: true,
             amount: true,
@@ -312,7 +312,7 @@ export async function loadStakeholderPortfolio(
       : Promise.resolve([]),
     dealIds.length
       ? prisma.salesReceipt.findMany({
-          where: { tenantId, dealId: { in: dealIds } },
+          where: { tenantId, dealId: { in: dealIds }, voidedAt: null, status: { not: "VOID" } },
           select: {
             id: true,
             dealId: true,
@@ -435,7 +435,7 @@ export async function loadStakeholderPortfolio(
     if (clientDealIds.length > 0) {
       const [clientPayments, clientReceipts] = await Promise.all([
         prisma.paymentRecord.findMany({
-          where: { tenantId, invoice: { dealId: { in: clientDealIds } } },
+          where: { tenantId, invoice: { dealId: { in: clientDealIds } }, voidedAt: null },
           select: {
             id: true,
             amount: true,
@@ -448,7 +448,7 @@ export async function loadStakeholderPortfolio(
           take: 12,
         }),
         prisma.salesReceipt.findMany({
-          where: { tenantId, dealId: { in: clientDealIds } },
+          where: { tenantId, dealId: { in: clientDealIds }, voidedAt: null, status: { not: "VOID" } },
           select: {
             id: true,
             amount: true,
@@ -614,7 +614,7 @@ export async function loadInvestorProjectDetail(
       : Promise.resolve([]),
     dealIds.length
       ? prisma.paymentRecord.findMany({
-          where: { tenantId, invoice: { dealId: { in: dealIds } } },
+          where: { tenantId, voidedAt: null, invoice: { dealId: { in: dealIds } } },
           select: {
             id: true,
             amount: true,
@@ -628,7 +628,7 @@ export async function loadInvestorProjectDetail(
       : Promise.resolve([]),
     dealIds.length
       ? prisma.salesReceipt.findMany({
-          where: { tenantId, dealId: { in: dealIds } },
+          where: { tenantId, dealId: { in: dealIds }, voidedAt: null, status: { not: "VOID" } },
           select: {
             id: true,
             amount: true,

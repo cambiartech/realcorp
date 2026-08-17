@@ -89,7 +89,7 @@ export default async function ClientDetailPage({
               id: true,
               label: true,
               pricingPlanId: true,
-              pricingPlan: { select: { name: true } },
+              pricingPlan: { select: { name: true, price: true } },
             },
             orderBy: { label: "asc" },
           },
@@ -224,6 +224,7 @@ export default async function ClientDetailPage({
     project.units.map((unit) => ({
       id: unit.id,
       label: `${project.name} · ${unit.label}`,
+      listPrice: Number(unit.pricingPlan?.price || 0),
     })),
   );
 
@@ -251,11 +252,15 @@ export default async function ClientDetailPage({
       depositSummary={depositSummary}
       depositRows={depositRows.map((row) => ({
         id: row.id,
+        unitId: row.unitId,
         projectLabel: row.projectLabel,
         unitLabel: row.unitLabel,
+        listPrice: row.listPrice,
         contractValue: row.contractValue,
         collected: row.collected,
         remaining: row.remaining,
+        isDiscounted: row.isDiscounted,
+        adjustmentReason: row.adjustmentReason,
       }))}
       payments={payments.map((payment) => ({
         id: payment.id,

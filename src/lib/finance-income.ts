@@ -30,6 +30,23 @@ export function remainingClientBalance(input: {
   return Math.max(0, money(input.contractValue) - money(input.collected));
 }
 
+/** Brochure / list price vs the amount this client is actually expected to pay. */
+export function resolveClientUnitSalePrice(input: {
+  agreedPrice?: number | null;
+  dealValue?: number | null;
+  listPrice?: number | null;
+}) {
+  const listPrice = money(Number(input.listPrice) || Number(input.dealValue) || 0);
+  const agreedRaw = input.agreedPrice;
+  const hasAgreed = agreedRaw != null && Number.isFinite(Number(agreedRaw)) && Number(agreedRaw) >= 0;
+  const salePrice = hasAgreed ? money(Number(agreedRaw)) : money(Number(input.dealValue) || listPrice);
+  return {
+    listPrice,
+    salePrice,
+    isDiscounted: listPrice > 0 && salePrice + 0.001 < listPrice,
+  };
+}
+
 export function summarizeClientDeposits(
   rows: Array<{ contractValue: number; collected: number; remaining: number }>,
 ) {

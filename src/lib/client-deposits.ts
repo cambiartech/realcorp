@@ -1,5 +1,5 @@
 import prisma from "@/lib/db";
-import { remainingClientBalance, summarizeClientDeposits } from "@/lib/finance-income";
+import { remainingClientBalance, resolveClientUnitSalePrice, summarizeClientDeposits } from "@/lib/finance-income";
 
 export { summarizeClientDeposits };
 
@@ -11,11 +11,14 @@ export type ClientDepositRow = {
   projectLabel: string;
   unitId: string;
   unitLabel: string;
+  listPrice: number;
   contractValue: number;
   expectedDeposit: number;
   depositsPaid: number;
   collected: number;
   remaining: number;
+  isDiscounted: boolean;
+  adjustmentReason: string | null;
 };
 
 function money(value: number) {
@@ -57,6 +60,8 @@ export async function loadClientDepositRows(
       unitLinks: {
         select: {
           unitId: true,
+          agreedPrice: true,
+          priceAdjustmentReason: true,
           unit: {
             select: {
               id: true,
@@ -201,37 +206,53 @@ export async function loadClientDepositRows(
         projectLabel: string;
         unitId: string;
         unitLabel: string;
+        listPrice: number;
         contractValue: number;
         expectedDeposit: number;
+        isDiscounted: boolean;
+        adjustmentReason: string | null;
       }
     >();
 
     for (const link of client.unitLinks) {
+      const priced = resolveClientUnitSalePrice({
+        agreedPrice: link.agreedPrice != null ? Number(link.agreedPrice) : null,
+        dealValue: link.unit.deal?.value != null ? Number(link.unit.deal.value) : null,
+        listPrice: link.unit.pricingPlan?.price != null ? Number(link.unit.pricingPlan.price) : null,
+      });
       units.set(link.unit.id, {
         projectId: link.unit.projectId,
         projectLabel: link.unit.project.name,
         unitId: link.unit.id,
         unitLabel: link.unit.label,
-        contractValue: Number(link.unit.deal?.value) || Number(link.unit.pricingPlan?.price) || 0,
+        listPrice: priced.listPrice,
+        contractValue: priced.salePrice,
         expectedDeposit: Number(link.unit.pricingPlan?.initialDeposit) || 0,
+        isDiscounted: priced.isDiscounted,
+        adjustmentReason: link.priceAdjustmentReason || null,
       });
     }
 
     if (client.deal?.unit) {
       const unit = client.deal.unit;
       const existing = units.get(unit.id);
-      units.set(unit.id, {
-        projectId: unit.projectId,
-        projectLabel: unit.project.name,
-        unitId: unit.id,
-        unitLabel: unit.label,
-        contractValue:
-          Number(client.deal.value) ||
-          existing?.contractValue ||
-          Number(unit.pricingPlan?.price) ||
-          0,
-        expectedDeposit: existing?.expectedDeposit || Number(unit.pricingPlan?.initialDeposit) || 0,
-      });
+      if (!existing) {
+        const priced = resolveClientUnitSalePrice({
+          dealValue: client.deal.value != null ? Number(client.deal.value) : null,
+          listPrice: unit.pricingPlan?.price != null ? Number(unit.pricingPlan.price) : null,
+        });
+        units.set(unit.id, {
+          projectId: unit.projectId,
+          projectLabel: unit.project.name,
+          unitId: unit.id,
+          unitLabel: unit.label,
+          listPrice: priced.listPrice,
+          contractValue: priced.salePrice,
+          expectedDeposit: Number(unit.pricingPlan?.initialDeposit) || 0,
+          isDiscounted: priced.isDiscounted,
+          adjustmentReason: null,
+        });
+      }
     }
 
     for (const unit of units.values()) {
@@ -246,6 +267,7 @@ export async function loadClientDepositRows(
         projectLabel: unit.projectLabel,
         unitId: unit.unitId,
         unitLabel: unit.unitLabel,
+        listPrice: unit.listPrice,
         contractValue: unit.contractValue,
         expectedDeposit: unit.expectedDeposit,
         depositsPaid: cash?.deposits || 0,
@@ -254,6 +276,8 @@ export async function loadClientDepositRows(
           contractValue: unit.contractValue,
           collected: cash?.collected || 0,
         }),
+        isDiscounted: unit.isDiscounted,
+        adjustmentReason: unit.adjustmentReason,
       });
     }
   }
@@ -272,14 +296,17 @@ export async function loadClientDepositRows(
       unitId: unitIdRaw === "__none" ? "" : unitIdRaw,
       unitLabel: "Unassigned unit",
       contractValue: 0,
+      listPrice: 0,
       expectedDeposit: 0,
       depositsPaid: cash.deposits,
       collected: cash.collected,
       remaining: 0,
+      isDiscounted: false,
+      adjustmentReason: null,
     });
   }
 
   return rows
-    .filter((row) => row.contractValue > 0 || row.collected > 0)
+    .filter((row) => row.contractValue > 0 || row.collected > 0 || row.isDiscounted)
     .sort((a, b) => b.remaining - a.remaining || a.clientName.localeCompare(b.clientName));
 }

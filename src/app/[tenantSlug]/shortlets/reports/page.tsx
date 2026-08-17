@@ -49,7 +49,7 @@ export default async function ReportsPage({
       },
     }),
     prisma.shortletPayment.findMany({
-      where: { tenantId: ctx.tenant.id, paidAt: { gte: fromDate, lte: toDate } },
+      where: { tenantId: ctx.tenant.id, voidedAt: null, paidAt: { gte: fromDate, lte: toDate } },
       select: { amount: true, paidAt: true },
     }),
     prisma.shortletFolioLine.findMany({
@@ -72,7 +72,7 @@ export default async function ReportsPage({
   const occupancy = computeOccupancyPercent(units);
   const adr = computeAdr(reservations, currency);
   const totalRevenue = await prisma.shortletPayment.aggregate({
-    where: { tenantId: ctx.tenant.id },
+    where: { tenantId: ctx.tenant.id, voidedAt: null },
     _sum: { amount: true },
   });
   const periodRevenue = payments.reduce((s, p) => s + Number(p.amount), 0);

@@ -60,7 +60,7 @@ function bump(
 export async function loadShortletIncomeReport(tenantId: string): Promise<ShortletIncomeReport> {
   const [payments, reservations, folioLines] = await Promise.all([
     prisma.shortletPayment.findMany({
-      where: { tenantId },
+      where: { tenantId, voidedAt: null },
       orderBy: { paidAt: "desc" },
       take: 2000,
       select: {

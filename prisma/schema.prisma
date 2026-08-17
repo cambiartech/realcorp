@@ -1244,25 +1244,27 @@ model ShortletCheckoutInspection {
 }
 
 model ShortletPayment {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   tenantId         String
   reservationId    String
   financeReceiptId String?
-  amount           Decimal  @db.Decimal(18, 2)
-  currency         String   @default("NGN")
+  amount           Decimal   @db.Decimal(18, 2)
+  currency         String    @default("NGN")
   paidAt           DateTime
   method           String?
   reference        String?
   note             String?
   recordedByUserId String?
   recordedByLabel  String?
-  createdAt        DateTime @default(now())
+  voidedAt         DateTime?
+  createdAt        DateTime  @default(now())
 
   tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   reservation    ShortletReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   financeReceipt SalesReceipt?       @relation(fields: [financeReceiptId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, paidAt])
+  @@index([tenantId, voidedAt])
   @@index([reservationId])
   @@index([financeReceiptId])
 }
@@ -2138,18 +2140,22 @@ model PropertyClient {
 }
 
 model ClientUnitLink {
-  id            String             @id @default(cuid())
-  tenantId      String
-  clientId      String
-  unitId        String
-  pricingPlanId String?
-  role          ClientUnitLinkRole @default(OWNER)
-  startDate     DateTime?
-  endDate       DateTime?
-  isPrimary     Boolean            @default(true)
-  notes         String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id                     String             @id @default(cuid())
+  tenantId               String
+  clientId               String
+  unitId                 String
+  pricingPlanId          String?
+  role                   ClientUnitLinkRole @default(OWNER)
+  startDate              DateTime?
+  endDate                DateTime?
+  isPrimary              Boolean            @default(true)
+  notes                  String?
+  agreedPrice            Decimal?           @db.Decimal(18, 2)
+  priceAdjustmentReason  String?
+  priceAdjustedAt        DateTime?
+  priceAdjustedByUserId  String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   client      PropertyClient      @relation(fields: [clientId], references: [id], onDelete: Cascade)

@@ -87,6 +87,7 @@ export async function syncDayPaymentsToFinance(
       tenantId: input.tenantId,
       paidAt: { gte: dayStart, lte: dayEnd },
       financeReceiptId: null,
+      voidedAt: null,
     },
     include: {
       reservation: { select: { guestName: true } },

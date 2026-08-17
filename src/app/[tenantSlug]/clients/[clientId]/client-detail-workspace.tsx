@@ -65,7 +65,7 @@ type ShortletPropertyOption = {
   }[];
 };
 
-type ActionResult = { ok: true } | { ok: false; error: string };
+type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 const initial: ActionResult | null = null;
 
 function moneyLabel(currency: string, value: number) {
@@ -174,11 +174,15 @@ export function ClientDetailWorkspace({
   depositSummary: { contractValue: number; collected: number; remaining: number };
   depositRows: Array<{
     id: string;
+    unitId: string;
     projectLabel: string;
     unitLabel: string;
+    listPrice: number;
     contractValue: number;
     collected: number;
     remaining: number;
+    isDiscounted: boolean;
+    adjustmentReason: string | null;
   }>;
   payments: Array<{
     id: string;
@@ -190,7 +194,7 @@ export function ClientDetailWorkspace({
     method: string;
     reference: string;
   }>;
-  paymentUnitOptions: Array<{ id: string; label: string }>;
+  paymentUnitOptions: Array<{ id: string; label: string; listPrice: number }>;
   unitLinks: UnitLinkRow[];
   shortletLinks: ShortletLinkRow[];
   projectOptions: ProjectOption[];
@@ -213,6 +217,10 @@ export function ClientDetailWorkspace({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [isPayOpen, setIsPayOpen] = useState(false);
+  const [payUnitId, setPayUnitId] = useState(paymentUnitOptions[0]?.id ?? "");
+  const [balanceAdjustment, setBalanceAdjustment] = useState<"none" | "set_sale_price" | "waive_remaining">(
+    "none",
+  );
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -274,6 +282,8 @@ export function ClientDetailWorkspace({
   const pagedBalances = usePaged(depositRows, `${client.id}-balances-${depositRows.length}`);
   const pagedPayments = usePaged(payments, `${client.id}-payments-${payments.length}`);
   const pagedLinks = usePaged(linkedRows, `${client.id}-links-${linkedRows.length}`);
+  const selectedPayUnit = paymentUnitOptions.find((unit) => unit.id === payUnitId) ?? paymentUnitOptions[0];
+  const selectedPayBalance = depositRows.find((row) => row.unitId === selectedPayUnit?.id);
 
   useEffect(() => {
     setProfile(client);
@@ -347,8 +357,9 @@ export function ClientDetailWorkspace({
   useEffect(() => {
     if (!payState) return;
     if (payState.ok) {
-      showSnackbar("Payment recorded.", "success");
+      showSnackbar(payState.message || "Payment recorded.", "success");
       setIsPayOpen(false);
+      setBalanceAdjustment("none");
       router.refresh();
     } else showSnackbar(payState.error, "error");
   }, [payState, router, showSnackbar]);
@@ -362,6 +373,12 @@ export function ClientDetailWorkspace({
       notes: profile.notes,
     });
     setIsEditOpen(true);
+  }
+
+  function openPayModal() {
+    setPayUnitId(paymentUnitOptions[0]?.id ?? "");
+    setBalanceAdjustment("none");
+    setIsPayOpen(true);
   }
 
   function openLinkModal() {
@@ -465,7 +482,7 @@ export function ClientDetailWorkspace({
             </button>
             <button
               type="button"
-              onClick={() => setIsPayOpen(true)}
+              onClick={openPayModal}
               className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
             >
               Add payment
@@ -498,7 +515,7 @@ export function ClientDetailWorkspace({
           </p>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
-          <p className="text-xs uppercase text-muted">Unit amount</p>
+          <p className="text-xs uppercase text-muted">Sale amount</p>
           <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.contractValue)}</p>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
@@ -575,13 +592,14 @@ export function ClientDetailWorkspace({
             <div>
               <h2 className="text-sm font-semibold">Payments & balance</h2>
               <p className="mt-0.5 text-xs text-muted">
-                Part payments for a project unit. Remaining is calculated automatically.
+                Part payments for a project unit. Remaining follows the sale price for this client, including
+                any promo or waived balance.
               </p>
             </div>
             {canManage ? (
               <button
                 type="button"
-                onClick={() => setIsPayOpen(true)}
+                onClick={openPayModal}
                 className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
               >
                 Add payment
@@ -612,7 +630,15 @@ export function ClientDetailWorkspace({
                             <p className="font-medium">{row.unitLabel}</p>
                             <p className="text-xs text-muted">{row.projectLabel}</p>
                           </td>
-                          <td className="px-4 py-3">{moneyLabel(currency, row.contractValue)}</td>
+                          <td className="px-4 py-3">
+                            <p>{moneyLabel(currency, row.contractValue)}</p>
+                            {row.isDiscounted ? (
+                              <p className="text-xs text-muted">
+                                List {moneyLabel(currency, row.listPrice)}
+                                {row.adjustmentReason ? ` · ${row.adjustmentReason}` : " · promo"}
+                              </p>
+                            ) : null}
+                          </td>
                           <td className="px-4 py-3">{moneyLabel(currency, row.collected)}</td>
                           <td className="px-4 py-3 font-semibold">
                             {moneyLabel(currency, row.remaining)}
@@ -1058,13 +1084,18 @@ export function ClientDetailWorkspace({
       <ModalOverlay open={isPayOpen} onClose={() => setIsPayOpen(false)} panelClassName={MODAL_PANEL_XL}>
         <h2 className="text-lg font-semibold">Add payment</h2>
         <p className="mt-1 text-sm text-muted">
-          Record a part payment for a project unit. Remaining balance updates automatically.
+          Record a part payment for a project unit. If this client has a promo or you are writing off the
+          leftover, override the sale price so remaining does not stay on the full unit price.
         </p>
         <form action={payAction} className="mt-4 space-y-3">
           {payState && !payState.ok ? <FormAlert>{payState.error}</FormAlert> : null}
           <div>
             <label className="mb-1 block text-sm text-muted">Project unit</label>
-            <UiSelect name="unitId" defaultValue={paymentUnitOptions[0]?.id ?? ""}>
+            <UiSelect
+              name="unitId"
+              value={selectedPayUnit?.id ?? ""}
+              onChange={(event) => setPayUnitId(event.target.value)}
+            >
               {paymentUnitOptions.length === 0 ? (
                 <option value="">No units available</option>
               ) : (
@@ -1075,16 +1106,25 @@ export function ClientDetailWorkspace({
                 ))
               )}
             </UiSelect>
+            {selectedPayBalance || selectedPayUnit?.listPrice ? (
+              <p className="mt-1 text-xs text-muted">
+                {selectedPayBalance
+                  ? `Sale ${moneyLabel(currency, selectedPayBalance.contractValue)} · Paid ${moneyLabel(currency, selectedPayBalance.collected)} · Remaining ${moneyLabel(currency, selectedPayBalance.remaining)}`
+                  : `List ${moneyLabel(currency, selectedPayUnit?.listPrice || 0)}`}
+              </p>
+            ) : null}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <label className="mb-1 block text-sm text-muted">
+                Amount{balanceAdjustment === "none" ? "" : " (optional if you are only adjusting the sale price)"}
+              </label>
               <input
                 name="amount"
                 type="number"
-                min="0.01"
+                min="0"
                 step="0.01"
-                required
+                required={balanceAdjustment === "none"}
                 placeholder="0.00"
                 className="w-full border border-foreground/15 bg-field px-3 py-2"
               />
@@ -1125,6 +1165,56 @@ export function ClientDetailWorkspace({
             placeholder="Note (optional)"
             className="w-full border border-foreground/15 bg-field px-3 py-2"
           />
+          <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
+            <label className="mb-1 block text-sm font-medium text-foreground">Sale price for this client</label>
+            <p className="mb-2 text-xs text-muted">
+              Use this when they are not paying the brochure unit price — promo, staff discount, or writing off
+              the leftover balance.
+            </p>
+            <UiSelect
+              name="balanceAdjustment"
+              value={balanceAdjustment}
+              onChange={(event) =>
+                setBalanceAdjustment(event.target.value as "none" | "set_sale_price" | "waive_remaining")
+              }
+            >
+              <option value="none">Keep current sale price</option>
+              <option value="set_sale_price">Set a discounted sale price</option>
+              <option value="waive_remaining">This settles the account (waive leftover)</option>
+            </UiSelect>
+            {balanceAdjustment === "set_sale_price" ? (
+              <div className="mt-3">
+                <label className="mb-1 block text-sm text-muted">Agreed sale price</label>
+                <input
+                  name="agreedPrice"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  defaultValue={
+                    selectedPayBalance?.contractValue
+                      ? String(selectedPayBalance.contractValue)
+                      : selectedPayUnit?.listPrice
+                        ? String(selectedPayUnit.listPrice)
+                        : ""
+                  }
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+            ) : null}
+            {balanceAdjustment !== "none" ? (
+              <div className="mt-3">
+                <label className="mb-1 block text-sm text-muted">Reason</label>
+                <input
+                  name="adjustmentReason"
+                  required
+                  maxLength={240}
+                  placeholder="e.g. Launch promo, staff discount, goodwill write-off"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+            ) : null}
+          </div>
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -1139,7 +1229,7 @@ export function ClientDetailWorkspace({
               className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
             >
               {payPending ? <ButtonSpinner /> : null}
-              Save payment
+              {balanceAdjustment === "none" ? "Save payment" : "Save"}
             </button>
           </div>
         </form>

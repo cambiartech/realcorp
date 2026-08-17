@@ -436,11 +436,14 @@ type ReportView = {
     projectLabel: string;
     unitId: string;
     unitLabel: string;
+    listPrice?: number;
     contractValue: number;
     expectedDeposit: number;
     depositsPaid: number;
     collected: number;
     remaining: number;
+    isDiscounted?: boolean;
+    adjustmentReason?: string | null;
   }>;
 };
 
@@ -1482,11 +1485,19 @@ export function FinanceWorkspace({
   }
 
   const paymentsListFiltered = useMemo(() => {
-    if (paymentsViewTab === "invoiced")
-      return payments.filter((p) => !p.isDirect);
-    if (paymentsViewTab === "direct") return payments.filter((p) => p.isDirect);
-    return payments;
+    const live = payments.filter((p) => !p.voided);
+    if (paymentsViewTab === "invoiced") return live.filter((p) => !p.isDirect);
+    if (paymentsViewTab === "direct") return live.filter((p) => p.isDirect);
+    return live;
   }, [payments, paymentsViewTab]);
+  const liveExpenses = useMemo(
+    () => expenses.filter((expense) => !expense.voided),
+    [expenses],
+  );
+  const liveReceipts = useMemo(
+    () => salesReceipts.filter((receipt) => !receipt.voided),
+    [salesReceipts],
+  );
 
   async function handleCreateBill(formData: FormData) {
     if (actionPending) return;
@@ -3420,7 +3431,7 @@ export function FinanceWorkspace({
                 </div>
               )
             ) : recordsTab === "receipts" ? (
-              salesReceipts.length === 0 ? (
+              liveReceipts.length === 0 ? (
                 <p className="text-sm text-muted">No sales receipts yet.</p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -3440,7 +3451,7 @@ export function FinanceWorkspace({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
-                      {salesReceipts.map((receipt) => (
+                      {liveReceipts.map((receipt) => (
                         <tr key={receipt.id}>
                           <td className="px-3 py-2">
                             <p className="font-medium text-foreground">
@@ -3665,7 +3676,7 @@ export function FinanceWorkspace({
                 )}
               </>
             ) : recordsTab === "expenses" ? (
-              expenses.length === 0 ? (
+              liveExpenses.length === 0 ? (
                 <p className="text-sm text-muted">No expense records yet.</p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -3685,7 +3696,7 @@ export function FinanceWorkspace({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
-                      {expenses.map((expense) => (
+                      {liveExpenses.map((expense) => (
                         <tr
                           key={expense.id}
                           data-focus-id={expense.id}
@@ -4768,15 +4779,16 @@ export function FinanceWorkspace({
                         Client Deposit
                       </p>
                       <p className="text-xs text-muted">
-                        Unit price, amount paid, and what is still outstanding for
-                        each client. Record part payments from the client profile
-                        or here as Client deposit.
+                        Sale amount, amount paid, and what is still outstanding for
+                        each client. Record part payments from the client profile.
+                        Promos and waived balances use the agreed sale price, not the
+                        brochure unit price.
                       </p>
                     </div>
                     {reportKind === "deposits" && filteredClientBalances.length > 0 ? (
                       <div className="mb-4 grid gap-3 sm:grid-cols-3">
                         <div className="rounded-md border border-foreground/10 bg-background px-3 py-2">
-                          <p className="text-[11px] uppercase text-muted">Unit amount</p>
+                          <p className="text-[11px] uppercase text-muted">Sale amount</p>
                           <p className="mt-1 text-sm font-semibold">
                             {reportView.currency}{" "}
                             {filteredClientBalances
@@ -4835,6 +4847,12 @@ export function FinanceWorkspace({
                                 <td className="px-3 py-2">
                                   {reportView.currency}{" "}
                                   {row.contractValue.toLocaleString()}
+                                  {row.isDiscounted ? (
+                                    <p className="text-xs text-muted">
+                                      List {reportView.currency} {(row.listPrice || 0).toLocaleString()}
+                                      {row.adjustmentReason ? ` · ${row.adjustmentReason}` : " · promo"}
+                                    </p>
+                                  ) : null}
                                 </td>
                                 <td className="px-3 py-2">
                                   {reportView.currency}{" "}

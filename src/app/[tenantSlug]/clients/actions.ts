@@ -27,7 +27,7 @@ import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
 import { sendPropertyClientPortalInvite } from "@/lib/client-portal-invite";
 import { revalidatePath } from "next/cache";
 
-type ActionResult = { ok: true } | { ok: false; error: string };
+type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 
 type CreateClientResult =
   | { ok: true; inviteSent?: boolean; inviteError?: string; alreadyOnPortal?: boolean }
@@ -489,9 +489,19 @@ export async function recordClientDeposit(
 
   const unit = await prisma.unit.findFirst({
     where: { id: parsed.data.unitId, tenantId: tenant.id },
-    select: { id: true, label: true, projectId: true, pricingPlanId: true, project: { select: { name: true } } },
+    select: {
+      id: true,
+      label: true,
+      projectId: true,
+      pricingPlanId: true,
+      project: { select: { name: true } },
+      deal: { select: { id: true, propertyClient: { select: { id: true } } } },
+    },
   });
   if (!unit) return { ok: false, error: "Unit not found." };
+
+  const adjustment = parsed.data.balanceAdjustment || "none";
+  const paymentAmount = parsed.data.amount || 0;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -499,37 +509,74 @@ export async function recordClientDeposit(
         where: { tenantId: tenant.id, clientId: client.id, unitId: unit.id },
         select: { id: true },
       });
-      if (!existingLink) {
-        await tx.clientUnitLink.create({
+      const link =
+        existingLink ??
+        (await tx.clientUnitLink.create({
           data: {
             tenantId: tenant.id,
             clientId: client.id,
             unitId: unit.id,
             pricingPlanId: unit.pricingPlanId,
           },
+          select: { id: true },
+        }));
+
+      if (adjustment !== "none") {
+        let agreedPrice = parsed.data.agreedPrice || 0;
+        if (adjustment === "waive_remaining") {
+          const paidAgg = await tx.paymentRecord.aggregate({
+            where: {
+              tenantId: tenant.id,
+              voidedAt: null,
+              unitId: unit.id,
+              OR: [
+                { propertyClientId: client.id },
+                { invoice: { deal: { propertyClient: { id: client.id } } } },
+              ],
+            },
+            _sum: { amount: true },
+          });
+          agreedPrice = Number(paidAgg._sum.amount || 0) + paymentAmount;
+        }
+        await tx.clientUnitLink.update({
+          where: { id: link.id },
+          data: {
+            agreedPrice,
+            priceAdjustmentReason: parsed.data.adjustmentReason || null,
+            priceAdjustedAt: new Date(),
+            priceAdjustedByUserId: session.user.id,
+          },
         });
+        if (unit.deal?.id && (!unit.deal.propertyClient || unit.deal.propertyClient.id === client.id)) {
+          await tx.deal.update({
+            where: { id: unit.deal.id },
+            data: { value: agreedPrice },
+          });
+        }
       }
 
-      await tx.paymentRecord.create({
-        data: {
-          tenantId: tenant.id,
-          invoiceId: null,
-          propertyClientId: client.id,
-          projectId: unit.projectId,
-          unitId: unit.id,
-          incomeType: "CLIENT_DEPOSIT",
-          standaloneTitle: `Client deposit · ${client.fullName} · ${unit.project.name} ${unit.label}`,
-          payerName: client.fullName,
-          amount: parsed.data.amount,
-          currency: tenantRecord?.defaultCurrency || "NGN",
-          paidAt: new Date(parsed.data.paidAt),
-          method: parsed.data.method || null,
-          reference: parsed.data.reference || null,
-          note: parsed.data.note || null,
-          recordedByUserId: session.user.id,
-          recordedByLabel: session.user.name || session.user.email || "Unknown recorder",
-        },
-      });
+      if (paymentAmount > 0) {
+        await tx.paymentRecord.create({
+          data: {
+            tenantId: tenant.id,
+            invoiceId: null,
+            propertyClientId: client.id,
+            projectId: unit.projectId,
+            unitId: unit.id,
+            incomeType: "CLIENT_DEPOSIT",
+            standaloneTitle: `Client deposit · ${client.fullName} · ${unit.project.name} ${unit.label}`,
+            payerName: client.fullName,
+            amount: paymentAmount,
+            currency: tenantRecord?.defaultCurrency || "NGN",
+            paidAt: new Date(parsed.data.paidAt),
+            method: parsed.data.method || null,
+            reference: parsed.data.reference || null,
+            note: parsed.data.note || null,
+            recordedByUserId: session.user.id,
+            recordedByLabel: session.user.name || session.user.email || "Unknown recorder",
+          },
+        });
+      }
     });
 
     await writeAuditLog({
@@ -539,13 +586,19 @@ export async function recordClientDeposit(
       module: "FINANCE",
       entityType: "PAYMENT",
       entityId: client.id,
-      action: "CREATE",
-      summary: `Recorded client deposit for ${client.fullName} on ${unit.project.name} ${unit.label}.`,
+      action: paymentAmount > 0 ? "CREATE" : "UPDATE",
+      summary:
+        paymentAmount > 0
+          ? `Recorded client deposit for ${client.fullName} on ${unit.project.name} ${unit.label}.`
+          : `Updated sale price for ${client.fullName} on ${unit.project.name} ${unit.label}.`,
       metadata: {
-        amount: parsed.data.amount,
+        amount: paymentAmount,
         unitId: unit.id,
         projectId: unit.projectId,
         incomeType: "CLIENT_DEPOSIT",
+        balanceAdjustment: adjustment,
+        agreedPrice: parsed.data.agreedPrice ?? null,
+        adjustmentReason: parsed.data.adjustmentReason ?? null,
       },
     });
   } catch {
@@ -554,7 +607,11 @@ export async function recordClientDeposit(
 
   revalidateClients(tenantSlug, clientId);
   revalidatePath(`/${tenantSlug}/finance`);
-  return { ok: true };
+  if (paymentAmount > 0 && adjustment !== "none") {
+    return { ok: true, message: "Payment saved. Remaining balance now uses the agreed sale price." };
+  }
+  if (paymentAmount > 0) return { ok: true, message: "Payment recorded." };
+  return { ok: true, message: "Sale price updated. Remaining balance no longer uses the full unit price." };
 }
 
 export async function sendClientPortalInvite(

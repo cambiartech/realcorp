@@ -4,6 +4,15 @@ import { useState } from "react";
 import { downloadModuleReportXlsx } from "@/lib/module-report-xlsx";
 import type { ShortletIncomeReport } from "@/lib/shortlet-income-report";
 
+const INCOME_TABS = [
+  { id: "project" as const, label: "By sales project" },
+  { id: "property" as const, label: "By short-let property" },
+  { id: "apartment" as const, label: "By apartment" },
+  { id: "payments" as const, label: "Recent payments" },
+];
+
+type IncomeTab = (typeof INCOME_TABS)[number]["id"];
+
 function moneyLabel(currency: string, value: number) {
   return `${currency} ${value.toLocaleString("en-NG")}`;
 }
@@ -19,6 +28,7 @@ export function ShortletsIncomeWorkspace({
   report: ShortletIncomeReport;
 }) {
   const [exporting, setExporting] = useState(false);
+  const [tab, setTab] = useState<IncomeTab>("project");
 
   async function exportExcel() {
     setExporting(true);
@@ -85,63 +95,85 @@ export function ShortletsIncomeWorkspace({
         <Kpi label="Synced to Finance" value={moneyLabel(currency, report.financeSynced)} />
       </div>
 
-      <IncomeTable
-        title="By sales project"
-        empty="No short-let payments are linked to a sales project yet."
-        currency={currency}
-        rows={report.byProject}
-      />
-      <IncomeTable
-        title="By short-let property"
-        empty="No short-let property collections yet."
-        currency={currency}
-        rows={report.byProperty}
-      />
-      <IncomeTable
-        title="By apartment"
-        empty="No apartment collections yet."
-        currency={currency}
-        rows={report.byApartment}
-      />
+      <div className="mt-6 flex flex-wrap gap-1 border-b border-foreground/10 pb-2">
+        {INCOME_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={[
+              "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+              tab === item.id
+                ? "bg-foreground text-background"
+                : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+            ].join(" ")}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
 
-      <section className="mt-6 overflow-hidden rounded-lg border border-foreground/10">
-        <div className="border-b border-foreground/10 px-4 py-3">
-          <h2 className="text-sm font-semibold">Recent short-let payments</h2>
-        </div>
-        {report.payments.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted">No short-let payments recorded yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-foreground/[0.03] text-xs uppercase text-muted">
-                <tr>
-                  <th className="px-4 py-2">Date</th>
-                  <th className="px-4 py-2">Guest</th>
-                  <th className="px-4 py-2">Property / apartment</th>
-                  <th className="px-4 py-2">Project</th>
-                  <th className="px-4 py-2">Amount</th>
-                  <th className="px-4 py-2">Finance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-foreground/10">
-                {report.payments.map((row) => (
-                  <tr key={row.id}>
-                    <td className="px-4 py-3 text-muted">{row.paidAtLabel}</td>
-                    <td className="px-4 py-3 font-medium">{row.guestName}</td>
-                    <td className="px-4 py-3">
-                      <p>{row.apartmentLabel}</p>
-                      <p className="text-xs text-muted">{row.propertyLabel}</p>
-                    </td>
-                    <td className="px-4 py-3 text-muted">{row.projectLabel}</td>
-                    <td className="px-4 py-3 font-semibold">{moneyLabel(currency, row.amount)}</td>
-                    <td className="px-4 py-3 text-xs">{row.synced ? "Synced" : "Not synced"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {tab === "project" ? (
+        <IncomeTable
+          title="By sales project"
+          empty="No short-let payments are linked to a sales project yet."
+          currency={currency}
+          rows={report.byProject}
+        />
+      ) : tab === "property" ? (
+        <IncomeTable
+          title="By short-let property"
+          empty="No short-let property collections yet."
+          currency={currency}
+          rows={report.byProperty}
+        />
+      ) : tab === "apartment" ? (
+        <IncomeTable
+          title="By apartment"
+          empty="No apartment collections yet."
+          currency={currency}
+          rows={report.byApartment}
+        />
+      ) : (
+        <section className="mt-4 overflow-hidden rounded-lg border border-foreground/10">
+          <div className="border-b border-foreground/10 px-4 py-3">
+            <h2 className="text-sm font-semibold">Recent short-let payments</h2>
           </div>
-        )}
-      </section>
+          {report.payments.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted">No short-let payments recorded yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-foreground/[0.03] text-xs uppercase text-muted">
+                  <tr>
+                    <th className="px-4 py-2">Date</th>
+                    <th className="px-4 py-2">Guest</th>
+                    <th className="px-4 py-2">Property / apartment</th>
+                    <th className="px-4 py-2">Project</th>
+                    <th className="px-4 py-2">Amount</th>
+                    <th className="px-4 py-2">Finance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-foreground/10">
+                  {report.payments.map((row) => (
+                    <tr key={row.id}>
+                      <td className="px-4 py-3 text-muted">{row.paidAtLabel}</td>
+                      <td className="px-4 py-3 font-medium">{row.guestName}</td>
+                      <td className="px-4 py-3">
+                        <p>{row.apartmentLabel}</p>
+                        <p className="text-xs text-muted">{row.propertyLabel}</p>
+                      </td>
+                      <td className="px-4 py-3 text-muted">{row.projectLabel}</td>
+                      <td className="px-4 py-3 font-semibold">{moneyLabel(currency, row.amount)}</td>
+                      <td className="px-4 py-3 text-xs">{row.synced ? "Synced" : "Not synced"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -167,7 +199,7 @@ function IncomeTable({
   rows: ShortletIncomeReport["byProject"];
 }) {
   return (
-    <section className="mt-6 overflow-hidden rounded-lg border border-foreground/10">
+    <section className="mt-4 overflow-hidden rounded-lg border border-foreground/10">
       <div className="border-b border-foreground/10 px-4 py-3">
         <h2 className="text-sm font-semibold">{title}</h2>
       </div>

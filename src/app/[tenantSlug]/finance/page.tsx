@@ -326,7 +326,7 @@ export default async function FinanceQueuePage({
       : Promise.resolve([]),
     needsPayments
       ? prisma.paymentRecord.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId: tenant.id, voidedAt: null },
           orderBy: { paidAt: "desc" },
           include: {
             invoice: {
@@ -354,7 +354,7 @@ export default async function FinanceQueuePage({
       : Promise.resolve([]),
     needsExpenses
       ? prisma.expense.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId: tenant.id, voidedAt: null },
           orderBy: { expenseDate: "desc" },
           take: 300,
         })
@@ -368,7 +368,7 @@ export default async function FinanceQueuePage({
       : Promise.resolve([]),
     needsReceipts
       ? prisma.salesReceipt.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId: tenant.id, voidedAt: null, status: { not: "VOID" } },
           orderBy: { issuedAt: "desc" },
           include: {
             deal: {
@@ -891,7 +891,9 @@ export default async function FinanceQueuePage({
           deal.lead?.name || deal.lead?.email || `Deal ${deal.id.slice(0, 8)}`,
       }))}
       invoices={invoiceRows}
-      payments={payments.map((payment) => {
+      payments={payments
+        .filter((payment) => !payment.voidedAt)
+        .map((payment) => {
         const isDirect = !payment.invoiceId;
         const invoiceLabel = payment.invoice
           ? `${payment.invoice.invoiceNumber} - ${payment.invoice.title}`
@@ -927,7 +929,9 @@ export default async function FinanceQueuePage({
           department: payment.department || payment.invoice?.department || "",
         };
       })}
-      expenses={expenses.map((expense) => ({
+      expenses={expenses
+        .filter((expense) => !expense.voidedAt)
+        .map((expense) => ({
         id: expense.id,
         category: expense.category,
         vendorName: expense.vendorName || "—",
@@ -966,7 +970,9 @@ export default async function FinanceQueuePage({
         voidReason: expense.voidReason || "",
         canVoid: !expense.voidedAt,
       }))}
-      salesReceipts={salesReceipts.map((receipt) => ({
+      salesReceipts={salesReceipts
+        .filter((receipt) => !receipt.voidedAt && receipt.status !== "VOID")
+        .map((receipt) => ({
         id: receipt.id,
         receiptNumber: receipt.receiptNumber,
         title: receipt.title,

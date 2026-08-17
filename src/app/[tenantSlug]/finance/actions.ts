@@ -1003,10 +1003,29 @@ export async function voidSalesReceiptRecord(
           voidReason: parsed.data.reason,
         },
       });
-      await tx.shortletPayment.updateMany({
-        where: { tenantId: tenant.id, financeReceiptId: receipt.id },
-        data: { financeReceiptId: null },
+      const linkedShortletPayments = await tx.shortletPayment.findMany({
+        where: { tenantId: tenant.id, financeReceiptId: receipt.id, voidedAt: null },
+        select: { id: true, amount: true, reservationId: true },
       });
+      const voidedAt = new Date();
+      for (const payment of linkedShortletPayments) {
+        await tx.shortletPayment.update({
+          where: { id: payment.id },
+          data: { voidedAt },
+        });
+        const reservation = await tx.shortletReservation.findFirst({
+          where: { id: payment.reservationId, tenantId: tenant.id },
+          select: { id: true, amountPaid: true, balanceDue: true },
+        });
+        if (!reservation) continue;
+        await tx.shortletReservation.update({
+          where: { id: reservation.id },
+          data: {
+            amountPaid: Math.max(0, Number(reservation.amountPaid) - Number(payment.amount)),
+            balanceDue: Number(reservation.balanceDue) + Number(payment.amount),
+          },
+        });
+      }
       await tx.shortletBusinessDay.updateMany({
         where: { tenantId: tenant.id, financeReceiptId: receipt.id },
         data: { financeReceiptId: null },
@@ -1034,6 +1053,8 @@ export async function voidSalesReceiptRecord(
   }
 
   revalidatePath(`/${tenantSlug}/finance`);
+  revalidatePath(`/${tenantSlug}/finance/shortlets`);
+  revalidatePath(`/${tenantSlug}/shortlets`);
   return { ok: true };
 }
 

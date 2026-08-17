@@ -60,5 +60,5 @@ export const FOLIO_RESERVATION_INCLUDE = {
   unit: { select: { name: true } },
   property: { select: { name: true } },
   folioLines: { orderBy: { postedAt: "desc" as const } },
-  payments: { orderBy: { paidAt: "desc" as const } },
+  payments: { where: { voidedAt: null }, orderBy: { paidAt: "desc" as const } },
 } as const;

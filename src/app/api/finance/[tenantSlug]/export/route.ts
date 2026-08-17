@@ -75,7 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tena
 
   if (kind === "payments") {
     const payments = await prisma.paymentRecord.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: tenant.id, voidedAt: null },
       orderBy: { paidAt: "desc" },
       include: { invoice: { select: { invoiceNumber: true } } },
       take: 4000,

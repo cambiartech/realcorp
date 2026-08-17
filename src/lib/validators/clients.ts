@@ -97,38 +97,77 @@ export function parseLinkClientShortletForm(formData: FormData) {
   });
 }
 
-export const recordClientDepositSchema = z.object({
-  unitId: z.string().trim().min(1, "Select a project unit."),
-  amount: z.coerce.number().positive("Payment amount must be greater than zero."),
-  paidAt: z.string().trim().min(1, "Payment date is required."),
-  method: z
-    .string()
-    .trim()
-    .max(80)
-    .optional()
-    .transform((v) => (v && v !== "" ? v : undefined)),
-  reference: z
-    .string()
-    .trim()
-    .max(120)
-    .optional()
-    .transform((v) => (v && v !== "" ? v : undefined)),
-  note: z
-    .string()
-    .trim()
-    .max(500)
-    .optional()
-    .transform((v) => (v && v !== "" ? v : undefined)),
-});
+export const recordClientDepositSchema = z
+  .object({
+    unitId: z.string().trim().min(1, "Select a project unit."),
+    amount: z.coerce.number().min(0, "Payment amount cannot be negative.").optional().default(0),
+    paidAt: z.string().trim().min(1, "Payment date is required."),
+    method: z
+      .string()
+      .trim()
+      .max(80)
+      .optional()
+      .transform((v) => (v && v !== "" ? v : undefined)),
+    reference: z
+      .string()
+      .trim()
+      .max(120)
+      .optional()
+      .transform((v) => (v && v !== "" ? v : undefined)),
+    note: z
+      .string()
+      .trim()
+      .max(500)
+      .optional()
+      .transform((v) => (v && v !== "" ? v : undefined)),
+    balanceAdjustment: z.enum(["none", "set_sale_price", "waive_remaining"]).optional().default("none"),
+    agreedPrice: z.coerce.number().positive("Discounted sale price must be greater than zero.").optional(),
+    adjustmentReason: z
+      .string()
+      .trim()
+      .max(240)
+      .optional()
+      .transform((v) => (v && v !== "" ? v : undefined)),
+  })
+  .superRefine((data, ctx) => {
+    const adjustment = data.balanceAdjustment || "none";
+    if (adjustment === "none" && !(data.amount > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Payment amount must be greater than zero.",
+        path: ["amount"],
+      });
+    }
+    if (adjustment === "set_sale_price" && !(data.agreedPrice && data.agreedPrice > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter the discounted sale price for this client.",
+        path: ["agreedPrice"],
+      });
+    }
+    if (adjustment !== "none" && !data.adjustmentReason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Add a short reason for the promo, discount, or waived balance.",
+        path: ["adjustmentReason"],
+      });
+    }
+  });
 
 export function parseRecordClientDepositForm(formData: FormData) {
+  const amountRaw = String(formData.get("amount") ?? "").trim();
+  const agreedRaw = String(formData.get("agreedPrice") ?? "").trim();
+  const adjustmentRaw = String(formData.get("balanceAdjustment") || "none").trim();
   return recordClientDepositSchema.safeParse({
     unitId: formData.get("unitId"),
-    amount: formData.get("amount"),
+    amount: amountRaw === "" ? 0 : amountRaw,
     paidAt: formData.get("paidAt"),
     method: formData.get("method") || undefined,
     reference: formData.get("reference") || undefined,
     note: formData.get("note") || undefined,
+    balanceAdjustment: adjustmentRaw || "none",
+    agreedPrice: agreedRaw === "" ? undefined : agreedRaw,
+    adjustmentReason: formData.get("adjustmentReason") || undefined,
   });
 }
 
