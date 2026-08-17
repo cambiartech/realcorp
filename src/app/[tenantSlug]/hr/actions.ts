@@ -2121,3 +2121,51 @@ export async function sendOfferLetterForSignature(
   revalidateHr(tenantSlug);
   return { ok: true, signUrl: absoluteAppUrl(hrOfferSignPath(token)) };
 }
+
+const myStatutoryIdsSchema = z.object({
+  taxId: z.string().trim().max(80).optional(),
+  rsaPin: z.string().trim().max(40).optional(),
+  pensionAdministrator: z.string().trim().max(120).optional(),
+  nhfMembershipNumber: z.string().trim().max(40).optional(),
+});
+
+/** Employees can add their own TIN / RSA PIN from My HR. */
+export async function updateMyStatutoryIds(
+  tenantSlug: string,
+  input: {
+    taxId?: string;
+    rsaPin?: string;
+    pensionAdministrator?: string;
+    nhfMembershipNumber?: string;
+  },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const parsed = myStatutoryIdsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Check the ID fields and try again." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const profile = await prisma.employeeProfile.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { id: true },
+  });
+  if (!profile) return { ok: false, error: "Your HR record is not set up yet." };
+
+  const strOrNull = (value?: string) => (value && value.trim() ? value.trim() : null);
+  await prisma.employeeProfile.update({
+    where: { id: profile.id },
+    data: {
+      taxId: strOrNull(parsed.data.taxId),
+      rsaPin: strOrNull(parsed.data.rsaPin),
+      pensionAdministrator: strOrNull(parsed.data.pensionAdministrator),
+      nhfMembershipNumber: strOrNull(parsed.data.nhfMembershipNumber),
+    },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true };
+}

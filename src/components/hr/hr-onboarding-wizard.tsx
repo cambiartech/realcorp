@@ -322,6 +322,25 @@ export function HrOnboardingWizard({
               className={inputClass}
             />
           </label>
+          <p className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            Statutory IDs
+          </p>
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs font-medium">Tax identification number (TIN)</span>
+            <input name="taxId" defaultValue={draft.taxId} className={inputClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs font-medium">RSA PIN</span>
+            <input name="rsaPin" defaultValue={draft.rsaPin} placeholder="PEN…" className={inputClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs font-medium">Pension administrator (PFA)</span>
+            <input name="pensionAdministrator" defaultValue={draft.pensionAdministrator} className={inputClass} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs font-medium">NHF membership number</span>
+            <input name="nhfMembershipNumber" defaultValue={draft.nhfMembershipNumber} className={inputClass} />
+          </label>
         </form>
       ) : null}
 
@@ -367,22 +386,62 @@ export function HrOnboardingWizard({
 
       {step === "compliance" ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <ProfileComplianceChecklist
-            items={checklist}
-            percent={checklistPercent}
-            tenantSlug={tenantSlug}
-            inOnboardingWizard
-            onOpenDocuments={openDocumentsForEmployee}
-            onGenerateOffer={onGenerateOffer}
-            onSendForm={onSendForm}
-            onSendAllForms={onSendAllForms}
-            onPrefillFromDocs={() => void prefillFromUploadedDocs()}
-            prefillPending={prefillPending}
-          />
+          <div className="space-y-4">
+            <form
+              key={`onboard-compliance-${formKey}`}
+              id="onboard-compliance"
+              className="grid gap-3 sm:grid-cols-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4"
+              onSubmit={(e) => e.preventDefault()}
+            >
+              <p className="sm:col-span-2 text-sm font-semibold text-foreground">Statutory IDs</p>
+              <p className="sm:col-span-2 text-xs text-muted">
+                TIN and RSA PIN are needed for PAYE and pension remittances. Type them here, use Prefill with
+                AI if a form was uploaded, or send the biodata form so the employee can add them on My HR.
+              </p>
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs font-medium">Tax identification number (TIN)</span>
+                <input name="taxId" defaultValue={draft.taxId} className={inputClass} />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs font-medium">RSA PIN</span>
+                <input name="rsaPin" defaultValue={draft.rsaPin} placeholder="PEN…" className={inputClass} />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs font-medium">Pension administrator (PFA)</span>
+                <input
+                  name="pensionAdministrator"
+                  defaultValue={draft.pensionAdministrator}
+                  className={inputClass}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs font-medium">NHF membership number</span>
+                <input
+                  name="nhfMembershipNumber"
+                  defaultValue={draft.nhfMembershipNumber}
+                  className={inputClass}
+                />
+              </label>
+              <OnboardingProfileHiddenFields draft={{ ...draft, status: "DRAFT" }} statusOverride="DRAFT" />
+            </form>
+            <ProfileComplianceChecklist
+              items={checklist}
+              percent={checklistPercent}
+              tenantSlug={tenantSlug}
+              inOnboardingWizard
+              onOpenDocuments={openDocumentsForEmployee}
+              onGenerateOffer={onGenerateOffer}
+              onSendForm={onSendForm}
+              onSendAllForms={onSendAllForms}
+              onPrefillFromDocs={() => void prefillFromUploadedDocs()}
+              prefillPending={prefillPending}
+            />
+          </div>
           <div className="text-sm text-muted">
             <p className="font-medium text-foreground">What to do now</p>
             <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs">
-              <li>If documents are already uploaded, use Prefill with AI.</li>
+              <li>If documents are already uploaded, use Prefill with AI — including TIN and RSA PIN.</li>
+              <li>Or type statutory IDs in the fields on this step (also on Personal & job).</li>
               <li>Generate and print the offer letter for signature.</li>
               <li>Send biodata, bank, and guarantor forms only if a file is missing or unreadable.</li>
               <li>When forms are submitted, approve them under Form requests.</li>
@@ -430,7 +489,13 @@ export function HrOnboardingWizard({
             aria-busy={pending}
             onClick={async () => {
               const formId =
-                step === "personal" ? "onboard-personal" : step === "bank" ? "onboard-bank" : null;
+                step === "personal"
+                  ? "onboard-personal"
+                  : step === "bank"
+                    ? "onboard-bank"
+                    : step === "compliance"
+                      ? "onboard-compliance"
+                      : null;
               if (formId) {
                 const form = document.getElementById(formId) as HTMLFormElement | null;
                 if (form && !(await saveForm(form))) return;

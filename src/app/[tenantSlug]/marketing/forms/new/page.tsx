@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { CaptureFormNewWorkspace } from "@/components/capture-forms/capture-form-new-workspace";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 
@@ -35,7 +35,7 @@ export default async function CaptureFormNewPage({ params }: { params: Promise<{
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "marketing");
   if (

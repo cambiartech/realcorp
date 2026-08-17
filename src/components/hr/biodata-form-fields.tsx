@@ -88,6 +88,25 @@ export function BiodataFormFields({ v }: { v: InitialValues }) {
       />
 
       <hr className="border-slate-200" />
+      <p className="text-xs font-semibold uppercase text-slate-500">Tax and pension IDs</p>
+      <HrFormField
+        label="Tax identification number (TIN)"
+        name="taxId"
+        defaultValue={v.taxId}
+      />
+      <HrFormField label="RSA PIN" name="rsaPin" defaultValue={v.rsaPin} />
+      <HrFormField
+        label="Pension administrator (PFA)"
+        name="pensionAdministrator"
+        defaultValue={v.pensionAdministrator}
+      />
+      <HrFormField
+        label="NHF membership number"
+        name="nhfMembershipNumber"
+        defaultValue={v.nhfMembershipNumber}
+      />
+
+      <hr className="border-slate-200" />
       <p className="text-xs font-semibold uppercase text-slate-500">Emergency contact</p>
       <HrFormField label="Name" name="emergencyName" defaultValue={v.emergencyName}>
         <input

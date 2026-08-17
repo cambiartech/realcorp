@@ -45,7 +45,7 @@ export default async function TasksPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true, department: true, isDepartmentLead: true },
+    select: { role: true, status: true, department: true, isDepartmentLead: true, modulePermissions: true },
   });
 
   assertTenantNavAccess(session, membership, tenant.settings, "tasks");

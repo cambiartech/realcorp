@@ -1,8 +1,9 @@
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { resolveTenantCurrencies } from "@/lib/finance-catalog";
+import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { notFound } from "next/navigation";
 import { ProjectsWorkspace } from "./projects-workspace";
 
@@ -45,13 +46,16 @@ export default async function TenantProjectsPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "projects");
+  const projectAccess = parseMembershipModulePermissions(membership?.modulePermissions).projects;
   const canManage =
     session.user.isPlatformAdmin ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SALES_MANAGER));
+      (membership.role === MembershipRole.ORG_ADMIN ||
+        membership.role === MembershipRole.SALES_MANAGER ||
+        projectAccess === "full"));
 
   const [projects, stakeholders, portalMembers] = await Promise.all([
     prisma.project.findMany({

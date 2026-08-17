@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
 import { PdfDownloadButton } from "@/components/pdf-download-button";
 import { PayslipYtdCard } from "@/components/hr/payslip-ytd-card";
@@ -11,7 +12,7 @@ import { useSnackbar } from "@/components/snackbar";
 import type { PayslipCalculation } from "@/lib/hr-payslip";
 import type { ProfileDetailRow } from "@/lib/hr-profile-form";
 import type { TenantBranding } from "@/lib/tenant-branding";
-import { saveSelfAppraisal } from "@/app/[tenantSlug]/hr/actions";
+import { saveSelfAppraisal, updateMyStatutoryIds } from "@/app/[tenantSlug]/hr/actions";
 import { AppraisalRatingSelect } from "@/components/hr/appraisal-rating-select";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { RichTextDisplay, RichTextField } from "@/components/rich-text-field";
@@ -136,9 +137,12 @@ export function HrMyDashboard({
 }) {
   const { showSnackbar } = useSnackbar();
   const [tab, setTab] = useState<MyTab>("overview");
-  const [recordSection, setRecordSection] = useState<"personal" | "job" | "bank" | "emergency">("personal");
+  const [recordSection, setRecordSection] = useState<"personal" | "job" | "bank" | "emergency" | "ids">(
+    "personal",
+  );
   const [viewPayslipId, setViewPayslipId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const router = useRouter();
 
   const viewPayslip = viewPayslipId ? myView.payslips.find((p) => p.id === viewPayslipId) : null;
 
@@ -202,6 +206,24 @@ export function HrMyDashboard({
       return;
     }
     showSnackbar("Your self-appraisal was submitted.", "success");
+  }
+
+  async function saveStatutoryIds(form: HTMLFormElement) {
+    const fd = new FormData(form);
+    setPending(true);
+    const result = await updateMyStatutoryIds(tenantSlug, {
+      taxId: String(fd.get("taxId") ?? ""),
+      rsaPin: String(fd.get("rsaPin") ?? ""),
+      pensionAdministrator: String(fd.get("pensionAdministrator") ?? ""),
+      nhfMembershipNumber: String(fd.get("nhfMembershipNumber") ?? ""),
+    });
+    setPending(false);
+    if (!result.ok) {
+      showSnackbar(result.error || "Could not save.", "error");
+      return;
+    }
+    showSnackbar("Tax and pension IDs saved.", "success");
+    router.refresh();
   }
 
   if (!myView.profile) {
@@ -274,6 +296,7 @@ export function HrMyDashboard({
   }
 
   const p = myView.profile;
+  if (!p) return null;
 
   return (
     <div className="space-y-4">
@@ -521,20 +544,29 @@ export function HrMyDashboard({
       {tab === "record" ? (
         <div>
           <p className="mb-3 text-xs text-muted">
-            Read-only view of what HR has on file. Contact HR to request changes.
+            Personal, job, bank, and emergency details are set by HR. You can add or update your TIN and RSA
+            PIN here for PAYE and pension remittances.
           </p>
           <div className="mb-3 flex flex-wrap gap-1">
-            {(["personal", "job", "bank", "emergency"] as const).map((s) => (
+            {(
+              [
+                ["personal", "Personal"],
+                ["job", "Job"],
+                ["bank", "Bank"],
+                ["emergency", "Emergency"],
+                ["ids", "Tax & pension"],
+              ] as const
+            ).map(([id, label]) => (
               <button
-                key={s}
+                key={id}
                 type="button"
-                onClick={() => setRecordSection(s)}
+                onClick={() => setRecordSection(id)}
                 className={[
-                  "rounded-md px-2.5 py-1.5 text-xs font-medium capitalize",
-                  recordSection === s ? "bg-foreground/10 text-foreground" : "text-muted",
+                  "rounded-md px-2.5 py-1.5 text-xs font-medium",
+                  recordSection === id ? "bg-foreground/10 text-foreground" : "text-muted",
                 ].join(" ")}
               >
-                {s}
+                {label}
               </button>
             ))}
           </div>
@@ -580,6 +612,62 @@ export function HrMyDashboard({
                 <ReadRow label="Relationship" value={p.emergencyRelationship} />
                 <ReadRow label="Phone" value={p.emergencyPhone} />
               </>
+            ) : null}
+            {recordSection === "ids" ? (
+              previewAs ? (
+                <>
+                  <ReadRow label="Tax identification number (TIN)" value={p.taxId} />
+                  <ReadRow label="RSA PIN" value={p.rsaPin} />
+                  <ReadRow label="Pension administrator (PFA)" value={p.pensionAdministrator} />
+                  <ReadRow label="NHF membership number" value={p.nhfMembershipNumber} />
+                </>
+              ) : (
+                <form
+                  className="grid gap-3 py-3 sm:grid-cols-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveStatutoryIds(event.currentTarget);
+                  }}
+                >
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">
+                      Tax identification number (TIN)
+                    </span>
+                    <input name="taxId" defaultValue={p.taxId} className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">RSA PIN</span>
+                    <input name="rsaPin" defaultValue={p.rsaPin} placeholder="PEN…" className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">
+                      Pension administrator (PFA)
+                    </span>
+                    <input
+                      name="pensionAdministrator"
+                      defaultValue={p.pensionAdministrator}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">NHF membership number</span>
+                    <input
+                      name="nhfMembershipNumber"
+                      defaultValue={p.nhfMembershipNumber}
+                      className={inputClass}
+                    />
+                  </label>
+                  <div className="sm:col-span-2">
+                    <button
+                      type="submit"
+                      disabled={pending}
+                      className="rounded-md border border-foreground bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                    >
+                      {pending ? "Saving…" : "Save tax & pension IDs"}
+                    </button>
+                  </div>
+                </form>
+              )
             ) : null}
           </div>
         </div>

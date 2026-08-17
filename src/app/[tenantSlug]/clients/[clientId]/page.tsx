@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import { canManageClients } from "@/lib/clients-access";
 import prisma from "@/lib/db";
 import { loadClientDepositRows, summarizeClientDeposits } from "@/lib/client-deposits";
@@ -44,7 +44,7 @@ export default async function ClientDetailPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "clients");
 

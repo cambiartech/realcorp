@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { CampaignStatus, MembershipStatus } from "@/generated/prisma";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { buildLeadSourceOptions } from "@/lib/lead-source-options";
 import { paginate, parsePage } from "@/lib/pagination";
@@ -52,7 +52,7 @@ export default async function TenantLeadsPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "leads");
   const canCreate = Boolean(session.user.isPlatformAdmin) || membership?.status === MembershipStatus.ACTIVE;

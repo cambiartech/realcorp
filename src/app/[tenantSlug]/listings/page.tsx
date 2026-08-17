@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { ListingsWorkspace } from "./listings-workspace";
@@ -36,7 +36,7 @@ export default async function ListingsPage({ params }: { params: Promise<{ tenan
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "listings");
 

@@ -41,6 +41,10 @@ export const biodataFormSchema = z.object({
   nextOfKinState: z.string().trim().max(80).optional(),
   nextOfKinOccupation: z.string().trim().max(120).optional(),
   nextOfKinSameAsEmergency: z.enum(["yes"]).optional(),
+  taxId: z.string().trim().max(80).optional(),
+  rsaPin: z.string().trim().max(40).optional(),
+  pensionAdministrator: z.string().trim().max(120).optional(),
+  nhfMembershipNumber: z.string().trim().max(40).optional(),
 });
 
 export const bankFormSchema = z.object({

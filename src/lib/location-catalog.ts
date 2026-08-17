@@ -1,4 +1,5 @@
 import prisma from "@/lib/db";
+import { NIGERIA_CITIES_BY_STATE, NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { listNigeriaLgasFromDb, listNigeriaStatesFromDb } from "@/lib/nigeria-locations-sync";
 
 const CSC_DATA_CDN =
@@ -17,6 +18,10 @@ async function fetchCscJson<T>(path: string): Promise<T> {
     throw new Error(`Location catalog request failed (${response.status}).`);
   }
   return (await response.json()) as T;
+}
+
+function nigeriaStateFallback(): StateRow[] {
+  return NIGERIA_STATES.map((name) => ({ code: name, name, type: "state" }));
 }
 
 export async function listCatalogCountries(): Promise<CountryRow[]> {
@@ -39,8 +44,9 @@ export async function listLocationStates(countryCode: string): Promise<StateRow[
         return names.map((name) => ({ code: name, name, type: "state" }));
       }
     } catch {
-      // Fall through to the prefilled world catalog.
+      // Use the static Nigerian state list — never a world country catalog.
     }
+    return nigeriaStateFallback();
   }
 
   const rows = await prisma.countryStateRef.findMany({
@@ -63,8 +69,12 @@ export async function listLocationCities(countryCode: string, stateCode: string)
         return fromDb.cities.map((name, index) => ({ id: index + 1, name }));
       }
     } catch {
-      // Fall through to the public city catalog.
+      // Fall through to the static city list for that state.
     }
+    const fallback = NIGERIA_CITIES_BY_STATE[stateCode] || [];
+    return fallback
+      .filter((name) => name && name !== "Other")
+      .map((name, index) => ({ id: index + 1, name }));
   }
 
   const country = await prisma.countryRef.findUnique({

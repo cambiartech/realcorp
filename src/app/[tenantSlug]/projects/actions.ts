@@ -14,6 +14,7 @@ import {
 } from "@/lib/validators/project";
 import { revalidatePath } from "next/cache";
 import { createTenantUploadSignature, type CloudinaryUploadSignature } from "@/lib/cloudinary-upload-server";
+import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -30,13 +31,16 @@ async function getTenantAndAccess(tenantSlug: string, userId: string, isPlatform
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId } },
-    select: { role: true, status: true },
+    select: { role: true, status: true, modulePermissions: true },
   });
 
+  const projectAccess = parseMembershipModulePermissions(membership?.modulePermissions).projects;
   const canManage =
     Boolean(isPlatformAdmin) ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SALES_MANAGER));
+      (membership.role === MembershipRole.ORG_ADMIN ||
+        membership.role === MembershipRole.SALES_MANAGER ||
+        projectAccess === "full"));
 
   return { tenant, canManage };
 }

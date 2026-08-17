@@ -491,6 +491,15 @@ export async function prefillEmployeeFromUploadedDocs(
       },
     });
     filled.add(PREFILL_FORM_LABELS[request.formType]);
+    const submitted = request.submittedPayload;
+    if (
+      submitted &&
+      typeof submitted === "object" &&
+      (("taxId" in submitted && String((submitted as { taxId?: unknown }).taxId || "").trim()) ||
+        ("rsaPin" in submitted && String((submitted as { rsaPin?: unknown }).rsaPin || "").trim()))
+    ) {
+      filled.add("Statutory IDs");
+    }
     applied += 1;
     if (request.submittedFileUrl) appliedFileUrls.add(request.submittedFileUrl);
   }
@@ -558,6 +567,7 @@ export async function prefillEmployeeFromUploadedDocs(
         });
       }
       filled.add(PREFILL_FORM_LABELS[extracted.formType]);
+      if (extracted.payload.taxId || extracted.payload.rsaPin) filled.add("Statutory IDs");
       applied += 1;
     } catch (error) {
       failed.push({

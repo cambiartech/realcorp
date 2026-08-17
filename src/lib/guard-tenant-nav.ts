@@ -15,6 +15,13 @@ type MembershipSlice = {
   modulePermissions?: unknown;
 } | null;
 
+/** Always load this with assertTenantNavAccess so Team → Module access overrides apply. */
+export const MEMBERSHIP_FOR_NAV_SELECT = {
+  role: true,
+  status: true,
+  modulePermissions: true,
+} as const;
+
 export function assertTenantNavAccess(
   session: Session | null,
   membership: MembershipSlice,

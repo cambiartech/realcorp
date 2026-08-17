@@ -9,10 +9,44 @@ type CityOption = { id: number; name: string };
 const fieldClass =
   "w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60";
 
-async function locationRows<T>(query: string, signal: AbortSignal): Promise<T[]> {
-  const response = await fetch(`/api/locations?${query}`, { signal });
+function looksLikeCountryList(rows: unknown[]): boolean {
+  if (rows.length < 30) return false;
+  let iso = 0;
+  let emoji = 0;
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as { code?: unknown; name?: unknown; emoji?: unknown };
+    const code = String(item.code || "");
+    const name = String(item.name || "");
+    if (/^[A-Z]{2}$/.test(code) && code.toLowerCase() !== name.toLowerCase()) iso += 1;
+    if (typeof item.emoji === "string" && item.emoji) emoji += 1;
+  }
+  return iso > rows.length * 0.6 || emoji > rows.length * 0.5;
+}
+
+function isCountryNameAsRegion(region: string, countryName: string, countryCode: string) {
+  const value = region.trim().toLowerCase();
+  if (!value) return false;
+  if (countryName && value === countryName.trim().toLowerCase()) return true;
+  if (countryCode && value === countryCode.trim().toLowerCase()) return true;
+  return false;
+}
+
+async function locationItems<T>(
+  type: "countries" | "states" | "cities",
+  query: string,
+  signal: AbortSignal,
+): Promise<T[]> {
+  const response = await fetch(`/api/locations?${query}`, { signal, cache: "no-store" });
   if (!response.ok) throw new Error("Location data is unavailable.");
-  return (await response.json()) as T[];
+  const body = (await response.json()) as { type?: string; items?: unknown };
+  if (body?.type !== type || !Array.isArray(body.items)) {
+    throw new Error("Location data is unavailable.");
+  }
+  if (type !== "countries" && looksLikeCountryList(body.items)) {
+    throw new Error("Location data is unavailable.");
+  }
+  return body.items as T[];
 }
 
 export function GlobalLocationFields({
@@ -42,15 +76,19 @@ export function GlobalLocationFields({
   className?: string;
   onLocationChange?: (location: { country: string; state: string; city: string }) => void;
 }) {
+  const initialCountry = defaultCountry || "";
+  const initialState = isCountryNameAsRegion(defaultState || "", initialCountry, "")
+    ? ""
+    : defaultState || "";
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [states, setStates] = useState<StateOption[]>([]);
   const [cities, setCities] = useState<CityOption[]>([]);
   const [countryCode, setCountryCode] = useState(
-    defaultCountry && /^[A-Za-z]{2}$/.test(defaultCountry) ? defaultCountry.toUpperCase() : "",
+    initialCountry && /^[A-Za-z]{2}$/.test(initialCountry) ? initialCountry.toUpperCase() : "",
   );
   const [stateCode, setStateCode] = useState("");
-  const [countryValue, setCountryValue] = useState(defaultCountry || "");
-  const [stateValue, setStateValue] = useState(defaultState || "");
+  const [countryValue, setCountryValue] = useState(initialCountry);
+  const [stateValue, setStateValue] = useState(initialState);
   const [cityValue, setCityValue] = useState(defaultCity || "");
   const [error, setError] = useState("");
   const [countryReload, setCountryReload] = useState(0);
@@ -58,53 +96,72 @@ export function GlobalLocationFields({
   useEffect(() => {
     const controller = new AbortController();
     setError("");
-    locationRows<CountryOption>("type=countries", controller.signal)
+    locationItems<CountryOption>("countries", "type=countries", controller.signal)
       .then((rows) => {
         setCountries(rows);
-        if (!countryCode && defaultCountry) {
+        setCountryCode((current) => {
+          if (current) return current;
+          if (!defaultCountry) return current;
           const target = defaultCountry.toLowerCase();
           const match = rows.find(
             (row) => row.code.toLowerCase() === target || row.name.toLowerCase() === target,
           );
-          if (match) {
-            setCountryCode(match.code);
-            setCountryValue(match.name);
-          }
-        }
+          if (!match) return current;
+          setCountryValue(match.name);
+          return match.code;
+        });
       })
       .catch((caught) => {
         if ((caught as Error).name !== "AbortError") setError("Could not load countries.");
       });
     return () => controller.abort();
-  }, [countryCode, countryReload, defaultCountry]);
+  }, [countryReload, defaultCountry]);
 
   useEffect(() => {
-    if (!countryCode) return;
+    if (!countryCode) {
+      setStates([]);
+      setCities([]);
+      return;
+    }
     const controller = new AbortController();
-    locationRows<StateOption>(`type=states&country=${encodeURIComponent(countryCode)}`, controller.signal)
+    locationItems<StateOption>(
+      "states",
+      `type=states&country=${encodeURIComponent(countryCode)}`,
+      controller.signal,
+    )
       .then((rows) => {
         setStates(rows);
-        if (!stateCode && defaultState) {
-          const target = defaultState.toLowerCase();
-          const match = rows.find(
-            (row) => row.code.toLowerCase() === target || row.name.toLowerCase() === target,
-          );
-          if (match) {
-            setStateCode(match.code);
-            setStateValue(match.name);
-          }
+        const usableDefault =
+          defaultState && !isCountryNameAsRegion(defaultState, countryValue, countryCode)
+            ? defaultState
+            : "";
+        if (!usableDefault) {
+          setStateCode((current) => (rows.some((row) => row.code === current) ? current : ""));
+          return;
+        }
+        const target = usableDefault.toLowerCase();
+        const match = rows.find(
+          (row) => row.code.toLowerCase() === target || row.name.toLowerCase() === target,
+        );
+        if (match) {
+          setStateCode(match.code);
+          setStateValue(match.name);
         }
       })
       .catch((caught) => {
         if ((caught as Error).name !== "AbortError") setError("Could not load states or provinces.");
       });
     return () => controller.abort();
-  }, [countryCode, defaultState, stateCode]);
+  }, [countryCode, countryValue, defaultState]);
 
   useEffect(() => {
-    if (!countryCode || !stateCode) return;
+    if (!countryCode || !stateCode) {
+      setCities([]);
+      return;
+    }
     const controller = new AbortController();
-    locationRows<CityOption>(
+    locationItems<CityOption>(
+      "cities",
       `type=cities&country=${encodeURIComponent(countryCode)}&state=${encodeURIComponent(stateCode)}`,
       controller.signal,
     )
@@ -202,7 +259,7 @@ export function GlobalLocationFields({
         >
           <option value="">{stateCode && cities.length === 0 ? "No cities available" : "Select city"}</option>
           {cities.map((city) => (
-            <option key={city.id} value={city.name}>
+            <option key={`${city.id}-${city.name}`} value={city.name}>
               {city.name}
             </option>
           ))}

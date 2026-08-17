@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { loadInvestorProjectDetail } from "@/lib/portal";
 import { notFound } from "next/navigation";
@@ -42,7 +42,7 @@ export default async function InvestorProjectDetailPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
 
   const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";

@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { MembershipStatus } from "@/generated/prisma";
 import { FinanceDocumentsWorkspace } from "@/components/finance/finance-documents-workspace";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
@@ -32,7 +32,7 @@ export default async function FinanceDocumentsPage({ params }: { params: Promise
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "finance");
 

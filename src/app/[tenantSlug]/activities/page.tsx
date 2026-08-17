@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { ActivityStatus, ActivityType, MembershipStatus } from "@/generated/prisma";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -56,7 +56,7 @@ export default async function ActivitiesPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "activities");
 

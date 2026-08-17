@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import {
   mergeCurrencyOptions,
@@ -79,7 +79,7 @@ export default async function FinanceQueuePage({
       memberships: {
         where: { userId: session.user.id },
         take: 1,
-        select: { status: true, role: true },
+        select: MEMBERSHIP_FOR_NAV_SELECT,
       },
     },
   });

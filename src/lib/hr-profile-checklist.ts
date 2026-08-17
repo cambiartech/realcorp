@@ -38,7 +38,7 @@ export function buildProfileChecklist(
       id: "statutory",
       label: "Statutory IDs (TIN / RSA PIN)",
       done: Boolean(profile.taxId && profile.rsaPin),
-      hint: "Needed for PAYE and pension remittance schedules",
+      hint: "Type TIN and RSA PIN in this wizard, on My HR, or Prefill with AI from an uploaded form",
     },
     {
       id: "emergency",

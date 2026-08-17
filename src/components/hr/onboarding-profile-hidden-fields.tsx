@@ -26,6 +26,10 @@ export function OnboardingProfileHiddenFields({
       <input type="hidden" name="workEmail" value={draft.workEmail} />
       <input type="hidden" name="grossMonthly" value={draft.grossMonthly} />
       <input type="hidden" name="payeeTaxMonthly" value={draft.payeeTaxMonthly} />
+      <input type="hidden" name="taxId" value={draft.taxId} />
+      <input type="hidden" name="rsaPin" value={draft.rsaPin} />
+      <input type="hidden" name="pensionAdministrator" value={draft.pensionAdministrator} />
+      <input type="hidden" name="nhfMembershipNumber" value={draft.nhfMembershipNumber} />
       <input type="hidden" name="basicPercent" value={draft.basicPercent} />
       <input type="hidden" name="housingPercent" value={draft.housingPercent} />
       <input type="hidden" name="transportPercent" value={draft.transportPercent} />

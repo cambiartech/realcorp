@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { MembershipRole } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import { mergeOrgDepartments } from "@/lib/org-departments";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
@@ -111,7 +111,7 @@ export default async function TenantSettingsPage({
         userId: session.user.id,
       },
     },
-    select: { role: true, status: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
 
   assertTenantNavAccess(session, membership, tenant.settings, "settings");

@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { CampaignStatus, MembershipRole, MembershipStatus } from "@/generated/prisma";
-import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { buildLeadSourceOptions } from "@/lib/lead-source-options";
 import { formatEnumLabel } from "@/lib/ui-format";
@@ -39,7 +39,7 @@ export default async function LeadDetailPage({
 
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true },
+    select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "leads");
 

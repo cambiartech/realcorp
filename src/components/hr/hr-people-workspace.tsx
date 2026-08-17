@@ -996,12 +996,12 @@ export function HrPeopleWorkspace({
                       name="payrollRegionCode"
                       defaultValue={record.payrollRegionCode}
                     />
-                    <Field label="Tax identification number (TIN)" name="taxId" defaultValue={record.taxId} />
+                    <Field label="Tax identification number (TIN)" name="taxId" defaultValue={record.taxId} hint="Also on the onboarding wizard (Personal & job / Forms & documents)." />
                     <Field
                       label="RSA PIN"
                       name="rsaPin"
                       defaultValue={record.rsaPin}
-                      hint="Pension Retirement Savings Account PIN for remittance schedules."
+                      hint="Pension Retirement Savings Account PIN. Also on the onboarding wizard and My HR → Tax & pension."
                     />
                     <Field
                       label="Pension administrator (PFA)"

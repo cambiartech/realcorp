@@ -6,9 +6,16 @@ import {
 } from "@/lib/location-catalog";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function code(value: string | null) {
   return (value || "").trim().toUpperCase();
+}
+
+const NO_STORE = { "Cache-Control": "private, no-store" };
+
+function payload(type: "countries" | "states" | "cities", items: unknown[]) {
+  return NextResponse.json({ type, items }, { headers: NO_STORE });
 }
 
 export async function GET(request: NextRequest) {
@@ -18,23 +25,20 @@ export async function GET(request: NextRequest) {
 
   try {
     if (type === "countries") {
-      return NextResponse.json(await listCatalogCountries(), {
-        headers: { "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800" },
-      });
+      return payload("countries", await listCatalogCountries());
     }
     if (type === "states" && /^[A-Z]{2}$/.test(country)) {
-      return NextResponse.json(await listLocationStates(country), {
-        headers: { "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800" },
-      });
+      return payload("states", await listLocationStates(country));
     }
     if (type === "cities" && /^[A-Z]{2}$/.test(country) && state) {
-      return NextResponse.json(await listLocationCities(country, state), {
-        headers: { "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800" },
-      });
+      return payload("cities", await listLocationCities(country, state));
     }
-    return NextResponse.json({ error: "Invalid location query." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid location query." }, { status: 400, headers: NO_STORE });
   } catch (error) {
     console.error("Location catalog failed", error);
-    return NextResponse.json({ error: "Location data is temporarily unavailable." }, { status: 503 });
+    return NextResponse.json(
+      { error: "Location data is temporarily unavailable." },
+      { status: 503, headers: NO_STORE },
+    );
   }
 }

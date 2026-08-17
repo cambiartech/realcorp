@@ -73,7 +73,7 @@ export default async function TenantHomePage({
         userId: session.user.id,
       },
     },
-    select: { role: true, status: true, tenantId: true, department: true, isDepartmentLead: true },
+    select: { role: true, status: true, tenantId: true, department: true, isDepartmentLead: true, modulePermissions: true },
   });
   const isActive = membership?.status === MembershipStatus.ACTIVE;
   const canView = Boolean(session.user.isPlatformAdmin) || isActive;
