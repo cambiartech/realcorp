@@ -19,9 +19,18 @@ type Props = {
   onChange?: (value: string) => void;
   name?: string;
   label?: string;
+  hideLabel?: boolean;
+  compact?: boolean;
   required?: boolean;
   allowCreate?: boolean;
 };
+
+function withCurrentDepartment(departments: string[], current: string) {
+  const extra = current.trim();
+  if (!extra) return departments;
+  if (departments.some((item) => item.toLowerCase() === extra.toLowerCase())) return departments;
+  return [...departments, extra];
+}
 
 export function OrgDepartmentSelect({
   tenantSlug,
@@ -31,10 +40,14 @@ export function OrgDepartmentSelect({
   onChange,
   name = "department",
   label = "Department (optional)",
+  hideLabel = false,
+  compact = false,
   required = false,
   allowCreate = true,
 }: Props) {
-  const [localDepartments, setLocalDepartments] = useState(departments);
+  const [localDepartments, setLocalDepartments] = useState(() =>
+    withCurrentDepartment(departments, value ?? defaultValue),
+  );
   const [selected, setSelected] = useState(value ?? defaultValue);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -90,7 +103,11 @@ export function OrgDepartmentSelect({
 
   return (
     <div>
-      <label className="mb-1 block text-sm text-muted">{label}</label>
+      {hideLabel ? null : (
+        <label className={compact ? "mb-1 block text-xs font-medium text-foreground" : "mb-1 block text-sm text-muted"}>
+          {label}
+        </label>
+      )}
       <input type="hidden" name={name} value={current} />
       <UiSelect
         value={adding ? NEW_VALUE : current}

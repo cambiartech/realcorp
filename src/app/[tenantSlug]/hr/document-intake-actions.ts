@@ -452,6 +452,7 @@ export async function prefillEmployeeFromUploadedDocs(
       skipped: number;
       failed: Array<{ fileName: string; error: string }>;
       filled: string[];
+      partial?: boolean;
     }
   | { ok: false; error: string }
 > {
@@ -464,7 +465,7 @@ export async function prefillEmployeeFromUploadedDocs(
   });
   if (!profile) return { ok: false, error: "Create this employee record first, then prefill from their documents." };
 
-  const [documents, pendingRequests] = await Promise.all([
+  const [documents, pendingRequests, alreadyRead] = await Promise.all([
     prisma.hrDocument.findMany({
       where: { tenantId: ctx.tenant.id, employeeProfileId: profile.id, deletedAt: null },
       orderBy: { createdAt: "asc" },
@@ -478,6 +479,15 @@ export async function prefillEmployeeFromUploadedDocs(
       },
       select: { id: true, formType: true, submittedPayload: true, submittedFileUrl: true },
     }),
+    prisma.hrFormRequest.findMany({
+      where: {
+        tenantId: ctx.tenant.id,
+        employeeProfileId: profile.id,
+        status: HrFormRequestStatus.APPROVED,
+        submittedFileUrl: { not: null },
+      },
+      select: { submittedFileUrl: true },
+    }),
   ]);
 
   if (!documents.length && !pendingRequests.length) {
@@ -488,7 +498,14 @@ export async function prefillEmployeeFromUploadedDocs(
   const failed: Array<{ fileName: string; error: string }> = [];
   let applied = 0;
   let skipped = 0;
+  let alreadyAppliedCount = 0;
+  let partial = false;
+  const started = Date.now();
+  const BUDGET_MS = 16_000;
   const appliedFileUrls = new Set<string>();
+  for (const row of alreadyRead) {
+    if (row.submittedFileUrl) appliedFileUrls.add(row.submittedFileUrl);
+  }
 
   for (const request of pendingRequests) {
     if (!request.submittedPayload) {
@@ -524,7 +541,13 @@ export async function prefillEmployeeFromUploadedDocs(
   for (const document of documents) {
     if (appliedFileUrls.has(document.fileUrl)) {
       skipped += 1;
+      alreadyAppliedCount += 1;
       continue;
+    }
+    if (Date.now() - started > BUDGET_MS) {
+      skipped += documents.length - documents.indexOf(document);
+      partial = true;
+      break;
     }
     const fileName = document.fileName?.trim() || document.title?.trim() || "";
     if (!fileName) {
@@ -540,7 +563,8 @@ export async function prefillEmployeeFromUploadedDocs(
       continue;
     }
     try {
-      if (applied + failed.length > 0) {
+      const remainingMs = BUDGET_MS - (Date.now() - started);
+      if (applied + failed.length > 0 && remainingMs > 4_000) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
       const extracted = await extractHrDocument({
@@ -617,11 +641,17 @@ export async function prefillEmployeeFromUploadedDocs(
   revalidatePath(`/${tenantSlug}/hr/people`);
   revalidatePath(`/${tenantSlug}/hr/documents`);
 
+  if (applied === 0 && alreadyAppliedCount > 0 && failed.length === 0) {
+    filled.add("existing document data");
+    applied = alreadyAppliedCount;
+  }
+
   return {
     ok: true,
     applied,
     skipped,
     failed,
     filled: Array.from(filled),
+    partial,
   };
 }

@@ -6,16 +6,17 @@ import {
 } from "@/lib/location-catalog";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function code(value: string | null) {
   return (value || "").trim().toUpperCase();
 }
 
-const NO_STORE = { "Cache-Control": "private, no-store" };
+const CACHE = {
+  "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+};
 
 function payload(type: "countries" | "states" | "cities", items: unknown[]) {
-  return NextResponse.json({ type, items }, { headers: NO_STORE });
+  return NextResponse.json({ type, items }, { headers: CACHE });
 }
 
 export async function GET(request: NextRequest) {
@@ -33,12 +34,12 @@ export async function GET(request: NextRequest) {
     if (type === "cities" && /^[A-Z]{2}$/.test(country) && state) {
       return payload("cities", await listLocationCities(country, state));
     }
-    return NextResponse.json({ error: "Invalid location query." }, { status: 400, headers: NO_STORE });
+    return NextResponse.json({ error: "Invalid location query." }, { status: 400 });
   } catch (error) {
     console.error("Location catalog failed", error);
     return NextResponse.json(
       { error: "Location data is temporarily unavailable." },
-      { status: 503, headers: NO_STORE },
+      { status: 503 },
     );
   }
 }

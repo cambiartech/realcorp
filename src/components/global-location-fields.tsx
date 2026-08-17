@@ -37,7 +37,7 @@ async function locationItems<T>(
   query: string,
   signal: AbortSignal,
 ): Promise<T[]> {
-  const response = await fetch(`/api/locations?${query}`, { signal, cache: "no-store" });
+  const response = await fetch(`/api/locations?${query}`, { signal });
   if (!response.ok) throw new Error("Location data is unavailable.");
   const body = (await response.json()) as { type?: string; items?: unknown };
   if (body?.type !== type || !Array.isArray(body.items)) {

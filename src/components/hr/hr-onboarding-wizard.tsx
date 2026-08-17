@@ -10,8 +10,14 @@ import { type OnboardingStepId, writeStoredOnboardingStep } from "@/lib/hr-onboa
 import { mergeProfileDraftFromForm, profileDraftFingerprint } from "@/lib/hr-onboarding-draft";
 import { OnboardingProfileHiddenFields } from "@/components/hr/onboarding-profile-hidden-fields";
 import { upsertEmployeeProfile } from "@/app/[tenantSlug]/hr/actions";
-import { prefillEmployeeFromUploadedDocs } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { UiSelect } from "@/components/ui-select";
+import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { useSnackbar } from "@/components/snackbar";
+import {
+  notifyPrefillResult,
+  prefillSuccessMessage,
+  runPrefillFromUploadedDocs,
+} from "@/lib/hr-prefill-client";
 
 const inputClass =
   "w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20";
@@ -38,6 +44,7 @@ export function HrOnboardingWizard({
   onGenerateOffer,
   onSendForm,
   onSendAllForms,
+  departments,
 }: {
   tenantSlug: string;
   currency: string;
@@ -65,8 +72,10 @@ export function HrOnboardingWizard({
   onGenerateOffer: () => void;
   onSendForm: (formType: "BIODATA" | "BANK_FORM" | "GUARANTOR" | "HEALTH") => void;
   onSendAllForms?: () => void;
+  departments: string[];
 }) {
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [draft, setDraft] = useState<ProfileDetailRow>(record);
   const [step, setStep] = useState<OnboardingStepId>(initialStep);
   const [pending, setPending] = useState(false);
@@ -108,29 +117,25 @@ export function HrOnboardingWizard({
     setPrefillPending(true);
     setError(null);
     setPrefillNote(null);
-    const result = await prefillEmployeeFromUploadedDocs(tenantSlug, record.userId);
-    setPrefillPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await runPrefillFromUploadedDocs(tenantSlug, record.userId);
+      if (!notifyPrefillResult(showSnackbar, result)) {
+        if (!result.ok) setError(result.error);
+        else {
+          setError(
+            result.failed[0]
+              ? `Nothing could be read yet. ${result.failed[0].fileName}: ${result.failed[0].error}`
+              : "The uploaded files were found, but no employee fields could be read. Try PDF or JPG copies.",
+          );
+        }
+        return;
+      }
+      if (!result.ok) return;
+      setPrefillNote(prefillSuccessMessage(result));
+      router.refresh();
+    } finally {
+      setPrefillPending(false);
     }
-    if (!result.applied) {
-      setError(
-        result.failed[0]
-          ? `Nothing could be read yet. ${result.failed[0].fileName}: ${result.failed[0].error}`
-          : "The uploaded files were found, but no employee fields could be read. Try PDF or JPG copies.",
-      );
-      return;
-    }
-    const failedHint = result.failed.length
-      ? ` ${result.failed.length} file${result.failed.length === 1 ? "" : "s"} could not be read.`
-      : "";
-    setPrefillNote(
-      `Filled ${result.filled.join(", ") || "employee fields"} from ${result.applied} document${
-        result.applied === 1 ? "" : "s"
-      }.${failedHint}`,
-    );
-    router.refresh();
   }
 
   async function saveForm(form: HTMLFormElement, status?: string) {
@@ -277,10 +282,17 @@ export function HrOnboardingWizard({
               Payroll title — separate from their Team app role.
             </span>
           </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-medium">Department</span>
-            <input name="department" defaultValue={draft.department} className={inputClass} />
-          </label>
+          <div className="block text-sm">
+            <OrgDepartmentSelect
+              tenantSlug={tenantSlug}
+              departments={departments}
+              name="department"
+              label="Department"
+              defaultValue={draft.department}
+              compact
+              allowCreate
+            />
+          </div>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Date of joining</span>
             <input

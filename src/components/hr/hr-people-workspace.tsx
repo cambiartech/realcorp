@@ -29,13 +29,15 @@ import {
   createHrFormRequestsBatch,
   upsertEmployeeProfile,
 } from "@/app/[tenantSlug]/hr/actions";
-import { createHrOnlyEmployee, prefillEmployeeFromUploadedDocs } from "@/app/[tenantSlug]/hr/document-intake-actions";
+import { createHrOnlyEmployee } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { inviteTenantMembersBatch } from "@/app/[tenantSlug]/team/actions";
 import { HR_FORM_OPTIONS } from "@/lib/hr-form-types";
 import { INVITE_DEPARTMENT_OPTIONS } from "@/lib/team-membership-roles";
 import { downloadExcel } from "@/lib/table-export";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { GlobalLocationFields } from "@/components/global-location-fields";
+import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { notifyPrefillResult, runPrefillFromUploadedDocs } from "@/lib/hr-prefill-client";
 
 type PeopleTab = "directory" | "onboard" | "record" | "send" | "requests";
 type RecordTab = "personal" | "job" | "bank" | "emergency" | "family";
@@ -104,6 +106,7 @@ export function HrPeopleWorkspace({
   initialOnboardUserId,
   offerByUserId,
   formRequests,
+  departments,
 }: {
   tenantSlug: string;
   companyName: string;
@@ -166,6 +169,7 @@ export function HrPeopleWorkspace({
     submittedPayload: Record<string, unknown> | null;
     reviewNote: string | null;
   }>;
+  departments: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -724,6 +728,7 @@ export function HrPeopleWorkspace({
           onGenerateOffer={() => setShowOfferLetter(true)}
           onSendForm={(ft) => openSendForm(ft)}
           onSendAllForms={openSendAllForms}
+          departments={departments}
         />
       ) : null}
 
@@ -855,7 +860,17 @@ export function HrPeopleWorkspace({
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Job title" name="position" defaultValue={record.position} />
-                    <Field label="Department" name="department" defaultValue={record.department} />
+                    <Field label="Department" name="department">
+                      <OrgDepartmentSelect
+                        tenantSlug={tenantSlug}
+                        departments={departments}
+                        name="department"
+                        label="Department"
+                        defaultValue={record.department}
+                        hideLabel
+                        allowCreate
+                      />
+                    </Field>
                     <Field
                       label="Date of joining"
                       name="dateOfJoining"
@@ -1240,28 +1255,17 @@ export function HrPeopleWorkspace({
               onPrefillFromDocs={() => {
                 void (async () => {
                   setPending(true);
-                  const result = await prefillEmployeeFromUploadedDocs(
-                    tenantSlug,
-                    selectedMember.userId,
-                  );
-                  setPending(false);
-                  if (!result.ok) {
-                    showSnackbar(result.error, "error");
-                    return;
-                  }
-                  if (!result.applied) {
-                    showSnackbar(
-                      result.failed[0]?.error ||
-                        "Uploaded files were found, but no employee fields could be read.",
-                      "error",
+                  try {
+                    const result = await runPrefillFromUploadedDocs(
+                      tenantSlug,
+                      selectedMember.userId,
                     );
-                    return;
+                    if (notifyPrefillResult(showSnackbar, result)) {
+                      router.refresh();
+                    }
+                  } finally {
+                    setPending(false);
                   }
-                  showSnackbar(
-                    `Filled ${result.filled.join(", ") || "employee fields"} from uploaded documents.`,
-                    "success",
-                  );
-                  router.refresh();
                 })();
               }}
               prefillPending={pending}
@@ -1831,7 +1835,16 @@ export function HrPeopleWorkspace({
             <Field label="Work email (optional)" name="workEmail" type="email" />
             <Field label="Phone" name="phoneMobile" />
             <Field label="Job title" name="position" />
-            <Field label="Department" name="department" />
+            <Field label="Department" name="department">
+              <OrgDepartmentSelect
+                tenantSlug={tenantSlug}
+                departments={departments}
+                name="department"
+                label="Department"
+                hideLabel
+                allowCreate
+              />
+            </Field>
             <Field label="Pay group" name="paygroupName" />
             <Field label={`Gross monthly pay (${currency})`} name="grossMonthly" type="number" />
           </div>

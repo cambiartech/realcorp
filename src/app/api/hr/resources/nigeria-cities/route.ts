@@ -1,6 +1,9 @@
-import { listNigeriaLgasFromDb } from "@/lib/nigeria-locations-sync";
-import { citiesForState } from "@/lib/nigeria-locations";
+import { citiesForState, resolveNigeriaStateName } from "@/lib/nigeria-locations";
 import { NextRequest, NextResponse } from "next/server";
+
+const CACHE = {
+  "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+};
 
 export async function GET(req: NextRequest) {
   const state = req.nextUrl.searchParams.get("state")?.trim() ?? "";
@@ -9,28 +12,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "state query param required" }, { status: 400 });
   }
 
-  try {
-    const result = await listNigeriaLgasFromDb(state, q || undefined);
-    if (result.cities.length > 0) {
-      return NextResponse.json({
-        state: result.state,
-        cities: result.cities,
-        total: result.total,
-        kind: "LGA",
-        source: "db",
-      });
-    }
-  } catch (err) {
-    console.error("nigeria-cities db", err);
-  }
-
-  const fallback = citiesForState(state).filter((c) => c !== "Other");
-  const filtered = q ? fallback.filter((c) => c.toLowerCase().includes(q.toLowerCase())) : fallback;
-  return NextResponse.json({
-    state,
-    cities: filtered,
-    total: filtered.length,
-    kind: "city",
-    source: "fallback",
-  });
+  const resolved = resolveNigeriaStateName(state);
+  const all = citiesForState(resolved);
+  const cities = q ? all.filter((city) => city.toLowerCase().includes(q.toLowerCase())) : all;
+  return NextResponse.json(
+    {
+      state: resolved,
+      cities,
+      total: all.length,
+      kind: "LGA",
+      source: "catalog",
+    },
+    { headers: CACHE },
+  );
 }

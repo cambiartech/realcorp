@@ -24,6 +24,7 @@ import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
 import type { EmployeeProfile } from "@/generated/prisma";
 import { brandingFromSettings } from "@/lib/tenant-branding";
+import { mergeOrgDepartments } from "@/lib/org-departments";
 import { redirect } from "next/navigation";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
@@ -77,6 +78,7 @@ export default async function HrQueuePage({
           orgCity: true,
           orgState: true,
           orgCountry: true,
+          orgDepartments: true,
         },
       },
     },
@@ -475,9 +477,10 @@ export default async function HrQueuePage({
     (p) => p.status === "ACTIVE" && (p.grossMonthly == null || Number(p.grossMonthly) <= 0),
   ).length;
 
-  const departments = Array.from(
-    new Set(profiles.map((p) => p.department?.trim() || "").filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b));
+  const departments = mergeOrgDepartments([
+    ...((tenant.settings?.orgDepartments as string[] | null | undefined) ?? []),
+    ...profiles.map((p) => p.department?.trim() || ""),
+  ]).sort((a, b) => a.localeCompare(b));
 
   const performanceGoalRows: PerformanceGoalRow[] = goals.map((g) => ({
     id: g.id,

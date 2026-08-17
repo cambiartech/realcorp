@@ -1,12 +1,13 @@
-import { listNigeriaStatesFromDb } from "@/lib/nigeria-locations-sync";
+import { NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  try {
-    const states = await listNigeriaStatesFromDb();
-    return NextResponse.json({ states, source: "db" });
-  } catch (err) {
-    console.error("nigeria-states", err);
-    return NextResponse.json({ error: "Could not load states" }, { status: 503 });
-  }
+  return NextResponse.json(
+    { states: [...NIGERIA_STATES], source: "catalog" },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      },
+    },
+  );
 }

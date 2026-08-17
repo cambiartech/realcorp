@@ -402,6 +402,7 @@ export function HrWorkspace(props: {
             initialOnboardUserId={peopleOnboardUserId}
             offerByUserId={offerByUserId}
             aiEnabled={aiEnabled}
+            departments={departments}
           />
         ) : null}
 

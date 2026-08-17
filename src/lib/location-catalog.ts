@@ -1,6 +1,9 @@
 import prisma from "@/lib/db";
-import { NIGERIA_CITIES_BY_STATE, NIGERIA_STATES } from "@/lib/nigeria-locations";
-import { listNigeriaLgasFromDb, listNigeriaStatesFromDb } from "@/lib/nigeria-locations-sync";
+import {
+  NIGERIA_CITIES_BY_STATE,
+  NIGERIA_STATES,
+  resolveNigeriaStateName,
+} from "@/lib/nigeria-locations";
 
 const CSC_DATA_CDN =
   "https://cdn.jsdelivr.net/npm/@countrystatecity/countries@1.0.9/dist/data";
@@ -8,6 +11,39 @@ const CSC_DATA_CDN =
 type CountryRow = { code: string; name: string; emoji?: string };
 type StateRow = { code: string; name: string; type?: string | null };
 type CityRow = { id: number; name: string };
+
+const MEMORY_TTL_MS = 24 * 60 * 60 * 1000;
+const DB_WAIT_MS = 1_200;
+
+const memory = new Map<string, { at: number; value: unknown }>();
+
+function memoryGet<T>(key: string): T | null {
+  const hit = memory.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > MEMORY_TTL_MS) {
+    memory.delete(key);
+    return null;
+  }
+  return hit.value as T;
+}
+
+function memorySet(key: string, value: unknown) {
+  memory.set(key, { at: Date.now(), value });
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("LOCATION_DB_TIMEOUT")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 async function fetchCscJson<T>(path: string): Promise<T> {
   const response = await fetch(`${CSC_DATA_CDN}/${path}`, {
@@ -20,62 +56,69 @@ async function fetchCscJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-function nigeriaStateFallback(): StateRow[] {
+function nigeriaStates(): StateRow[] {
   return NIGERIA_STATES.map((name) => ({ code: name, name, type: "state" }));
 }
 
+function nigeriaCities(stateInput: string): CityRow[] {
+  const state = resolveNigeriaStateName(stateInput);
+  const names = NIGERIA_CITIES_BY_STATE[state] || [];
+  return names.map((name, index) => ({ id: index + 1, name }));
+}
+
+const NG_COUNTRY: CountryRow = { code: "NG", name: "Nigeria", emoji: "🇳🇬" };
+
 export async function listCatalogCountries(): Promise<CountryRow[]> {
-  const rows = await prisma.countryRef.findMany({
-    orderBy: { name: "asc" },
-    select: { code: true, name: true, emoji: true },
-  });
-  return rows.map((row) => ({
-    code: row.code,
-    name: row.name,
-    emoji: row.emoji || undefined,
-  }));
+  const cached = memoryGet<CountryRow[]>("countries");
+  if (cached?.length) return cached;
+
+  try {
+    const rows = await withTimeout(
+      prisma.countryRef.findMany({
+        orderBy: { name: "asc" },
+        select: { code: true, name: true, emoji: true },
+      }),
+      DB_WAIT_MS,
+    );
+    const items = rows.map((row) => ({
+      code: row.code,
+      name: row.name,
+      emoji: row.emoji || undefined,
+    }));
+    if (items.length) {
+      memorySet("countries", items);
+      return items;
+    }
+  } catch {
+    // Paused or slow DB — keep the form usable for Nigeria without waiting.
+  }
+
+  return [NG_COUNTRY];
 }
 
 export async function listLocationStates(countryCode: string): Promise<StateRow[]> {
-  if (countryCode === "NG") {
-    try {
-      const names = await listNigeriaStatesFromDb();
-      if (names.length > 0) {
-        return names.map((name) => ({ code: name, name, type: "state" }));
-      }
-    } catch {
-      // Use the static Nigerian state list — never a world country catalog.
-    }
-    return nigeriaStateFallback();
-  }
+  if (countryCode === "NG") return nigeriaStates();
+
+  const cacheKey = `states:${countryCode}`;
+  const cached = memoryGet<StateRow[]>(cacheKey);
+  if (cached) return cached;
 
   const rows = await prisma.countryStateRef.findMany({
     where: { countryCode },
     orderBy: { name: "asc" },
     select: { code: true, name: true, type: true },
   });
-  return rows.map((row) => ({
+  const items = rows.map((row) => ({
     code: row.code,
     name: row.name,
     type: row.type,
   }));
+  memorySet(cacheKey, items);
+  return items;
 }
 
 export async function listLocationCities(countryCode: string, stateCode: string): Promise<CityRow[]> {
-  if (countryCode === "NG") {
-    try {
-      const fromDb = await listNigeriaLgasFromDb(stateCode);
-      if (fromDb.cities.length > 0) {
-        return fromDb.cities.map((name, index) => ({ id: index + 1, name }));
-      }
-    } catch {
-      // Fall through to the static city list for that state.
-    }
-    const fallback = NIGERIA_CITIES_BY_STATE[stateCode] || [];
-    return fallback
-      .filter((name) => name && name !== "Other")
-      .map((name, index) => ({ id: index + 1, name }));
-  }
+  if (countryCode === "NG") return nigeriaCities(stateCode);
 
   const country = await prisma.countryRef.findUnique({
     where: { code: countryCode },

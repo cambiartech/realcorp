@@ -23,9 +23,10 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { addHrDocument, getHrUploadSignature, softDeleteHrDocument } from "@/app/[tenantSlug]/hr/actions";
-import { ingestHrDocument, prefillEmployeeFromUploadedDocs } from "@/app/[tenantSlug]/hr/document-intake-actions";
+import { ingestHrDocument } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 import { MODAL_PANEL_XS } from "@/lib/modal-panel";
+import { notifyPrefillResult, runPrefillFromUploadedDocs } from "@/lib/hr-prefill-client";
 
 const DOC_CATEGORIES = [
   { value: "BIODATA", label: "Biodata" },
@@ -309,7 +310,7 @@ export function HrDocumentsWorkspace({
       }
     }
     setUploading(false);
-    
+
     setLastUploadResults([...completed, ...failed.map((message) => `Failed: ${message}`)]);
     if (completed.length) {
       const aiLater = completed.filter((message) => message.includes("AI could not read"));
@@ -626,25 +627,17 @@ export function HrDocumentsWorkspace({
                 onClick={() => {
                   void (async () => {
                     setPrefillPending(true);
-                    const result = await prefillEmployeeFromUploadedDocs(tenantSlug, selectedEmployee.userId);
-                    setPrefillPending(false);
-                    if (!result.ok) {
-                      showSnackbar(result.error, "error");
-                      return;
-                    }
-                    if (!result.applied) {
-                      showSnackbar(
-                        result.failed[0]?.error ||
-                          "Uploaded files were found, but no employee fields could be read.",
-                        "error",
+                    try {
+                      const result = await runPrefillFromUploadedDocs(
+                        tenantSlug,
+                        selectedEmployee.userId,
                       );
-                      return;
+                      if (notifyPrefillResult(showSnackbar, result)) {
+                        router.refresh();
+                      }
+                    } finally {
+                      setPrefillPending(false);
                     }
-                    showSnackbar(
-                      `Filled ${result.filled.join(", ") || "employee fields"} from uploaded documents.`,
-                      "success",
-                    );
-                    router.refresh();
                   })();
                 }}
               />
