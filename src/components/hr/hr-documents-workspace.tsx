@@ -309,6 +309,7 @@ export function HrDocumentsWorkspace({
       }
     }
     setUploading(false);
+    
     setLastUploadResults([...completed, ...failed.map((message) => `Failed: ${message}`)]);
     if (completed.length) {
       const aiLater = completed.filter((message) => message.includes("AI could not read"));
