@@ -10,6 +10,8 @@ type ReservationRow = {
 };
 
 
+
+
 export function computeOccupancyPercent(units: UnitRow[]): number {
   if (units.length === 0) return 0;
   const occupied = units.filter((u) => u.housekeepingStatus === "OCCUPIED").length;
