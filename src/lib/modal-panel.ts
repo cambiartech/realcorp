@@ -11,3 +11,7 @@ export const MODAL_PANEL_XL = `${BASE} max-w-2xl p-6 sm:p-7`;
 export const MODAL_PANEL_FORM = `${BASE} max-w-3xl p-6 sm:p-8`;
 export const MODAL_PANEL_2XL =
   "flex max-h-[min(90vh,720px)] w-full max-w-4xl shrink-0 flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-2xl";
+
+/** Right-hand timeline / entity drawer — solid so it covers the app header. */
+export const MODAL_DRAWER_MD =
+  "relative flex h-full w-full max-w-md shrink-0 flex-col overflow-hidden border-l border-foreground/10 bg-background p-5 shadow-2xl";

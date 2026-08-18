@@ -2,6 +2,7 @@
 
 import { ModalOverlay } from "@/components/modal-overlay";
 import {
+  MODAL_DRAWER_MD,
   MODAL_PANEL_LG,
   MODAL_PANEL_MD,
   MODAL_PANEL_SM,
@@ -621,9 +622,9 @@ export function ProjectsWorkspace({
           open
           onClose={() => setTimelineProject(null)}
           variant="drawer"
-          panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-foreground/[0.02] p-4 shadow-2xl"
+          panelClassName={MODAL_DRAWER_MD}
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 pb-4">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Project Timeline</h2>
               <p className="text-xs text-muted">{timelineProject.name}</p>
@@ -639,22 +640,24 @@ export function ProjectsWorkspace({
               </svg>
             </button>
           </div>
-          {timelineLoading ? (
-            <p className="mt-4 text-sm text-muted">Loading timeline...</p>
-          ) : timelineLogs.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
-          ) : (
-            <ul className="mt-4 space-y-2">
-              {timelineLogs.map((log) => (
-                <li key={log.id} className="rounded-md border border-foreground/10 p-3">
-                  <p className="text-xs text-muted">{log.timestamp}</p>
-                  <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
-                  <p className="text-xs text-muted">By: {log.actor}</p>
-                  <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="min-h-0 flex-1 overflow-y-auto pt-4">
+            {timelineLoading ? (
+              <p className="text-sm text-muted">Loading timeline...</p>
+            ) : timelineLogs.length === 0 ? (
+              <p className="text-sm text-muted">No timeline events yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {timelineLogs.map((log) => (
+                  <li key={log.id} className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
+                    <p className="text-xs text-muted">{log.timestamp}</p>
+                    <p className="mt-0.5 text-sm font-medium text-foreground">{log.action}</p>
+                    <p className="text-xs text-muted">By: {log.actor}</p>
+                    <p className="mt-1 text-sm text-foreground/90">{log.summary}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </ModalOverlay>
       ) : null}
     </div>

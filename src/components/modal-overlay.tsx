@@ -23,7 +23,7 @@ export function ModalOverlay({
   onClose,
   children,
   variant = "center",
-  zClassName = "z-50",
+  zClassName = "z-[80]",
   panelClassName,
   "aria-labelledby": ariaLabelledby,
 }: ModalOverlayProps) {

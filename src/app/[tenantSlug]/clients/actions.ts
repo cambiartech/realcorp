@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import {
   BankMatchStatus,
   ClientDocumentCategory,
+  ClientUnitLinkRole,
   InvoiceStatus,
   MembershipRole,
   MembershipStatus,
@@ -27,6 +28,16 @@ import {
 } from "@/lib/validators/clients";
 import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
 import { sendPropertyClientPortalInvite } from "@/lib/client-portal-invite";
+import {
+  detectUnitNamePattern,
+  groupUnitsByExtractedClient,
+  nameLooksGeneric,
+  normalizeClientNameKey,
+  reservedOwnerNote,
+  suggestedClientRole,
+  suggestedClientStatus,
+  type UnitNamePatternPresetId,
+} from "@/lib/unit-label-client-import";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -1048,4 +1059,271 @@ export async function importClients(
 
   revalidateClients(tenantSlug);
   return { ok: true, count, unitsLinked, unitLinkSkipped };
+}
+
+// ---------------------------------------------------------------------------
+// Import clients from unit labels
+// ---------------------------------------------------------------------------
+
+export type UnitLabelImportPreviewGroup = {
+  key: string;
+  fullName: string;
+  warning: string | null;
+  defaultSelected: boolean;
+  existingClientId: string | null;
+  existingClientName: string | null;
+  suggestedStatus: "ACTIVE" | "PROSPECT";
+  suggestedRole: "OWNER" | "TENANT";
+  units: Array<{
+    id: string;
+    label: string;
+    projectName: string;
+    status: string;
+    purpose: string;
+  }>;
+};
+
+export type UnitLabelImportPreview =
+  | {
+      ok: true;
+      preset: UnitNamePatternPresetId;
+      pattern: string;
+      unitsScanned: number;
+      skippedNoName: number;
+      skippedAlreadyLinked: number;
+      groups: UnitLabelImportPreviewGroup[];
+    }
+  | { ok: false; error: string };
+
+async function loadUnitsForLabelImport(tenantId: string) {
+  const units = await prisma.unit.findMany({
+    where: { tenantId },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    take: 2000,
+    select: {
+      id: true,
+      label: true,
+      purpose: true,
+      status: true,
+      pricingPlanId: true,
+      project: { select: { id: true, name: true } },
+      clientLinks: { select: { id: true }, take: 1 },
+    },
+  });
+  return units.map((unit) => ({
+    id: unit.id,
+    label: unit.label,
+    projectId: unit.project.id,
+    projectName: unit.project.name,
+    purpose: unit.purpose,
+    status: unit.status,
+    pricingPlanId: unit.pricingPlanId,
+    alreadyLinked: unit.clientLinks.length > 0,
+  }));
+}
+
+export async function previewClientsFromUnitLabels(
+  tenantSlug: string,
+  input?: { preset?: UnitNamePatternPresetId; pattern?: string },
+): Promise<UnitLabelImportPreview> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to import clients." };
+  }
+
+  const tenantRecord = await prisma.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { name: true },
+  });
+  const units = await loadUnitsForLabelImport(tenant.id);
+  if (!units.length) {
+    return { ok: false, error: "No project units found. Add units to a project first." };
+  }
+
+  const labels = units.filter((unit) => !unit.alreadyLinked).map((unit) => unit.label);
+  const detected = detectUnitNamePattern(labels);
+  const preset = input?.preset ?? detected.preset;
+  const pattern =
+    preset === "custom"
+      ? (input?.pattern || "").trim()
+      : input?.pattern || detected.pattern;
+
+  if (preset === "custom" && !/{name}/i.test(pattern)) {
+    return { ok: false, error: "Custom pattern must include {name} so we know which part is the client." };
+  }
+
+  const grouped = groupUnitsByExtractedClient(units, { preset, pattern });
+  const existing = await prisma.propertyClient.findMany({
+    where: { tenantId: tenant.id },
+    select: { id: true, fullName: true },
+  });
+  const existingByKey = new Map(
+    existing.map((client) => [normalizeClientNameKey(client.fullName), client] as const),
+  );
+
+  const groups: UnitLabelImportPreviewGroup[] = grouped.groups.map((group) => {
+    const orgMatch = tenantRecord?.name
+      ? nameLooksGeneric(group.fullName, tenantRecord.name)
+      : false;
+    const existingClient = existingByKey.get(group.key) ?? null;
+    const warning = orgMatch
+      ? `This matches the organization name (${tenantRecord?.name}).`
+      : group.warning;
+    return {
+      key: group.key,
+      fullName: existingClient?.fullName || group.fullName,
+      warning,
+      defaultSelected: existingClient ? true : orgMatch ? false : group.defaultSelected,
+      existingClientId: existingClient?.id ?? null,
+      existingClientName: existingClient?.fullName ?? null,
+      suggestedStatus: suggestedClientStatus(
+        group.units.map((unit) => unit.status),
+        group.units.map((unit) => unit.purpose),
+      ),
+      suggestedRole: suggestedClientRole(group.units.map((unit) => unit.purpose)),
+      units: group.units.map((unit) => ({
+        id: unit.id,
+        label: unit.label,
+        projectName: unit.projectName,
+        status: unit.status,
+        purpose: unit.purpose,
+      })),
+    };
+  });
+
+  return {
+    ok: true,
+    preset,
+    pattern,
+    unitsScanned: units.length,
+    skippedNoName: grouped.skippedNoName,
+    skippedAlreadyLinked: grouped.skippedAlreadyLinked,
+    groups,
+  };
+}
+
+export async function importClientsFromUnitLabels(
+  tenantSlug: string,
+  input: {
+    preset: UnitNamePatternPresetId;
+    pattern?: string;
+    selectedKeys: string[];
+  },
+): Promise<
+  | { ok: true; created: number; reused: number; unitsLinked: number; skipped: number }
+  | { ok: false; error: string }
+> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  if (!input.selectedKeys.length) return { ok: false, error: "Select at least one client to import." };
+  if (input.selectedKeys.length > 500) return { ok: false, error: "Select 500 clients or fewer per import." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to import clients." };
+  }
+
+  const preview = await previewClientsFromUnitLabels(tenantSlug, {
+    preset: input.preset,
+    pattern: input.pattern,
+  });
+  if (!preview.ok) return preview;
+
+  const selected = new Set(input.selectedKeys.map((key) => key.toUpperCase()));
+  const groups = preview.groups.filter((group) => selected.has(group.key));
+  if (!groups.length) return { ok: false, error: "None of the selected clients matched the current pattern." };
+
+  const unitIds = groups.flatMap((group) => group.units.map((unit) => unit.id));
+  const units = await prisma.unit.findMany({
+    where: { tenantId: tenant.id, id: { in: unitIds } },
+    select: { id: true, label: true, pricingPlanId: true },
+  });
+  const unitById = new Map(units.map((unit) => [unit.id, unit]));
+  const alreadyLinked = new Set(
+    (
+      await prisma.clientUnitLink.findMany({
+        where: { tenantId: tenant.id, unitId: { in: unitIds } },
+        select: { unitId: true },
+      })
+    ).map((link) => link.unitId),
+  );
+
+  let created = 0;
+  let reused = 0;
+  let unitsLinked = 0;
+  let skipped = 0;
+
+  for (const group of groups) {
+    let clientId = group.existingClientId;
+    if (!clientId) {
+      const client = await prisma.propertyClient.create({
+        data: {
+          tenantId: tenant.id,
+          fullName: group.fullName,
+          status:
+            group.suggestedStatus === "ACTIVE"
+              ? PropertyClientStatus.ACTIVE
+              : PropertyClientStatus.PROSPECT,
+          notes: `Imported from unit names (${group.units.map((unit) => unit.label).join(", ")}).`,
+        },
+      });
+      clientId = client.id;
+      created += 1;
+    } else {
+      reused += 1;
+      if (group.suggestedStatus === "ACTIVE") {
+        await prisma.propertyClient.updateMany({
+          where: {
+            id: clientId,
+            tenantId: tenant.id,
+            status: PropertyClientStatus.PROSPECT,
+          },
+          data: { status: PropertyClientStatus.ACTIVE },
+        });
+      }
+    }
+
+    for (const unitRef of group.units) {
+      const unit = unitById.get(unitRef.id);
+      if (!unit || alreadyLinked.has(unit.id)) {
+        skipped += 1;
+        continue;
+      }
+      try {
+        await prisma.clientUnitLink.create({
+          data: {
+            tenantId: tenant.id,
+            clientId,
+            unitId: unit.id,
+            pricingPlanId: unit.pricingPlanId ?? null,
+            role: ClientUnitLinkRole.OWNER,
+            notes: reservedOwnerNote(unitRef.status),
+          },
+        });
+        alreadyLinked.add(unit.id);
+        unitsLinked += 1;
+      } catch {
+        skipped += 1;
+      }
+    }
+  }
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    module: "CLIENTS",
+    entityType: "PROPERTY_CLIENT",
+    entityId: tenant.id,
+    action: "IMPORT",
+    summary: `Imported ${created} client(s) from unit names (${reused} already existed, ${unitsLinked} unit link(s)).`,
+  });
+
+  revalidateClients(tenantSlug);
+  return { ok: true, created, reused, unitsLinked, skipped };
 }

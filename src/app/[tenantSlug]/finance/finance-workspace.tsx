@@ -1,6 +1,7 @@
 "use client";
 
-import { MODAL_PANEL_SM, MODAL_PANEL_XL } from "@/lib/modal-panel";
+import { MODAL_DRAWER_MD, MODAL_PANEL_SM, MODAL_PANEL_XL } from "@/lib/modal-panel";
+import { ClientTablePager, useClientPage } from "@/components/client-table-pager";
 import {
   SendFinanceEmailModal,
   type FinanceEmailModalMode,
@@ -252,7 +253,15 @@ type BankingImportSummary = {
 type BankingDateFilter = "all" | "today" | "7d" | "month";
 type BankingStatusFilter = "all" | "unmatched" | "matched" | "exception";
 type ReportMonthWindow = 3 | 6 | 12;
-type ReportKind = "pnl" | "cashflow" | "balance" | "deposits";
+type ReportKind = "overview" | "pnl" | "cashflow" | "balance" | "deposits";
+
+const REPORT_TABS: { id: ReportKind; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "pnl", label: "Profit & loss" },
+  { id: "cashflow", label: "Cash flow" },
+  { id: "balance", label: "Balance sheet" },
+  { id: "deposits", label: "Client deposits" },
+];
 type ReportDrilldownKind = "invoices" | "payments" | "expenses";
 type ReportCompareMode = "previous_period" | "same_period_last_year";
 
@@ -671,7 +680,7 @@ export function FinanceWorkspace({
   >({});
   const [reportMonthWindow, setReportMonthWindow] =
     useState<ReportMonthWindow>(6);
-  const [reportKind, setReportKind] = useState<ReportKind>("pnl");
+  const [reportKind, setReportKind] = useState<ReportKind>("overview");
   const [reportCompareMode, setReportCompareMode] =
     useState<ReportCompareMode>("previous_period");
   const [reportProjectFilter, setReportProjectFilter] = useState<string>("all");
@@ -1498,6 +1507,14 @@ export function FinanceWorkspace({
     () => salesReceipts.filter((receipt) => !receipt.voided),
     [salesReceipts],
   );
+  const invoicePager = useClientPage(invoices);
+  const receiptPager = useClientPage(liveReceipts);
+  const paymentPager = useClientPage(paymentsListFiltered, {
+    resetKey: paymentsViewTab,
+  });
+  const expensePager = useClientPage(liveExpenses);
+  const billPager = useClientPage(vendorBills);
+  const followUpPager = useClientPage(arView.followUps);
 
   async function handleCreateBill(formData: FormData) {
     if (actionPending) return;
@@ -1847,6 +1864,7 @@ export function FinanceWorkspace({
       generatedAtLabel: reportView.generatedAtLabel,
       currency: reportView.currency,
       windowMonths: reportMonthWindow,
+      scopeLabel: reportScopeLabel,
     };
   }
 
@@ -2000,14 +2018,32 @@ export function FinanceWorkspace({
         continue;
       for (const unit of project.units) map.set(unit.id, unit.label);
     }
-    for (const x of invoices) if (x.unitId) map.set(x.unitId, x.unitLabel);
-    for (const x of payments) if (x.unitId) map.set(x.unitId, x.unitLabel);
-    for (const x of expenses) if (x.unitId) map.set(x.unitId, x.unitLabel);
-    for (const x of salesReceipts) if (x.unitId) map.set(x.unitId, x.unitLabel);
+    const tagged = [...invoices, ...payments, ...expenses, ...salesReceipts];
+    for (const x of tagged) {
+      if (!x.unitId) continue;
+      if (reportProjectFilter !== "all" && x.projectId !== reportProjectFilter)
+        continue;
+      map.set(x.unitId, x.unitLabel);
+    }
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [allocationOptions, reportProjectFilter, invoices, payments, expenses, salesReceipts]);
+  const selectedReportProject =
+    allocationOptions.find((project) => project.id === reportProjectFilter) ??
+    null;
+  const reportScopeLabel = (() => {
+    if (reportUnitFilter !== "all") {
+      const unitLabel =
+        reportUnitOptions.find((unit) => unit.id === reportUnitFilter)?.label ||
+        "Selected unit";
+      return selectedReportProject
+        ? `${selectedReportProject.label} · ${unitLabel}`
+        : unitLabel;
+    }
+    if (selectedReportProject) return selectedReportProject.label;
+    return "All projects";
+  })();
   const reportDepartmentOptions = useMemo(
     () =>
       Array.from(
@@ -2213,6 +2249,14 @@ export function FinanceWorkspace({
       rows.set(id, current);
       return current;
     };
+    if (!isUnitDrilldown) {
+      for (const project of allocationOptions) bucket(project.id, project.label);
+    } else if (reportUnitFilter === "all") {
+      for (const unit of selectedReportProject?.units ?? []) {
+        bucket(unit.id, unit.label);
+      }
+      bucket("__project", "Project-wide / unassigned");
+    }
     for (const invoice of filteredInvoices) {
       if (invoice.statusValue === "VOID") continue;
       if (
@@ -2265,6 +2309,9 @@ export function FinanceWorkspace({
   }, [
     visiblePnlBreakdown,
     reportProjectFilter,
+    reportUnitFilter,
+    allocationOptions,
+    selectedReportProject,
     filteredInvoices,
     filteredExpenses,
   ]);
@@ -2298,6 +2345,14 @@ export function FinanceWorkspace({
       rows.set(id, current);
       return current;
     };
+    if (!isUnitDrilldown) {
+      for (const project of allocationOptions) bucket(project.id, project.label);
+    } else if (reportUnitFilter === "all") {
+      for (const unit of selectedReportProject?.units ?? []) {
+        bucket(unit.id, unit.label);
+      }
+      bucket("__project", "Project-wide / unassigned");
+    }
     const addIncome = (
       projectId: string,
       projectLabel: string,
@@ -2351,6 +2406,9 @@ export function FinanceWorkspace({
   }, [
     visiblePnlBreakdown,
     reportProjectFilter,
+    reportUnitFilter,
+    allocationOptions,
+    selectedReportProject,
     filteredPayments,
     filteredReceipts,
   ]);
@@ -2368,6 +2426,68 @@ export function FinanceWorkspace({
       }),
     [reportView.clientBalances, reportProjectFilter, reportUnitFilter],
   );
+  const projectWideOutsideUnit = useMemo(() => {
+    if (reportProjectFilter === "all" || reportUnitFilter === "all") {
+      return { invoiced: 0, collected: 0, expenses: 0 };
+    }
+    const onProjectNoUnit = (row: { projectId: string; unitId: string }) =>
+      row.projectId === reportProjectFilter && !row.unitId;
+    return {
+      invoiced: invoices
+        .filter((row) => row.statusValue !== "VOID" && onProjectNoUnit(row))
+        .reduce((sum, row) => sum + row.amountValue, 0),
+      collected:
+        payments
+          .filter((row) => !row.voided && onProjectNoUnit(row))
+          .reduce((sum, row) => sum + row.amountValue, 0) +
+        salesReceipts
+          .filter((row) => !row.voided && onProjectNoUnit(row))
+          .reduce((sum, row) => sum + row.amountValue, 0),
+      expenses: expenses
+        .filter((row) => !row.voided && onProjectNoUnit(row))
+        .reduce((sum, row) => sum + row.pnlAmountValue, 0),
+    };
+  }, [
+    reportProjectFilter,
+    reportUnitFilter,
+    invoices,
+    payments,
+    salesReceipts,
+    expenses,
+  ]);
+  const scopedCollections = useMemo(() => {
+    const issued = filteredInvoices.filter((row) => row.statusValue !== "VOID");
+    const invoiced = issued.reduce((sum, row) => sum + row.amountValue, 0);
+    const collectedOnInvoices = issued.reduce(
+      (sum, row) => sum + Math.max(0, row.amountValue - row.balanceValue),
+      0,
+    );
+    const overdue = issued.filter(
+      (row) => row.isOverdue && row.statusValue !== "PAID",
+    );
+    return {
+      invoicedTotal: invoiced,
+      collectionRateLabel:
+        invoiced > 0
+          ? `${((collectedOnInvoices / invoiced) * 100).toFixed(1)}%`
+          : "—",
+      overdueCount: overdue.length,
+      remindersSent: issued.reduce((sum, row) => sum + row.reminderCount, 0),
+    };
+  }, [filteredInvoices]);
+  const reportScopeKey = `${reportProjectFilter}:${reportUnitFilter}:${reportDepartmentFilter}:${reportMonthWindow}`;
+  const dimensionalPnlPager = useClientPage(dimensionalPnlRows, {
+    resetKey: reportScopeKey,
+  });
+  const incomePager = useClientPage(incomeByDimension, {
+    resetKey: reportScopeKey,
+  });
+  const depositPager = useClientPage(filteredClientBalances, {
+    resetKey: reportScopeKey,
+  });
+  const expenseCatPager = useClientPage(visibleExpenseBreakdown, {
+    resetKey: reportScopeKey,
+  });
   const reportMonthLabel = useMemo(
     () => new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }),
     [],
@@ -2418,7 +2538,9 @@ export function FinanceWorkspace({
           x.isOverdue && x.statusValue !== "VOID" && x.statusValue !== "PAID",
       )
       .reduce((sum, x) => sum + x.balanceValue, 0);
-    const cashIn = filteredPayments.reduce((sum, x) => sum + x.amountValue, 0);
+    const cashIn =
+      filteredPayments.reduce((sum, x) => sum + x.amountValue, 0) +
+      filteredReceipts.reduce((sum, x) => sum + x.amountValue, 0);
     const cashOut = filteredExpenses.reduce((sum, x) => sum + x.amountValue, 0);
     return {
       receivables,
@@ -2427,7 +2549,7 @@ export function FinanceWorkspace({
       cashOut,
       netCashflow: cashIn - cashOut,
     };
-  }, [filteredInvoices, filteredPayments, filteredExpenses]);
+  }, [filteredInvoices, filteredPayments, filteredExpenses, filteredReceipts]);
   const reportComparison = useMemo(() => {
     const now = new Date();
     const currentEnd = shiftMonthBoundary(now, 1);
@@ -2458,9 +2580,13 @@ export function FinanceWorkspace({
             inRange(x.issuedAtValue, currentStart, currentEnd),
         )
         .reduce((sum, x) => sum + x.amountValue, 0),
-      collected: filteredPayments
-        .filter((x) => inRange(x.paidAtValue, currentStart, currentEnd))
-        .reduce((sum, x) => sum + x.amountValue, 0),
+      collected:
+        filteredPayments
+          .filter((x) => inRange(x.paidAtValue, currentStart, currentEnd))
+          .reduce((sum, x) => sum + x.amountValue, 0) +
+        filteredReceipts
+          .filter((x) => inRange(x.issuedAtValue, currentStart, currentEnd))
+          .reduce((sum, x) => sum + x.amountValue, 0),
       expenses: filteredExpenses
         .filter((x) => inRange(x.expenseDateValue, currentStart, currentEnd))
         .reduce((sum, x) => sum + x.pnlAmountValue, 0),
@@ -2473,9 +2599,13 @@ export function FinanceWorkspace({
             inRange(x.issuedAtValue, comparisonStart, comparisonEnd),
         )
         .reduce((sum, x) => sum + x.amountValue, 0),
-      collected: filteredPayments
-        .filter((x) => inRange(x.paidAtValue, comparisonStart, comparisonEnd))
-        .reduce((sum, x) => sum + x.amountValue, 0),
+      collected:
+        filteredPayments
+          .filter((x) => inRange(x.paidAtValue, comparisonStart, comparisonEnd))
+          .reduce((sum, x) => sum + x.amountValue, 0) +
+        filteredReceipts
+          .filter((x) => inRange(x.issuedAtValue, comparisonStart, comparisonEnd))
+          .reduce((sum, x) => sum + x.amountValue, 0),
       expenses: filteredExpenses
         .filter((x) =>
           inRange(x.expenseDateValue, comparisonStart, comparisonEnd),
@@ -2490,6 +2620,7 @@ export function FinanceWorkspace({
     filteredInvoices,
     filteredPayments,
     filteredExpenses,
+    filteredReceipts,
     reportMonthWindow,
     reportCompareMode,
   ]);
@@ -2922,7 +3053,7 @@ export function FinanceWorkspace({
   }
 
   return (
-    <div className="w-full max-w-[1100px] px-4 py-6 sm:px-6 sm:py-8">
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
@@ -3306,7 +3437,7 @@ export function FinanceWorkspace({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
-                      {invoices.map((invoice) => (
+                      {invoicePager.rows.map((invoice) => (
                         <tr
                           key={invoice.id}
                           data-focus-id={invoice.id}
@@ -3428,6 +3559,13 @@ export function FinanceWorkspace({
                       ))}
                     </tbody>
                   </table>
+                  <ClientTablePager
+                    page={invoicePager.page}
+                    setPage={invoicePager.setPage}
+                    total={invoicePager.total}
+                    pageSize={invoicePager.pageSize}
+                    itemLabel="invoices"
+                  />
                 </div>
               )
             ) : recordsTab === "receipts" ? (
@@ -3451,7 +3589,7 @@ export function FinanceWorkspace({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
-                      {liveReceipts.map((receipt) => (
+                      {receiptPager.rows.map((receipt) => (
                         <tr key={receipt.id}>
                           <td className="px-3 py-2">
                             <p className="font-medium text-foreground">
@@ -3544,6 +3682,13 @@ export function FinanceWorkspace({
                       ))}
                     </tbody>
                   </table>
+                  <ClientTablePager
+                    page={receiptPager.page}
+                    setPage={receiptPager.setPage}
+                    total={receiptPager.total}
+                    pageSize={receiptPager.pageSize}
+                    itemLabel="receipts"
+                  />
                 </div>
               )
             ) : recordsTab === "payments" ? (
@@ -3597,7 +3742,7 @@ export function FinanceWorkspace({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-foreground/10">
-                        {paymentsListFiltered.map((payment) => (
+                        {paymentPager.rows.map((payment) => (
                           <tr
                             key={payment.id}
                             data-focus-id={payment.id}
@@ -3672,6 +3817,13 @@ export function FinanceWorkspace({
                         ))}
                       </tbody>
                     </table>
+                    <ClientTablePager
+                      page={paymentPager.page}
+                      setPage={paymentPager.setPage}
+                      total={paymentPager.total}
+                      pageSize={paymentPager.pageSize}
+                      itemLabel="payments"
+                    />
                   </div>
                 )}
               </>
@@ -3680,12 +3832,15 @@ export function FinanceWorkspace({
                 <p className="text-sm text-muted">No expense records yet.</p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
-                  <table className="w-full text-left text-sm">
+                  <div className="overflow-x-auto">
+                  <table className="w-full min-w-[960px] text-left text-sm">
                     <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
                       <tr>
                         <th className="px-3 py-2">Category</th>
                         <th className="px-3 py-2">Vendor</th>
                         <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Project / unit</th>
+                        <th className="px-3 py-2">VAT</th>
                         <th className="px-3 py-2">Paid Through</th>
                         <th className="px-3 py-2">Reference</th>
                         <th className="px-3 py-2">Date</th>
@@ -3696,7 +3851,7 @@ export function FinanceWorkspace({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-foreground/10">
-                      {liveExpenses.map((expense) => (
+                      {expensePager.rows.map((expense) => (
                         <tr
                           key={expense.id}
                           data-focus-id={expense.id}
@@ -3802,6 +3957,14 @@ export function FinanceWorkspace({
                       ))}
                     </tbody>
                   </table>
+                  </div>
+                  <ClientTablePager
+                    page={expensePager.page}
+                    setPage={expensePager.setPage}
+                    total={expensePager.total}
+                    pageSize={expensePager.pageSize}
+                    itemLabel="expenses"
+                  />
                 </div>
               )
             ) : recordsTab === "ar" ? (
@@ -3936,7 +4099,7 @@ export function FinanceWorkspace({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-foreground/10">
-                        {arView.followUps.map((row) => (
+                        {followUpPager.rows.map((row) => (
                           <tr key={row.id}>
                             <td className="px-3 py-2">
                               <p className="font-medium text-foreground">
@@ -3960,6 +4123,13 @@ export function FinanceWorkspace({
                         ))}
                       </tbody>
                     </table>
+                    <ClientTablePager
+                      page={followUpPager.page}
+                      setPage={followUpPager.setPage}
+                      total={followUpPager.total}
+                      pageSize={followUpPager.pageSize}
+                      itemLabel="follow-ups"
+                    />
                   </div>
                 )}
               </div>
@@ -4085,7 +4255,7 @@ export function FinanceWorkspace({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-foreground/10">
-                        {vendorBills.map((bill) => (
+                        {billPager.rows.map((bill) => (
                           <tr
                             key={bill.id}
                             data-focus-id={bill.id}
@@ -4138,6 +4308,13 @@ export function FinanceWorkspace({
                         ))}
                       </tbody>
                     </table>
+                    <ClientTablePager
+                      page={billPager.page}
+                      setPage={billPager.setPage}
+                      total={billPager.total}
+                      pageSize={billPager.pageSize}
+                      itemLabel="bills"
+                    />
                   </div>
                 )}
               </div>
@@ -4159,7 +4336,7 @@ export function FinanceWorkspace({
                           Financial performance
                         </p>
                         <p className="mt-0.5 text-xs text-muted">
-                          {reportView.companyName} · Updated{" "}
+                          {reportView.companyName} · {reportScopeLabel} · Updated{" "}
                           {reportView.generatedAtLabel}
                         </p>
                       </div>
@@ -4172,23 +4349,7 @@ export function FinanceWorkspace({
                       Export report pack
                     </button>
                   </div>
-                  <div className="mt-4 grid gap-3 border-t border-foreground/10 pt-4 sm:grid-cols-3">
-                    <label className="space-y-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
-                        Statement
-                      </span>
-                      <UiSelect
-                        value={reportKind}
-                        onChange={(e) =>
-                          setReportKind((e.target.value as ReportKind) || "pnl")
-                        }
-                      >
-                        <option value="pnl">Profit & Loss</option>
-                        <option value="cashflow">Cash Flow</option>
-                        <option value="balance">Balance Sheet</option>
-                        <option value="deposits">Client Deposit</option>
-                      </UiSelect>
-                    </label>
+                  <div className="mt-4 grid gap-3 border-t border-foreground/10 pt-4 sm:grid-cols-2">
                     <label className="space-y-1">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
                         Period
@@ -4235,8 +4396,9 @@ export function FinanceWorkspace({
                         Reporting scope
                       </p>
                       <p className="text-xs text-muted">
-                        Narrow the statement from company to project and
-                        apartment.
+                        Choose a project or apartment to pull that statement.
+                        Apartment reports only include records tagged to that
+                        unit.
                       </p>
                     </div>
                     {reportProjectFilter !== "all" ||
@@ -4281,19 +4443,47 @@ export function FinanceWorkspace({
                       </span>
                       <UiSelect
                         value={reportUnitFilter}
-                        onChange={(e) => setReportUnitFilter(e.target.value)}
-                        disabled={reportProjectFilter === "all"}
+                        onChange={(e) => {
+                          const unitId = e.target.value;
+                          setReportUnitFilter(unitId);
+                          if (unitId === "all") return;
+                          const owner = allocationOptions.find((project) =>
+                            project.units.some((unit) => unit.id === unitId),
+                          );
+                          if (owner) {
+                            setReportProjectFilter(owner.id);
+                            return;
+                          }
+                          const tagged = [
+                            ...invoices,
+                            ...payments,
+                            ...expenses,
+                            ...salesReceipts,
+                          ].find((row) => row.unitId === unitId);
+                          if (tagged?.projectId)
+                            setReportProjectFilter(tagged.projectId);
+                        }}
                       >
                         <option value="all">
                           {reportProjectFilter === "all"
-                            ? "Choose a project first"
-                            : "All apartments / units"}
+                            ? "All apartments / units"
+                            : "All apartments / units in this project"}
                         </option>
-                        {reportUnitOptions.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.label}
-                          </option>
-                        ))}
+                        {reportProjectFilter === "all"
+                          ? allocationOptions.map((project) => (
+                              <optgroup key={project.id} label={project.label}>
+                                {project.units.map((unit) => (
+                                  <option key={unit.id} value={unit.id}>
+                                    {unit.label}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))
+                          : reportUnitOptions.map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.label}
+                              </option>
+                            ))}
                       </UiSelect>
                     </label>
                     <label className="space-y-1">
@@ -4317,6 +4507,68 @@ export function FinanceWorkspace({
                   </div>
                 </div>
 
+                <div
+                  className="flex flex-wrap gap-1 border-b border-foreground/10"
+                  role="tablist"
+                  aria-label="Report sections"
+                >
+                  {REPORT_TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={reportKind === tab.id}
+                      onClick={() => {
+                        setReportKind(tab.id);
+                        setReportDrilldownMonth(null);
+                      }}
+                      className={[
+                        "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                        reportKind === tab.id
+                          ? "border-foreground text-foreground"
+                          : "border-transparent text-muted hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-foreground/10 bg-background px-4 py-3">
+                  <p className="text-sm font-semibold text-foreground">
+                    Statement for {reportScopeLabel}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {reportUnitFilter !== "all"
+                      ? "Only invoices, collections, and expenses tagged to this apartment / unit."
+                      : reportProjectFilter !== "all"
+                        ? "Every apartment in this project is listed below. Click a row to open that unit’s statement."
+                        : "Company-wide figures. Choose a project or apartment above to pull that report."}
+                  </p>
+                  {reportUnitFilter !== "all" &&
+                  (projectWideOutsideUnit.expenses > 0 ||
+                    projectWideOutsideUnit.collected > 0 ||
+                    projectWideOutsideUnit.invoiced > 0) ? (
+                    <p className="mt-2 text-xs text-foreground">
+                      This apartment excludes project-wide amounts with no unit
+                      tag
+                      {projectWideOutsideUnit.invoiced
+                        ? ` · invoiced ${reportView.currency} ${projectWideOutsideUnit.invoiced.toLocaleString()}`
+                        : ""}
+                      {projectWideOutsideUnit.collected
+                        ? ` · collected ${reportView.currency} ${projectWideOutsideUnit.collected.toLocaleString()}`
+                        : ""}
+                      {projectWideOutsideUnit.expenses
+                        ? ` · expenses ${reportView.currency} ${projectWideOutsideUnit.expenses.toLocaleString()}`
+                        : ""}
+                      . Clear the apartment filter to include them on the
+                      project statement.
+                    </p>
+                  ) : null}
+                </div>
+
+                {reportKind === "overview" ? (
+                  <>
                 <div className="grid gap-3 md:grid-cols-4">
                   {reportComparisonCards.map((card) => (
                     <div
@@ -4393,7 +4645,8 @@ export function FinanceWorkspace({
                       <div>
                         <p className="text-muted">All-time invoiced</p>
                         <p className="mt-0.5 font-semibold text-foreground">
-                          {reportView.pnlLite.invoicedLabel}
+                          {reportView.currency}{" "}
+                          {scopedCollections.invoicedTotal.toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -4436,27 +4689,170 @@ export function FinanceWorkspace({
                       Collections control
                     </p>
                     <p className="mt-3 text-xl font-semibold text-[var(--success)]">
-                      {reportView.collections.collectionRateLabel}
+                      {scopedCollections.collectionRateLabel}
                     </p>
                     <p className="text-xs text-muted">
-                      Collection rate across issued invoices
+                      Collection rate across issued invoices in this scope
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-3 border-t border-foreground/10 pt-3 text-xs">
                       <div>
                         <p className="text-muted">Overdue invoices</p>
                         <p className="mt-0.5 font-semibold text-foreground">
-                          {reportView.collections.overdueCount}
+                          {scopedCollections.overdueCount}
                         </p>
                       </div>
                       <div>
                         <p className="text-muted">Reminders sent</p>
                         <p className="mt-0.5 font-semibold text-foreground">
-                          {reportView.collections.remindersSent}
+                          {scopedCollections.remindersSent}
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
+
+                <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                  <div className="mb-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      {reportUnitFilter !== "all"
+                        ? `Profit & loss by month · ${reportScopeLabel}`
+                        : reportProjectFilter !== "all"
+                          ? "Profit & loss by apartment / unit"
+                          : "Profit & loss by project"}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {reportUnitFilter !== "all"
+                        ? "This is the apartment statement for the selected period."
+                        : reportProjectFilter !== "all"
+                          ? "Click an apartment to open its statement."
+                          : "Click a project to see each apartment."}
+                    </p>
+                  </div>
+                  {reportUnitFilter !== "all" ? (
+                    <div className="overflow-hidden rounded-lg border border-foreground/10">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                          <tr>
+                            <th className="px-3 py-2">Month</th>
+                            <th className="px-3 py-2">Invoiced</th>
+                            <th className="px-3 py-2">Collected</th>
+                            <th className="px-3 py-2">Expenses</th>
+                            <th className="px-3 py-2">Net</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-foreground/10">
+                          {visiblePnlBreakdown.map((row) => (
+                            <tr key={row.month}>
+                              <td className="px-3 py-2 font-medium text-foreground">
+                                {row.month}
+                              </td>
+                              <td className="px-3 py-2">
+                                {reportView.currency}{" "}
+                                {row.invoiced.toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2">
+                                {reportView.currency}{" "}
+                                {row.collected.toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2">
+                                {reportView.currency}{" "}
+                                {row.expenses.toLocaleString()}
+                              </td>
+                              <td
+                                className={[
+                                  "px-3 py-2 font-semibold",
+                                  valueTone(row.net),
+                                ].join(" ")}
+                              >
+                                {reportView.currency} {row.net.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-lg border border-foreground/10">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                          <tr>
+                            <th className="px-3 py-2">
+                              {reportProjectFilter === "all"
+                                ? "Project"
+                                : "Apartment / unit"}
+                            </th>
+                            <th className="px-3 py-2">Revenue</th>
+                            <th className="px-3 py-2">Expenses</th>
+                            <th className="px-3 py-2">Profit / loss</th>
+                            <th className="px-3 py-2">Margin</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-foreground/10">
+                          {dimensionalPnlPager.rows.map((row) => (
+                            <tr key={row.id}>
+                              <td className="px-3 py-2 font-medium text-foreground">
+                                {row.id === "__project" ||
+                                row.id === "__unassigned" ? (
+                                  row.label
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (reportProjectFilter === "all") {
+                                        setReportProjectFilter(row.id);
+                                        setReportUnitFilter("all");
+                                      } else {
+                                        setReportUnitFilter(row.id);
+                                      }
+                                    }}
+                                    className="text-left underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
+                                  >
+                                    {row.label}
+                                  </button>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {reportView.currency}{" "}
+                                {row.revenue.toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2">
+                                {reportView.currency}{" "}
+                                {row.expenses.toLocaleString()}
+                              </td>
+                              <td
+                                className={[
+                                  "px-3 py-2 font-semibold",
+                                  valueTone(row.profit),
+                                ].join(" ")}
+                              >
+                                {reportView.currency}{" "}
+                                {row.profit.toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2">
+                                {row.margin === null
+                                  ? "—"
+                                  : `${row.margin.toFixed(1)}%`}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <ClientTablePager
+                        page={dimensionalPnlPager.page}
+                        setPage={dimensionalPnlPager.setPage}
+                        total={dimensionalPnlPager.total}
+                        pageSize={dimensionalPnlPager.pageSize}
+                        itemLabel={
+                          reportProjectFilter === "all"
+                            ? "projects"
+                            : "apartments"
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+                  </>
+                ) : null}
 
                 {reportKind === "balance" ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
@@ -4670,10 +5066,29 @@ export function FinanceWorkspace({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-foreground/10">
-                            {dimensionalPnlRows.map((row) => (
+                            {dimensionalPnlPager.rows.map((row) => (
                               <tr key={row.id}>
                                 <td className="px-3 py-2 font-medium text-foreground">
-                                  {row.label}
+                                  {row.id === "__project" ||
+                                  row.id === "__unassigned" ||
+                                  reportUnitFilter !== "all" ? (
+                                    row.label
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (reportProjectFilter === "all") {
+                                          setReportProjectFilter(row.id);
+                                          setReportUnitFilter("all");
+                                        } else {
+                                          setReportUnitFilter(row.id);
+                                        }
+                                      }}
+                                      className="text-left underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
+                                    >
+                                      {row.label}
+                                    </button>
+                                  )}
                                 </td>
                                 <td className="px-3 py-2">
                                   {reportView.currency}{" "}
@@ -4701,6 +5116,13 @@ export function FinanceWorkspace({
                             ))}
                           </tbody>
                         </table>
+                        <ClientTablePager
+                          page={dimensionalPnlPager.page}
+                          setPage={dimensionalPnlPager.setPage}
+                          total={dimensionalPnlPager.total}
+                          pageSize={dimensionalPnlPager.pageSize}
+                          itemLabel="projects"
+                        />
                       </div>
                     )}
                   </div>
@@ -4742,7 +5164,7 @@ export function FinanceWorkspace({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-foreground/10">
-                            {incomeByDimension.map((row) => (
+                            {incomePager.rows.map((row) => (
                               <tr key={row.id}>
                                 <td className="px-3 py-2 font-medium text-foreground">
                                   {row.label}
@@ -4767,12 +5189,19 @@ export function FinanceWorkspace({
                             ))}
                           </tbody>
                         </table>
+                        <ClientTablePager
+                          page={incomePager.page}
+                          setPage={incomePager.setPage}
+                          total={incomePager.total}
+                          pageSize={incomePager.pageSize}
+                          itemLabel="projects"
+                        />
                       </div>
                     )}
                   </div>
                 ) : null}
 
-                {reportKind === "pnl" || reportKind === "deposits" ? (
+                {reportKind === "deposits" ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3">
                       <p className="text-sm font-semibold text-foreground">
@@ -4833,7 +5262,7 @@ export function FinanceWorkspace({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-foreground/10">
-                            {filteredClientBalances.map((row) => (
+                            {depositPager.rows.map((row) => (
                               <tr key={row.id}>
                                 <td className="px-3 py-2 font-medium text-foreground">
                                   {row.clientName}
@@ -4866,13 +5295,19 @@ export function FinanceWorkspace({
                             ))}
                           </tbody>
                         </table>
+                        <ClientTablePager
+                          page={depositPager.page}
+                          setPage={depositPager.setPage}
+                          total={depositPager.total}
+                          pageSize={depositPager.pageSize}
+                          itemLabel="clients"
+                        />
                       </div>
                     )}
                   </div>
                 ) : null}
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  {reportKind === "cashflow" ? (
+                {reportKind === "cashflow" ? (
                     <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                       <div className="mb-2 flex items-center justify-between">
                         <p className="text-sm font-semibold text-foreground">
@@ -4933,8 +5368,9 @@ export function FinanceWorkspace({
                         </table>
                       </div>
                     </div>
-                  ) : null}
+                ) : null}
 
+                {reportKind === "pnl" ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-semibold text-foreground">
@@ -4958,7 +5394,7 @@ export function FinanceWorkspace({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-foreground/10">
-                          {visibleExpenseBreakdown.map((row) => (
+                          {expenseCatPager.rows.map((row) => (
                             <tr key={row.category}>
                               <td className="px-3 py-2">{row.category}</td>
                               <td className="px-3 py-2">{row.count}</td>
@@ -4970,11 +5406,19 @@ export function FinanceWorkspace({
                           ))}
                         </tbody>
                       </table>
+                      <ClientTablePager
+                        page={expenseCatPager.page}
+                        setPage={expenseCatPager.setPage}
+                        total={expenseCatPager.total}
+                        pageSize={expenseCatPager.pageSize}
+                        itemLabel="categories"
+                      />
                     </div>
                   </div>
-                </div>
+                ) : null}
 
-                {reportDrilldown ? (
+                {reportDrilldown &&
+                (reportKind === "pnl" || reportKind === "cashflow") ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-foreground">
@@ -7423,9 +7867,9 @@ export function FinanceWorkspace({
           open
           onClose={() => setTimelineTarget(null)}
           variant="drawer"
-          panelClassName="h-full w-full max-w-md shrink-0 overflow-y-auto border-l border-foreground/10 bg-foreground/[0.02] p-4 shadow-2xl"
+          panelClassName={MODAL_DRAWER_MD}
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/10 pb-4">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
                 Entity Timeline
@@ -7450,29 +7894,31 @@ export function FinanceWorkspace({
             </button>
           </div>
 
-          {timelineLoading ? (
-            <p className="mt-4 text-sm text-muted">Loading timeline...</p>
-          ) : timelineLogs.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">No timeline events yet.</p>
-          ) : (
-            <ul className="mt-4 space-y-2">
-              {timelineLogs.map((log) => (
-                <li
-                  key={log.id}
-                  className="rounded-md border border-foreground/10 p-3"
-                >
-                  <p className="text-xs text-muted">{log.timestamp}</p>
-                  <p className="mt-0.5 text-sm font-medium text-foreground">
-                    {log.action}
-                  </p>
-                  <p className="text-xs text-muted">By: {log.actor}</p>
-                  <p className="mt-1 text-sm text-foreground/90">
-                    {log.summary}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="min-h-0 flex-1 overflow-y-auto pt-4">
+            {timelineLoading ? (
+              <p className="text-sm text-muted">Loading timeline...</p>
+            ) : timelineLogs.length === 0 ? (
+              <p className="text-sm text-muted">No timeline events yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {timelineLogs.map((log) => (
+                  <li
+                    key={log.id}
+                    className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3"
+                  >
+                    <p className="text-xs text-muted">{log.timestamp}</p>
+                    <p className="mt-0.5 text-sm font-medium text-foreground">
+                      {log.action}
+                    </p>
+                    <p className="text-xs text-muted">By: {log.actor}</p>
+                    <p className="mt-1 text-sm text-foreground/90">
+                      {log.summary}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </ModalOverlay>
       ) : null}
 

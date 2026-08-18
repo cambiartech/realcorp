@@ -25,6 +25,7 @@ import {
   sendClientPortalInvite,
   updatePropertyClient,
 } from "./actions";
+import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
 
 type ClientRow = {
   id: string;
@@ -90,6 +91,7 @@ export function ClientsWorkspace({
   pagination,
   paginationSearchParams,
   clientStats,
+  unlinkedUnitsCount,
 }: {
   tenantSlug: string;
   companyName: string;
@@ -110,6 +112,7 @@ export function ClientsWorkspace({
   pagination: Pagination;
   paginationSearchParams: Record<string, SearchParamValue>;
   clientStats: { active: number; totalUnits: number };
+  unlinkedUnitsCount: number;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -133,6 +136,8 @@ export function ClientsWorkspace({
   });
   const [rowOverrides, setRowOverrides] = useState<Record<string, Partial<ClientRow>>>({});
   const [exporting, setExporting] = useState(false);
+  const [importUnitsOpen, setImportUnitsOpen] = useState(false);
+  const [dismissUnitImportHint, setDismissUnitImportHint] = useState(false);
   const [state, formAction, pending] = useActionState(createPropertyClient.bind(null, tenantSlug), initial);
   const [editPending, setEditPending] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -277,6 +282,13 @@ export function ClientsWorkspace({
             </button>
             {canManage ? (
               <>
+                <button
+                  type="button"
+                  onClick={() => setImportUnitsOpen(true)}
+                  className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.04]"
+                >
+                  From unit names
+                </button>
                 <Link
                   href={`/${tenantSlug}/clients/import`}
                   className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.04]"
@@ -295,6 +307,35 @@ export function ClientsWorkspace({
           </div>
         ) : null}
       </div>
+
+      {canManage && tab === "clients" && unlinkedUnitsCount > 0 && !dismissUnitImportHint ? (
+        <div className="mt-5 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-foreground/15 bg-foreground/[0.03] px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Import clients from units</p>
+            <p className="mt-0.5 max-w-2xl text-sm text-muted">
+              {unlinkedUnitsCount} unit{unlinkedUnitsCount === 1 ? "" : "s"} look unassigned. If labels include the
+              person&apos;s name (for example RM 26 MR EMANA EDET), we can create those clients and assign their
+              units in one step.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDismissUnitImportHint(true)}
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground"
+            >
+              Not now
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportUnitsOpen(true)}
+              className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+            >
+              Preview import
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
@@ -367,11 +408,20 @@ export function ClientsWorkspace({
                     No clients yet.{" "}
                     {canManage ? (
                       <>
+                        Import from{" "}
+                        <button
+                          type="button"
+                          onClick={() => setImportUnitsOpen(true)}
+                          className="font-semibold text-foreground underline"
+                        >
+                          unit names
+                        </button>
+                        ,{" "}
                         <Link
                           href={`/${tenantSlug}/clients/import`}
                           className="font-semibold text-foreground underline"
                         >
-                          Import from CSV
+                          CSV
                         </Link>{" "}
                         or add one manually.
                       </>
@@ -697,6 +747,17 @@ export function ClientsWorkspace({
           </button>
         </div>
       </ModalOverlay>
+
+      <ImportClientsFromUnitsModal
+        tenantSlug={tenantSlug}
+        open={importUnitsOpen}
+        onClose={() => setImportUnitsOpen(false)}
+        onImported={(summary) => {
+          showSnackbar(summary, "success");
+          setDismissUnitImportHint(true);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

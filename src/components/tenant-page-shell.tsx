@@ -5,7 +5,7 @@ const WIDTH_CLASS = {
   default: "max-w-[1400px]",
   narrow: "max-w-4xl",
   medium: "max-w-6xl",
-  finance: "max-w-[1100px]",
+  finance: "max-w-none",
 } as const;
 
 type TenantPageShellProps = {

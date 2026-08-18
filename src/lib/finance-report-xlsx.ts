@@ -23,6 +23,7 @@ export type ReportExportMeta = {
   generatedAtLabel: string;
   currency: string;
   windowMonths?: number;
+  scopeLabel?: string;
 };
 
 type PnlRow = { month: string; invoiced: number; collected: number; expenses: number; net: number };
@@ -65,13 +66,28 @@ export type FinanceReportKpis = {
 };
 
 function metaToReport(meta: ReportExportMeta, title: string): ReportMeta {
+  const scoped =
+    meta.scopeLabel && meta.scopeLabel !== "All projects"
+      ? `${title} · ${meta.scopeLabel}`
+      : title;
   return {
-    title,
+    title: scoped,
     companyName: meta.companyName,
     generatedAtLabel: meta.generatedAtLabel,
     currency: meta.currency,
     periodLabel: meta.windowMonths ? `Last ${meta.windowMonths} months` : undefined,
+    subtitle: meta.scopeLabel,
   };
+}
+
+function reportFileSlug(meta: ReportExportMeta) {
+  return (
+    (meta.scopeLabel || "all-projects")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "all-projects"
+  );
 }
 
 function sum(rows: PnlRow[]) {
@@ -425,7 +441,10 @@ export async function downloadFinanceReportXlsx(
     addBalanceSheet(workbook.addWorksheet("Balance Sheet"), meta, data.balance || []);
   }
 
-  await downloadWorkbook(workbook, `finance-${kind}-${stamp}.xlsx`);
+  await downloadWorkbook(
+    workbook,
+    `finance-${kind}-${reportFileSlug(meta)}-${stamp}.xlsx`,
+  );
 }
 
 export async function downloadFinanceReportPackXlsx(
@@ -474,7 +493,10 @@ export async function downloadFinanceReportPackXlsx(
     );
   }
 
-  await downloadWorkbook(workbook, `finance-report-pack-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  await downloadWorkbook(
+    workbook,
+    `finance-report-pack-${reportFileSlug(meta)}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+  );
 }
 
 export function buildBalanceExportLines(sections: {

@@ -60,12 +60,15 @@ export default async function ClientsPage({
   });
   assertTenantNavAccess(session, membership, tenant.settings, "clients");
 
-  const [totalClients, activeClients, totalUnitLinks, documents, documentClients] = await Promise.all([
+  const [totalClients, activeClients, totalUnitLinks, unlinkedUnitsCount, documents, documentClients] = await Promise.all([
     prisma.propertyClient.count({ where: { tenantId: tenant.id } }),
     prisma.propertyClient.count({
       where: { tenantId: tenant.id, status: PropertyClientStatus.ACTIVE },
     }),
     prisma.clientUnitLink.count({ where: { tenantId: tenant.id } }),
+    prisma.unit.count({
+      where: { tenantId: tenant.id, clientLinks: { none: {} } },
+    }),
     prisma.clientDocument.findMany({
       where: { tenantId: tenant.id },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
@@ -126,6 +129,7 @@ export default async function ClientsPage({
       pagination={pagination}
       paginationSearchParams={query}
       clientStats={{ active: activeClients, totalUnits: totalUnitLinks }}
+      unlinkedUnitsCount={unlinkedUnitsCount}
       clients={clients.map((c) => {
         const money = depositsByClient.get(c.id);
         return {
