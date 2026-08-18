@@ -88,8 +88,8 @@ export default async function DealsPage({
     }),
     prisma.unit.findMany({
       where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, label: true },
+      orderBy: [{ project: { name: "asc" } }, { label: "asc" }],
+      select: { id: true, label: true, project: { select: { name: true } } },
       take: 400,
     }),
     prisma.project.findMany({
@@ -171,7 +171,11 @@ export default async function DealsPage({
         id: lead.id,
         label: lead.name || lead.email || lead.id,
       }))}
-      units={units.map((unit) => ({ id: unit.id, label: unit.label }))}
+      units={units.map((unit) => ({
+        id: unit.id,
+        label: unit.label,
+        group: unit.project.name,
+      }))}
       users={users.map((u) => ({
         id: u.user.id,
         label: u.user.name || u.user.email || u.user.id,

@@ -37,6 +37,7 @@ import { downloadExcel } from "@/lib/table-export";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { GlobalLocationFields } from "@/components/global-location-fields";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { TableSearch, filterTableRows } from "@/components/table-search";
 import { notifyPrefillResult, runPrefillFromUploadedDocs } from "@/lib/hr-prefill-client";
 
 type PeopleTab = "directory" | "onboard" | "record" | "send" | "requests";
@@ -178,6 +179,7 @@ export function HrPeopleWorkspace({
   const [peopleTab, setPeopleTab] = useState<PeopleTab>(() =>
     searchParams.get("reviewForms") === "1" ? "requests" : "directory",
   );
+  const [peopleQuery, setPeopleQuery] = useState("");
   const [recordTab, setRecordTab] = useState<RecordTab>("personal");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -215,6 +217,15 @@ export function HrPeopleWorkspace({
   const selectedMember = teamMembers.find((m) => m.userId === selectedUserId);
   const selectedOnboarding = selectedUserId ? onboardingByUserId.get(selectedUserId) : undefined;
   const submittedRequests = formRequests.filter((request) => request.statusValue === "SUBMITTED");
+  const visibleTeamMembers = useMemo(
+    () =>
+      filterTableRows(
+        teamMembers,
+        peopleQuery,
+        (m) => `${m.name} ${m.email} ${m.role}`,
+      ),
+    [teamMembers, peopleQuery],
+  );
 
   async function runAction(fn: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     setPending(true);
@@ -592,6 +603,14 @@ export function HrPeopleWorkspace({
               <p className="mt-0.5 text-xs text-muted">Manage payroll records separately from software access.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <TableSearch
+                value={peopleQuery}
+                onChange={setPeopleQuery}
+                placeholder="Search people…"
+                resultCount={visibleTeamMembers.length}
+                totalCount={teamMembers.length}
+                className="max-w-xs flex-none"
+              />
               <button
                 type="button"
                 onClick={() => setShowHrOnlyForm(true)}
@@ -625,17 +644,23 @@ export function HrPeopleWorkspace({
               </tr>
             </thead>
             <tbody className="divide-y divide-foreground/10">
-              {teamMembers.length === 0 ? (
+              {visibleTeamMembers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3 py-6 text-center text-muted">
+                    {teamMembers.length === 0 ? (
+                      <>
                     No team members yet.{" "}
                     <Link href={`/${tenantSlug}/team`} className="font-semibold underline">
                       Invite on Team
                     </Link>
+                      </>
+                    ) : (
+                      "No people match that search."
+                    )}
                   </td>
                 </tr>
               ) : (
-                teamMembers.map((m) => {
+                visibleTeamMembers.map((m) => {
                   const prof = profiles.find((p) => p.userId === m.userId);
                   const onboard = onboardingByUserId.get(m.userId);
                   return (

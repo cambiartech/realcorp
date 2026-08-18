@@ -9,6 +9,8 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect, type SearchableSelectGroup } from "@/components/searchable-select";
+import { agreedPriceFromCatchUp } from "@/lib/finance-income";
 import {
   ClientDocumentsWorkspace,
   type ClientDocumentItem,
@@ -195,7 +197,13 @@ export function ClientDetailWorkspace({
     method: string;
     reference: string;
   }>;
-  paymentUnitOptions: Array<{ id: string; label: string; listPrice: number }>;
+  paymentUnitOptions: Array<{
+    id: string;
+    label: string;
+    projectName: string;
+    listPrice: number;
+    assigned: boolean;
+  }>;
   unitLinks: UnitLinkRow[];
   shortletLinks: ShortletLinkRow[];
   projectOptions: ProjectOption[];
@@ -218,10 +226,15 @@ export function ClientDetailWorkspace({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [isPayOpen, setIsPayOpen] = useState(false);
-  const [payUnitId, setPayUnitId] = useState(paymentUnitOptions[0]?.id ?? "");
-  const [balanceAdjustment, setBalanceAdjustment] = useState<"none" | "set_sale_price" | "waive_remaining">(
-    "none",
-  );
+  const defaultPayUnitId =
+    paymentUnitOptions.find((unit) => unit.assigned)?.id ?? paymentUnitOptions[0]?.id ?? "";
+  const [payUnitId, setPayUnitId] = useState(defaultPayUnitId);
+  const [paymentKind, setPaymentKind] = useState<
+    "part_payment" | "catch_up" | "set_sale_price" | "waive_remaining"
+  >("part_payment");
+  const [alreadyPaid, setAlreadyPaid] = useState("");
+  const [payingNow, setPayingNow] = useState("");
+  const [remainingToPay, setRemainingToPay] = useState("");
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [voidPayment, setVoidPayment] = useState<{
     id: string;
@@ -235,11 +248,7 @@ export function ClientDetailWorkspace({
   const [deleting, setDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [linkKind, setLinkKind] = useState<"project" | "shortlet">("project");
-  const [projectSearch, setProjectSearch] = useState("");
-  const [shortletSearch, setShortletSearch] = useState("");
-  const [linkProjectId, setLinkProjectId] = useState(projectOptions[0]?.id ?? "");
   const [linkUnitId, setLinkUnitId] = useState(projectOptions[0]?.units[0]?.id ?? "");
-  const [linkPropertyId, setLinkPropertyId] = useState(shortletPropertyOptions[0]?.id ?? "");
   const [linkShortletUnitId, setLinkShortletUnitId] = useState(
     shortletPropertyOptions[0]?.units[0]?.id ?? "",
   );
@@ -261,25 +270,51 @@ export function ClientDetailWorkspace({
     initial,
   );
 
-  const filteredProjects = useMemo(() => {
-    const q = projectSearch.trim().toLowerCase();
-    if (!q) return projectOptions;
-    return projectOptions.filter((p) => p.name.toLowerCase().includes(q));
-  }, [projectOptions, projectSearch]);
+  const linkUnitGroups = useMemo<SearchableSelectGroup[]>(
+    () =>
+      projectOptions
+        .filter((project) => project.units.length)
+        .map((project) => ({
+          label: project.name,
+          options: project.units.map((unit) => ({
+            value: unit.id,
+            label: unit.label,
+            hint: unit.defaultPricingPlanName ?? undefined,
+            keywords: project.name,
+          })),
+        })),
+    [projectOptions],
+  );
+  const selectedUnit = useMemo(() => {
+    for (const project of projectOptions) {
+      const unit = project.units.find((item) => item.id === linkUnitId);
+      if (unit) return unit;
+    }
+    return undefined;
+  }, [projectOptions, linkUnitId]);
 
-  const filteredShortletProperties = useMemo(() => {
-    const q = shortletSearch.trim().toLowerCase();
-    if (!q) return shortletPropertyOptions;
-    return shortletPropertyOptions.filter((p) => p.name.toLowerCase().includes(q));
-  }, [shortletPropertyOptions, shortletSearch]);
-
-  const selectedProject = projectOptions.find((p) => p.id === linkProjectId);
-  const unitsForProject = selectedProject?.units ?? [];
-  const selectedUnit = unitsForProject.find((u) => u.id === linkUnitId);
-
-  const selectedShortletProperty = shortletPropertyOptions.find((p) => p.id === linkPropertyId);
-  const shortletUnitsForProperty = selectedShortletProperty?.units ?? [];
-  const selectedShortletUnit = shortletUnitsForProperty.find((u) => u.id === linkShortletUnitId);
+  const linkShortletGroups = useMemo<SearchableSelectGroup[]>(
+    () =>
+      shortletPropertyOptions
+        .filter((property) => property.units.length)
+        .map((property) => ({
+          label: property.name,
+          options: property.units.map((unit) => ({
+            value: unit.id,
+            label: unit.name,
+            hint: unit.location || undefined,
+            keywords: `${property.name} ${unit.location}`,
+          })),
+        })),
+    [shortletPropertyOptions],
+  );
+  const selectedShortletUnit = useMemo(() => {
+    for (const property of shortletPropertyOptions) {
+      const unit = property.units.find((item) => item.id === linkShortletUnitId);
+      if (unit) return unit;
+    }
+    return undefined;
+  }, [shortletPropertyOptions, linkShortletUnitId]);
 
   const linkedCount = unitLinks.length + shortletLinks.length;
   const linkedRows = useMemo(
@@ -294,38 +329,62 @@ export function ClientDetailWorkspace({
   const pagedLinks = usePaged(linkedRows, `${client.id}-links-${linkedRows.length}`);
   const selectedPayUnit = paymentUnitOptions.find((unit) => unit.id === payUnitId) ?? paymentUnitOptions[0];
   const selectedPayBalance = depositRows.find((row) => row.unitId === selectedPayUnit?.id);
+  const paymentUnitGroups = useMemo<SearchableSelectGroup[]>(() => {
+    const assigned = paymentUnitOptions.filter((unit) => unit.assigned);
+    const rest = paymentUnitOptions.filter((unit) => !unit.assigned);
+    const groups: SearchableSelectGroup[] = [];
+    if (assigned.length) {
+      groups.push({
+        label: "Assigned to this client",
+        options: assigned.map((unit) => ({
+          value: unit.id,
+          label: `${unit.projectName} · ${unit.label}`,
+          hint: "Already linked",
+          keywords: `${unit.projectName} ${unit.label}`,
+        })),
+      });
+    }
+    const byProject = new Map<string, typeof rest>();
+    for (const unit of rest) {
+      const list = byProject.get(unit.projectName) ?? [];
+      list.push(unit);
+      byProject.set(unit.projectName, list);
+    }
+    for (const [projectName, units] of byProject) {
+      groups.push({
+        label: projectName,
+                    options: units.map((unit) => ({
+                      value: unit.id,
+                      label: `${projectName} · ${unit.label}`,
+                      keywords: `${projectName} ${unit.label}`,
+                    })),
+      });
+    }
+    return groups;
+  }, [paymentUnitOptions]);
+  const catchUpPreview = useMemo(() => {
+    const alreadyOnFile = selectedPayBalance?.collected ?? 0;
+    const listPrice = selectedPayBalance?.listPrice || selectedPayUnit?.listPrice || 0;
+    const opening = Number(alreadyPaid || 0);
+    const now = Number(payingNow || 0);
+    const leftover = Number(remainingToPay || 0);
+    const sale = agreedPriceFromCatchUp({
+      alreadyOnFile,
+      openingPaid: opening,
+      payingNow: now,
+      remainingToPay: leftover,
+    });
+    return {
+      alreadyOnFile,
+      listPrice,
+      sale,
+      discount: Math.max(0, listPrice - sale),
+    };
+  }, [alreadyPaid, payingNow, remainingToPay, selectedPayBalance, selectedPayUnit]);
 
   useEffect(() => {
     setProfile(client);
   }, [client]);
-
-  useEffect(() => {
-    if (!filteredProjects.some((p) => p.id === linkProjectId)) {
-      const next = filteredProjects[0];
-      setLinkProjectId(next?.id ?? "");
-      setLinkUnitId(next?.units[0]?.id ?? "");
-    }
-  }, [filteredProjects, linkProjectId]);
-
-  useEffect(() => {
-    if (selectedProject && !unitsForProject.some((u) => u.id === linkUnitId)) {
-      setLinkUnitId(unitsForProject[0]?.id ?? "");
-    }
-  }, [selectedProject, unitsForProject, linkUnitId]);
-
-  useEffect(() => {
-    if (!filteredShortletProperties.some((p) => p.id === linkPropertyId)) {
-      const next = filteredShortletProperties[0];
-      setLinkPropertyId(next?.id ?? "");
-      setLinkShortletUnitId(next?.units[0]?.id ?? "");
-    }
-  }, [filteredShortletProperties, linkPropertyId]);
-
-  useEffect(() => {
-    if (selectedShortletProperty && !shortletUnitsForProperty.some((u) => u.id === linkShortletUnitId)) {
-      setLinkShortletUnitId(shortletUnitsForProperty[0]?.id ?? "");
-    }
-  }, [selectedShortletProperty, shortletUnitsForProperty, linkShortletUnitId]);
 
   useEffect(() => {
     if (!editState) return;
@@ -369,7 +428,10 @@ export function ClientDetailWorkspace({
     if (payState.ok) {
       showSnackbar(payState.message || "Payment recorded.", "success");
       setIsPayOpen(false);
-      setBalanceAdjustment("none");
+      setPaymentKind("part_payment");
+      setAlreadyPaid("");
+      setPayingNow("");
+      setRemainingToPay("");
       router.refresh();
     } else showSnackbar(payState.error, "error");
   }, [payState, router, showSnackbar]);
@@ -386,18 +448,17 @@ export function ClientDetailWorkspace({
   }
 
   function openPayModal() {
-    setPayUnitId(paymentUnitOptions[0]?.id ?? "");
-    setBalanceAdjustment("none");
+    setPayUnitId(paymentUnitOptions.find((unit) => unit.assigned)?.id ?? paymentUnitOptions[0]?.id ?? "");
+    setPaymentKind("part_payment");
+    setAlreadyPaid("");
+    setPayingNow("");
+    setRemainingToPay("");
     setIsPayOpen(true);
   }
 
   function openLinkModal() {
     setLinkKind("project");
-    setProjectSearch("");
-    setShortletSearch("");
-    setLinkProjectId(projectOptions[0]?.id ?? "");
     setLinkUnitId(projectOptions[0]?.units[0]?.id ?? "");
-    setLinkPropertyId(shortletPropertyOptions[0]?.id ?? "");
     setLinkShortletUnitId(shortletPropertyOptions[0]?.units[0]?.id ?? "");
     setIsLinkOpen(true);
   }
@@ -945,50 +1006,16 @@ export function ClientDetailWorkspace({
           <form action={linkAction} className="mt-5 space-y-4">
             {linkState && !linkState.ok ? <FormAlert>{linkState.error}</FormAlert> : null}
             <div>
-              <label className="mb-1 block text-sm text-muted">Search project</label>
-              <input
-                type="search"
-                value={projectSearch}
-                onChange={(e) => setProjectSearch(e.target.value)}
-                placeholder="Type to filter projects…"
-                className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
+              <label className="mb-1 block text-sm text-muted">Project unit</label>
+              <SearchableSelect
+                name="unitId"
+                value={linkUnitId}
+                onChange={setLinkUnitId}
+                searchPlaceholder="Search project or unit…"
+                placeholder="Select a unit"
+                emptyText="No matching units"
+                groups={linkUnitGroups}
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted">Project</label>
-              <UiSelect
-                value={linkProjectId}
-                onChange={(e) => {
-                  const projectId = e.target.value;
-                  setLinkProjectId(projectId);
-                  const project = projectOptions.find((p) => p.id === projectId);
-                  setLinkUnitId(project?.units[0]?.id ?? "");
-                }}
-              >
-                {filteredProjects.length === 0 ? (
-                  <option value="">No projects available</option>
-                ) : (
-                  filteredProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.units.length} units)
-                    </option>
-                  ))
-                )}
-              </UiSelect>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted">Unit</label>
-              <UiSelect name="unitId" value={linkUnitId} onChange={(e) => setLinkUnitId(e.target.value)}>
-                {unitsForProject.length === 0 ? (
-                  <option value="">No units available in this project</option>
-                ) : (
-                  unitsForProject.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.label}
-                    </option>
-                  ))
-                )}
-              </UiSelect>
               {selectedUnit ? (
                 <p className="mt-2 text-xs text-muted">
                   Pricing plan:{" "}
@@ -1032,55 +1059,16 @@ export function ClientDetailWorkspace({
               <FormAlert>{shortletLinkState.error}</FormAlert>
             ) : null}
             <div>
-              <label className="mb-1 block text-sm text-muted">Search property / location</label>
-              <input
-                type="search"
-                value={shortletSearch}
-                onChange={(e) => setShortletSearch(e.target.value)}
-                placeholder="Type to filter short-let properties…"
-                className="w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted">Property / location</label>
-              <UiSelect
-                value={linkPropertyId}
-                onChange={(e) => {
-                  const propertyId = e.target.value;
-                  setLinkPropertyId(propertyId);
-                  const property = shortletPropertyOptions.find((p) => p.id === propertyId);
-                  setLinkShortletUnitId(property?.units[0]?.id ?? "");
-                }}
-              >
-                {filteredShortletProperties.length === 0 ? (
-                  <option value="">No short-let properties available</option>
-                ) : (
-                  filteredShortletProperties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.units.length} apartments)
-                    </option>
-                  ))
-                )}
-              </UiSelect>
-            </div>
-            <div>
               <label className="mb-1 block text-sm text-muted">Apartment</label>
-              <UiSelect
+              <SearchableSelect
                 name="shortletUnitId"
                 value={linkShortletUnitId}
-                onChange={(e) => setLinkShortletUnitId(e.target.value)}
-              >
-                {shortletUnitsForProperty.length === 0 ? (
-                  <option value="">No apartments available</option>
-                ) : (
-                  shortletUnitsForProperty.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                      {u.location ? ` — ${u.location}` : ""}
-                    </option>
-                  ))
-                )}
-              </UiSelect>
+                onChange={setLinkShortletUnitId}
+                searchPlaceholder="Search property, location, or apartment…"
+                placeholder="Select an apartment"
+                emptyText="No matching apartments"
+                groups={linkShortletGroups}
+              />
               {selectedShortletUnit ? (
                 <p className="mt-2 text-xs text-muted">
                   Nightly rate:{" "}
@@ -1125,62 +1113,156 @@ export function ClientDetailWorkspace({
       <ModalOverlay open={isPayOpen} onClose={() => setIsPayOpen(false)} panelClassName={MODAL_PANEL_XL}>
         <h2 className="text-lg font-semibold">Add payment</h2>
         <p className="mt-1 text-sm text-muted">
-          Record a part payment for a project unit. If this client has a promo or you are writing off the
-          leftover, override the sale price so remaining does not stay on the full unit price.
+          Record money against a project unit. This client&apos;s units sit at the top. Catch-up is for people who
+          started paying before Realcorp, or whose remaining amount is not the brochure price.
         </p>
         <form action={payAction} className="mt-4 space-y-3">
           {payState && !payState.ok ? <FormAlert>{payState.error}</FormAlert> : null}
           <div>
             <label className="mb-1 block text-sm text-muted">Project unit</label>
-            <UiSelect
-              name="unitId"
-              value={selectedPayUnit?.id ?? ""}
-              onChange={(event) => setPayUnitId(event.target.value)}
-            >
-              {paymentUnitOptions.length === 0 ? (
-                <option value="">No units available</option>
-              ) : (
-                paymentUnitOptions.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.label}
-                  </option>
-                ))
-              )}
-            </UiSelect>
+              <SearchableSelect
+                name="unitId"
+                value={selectedPayUnit?.id ?? ""}
+                onChange={setPayUnitId}
+                searchPlaceholder="Search project or unit…"
+                placeholder="Select a unit"
+                groups={paymentUnitGroups}
+                required
+              />
             {selectedPayBalance || selectedPayUnit?.listPrice ? (
               <p className="mt-1 text-xs text-muted">
                 {selectedPayBalance
-                  ? `Sale ${moneyLabel(currency, selectedPayBalance.contractValue)} · Paid ${moneyLabel(currency, selectedPayBalance.collected)} · Remaining ${moneyLabel(currency, selectedPayBalance.remaining)}`
+                  ? `Sale ${moneyLabel(currency, selectedPayBalance.contractValue)} · On file ${moneyLabel(currency, selectedPayBalance.collected)} · Remaining ${moneyLabel(currency, selectedPayBalance.remaining)}`
                   : `List ${moneyLabel(currency, selectedPayUnit?.listPrice || 0)}`}
               </p>
             ) : null}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm text-muted">
-                Amount{balanceAdjustment === "none" ? "" : " (optional if you are only adjusting the sale price)"}
-              </label>
-              <input
-                name="amount"
-                type="number"
-                min="0"
-                step="0.01"
-                required={balanceAdjustment === "none"}
-                placeholder="0.00"
-                className="w-full border border-foreground/15 bg-field px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-muted">Date paid</label>
-              <input
-                name="paidAt"
-                type="date"
-                required
-                defaultValue={new Date().toISOString().slice(0, 10)}
-                className="w-full border border-foreground/15 bg-field px-3 py-2"
-              />
-            </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Payment type</label>
+            <SearchableSelect
+              name="paymentKind"
+              value={paymentKind}
+              onChange={(next) =>
+                setPaymentKind(next as "part_payment" | "catch_up" | "set_sale_price" | "waive_remaining")
+              }
+              searchPlaceholder="Search payment type…"
+              options={[
+                { value: "part_payment", label: "Part payment", hint: "This installment only" },
+                {
+                  value: "catch_up",
+                  label: "Already paid, paying now, remaining",
+                  hint: "Catch-up for money before Realcorp or a promo leftover",
+                },
+                { value: "set_sale_price", label: "Set discounted sale price", hint: "Override the brochure price" },
+                { value: "waive_remaining", label: "This settles the account", hint: "Waive leftover" },
+              ]}
+            />
           </div>
+          {paymentKind === "catch_up" ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Already paid (not in Realcorp)</label>
+                <input
+                  name="alreadyPaid"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={alreadyPaid}
+                  onChange={(event) => setAlreadyPaid(event.target.value)}
+                  placeholder="0.00"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+                {catchUpPreview.alreadyOnFile > 0 ? (
+                  <p className="mt-1 text-xs text-muted">
+                    Already on file: {moneyLabel(currency, catchUpPreview.alreadyOnFile)}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Paying now</label>
+                <input
+                  name="amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={payingNow}
+                  onChange={(event) => setPayingNow(event.target.value)}
+                  placeholder="0.00"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Left to pay</label>
+                <input
+                  name="remainingToPay"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={remainingToPay}
+                  onChange={(event) => setRemainingToPay(event.target.value)}
+                  placeholder="0.00"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">
+                  Amount
+                  {paymentKind === "part_payment" ? "" : " (optional if you are only adjusting the sale price)"}
+                </label>
+                <input
+                  name="amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required={paymentKind === "part_payment"}
+                  placeholder="0.00"
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Date paid</label>
+                <input
+                  name="paidAt"
+                  type="date"
+                  required
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+            </div>
+          )}
+          {paymentKind === "catch_up" ? (
+            <>
+              <div>
+                <label className="mb-1 block text-sm text-muted">Date paid</label>
+                <input
+                  name="paidAt"
+                  type="date"
+                  required
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+                <p className="mt-1 text-xs text-muted">
+                  Use the original payment date if you are bringing money already collected onto the books.
+                </p>
+              </div>
+              <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs text-muted">
+                New sale price {moneyLabel(currency, catchUpPreview.sale)}
+                {catchUpPreview.listPrice > 0
+                  ? ` · Brochure ${moneyLabel(currency, catchUpPreview.listPrice)}`
+                  : ""}
+                {catchUpPreview.discount > 0
+                  ? ` · Discount ${moneyLabel(currency, catchUpPreview.discount)} (not income)`
+                  : ""}
+                . Collections in Finance will include previously paid + paying now as client deposits. Leftover
+                becomes remaining receivable — the brochure gap is discount, not income.
+              </div>
+            </>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Method</label>
@@ -1206,44 +1288,32 @@ export function ClientDetailWorkspace({
             placeholder="Note (optional)"
             className="w-full border border-foreground/15 bg-field px-3 py-2"
           />
-          <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
-            <label className="mb-1 block text-sm font-medium text-foreground">Sale price for this client</label>
-            <p className="mb-2 text-xs text-muted">
-              Use this when they are not paying the brochure unit price — promo, staff discount, or writing off
-              the leftover balance.
-            </p>
-            <UiSelect
-              name="balanceAdjustment"
-              value={balanceAdjustment}
-              onChange={(event) =>
-                setBalanceAdjustment(event.target.value as "none" | "set_sale_price" | "waive_remaining")
-              }
-            >
-              <option value="none">Keep current sale price</option>
-              <option value="set_sale_price">Set a discounted sale price</option>
-              <option value="waive_remaining">This settles the account (waive leftover)</option>
-            </UiSelect>
-            {balanceAdjustment === "set_sale_price" ? (
-              <div className="mt-3">
-                <label className="mb-1 block text-sm text-muted">Agreed sale price</label>
-                <input
-                  name="agreedPrice"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  required
-                  defaultValue={
-                    selectedPayBalance?.contractValue
-                      ? String(selectedPayBalance.contractValue)
-                      : selectedPayUnit?.listPrice
-                        ? String(selectedPayUnit.listPrice)
-                        : ""
-                  }
-                  className="w-full border border-foreground/15 bg-field px-3 py-2"
-                />
-              </div>
-            ) : null}
-            {balanceAdjustment !== "none" ? (
+          {paymentKind === "set_sale_price" || paymentKind === "waive_remaining" ? (
+            <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] p-3">
+              {paymentKind === "set_sale_price" ? (
+                <div>
+                  <label className="mb-1 block text-sm text-muted">Agreed sale price</label>
+                  <input
+                    name="agreedPrice"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    defaultValue={
+                      selectedPayBalance?.contractValue
+                        ? String(selectedPayBalance.contractValue)
+                        : selectedPayUnit?.listPrice
+                          ? String(selectedPayUnit.listPrice)
+                          : ""
+                    }
+                    className="w-full border border-foreground/15 bg-field px-3 py-2"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-muted">
+                  Remaining after this payment will be written off. Sale price becomes what has been collected.
+                </p>
+              )}
               <div className="mt-3">
                 <label className="mb-1 block text-sm text-muted">Reason (optional)</label>
                 <input
@@ -1253,8 +1323,19 @@ export function ClientDetailWorkspace({
                   className="w-full border border-foreground/15 bg-field px-3 py-2"
                 />
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
+          {paymentKind === "catch_up" ? (
+            <div>
+              <label className="mb-1 block text-sm text-muted">Reason (optional)</label>
+              <input
+                name="adjustmentReason"
+                maxLength={240}
+                placeholder="Promo, early payment, or amount agreed before Realcorp"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+          ) : null}
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -1269,7 +1350,7 @@ export function ClientDetailWorkspace({
               className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
             >
               {payPending ? <ButtonSpinner /> : null}
-              {balanceAdjustment === "none" ? "Save payment" : "Save"}
+              {paymentKind === "part_payment" ? "Save payment" : "Save"}
             </button>
           </div>
         </form>

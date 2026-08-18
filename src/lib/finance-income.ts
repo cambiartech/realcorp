@@ -30,6 +30,21 @@ export function remainingClientBalance(input: {
   return Math.max(0, money(input.contractValue) - money(input.collected));
 }
 
+/** Catch-up / opening position: sale price is what they still owe plus everything already paid. */
+export function agreedPriceFromCatchUp(input: {
+  alreadyOnFile: number;
+  openingPaid: number;
+  payingNow: number;
+  remainingToPay: number;
+}) {
+  return money(
+    Number(input.alreadyOnFile || 0) +
+      Number(input.openingPaid || 0) +
+      Number(input.payingNow || 0) +
+      Number(input.remainingToPay || 0),
+  );
+}
+
 /** Brochure / list price vs the amount this client is actually expected to pay. */
 export function resolveClientUnitSalePrice(input: {
   agreedPrice?: number | null;

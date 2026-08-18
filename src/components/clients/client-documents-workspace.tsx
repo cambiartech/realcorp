@@ -7,6 +7,7 @@ import { ChevronRight, File, FileImage, FileText, Folder, FolderOpen, HardDrive,
 import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   addClientDocument,
   getClientUploadSignature,
@@ -215,14 +216,15 @@ export function ClientDocumentsWorkspace({
             <FileDropZone onFile={uploadFile} uploading={uploading} disabled={!uploadClientId} />
             <div className="flex flex-col gap-3">
               <label className="text-xs font-medium text-muted">Client</label>
-              <UiSelect value={uploadClientId} onChange={(e) => setUploadClientId(e.target.value)}>
-                <option value="">Select client…</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.fullName}
-                  </option>
-                ))}
-              </UiSelect>
+              <SearchableSelect
+                value={uploadClientId}
+                onChange={setUploadClientId}
+                allowEmpty
+                emptyLabel="Select client…"
+                searchPlaceholder="Search clients…"
+                placeholder="Select client…"
+                options={clients.map((c) => ({ value: c.id, label: c.fullName }))}
+              />
               <label className="text-xs font-medium text-muted">Folder</label>
               <UiSelect value={uploadCategory} onChange={(e) => setUploadCategory(e.target.value)}>
                 {DOC_CATEGORIES.map((c) => (

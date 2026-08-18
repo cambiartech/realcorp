@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { ButtonSpinner } from "@/components/button-spinner";
@@ -27,6 +27,7 @@ import {
   updatePropertyClient,
 } from "./actions";
 import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
+import { TableSearch, filterTableRows } from "@/components/table-search";
 
 type ClientRow = {
   id: string;
@@ -143,7 +144,17 @@ export function ClientsWorkspace({
   const [state, formAction, pending] = useActionState(createPropertyClient.bind(null, tenantSlug), initial);
   const [editPending, setEditPending] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
-  const visibleClients = clients.map((row) => ({ ...row, ...rowOverrides[row.id] }));
+  const [tableQuery, setTableQuery] = useState("");
+  const visibleClients = useMemo(
+    () =>
+      filterTableRows(
+        clients.map((row) => ({ ...row, ...rowOverrides[row.id] })),
+        tableQuery,
+        (row) =>
+          `${row.fullName} ${row.email} ${row.phone} ${row.status} ${row.portalStatus} ${row.createdAtLabel}`,
+      ),
+    [clients, rowOverrides, tableQuery],
+  );
 
   useEffect(() => {
     try {
@@ -405,7 +416,17 @@ export function ClientsWorkspace({
           />
         </div>
       ) : (
-        <div className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
+        <div className="mt-5">
+          <div className="mb-3">
+            <TableSearch
+              value={tableQuery}
+              onChange={setTableQuery}
+              placeholder="Search clients by name, email, phone, or status…"
+              resultCount={visibleClients.length}
+              totalCount={clients.length}
+            />
+          </div>
+        <div className="overflow-hidden rounded-lg border border-foreground/10">
           <table className="w-full text-left text-sm">
             <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
               <tr>
@@ -421,9 +442,11 @@ export function ClientsWorkspace({
               </tr>
             </thead>
             <tbody className="divide-y divide-foreground/10">
-              {clients.length === 0 ? (
+              {visibleClients.length === 0 ? (
                 <tr>
                   <td colSpan={canManage ? 10 : 9} className="px-4 py-10 text-center text-sm text-muted">
+                    {clients.length === 0 ? (
+                      <>
                     No clients yet.{" "}
                     {canManage ? (
                       <>
@@ -446,6 +469,10 @@ export function ClientsWorkspace({
                       </>
                     ) : (
                       "Clients will appear here once added."
+                    )}
+                      </>
+                    ) : (
+                      "No clients match that search."
                     )}
                   </td>
                 </tr>
@@ -540,6 +567,7 @@ export function ClientsWorkspace({
             itemLabel="clients"
             {...pagination}
           />
+        </div>
         </div>
       )}
 

@@ -120,6 +120,12 @@ export const recordClientDepositSchema = z
       .max(500)
       .optional()
       .transform((v) => (v && v !== "" ? v : undefined)),
+    paymentKind: z
+      .enum(["part_payment", "catch_up", "set_sale_price", "waive_remaining"])
+      .optional()
+      .default("part_payment"),
+    alreadyPaid: z.coerce.number().min(0, "Already-paid amount cannot be negative.").optional().default(0),
+    remainingToPay: z.coerce.number().min(0, "Remaining amount cannot be negative.").optional(),
     balanceAdjustment: z.enum(["none", "set_sale_price", "waive_remaining"]).optional().default("none"),
     agreedPrice: z.coerce.number().positive("Discounted sale price must be greater than zero.").optional(),
     adjustmentReason: z
@@ -130,15 +136,24 @@ export const recordClientDepositSchema = z
       .transform((v) => (v && v !== "" ? v : undefined)),
   })
   .superRefine((data, ctx) => {
-    const adjustment = data.balanceAdjustment || "none";
-    if (adjustment === "none" && !(data.amount > 0)) {
+    const kind = data.paymentKind || "part_payment";
+    if (kind === "part_payment" && !(data.amount > 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Payment amount must be greater than zero.",
         path: ["amount"],
       });
     }
-    if (adjustment === "set_sale_price" && !(data.agreedPrice && data.agreedPrice > 0)) {
+    if (kind === "catch_up") {
+      if (data.remainingToPay == null || Number.isNaN(data.remainingToPay)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Enter how much is left to pay so we can set this client’s sale price.",
+          path: ["remainingToPay"],
+        });
+      }
+    }
+    if (kind === "set_sale_price" && !(data.agreedPrice && data.agreedPrice > 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Enter the discounted sale price for this client.",
@@ -150,7 +165,15 @@ export const recordClientDepositSchema = z
 export function parseRecordClientDepositForm(formData: FormData) {
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const agreedRaw = String(formData.get("agreedPrice") ?? "").trim();
-  const adjustmentRaw = String(formData.get("balanceAdjustment") || "none").trim();
+  const alreadyRaw = String(formData.get("alreadyPaid") ?? "").trim();
+  const remainingRaw = String(formData.get("remainingToPay") ?? "").trim();
+  const kindRaw = String(formData.get("paymentKind") || formData.get("balanceAdjustment") || "part_payment").trim();
+  const paymentKind =
+    kindRaw === "set_sale_price" || kindRaw === "waive_remaining" || kindRaw === "catch_up" || kindRaw === "part_payment"
+      ? kindRaw
+      : kindRaw === "none"
+        ? "part_payment"
+        : "part_payment";
   return recordClientDepositSchema.safeParse({
     unitId: formData.get("unitId"),
     amount: amountRaw === "" ? 0 : amountRaw,
@@ -158,7 +181,11 @@ export function parseRecordClientDepositForm(formData: FormData) {
     method: formData.get("method") || undefined,
     reference: formData.get("reference") || undefined,
     note: formData.get("note") || undefined,
-    balanceAdjustment: adjustmentRaw || "none",
+    paymentKind,
+    alreadyPaid: alreadyRaw === "" ? 0 : alreadyRaw,
+    remainingToPay: remainingRaw === "" ? undefined : remainingRaw,
+    balanceAdjustment:
+      paymentKind === "set_sale_price" || paymentKind === "waive_remaining" ? paymentKind : "none",
     agreedPrice: agreedRaw === "" ? undefined : agreedRaw,
     adjustmentReason: formData.get("adjustmentReason") || undefined,
   });

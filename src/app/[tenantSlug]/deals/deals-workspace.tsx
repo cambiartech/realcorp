@@ -21,11 +21,13 @@ import { DealStage } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect, groupSearchableOptions } from "@/components/searchable-select";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { PaginationControl } from "@/components/pagination";
 import { buildPageUrl, type Pagination, type SearchParamValue } from "@/lib/pagination";
 import { createDeal, moveDealStage, moveDealStageDirect } from "./actions";
 import { getEntityTimelineLogs } from "../finance/actions";
+import { TableSearch, filterTableRows } from "@/components/table-search";
 
 type DealCard = {
   id: string;
@@ -44,7 +46,7 @@ type DealCard = {
 
 type ViewMode = "kanban" | "list";
 
-type SelectOption = { id: string; label: string };
+type SelectOption = { id: string; label: string; group?: string };
 type ActiveFilterChip = { label: string; clearHref: string };
 type ActionResult = { ok: true } | { ok: false; error: string };
 type TimelineLogRow = {
@@ -109,6 +111,7 @@ export function DealsWorkspace({
   const [isCreateOpen, setIsCreateOpen] = useState(Boolean(defaultLeadId));
   const [activeDeal, setActiveDeal] = useState<DealCard | null>(null);
   const [boardDeals, setBoardDeals] = useState<DealCard[]>(deals);
+  const [tableQuery, setTableQuery] = useState("");
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
   const [hoverStage, setHoverStage] = useState<DealStage | null>(null);
   const [isDraggingSavePending, setIsDraggingSavePending] = useState(false);
@@ -126,6 +129,18 @@ export function DealsWorkspace({
   const { showSnackbar } = useSnackbar();
   const createFormRef = useRef<HTMLFormElement | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const unitGroups = useMemo(
+    () =>
+      groupSearchableOptions(
+        units.map((unit) => ({
+          value: unit.id,
+          label: unit.group ? `${unit.group} · ${unit.label}` : unit.label,
+          group: unit.group,
+          keywords: `${unit.group ?? ""} ${unit.label}`,
+        })),
+      ),
+    [units],
+  );
 
   useEffect(() => {
     setBoardDeals(deals);
@@ -152,15 +167,26 @@ export function DealsWorkspace({
     }
   }, [moveState, showSnackbar]);
 
+  const visibleBoardDeals = useMemo(
+    () =>
+      filterTableRows(
+        boardDeals,
+        tableQuery,
+        (deal) =>
+          `${deal.leadName} ${deal.unitLabel} ${deal.projectName} ${deal.owner} ${deal.value} ${STAGE_LABEL[deal.stage]}`,
+      ),
+    [boardDeals, tableQuery],
+  );
+
   const grouped = useMemo(() => {
     const out = new Map<DealStage, DealCard[]>();
     for (const stage of STAGE_ORDER) out.set(stage, []);
-    for (const deal of boardDeals) {
+    for (const deal of visibleBoardDeals) {
       if (!out.has(deal.stage)) out.set(deal.stage, []);
       out.get(deal.stage)!.push(deal);
     }
     return out;
-  }, [boardDeals]);
+  }, [visibleBoardDeals]);
 
   function parseDealValue(raw: string) {
     return parseFloat(raw.replace(/[^\d.-]/g, "")) || 0;
@@ -298,7 +324,15 @@ export function DealsWorkspace({
             </div>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <TableSearch
+            value={tableQuery}
+            onChange={setTableQuery}
+            placeholder="Search deals by lead, unit, project, or owner…"
+            resultCount={visibleBoardDeals.length}
+            totalCount={boardDeals.length}
+            className="max-w-xs flex-none"
+          />
           {/* View toggle */}
           <div className="flex overflow-hidden rounded-md border border-foreground/15">
             <Link
@@ -393,14 +427,14 @@ export function DealsWorkspace({
               </tr>
             </thead>
             <tbody className="divide-y divide-foreground/10">
-              {deals.length === 0 ? (
+              {visibleBoardDeals.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-sm text-muted">
-                    No deals yet.
+                    {boardDeals.length === 0 ? "No deals yet." : "No deals match that search."}
                   </td>
                 </tr>
               ) : (
-                deals.map((deal) => (
+                visibleBoardDeals.map((deal) => (
                   <tr key={deal.id}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -538,41 +572,46 @@ export function DealsWorkspace({
             <label htmlFor="deal-lead" className="mb-1 block text-sm text-muted">
               Lead (optional)
             </label>
-            <UiSelect id="deal-lead" name="leadId" defaultValue={defaultLeadId || ""}>
-              <option value="">None</option>
-              {leads.map((lead) => (
-                <option key={lead.id} value={lead.id}>
-                  {lead.label}
-                </option>
-              ))}
-            </UiSelect>
+            <SearchableSelect
+              id="deal-lead"
+              name="leadId"
+              defaultValue={defaultLeadId || ""}
+              allowEmpty
+              emptyLabel="None"
+              searchPlaceholder="Search leads…"
+              placeholder="Select a lead"
+              options={leads.map((lead) => ({ value: lead.id, label: lead.label }))}
+            />
           </div>
           <div>
             <label htmlFor="deal-unit" className="mb-1 block text-sm text-muted">
               Unit (optional)
             </label>
-            <UiSelect id="deal-unit" name="unitId" defaultValue="">
-              <option value="">None</option>
-              {units.map((unit) => (
-                <option key={unit.id} value={unit.id}>
-                  {unit.label}
-                </option>
-              ))}
-            </UiSelect>
+            <SearchableSelect
+              id="deal-unit"
+              name="unitId"
+              defaultValue=""
+              allowEmpty
+              emptyLabel="None"
+              searchPlaceholder="Search project or unit…"
+              placeholder="Select a unit"
+              groups={unitGroups}
+            />
           </div>
 
           <div>
             <label htmlFor="deal-owner" className="mb-1 block text-sm text-muted">
               Assign owner
             </label>
-            <UiSelect id="deal-owner" name="assignedUserId" defaultValue="">
-              <option value="">Use current user</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.label}
-                </option>
-              ))}
-            </UiSelect>
+            <SearchableSelect
+              id="deal-owner"
+              name="assignedUserId"
+              defaultValue=""
+              allowEmpty
+              emptyLabel="Use current user"
+              searchPlaceholder="Search team…"
+              options={users.map((user) => ({ value: user.id, label: user.label }))}
+            />
           </div>
           <div>
             <label htmlFor="deal-value" className="mb-1 block text-sm text-muted">

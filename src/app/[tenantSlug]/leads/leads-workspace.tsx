@@ -10,10 +10,12 @@ import { LeadQuality } from "@/generated/prisma";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { PaginationControl } from "@/components/pagination";
 import type { Pagination, SearchParamValue } from "@/lib/pagination";
 import { createLead } from "./actions";
+import { TableSearch, filterTableRows } from "@/components/table-search";
 
 type LeadRow = {
   id: string;
@@ -96,6 +98,17 @@ export function LeadsWorkspace({
   const [state, formAction, pending] = useActionState(createLead.bind(null, tenantSlug), initial);
   const { showSnackbar } = useSnackbar();
   const formRef = useRef<HTMLFormElement | null>(null);
+  const [tableQuery, setTableQuery] = useState("");
+  const visibleLeads = useMemo(
+    () =>
+      filterTableRows(
+        leads,
+        tableQuery,
+        (lead) =>
+          `${lead.name} ${lead.email} ${lead.phone} ${lead.source} ${lead.attribution} ${lead.owner}`,
+      ),
+    [leads, tableQuery],
+  );
 
   useEffect(() => {
     if (!state) return;
@@ -202,25 +215,22 @@ export function LeadsWorkspace({
       {campaignOptions.length > 0 ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted">Campaign</span>
-          <UiSelect
-            value={searchParams.get("campaign") ?? ""}
-            onChange={(e) => {
-              const id = e.target.value;
-              const next = new URLSearchParams(searchParams.toString());
-              if (id) next.set("campaign", id);
-              else next.delete("campaign");
-              const q = next.toString();
-              router.push(`/${tenantSlug}/leads${q ? `?${q}` : ""}`);
-            }}
-            className="max-w-xs text-sm"
-          >
-            <option value="">All campaigns</option>
-            {campaignOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </UiSelect>
+          <div className="min-w-[16rem]">
+            <SearchableSelect
+              value={searchParams.get("campaign") ?? ""}
+              onChange={(id) => {
+                const next = new URLSearchParams(searchParams.toString());
+                if (id) next.set("campaign", id);
+                else next.delete("campaign");
+                const q = next.toString();
+                router.push(`/${tenantSlug}/leads${q ? `?${q}` : ""}`);
+              }}
+              allowEmpty
+              emptyLabel="All campaigns"
+              searchPlaceholder="Search campaigns…"
+              options={campaignOptions.map((c) => ({ value: c.id, label: c.label }))}
+            />
+          </div>
         </div>
       ) : null}
 
@@ -255,7 +265,17 @@ export function LeadsWorkspace({
         </div>
       )}
 
-      <div className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
+      <div className="mt-5">
+        <div className="mb-3">
+          <TableSearch
+            value={tableQuery}
+            onChange={setTableQuery}
+            placeholder="Search leads by name, email, phone, source, or owner…"
+            resultCount={visibleLeads.length}
+            totalCount={leads.length}
+          />
+        </div>
+      <div className="overflow-hidden rounded-lg border border-foreground/10">
         <table className="w-full text-left text-sm">
           <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
             <tr>
@@ -270,14 +290,14 @@ export function LeadsWorkspace({
             </tr>
           </thead>
           <tbody className="divide-y divide-foreground/10">
-            {leads.length === 0 ? (
+            {visibleLeads.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-8 text-sm text-muted">
-                  No leads yet.
+                  {leads.length === 0 ? "No leads yet." : "No leads match that search."}
                 </td>
               </tr>
             ) : (
-              leads.map((lead) => (
+              visibleLeads.map((lead) => (
                 <tr key={lead.id} className={lead.score >= 70 ? "bg-[var(--danger)]/[0.02]" : ""}>
                   <td className="px-4 py-3">
                     <ScoreBadge score={lead.score} />
@@ -328,6 +348,7 @@ export function LeadsWorkspace({
           itemLabel="leads"
           {...pagination}
         />
+      </div>
       </div>
 
       <ModalOverlay
@@ -408,14 +429,15 @@ export function LeadsWorkspace({
             <label htmlFor="lead-campaign-record" className="mb-1 block text-sm text-muted">
               Link to campaign
             </label>
-            <UiSelect id="lead-campaign-record" name="campaignId" defaultValue="">
-              <option value="">None</option>
-              {campaignOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </UiSelect>
+            <SearchableSelect
+              id="lead-campaign-record"
+              name="campaignId"
+              defaultValue=""
+              allowEmpty
+              emptyLabel="None"
+              searchPlaceholder="Search campaigns…"
+              options={campaignOptions.map((c) => ({ value: c.id, label: c.label }))}
+            />
           </div>
           <div>
             <label htmlFor="lead-campaign" className="mb-1 block text-sm text-muted">
@@ -433,14 +455,15 @@ export function LeadsWorkspace({
             <label htmlFor="lead-project-interest" className="mb-1 block text-sm text-muted">
               Project interest
             </label>
-            <UiSelect id="lead-project-interest" name="projectInterest" defaultValue="">
-              <option value="">Not specified</option>
-              {projectOptions.map((project) => (
-                <option key={project.id} value={project.name}>
-                  {project.name}
-                </option>
-              ))}
-            </UiSelect>
+            <SearchableSelect
+              id="lead-project-interest"
+              name="projectInterest"
+              defaultValue=""
+              allowEmpty
+              emptyLabel="Not specified"
+              searchPlaceholder="Search projects…"
+              options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
+            />
           </div>
           <div>
             <label htmlFor="lead-budget" className="mb-1 block text-sm text-muted">
@@ -468,14 +491,15 @@ export function LeadsWorkspace({
             <label htmlFor="lead-owner" className="mb-1 block text-sm text-muted">
               Assign owner
             </label>
-            <UiSelect id="lead-owner" name="assignedUserId" defaultValue="">
-              <option value="">Unassigned</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.label}
-                </option>
-              ))}
-            </UiSelect>
+            <SearchableSelect
+              id="lead-owner"
+              name="assignedUserId"
+              defaultValue=""
+              allowEmpty
+              emptyLabel="Unassigned"
+              searchPlaceholder="Search team…"
+              options={users.map((user) => ({ value: user.id, label: user.label }))}
+            />
           </div>
 
           <div className="sm:col-span-2 flex justify-end gap-2 pt-1">

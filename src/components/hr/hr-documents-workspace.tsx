@@ -22,6 +22,7 @@ import { PrefillWithAiButton } from "@/components/hr/prefill-with-ai-button";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { addHrDocument, getHrUploadSignature, softDeleteHrDocument } from "@/app/[tenantSlug]/hr/actions";
 import { ingestHrDocument } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
@@ -438,17 +439,19 @@ export function HrDocumentsWorkspace({
               <label className="text-xs font-medium text-muted">
                 Employee {aiCategorySelected ? "(recommended)" : null}
               </label>
-              <UiSelect value={uploadEmployeeId} onChange={(e) => setUploadEmployeeId(e.target.value)}>
-                <option value="">
-                  {aiCategorySelected ? "Auto-match each file…" : "Select employee…"}
-                </option>
-                {employees.map((e) => (
-                  <option key={e.userId} value={employeeOptionValue(e)}>
-                    {e.fullName}
-                    {!e.profileId ? " (new HR record)" : ""}
-                  </option>
-                ))}
-              </UiSelect>
+              <SearchableSelect
+                value={uploadEmployeeId}
+                onChange={setUploadEmployeeId}
+                allowEmpty
+                emptyLabel={aiCategorySelected ? "Auto-match each file…" : "Select employee…"}
+                searchPlaceholder="Search employees…"
+                placeholder="Select employee…"
+                options={employees.map((e) => ({
+                  value: employeeOptionValue(e),
+                  label: e.fullName,
+                  hint: !e.profileId ? "new HR record" : undefined,
+                }))}
+              />
               <label className="text-xs font-medium text-muted">Folder / type</label>
               <UiSelect value={uploadCategory} onChange={(e) => setUploadCategory(e.target.value)}>
                 {aiEnabled ? <option value="AUTO">✨ Auto-detect each file</option> : null}

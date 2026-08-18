@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { TenantPageShell } from "@/components/tenant-page-shell";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
@@ -779,27 +780,29 @@ export function TasksWorkspace({
               </div>
               <div>
                 <label className="mb-1 block text-sm text-muted">Project (optional)</label>
-                <UiSelect name="projectId" defaultValue={editingTask.projectId || ""}>
-                  <option value="">None</option>
-                  {projectsForEditSpace.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.iconEmoji ? `${p.iconEmoji} ` : ""}
-                      {p.name}
-                    </option>
-                  ))}
-                </UiSelect>
+                <SearchableSelect
+                  name="projectId"
+                  defaultValue={editingTask.projectId || ""}
+                  allowEmpty
+                  emptyLabel="None"
+                  searchPlaceholder="Search projects…"
+                  options={projectsForEditSpace.map((p) => ({
+                    value: p.id,
+                    label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
+                  }))}
+                />
               </div>
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Assignee</label>
-              <UiSelect name="assigneeUserId" defaultValue={editingTask.assigneeUserId || ""}>
-                <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </UiSelect>
+              <SearchableSelect
+                name="assigneeUserId"
+                defaultValue={editingTask.assigneeUserId || ""}
+                allowEmpty
+                emptyLabel="Unassigned"
+                searchPlaceholder="Search people…"
+                options={members.map((m) => ({ value: m.id, label: m.label }))}
+              />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -902,28 +905,31 @@ export function TasksWorkspace({
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Project (optional)</label>
-              <UiSelect name="projectId" defaultValue="">
-                <option value="">None</option>
-                {projectsForSpace.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.iconEmoji ? `${p.iconEmoji} ` : ""}
-                    {p.name}
-                  </option>
-                ))}
-              </UiSelect>
+              <SearchableSelect
+                key={createSpaceId || "no-create-space"}
+                name="projectId"
+                defaultValue=""
+                allowEmpty
+                emptyLabel="None"
+                searchPlaceholder="Search projects…"
+                options={projectsForSpace.map((p) => ({
+                  value: p.id,
+                  label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
+                }))}
+              />
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm text-muted">Assignee</label>
-              <UiSelect name="assigneeUserId" defaultValue={currentUserId}>
-                <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </UiSelect>
+              <SearchableSelect
+                name="assigneeUserId"
+                defaultValue={currentUserId}
+                allowEmpty
+                emptyLabel="Unassigned"
+                searchPlaceholder="Search people…"
+                options={members.map((m) => ({ value: m.id, label: m.label }))}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Priority</label>

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   countImportableUnlinkedUnits,
   detectUnitNamePattern,
+  extractClientNameForImport,
   extractClientNameFromUnitLabel,
   formatClientDisplayName,
   groupUnitsByExtractedClient,
@@ -26,6 +27,8 @@ test("extracts the client from RM number then name labels", () => {
   );
   assert.equal(extractClientNameFromUnitLabel("RM 12"), null);
   assert.equal(extractClientNameFromUnitLabel("Becca's Deluxe 1"), null);
+  assert.equal(extractClientNameFromUnitLabel("S8 TUGBOGBO MUIZ"), "TUGBOGBO MUIZ");
+  assert.equal(extractClientNameFromUnitLabel("S7 LEKOM GRACE"), "LEKOM GRACE");
 });
 
 test("custom pattern uses {name} from the label", () => {
@@ -135,6 +138,36 @@ test("counts only unmapped units that look like a person, ignoring already linke
     ]),
     2,
   );
+});
+
+test("rental units with letter codes or name-only labels still import as clients", () => {
+  assert.equal(extractClientNameForImport("S8 TUGBOGBO MUIZ"), "TUGBOGBO MUIZ");
+  assert.equal(extractClientNameForImport("MR CHIMA DAVID"), "MR CHIMA DAVID");
+  assert.equal(extractClientNameForImport("Becca's Deluxe 1"), null);
+  const grouped = groupUnitsByExtractedClient([
+    {
+      id: "1",
+      label: "S8 TUGBOGBO MUIZ",
+      projectId: "p1",
+      projectName: "Project Primero",
+      purpose: "RENTAL",
+      status: "SOLD",
+      alreadyLinked: false,
+    },
+    {
+      id: "2",
+      label: "MR CHIMA DAVID",
+      projectId: "p1",
+      projectName: "Project Primero",
+      purpose: "RENTAL",
+      status: "SOLD",
+      alreadyLinked: false,
+    },
+  ]);
+  assert.equal(grouped.groups.length, 2);
+  assert.equal(grouped.skippedNoName, 0);
+  assert.ok(grouped.groups.every((group) => group.defaultSelected));
+  assert.equal(suggestedClientStatus(["SOLD"], ["RENTAL"]), "ACTIVE");
 });
 
 test("sold, short-let, and rental count as completed owners; reserved stays a prospect", () => {

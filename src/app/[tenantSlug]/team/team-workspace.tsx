@@ -34,6 +34,7 @@ import {
   updateMembershipRole,
   type TeamInviteResult,
 } from "./actions";
+import { TableSearch, filterTableRows } from "@/components/table-search";
 
 const initial: TeamInviteResult | null = null;
 
@@ -188,6 +189,16 @@ function MembersTable({
   const { showSnackbar } = useSnackbar();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [moduleAccessMember, setModuleAccessMember] = useState<TeamMemberRow | null>(null);
+  const [tableQuery, setTableQuery] = useState("");
+  const visibleMembers = useMemo(
+    () =>
+      filterTableRows(
+        members,
+        tableQuery,
+        (member) => `${member.name} ${member.email} ${member.role} ${member.status}`,
+      ),
+    [members, tableQuery],
+  );
 
   async function handleRoleChange(memberId: string, previousRole: MembershipRole, nextRole: string) {
     if (nextRole === previousRole) return;
@@ -225,7 +236,17 @@ function MembersTable({
   }
 
   return (
-    <div className="mt-4 overflow-hidden rounded-lg border border-foreground/10">
+    <div className="mt-4">
+      <div className="mb-3">
+        <TableSearch
+          value={tableQuery}
+          onChange={setTableQuery}
+          placeholder="Search team by name, email, or role…"
+          resultCount={visibleMembers.length}
+          totalCount={members.length}
+        />
+      </div>
+    <div className="overflow-hidden rounded-lg border border-foreground/10">
       <table className="w-full text-left text-sm">
         <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
           <tr>
@@ -238,7 +259,14 @@ function MembersTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-foreground/10">
-          {members.map((member) => (
+          {visibleMembers.length === 0 ? (
+            <tr>
+              <td colSpan={canManageRoles ? 6 : 4} className="px-4 py-8 text-sm text-muted">
+                No team members match that search.
+              </td>
+            </tr>
+          ) : (
+          visibleMembers.map((member) => (
             <tr key={member.id}>
               <td className="px-4 py-3 font-medium text-foreground">{member.name}</td>
               <td className="px-4 py-3 text-muted">{member.email}</td>
@@ -291,7 +319,8 @@ function MembersTable({
                 </td>
               ) : null}
             </tr>
-          ))}
+          ))
+          )}
         </tbody>
       </table>
       {canManageRoles ? (
@@ -317,6 +346,7 @@ function MembersTable({
           }}
         />
       ) : null}
+    </div>
     </div>
   );
 }

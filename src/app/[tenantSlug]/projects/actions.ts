@@ -15,6 +15,10 @@ import {
 import { revalidatePath } from "next/cache";
 import { createTenantUploadSignature, type CloudinaryUploadSignature } from "@/lib/cloudinary-upload-server";
 import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
+import {
+  ensureClientsFromUnitLabels,
+  wantsImportAsClient,
+} from "@/lib/ensure-client-from-unit-label";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -118,7 +122,7 @@ export async function createUnit(
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, tenantId: tenant.id },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!project) return { ok: false, error: "Project not found." };
 
@@ -144,6 +148,22 @@ export async function createUnit(
         status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
       },
     });
+    if (wantsImportAsClient(formData)) {
+      await ensureClientsFromUnitLabels({
+        tenantId: tenant.id,
+        projectName: project.name,
+        units: [
+          {
+            id: unit.id,
+            label: unit.label,
+            purpose: unit.purpose,
+            status: unit.status,
+            pricingPlanId: unit.pricingPlanId,
+          },
+        ],
+      });
+      revalidatePath(`/${tenantSlug}/clients`);
+    }
     await writeAuditLog({
       tenantId: tenant.id,
       actorUserId: session.user.id,
@@ -186,7 +206,7 @@ export async function createUnitsBulk(
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, tenantId: tenant.id },
-    select: { id: true, units: { select: { label: true } } },
+    select: { id: true, name: true, units: { select: { label: true } } },
   });
   if (!project) return { ok: false, error: "Project not found." };
 
@@ -208,7 +228,7 @@ export async function createUnitsBulk(
       return { ok: false, error: "Selected pricing plan is invalid for this project." };
     }
 
-    await prisma.$transaction(
+    const createdUnits = await prisma.$transaction(
       uniqueLabels.map((label) =>
         prisma.unit.create({
           data: {
@@ -220,9 +240,24 @@ export async function createUnitsBulk(
             unitType: parsed.data.unitType || null,
             status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
           },
+          select: {
+            id: true,
+            label: true,
+            purpose: true,
+            status: true,
+            pricingPlanId: true,
+          },
         }),
       ),
     );
+    if (wantsImportAsClient(formData)) {
+      await ensureClientsFromUnitLabels({
+        tenantId: tenant.id,
+        projectName: project.name,
+        units: createdUnits,
+      });
+      revalidatePath(`/${tenantSlug}/clients`);
+    }
 
     await writeAuditLog({
       tenantId: tenant.id,

@@ -8,6 +8,7 @@ import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { generateBulkUnitLabels } from "@/lib/unit-label-suggestions";
+import { clientDisplayNameFromUnitLabel } from "@/lib/unit-label-client-import";
 
 type PricingPlanOption = { id: string; name: string };
 
@@ -42,6 +43,7 @@ export function AddUnitsModal({
   const [status, setStatus] = useState<UnitStatus>(UnitStatus.AVAILABLE);
   const [unitType, setUnitType] = useState("");
   const [customLabels, setCustomLabels] = useState<string[]>([""]);
+  const [importAsClient, setImportAsClient] = useState(true);
 
   const selectedPlan = pricingPlans.find((p) => p.id === pricingPlanId);
 
@@ -55,6 +57,7 @@ export function AddUnitsModal({
     setStatus(UnitStatus.AVAILABLE);
     setUnitType("");
     setCustomLabels([""]);
+    setImportAsClient(true);
   }, [open, suggestedLabels]);
 
   useEffect(() => {
@@ -93,6 +96,13 @@ export function AddUnitsModal({
     suggestedLabels,
   ]);
 
+  const importableClientNames = useMemo(() => {
+    const names = previewLabels
+      .map((label) => clientDisplayNameFromUnitLabel(label, projectName))
+      .filter((name): name is string => Boolean(name));
+    return [...new Set(names)];
+  }, [previewLabels, projectName]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const fd = new FormData();
@@ -100,6 +110,7 @@ export function AddUnitsModal({
     fd.set("status", status);
     if (unitType.trim()) fd.set("unitType", unitType.trim());
     if (pricingPlanId) fd.set("pricingPlanId", pricingPlanId);
+    if (importAsClient) fd.set("importAsClient", "1");
 
     if (quantity === 1 && namingMode === "sequential") {
       const label = (baseLabel.trim() || suggestedLabels[0] || "").trim();
@@ -280,6 +291,25 @@ export function AddUnitsModal({
             </UiSelect>
           </label>
         </div>
+
+        <label className="flex items-start gap-2 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={importAsClient}
+            onChange={(e) => setImportAsClient(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-foreground">Also add as client</span>
+            <span className="mt-0.5 block text-xs text-muted">
+              If the label includes a person&apos;s name, create or reuse that client and assign this unit — including
+              rental, short-let, and sale. No need to re-enter them under Clients.
+              {importableClientNames.length
+                ? ` Preview: ${importableClientNames.slice(0, 4).join(", ")}${importableClientNames.length > 4 ? "…" : ""}.`
+                : " Labels without a name stay as units only."}
+            </span>
+          </span>
+        </label>
 
         <div className="flex justify-end gap-2">
           <button

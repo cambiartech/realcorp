@@ -11,7 +11,7 @@ import {
 } from "@/lib/modal-panel";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
@@ -30,6 +30,8 @@ import {
   updateUnit,
 } from "../actions";
 import { AddUnitsModal } from "./add-units-modal";
+import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
+import { TableSearch, filterTableRows } from "@/components/table-search";
 
 type UnitRow = {
   id: string;
@@ -63,6 +65,7 @@ export function ProjectUnitsWorkspace({
   projectId,
   projectName,
   canManage,
+  canImportClients,
   suggestedLabels,
   units,
   pricingPlans,
@@ -73,6 +76,7 @@ export function ProjectUnitsWorkspace({
   projectId: string;
   projectName: string;
   canManage: boolean;
+  canImportClients?: boolean;
   suggestedLabels: string[];
   units: UnitRow[];
   pricingPlans: PricingPlanRow[];
@@ -90,6 +94,9 @@ export function ProjectUnitsWorkspace({
   const [deletingPlan, setDeletingPlan] = useState<PricingPlanRow | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPending, startCreateTransition] = useTransition();
+  const [importClientsOpen, setImportClientsOpen] = useState(false);
+  const [unitQuery, setUnitQuery] = useState("");
+  const [planQuery, setPlanQuery] = useState("");
   const [editState, editAction, editPending] = useActionState(
     updateUnit.bind(null, tenantSlug, projectId, editingUnit?.id ?? ""),
     initial,
@@ -124,6 +131,20 @@ export function ProjectUnitsWorkspace({
   const editFormRef = useRef<HTMLFormElement | null>(null);
   const pricingFormRef = useRef<HTMLFormElement | null>(null);
   const editPlanFormRef = useRef<HTMLFormElement | null>(null);
+  const visibleUnits = useMemo(
+    () =>
+      filterTableRows(
+        units,
+        unitQuery,
+        (unit) => `${unit.label} ${unit.purpose} ${unit.unitType} ${unit.pricingPlanName} ${unit.status}`,
+      ),
+    [units, unitQuery],
+  );
+  const visiblePlans = useMemo(
+    () =>
+      filterTableRows(pricingPlans, planQuery, (plan) => `${plan.name} ${plan.currency} ${plan.price}`),
+    [pricingPlans, planQuery],
+  );
 
   useEffect(() => {
     if (!editState) return;
@@ -267,6 +288,15 @@ export function ProjectUnitsWorkspace({
               Add unit
             </button>
           ) : null}
+          {canImportClients ? (
+            <button
+              type="button"
+              onClick={() => setImportClientsOpen(true)}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.04]"
+            >
+              Import as clients
+            </button>
+          ) : null}
         </div>
       </div>
       <div className="mt-5 border-b border-foreground/10">
@@ -307,14 +337,26 @@ export function ProjectUnitsWorkspace({
       </div>
 
       {activeTab === "pricing" ? (
-        <section className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
-          {pricingPlans.length === 0 ? (
+        <section className="mt-5">
+          <div className="mb-3">
+            <TableSearch
+              value={planQuery}
+              onChange={setPlanQuery}
+              placeholder="Search pricing plans…"
+              resultCount={visiblePlans.length}
+              totalCount={pricingPlans.length}
+            />
+          </div>
+          <div className="overflow-hidden rounded-lg border border-foreground/10">
+          {visiblePlans.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted">
-              No pricing plans yet. Add one to support multiple offers.
+              {pricingPlans.length === 0
+                ? "No pricing plans yet. Add one to support multiple offers."
+                : "No pricing plans match that search."}
             </p>
           ) : (
             <div className="divide-y divide-foreground/10">
-              {pricingPlans.map((plan) => (
+              {visiblePlans.map((plan) => (
                 <div
                   key={plan.id}
                   className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[1.2fr_1fr_1fr_1fr_auto] sm:items-center"
@@ -355,9 +397,20 @@ export function ProjectUnitsWorkspace({
               ))}
             </div>
           )}
+          </div>
         </section>
       ) : (
-        <div className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
+        <div className="mt-5">
+          <div className="mb-3">
+            <TableSearch
+              value={unitQuery}
+              onChange={setUnitQuery}
+              placeholder="Search units by label, client, layout, or status…"
+              resultCount={visibleUnits.length}
+              totalCount={units.length}
+            />
+          </div>
+          <div className="overflow-hidden rounded-lg border border-foreground/10">
           <table className="w-full text-left text-sm">
             <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
               <tr>
@@ -370,14 +423,14 @@ export function ProjectUnitsWorkspace({
               </tr>
             </thead>
             <tbody className="divide-y divide-foreground/10">
-              {units.length === 0 ? (
+              {visibleUnits.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-sm text-muted">
-                    No units yet.
+                    {units.length === 0 ? "No units yet." : "No units match that search."}
                   </td>
                 </tr>
               ) : (
-                units.map((unit) => (
+                visibleUnits.map((unit) => (
                   <tr key={unit.id}>
                     <td className="px-4 py-3 font-medium text-foreground">{unit.label}</td>
                     <td className="px-4 py-3 text-foreground/90">{unit.purpose}</td>
@@ -426,6 +479,7 @@ export function ProjectUnitsWorkspace({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -443,6 +497,19 @@ export function ProjectUnitsWorkspace({
         error={createError}
         onSubmit={submitCreateUnits}
       />
+
+      {canImportClients ? (
+        <ImportClientsFromUnitsModal
+          tenantSlug={tenantSlug}
+          projectId={projectId}
+          open={importClientsOpen}
+          onClose={() => setImportClientsOpen(false)}
+          onImported={(summary) => {
+            showSnackbar(summary, "success");
+            router.refresh();
+          }}
+        />
+      ) : null}
 
       {editingUnit ? (
         <ModalOverlay open onClose={() => setEditingUnit(null)} panelClassName={MODAL_PANEL_XL}>

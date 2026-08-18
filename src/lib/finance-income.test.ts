@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, summarizeClientDeposits } from "./finance-income";
+import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, summarizeClientDeposits, agreedPriceFromCatchUp } from "./finance-income";
 
 test("parses known income types and falls back to other", () => {
   assert.equal(parseFinanceIncomeType("CLIENT_DEPOSIT"), "CLIENT_DEPOSIT");
@@ -8,7 +8,19 @@ test("parses known income types and falls back to other", () => {
   assert.equal(parseFinanceIncomeType("unknown"), "OTHER");
 });
 
-test("remaining client balance never goes below zero", () => {
+test("catch-up sale price is already paid + paying now + leftover", () => {
+  const sale = agreedPriceFromCatchUp({
+    alreadyOnFile: 1_000_000,
+    openingPaid: 4_000_000,
+    payingNow: 500_000,
+    remainingToPay: 8_000_000,
+  });
+  assert.equal(sale, 13_500_000);
+  // Collections (already on file + opening + paying now) stay income; leftover is AR, not a write-off.
+  assert.equal(remainingClientBalance({ contractValue: sale, collected: 5_500_000 }), 8_000_000);
+});
+
+test("remaining balance never goes negative", () => {
   assert.equal(remainingClientBalance({ contractValue: 50_000_000, collected: 12_500_000 }), 37_500_000);
   assert.equal(remainingClientBalance({ contractValue: 10_000_000, collected: 12_000_000 }), 0);
 });

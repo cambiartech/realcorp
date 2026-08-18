@@ -5,6 +5,7 @@ import prisma from "@/lib/db";
 import { formatEnumLabel, formatUnitPurpose } from "@/lib/ui-format";
 import { resolveTenantCurrencies } from "@/lib/finance-catalog";
 import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
+import { canManageClients } from "@/lib/clients-access";
 import { suggestUnitLabels } from "@/lib/unit-label-suggestions";
 import { notFound } from "next/navigation";
 import { ProjectUnitsWorkspace } from "./project-units-workspace";
@@ -101,6 +102,7 @@ export default async function ProjectUnitsPage({
       projectId={project.id}
       projectName={project.name}
       canManage={canManage}
+      canImportClients={canManageClients(Boolean(session.user.isPlatformAdmin), membership)}
       currencies={currencies}
       defaultCurrency={tenant.defaultCurrency || currencies[0] || "NGN"}
       suggestedLabels={suggestedLabels}

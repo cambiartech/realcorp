@@ -14,11 +14,13 @@ import {
 
 export function ImportClientsFromUnitsModal({
   tenantSlug,
+  projectId,
   open,
   onClose,
   onImported,
 }: {
   tenantSlug: string;
+  projectId?: string;
   open: boolean;
   onClose: () => void;
   onImported: (summary: string) => void;
@@ -39,7 +41,7 @@ export function ImportClientsFromUnitsModal({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void previewClientsFromUnitLabels(tenantSlug).then((result) => {
+    void previewClientsFromUnitLabels(tenantSlug, projectId ? { projectId } : undefined).then((result) => {
       if (cancelled) return;
       setLoading(false);
       if (!result.ok) {
@@ -58,7 +60,7 @@ export function ImportClientsFromUnitsModal({
     return () => {
       cancelled = true;
     };
-  }, [open, tenantSlug]);
+  }, [open, tenantSlug, projectId]);
 
   const selectedGroups = useMemo(
     () => groups.filter((group) => selected[group.key]),
@@ -72,6 +74,7 @@ export function ImportClientsFromUnitsModal({
     const result = await previewClientsFromUnitLabels(tenantSlug, {
       preset: nextPreset,
       pattern: nextPattern,
+      projectId,
     });
     setLoading(false);
     if (!result.ok) {
@@ -94,6 +97,7 @@ export function ImportClientsFromUnitsModal({
       preset,
       pattern,
       selectedKeys: selectedGroups.map((group) => group.key),
+      projectId,
     });
     setImporting(false);
     if (!result.ok) {
@@ -117,10 +121,11 @@ export function ImportClientsFromUnitsModal({
         <div className="shrink-0 border-b border-foreground/10 px-6 py-4">
           <h2 id="import-units-title" className="text-lg font-semibold text-foreground">
             Import clients from unit names
+            {projectId ? " in this project" : ""}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Tell us how unit labels are written. We extract the person, skip blanks, and assign every matching unit
-            to that client — without creating duplicates.
+            Tell us how unit labels are written. We extract the person from sale, rental, short-let, and hostel
+            units, skip blanks, and assign every matching unit to that client — without creating duplicates.
           </p>
         </div>
 

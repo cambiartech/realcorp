@@ -22,6 +22,7 @@ import { ListingEditorModal } from "@/components/listing-editor-modal";
 import { ListingImageUpload } from "@/components/listing-image-upload";
 import { AddStakeholderForm } from "@/components/stakeholders/add-stakeholder-form";
 import { createProject, deleteProject, removeProjectStakeholder, updateProject } from "./actions";
+import { TableSearch, filterTableRows } from "@/components/table-search";
 
 type ProjectRow = {
   id: string;
@@ -119,6 +120,7 @@ export function ProjectsWorkspace({
   const { showSnackbar } = useSnackbar();
   const formRef = useRef<HTMLFormElement | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
+  const [tableQuery, setTableQuery] = useState("");
 
   useEffect(() => {
     if (!state) return;
@@ -183,6 +185,16 @@ export function ProjectsWorkspace({
 
   const totalUnits = projects.reduce((s, p) => s + p.unitsCount, 0);
   const publishedCount = projects.filter((p) => p.isPublished).length;
+  const visibleProjects = useMemo(
+    () =>
+      filterTableRows(
+        projects,
+        tableQuery,
+        (p) =>
+          `${p.name} ${p.locationCity ?? ""} ${p.locationState ?? ""} ${p.locationCountry ?? ""} ${p.locationAddress ?? ""}`,
+      ),
+    [projects, tableQuery],
+  );
 
   function submitCreateProject(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -290,7 +302,17 @@ export function ProjectsWorkspace({
         </div>
       </div>
 
-      <div className="rc-card mt-5 overflow-hidden">
+      <div className="mt-5">
+        <div className="mb-3">
+          <TableSearch
+            value={tableQuery}
+            onChange={setTableQuery}
+            placeholder="Search projects by name or location…"
+            resultCount={visibleProjects.length}
+            totalCount={projects.length}
+          />
+        </div>
+      <div className="rc-card overflow-hidden">
         <table className="rc-table">
           <thead>
             <tr>
@@ -303,17 +325,23 @@ export function ProjectsWorkspace({
             </tr>
           </thead>
           <tbody>
-            {projects.length === 0 ? (
+            {visibleProjects.length === 0 ? (
               <tr>
                 <td colSpan={6}>
                   <div className="rc-empty my-2 border-0 bg-transparent">
-                    <p className="rc-empty-title">No projects yet</p>
-                    <p className="rc-empty-body">Create your first project to start tracking units, pricing and availability.</p>
+                    <p className="rc-empty-title">
+                      {projects.length === 0 ? "No projects yet" : "No projects match that search"}
+                    </p>
+                    <p className="rc-empty-body">
+                      {projects.length === 0
+                        ? "Create your first project to start tracking units, pricing and availability."
+                        : "Try a different name or location."}
+                    </p>
                   </div>
                 </td>
               </tr>
             ) : (
-              projects.map((project) => (
+              visibleProjects.map((project) => (
                 <tr key={project.id}>
                   <td className="font-medium">{project.name}</td>
                   <td className={project.basePrice == null ? "nil" : undefined}>
@@ -399,6 +427,7 @@ export function ProjectsWorkspace({
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       <ModalOverlay

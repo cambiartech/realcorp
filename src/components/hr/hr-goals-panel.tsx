@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Target } from "lucide-react";
 import { useSnackbar } from "@/components/snackbar";
-import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect, groupSearchableOptions } from "@/components/searchable-select";
 import { groupGoalsByDepartment, type PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import { updatePerformanceGoal, upsertPerformanceGoal } from "@/app/[tenantSlug]/hr/actions";
 
@@ -100,17 +100,21 @@ export function HrGoalsPanel({
       >
         <div className="sm:col-span-2">
           <label className="mb-1 block text-[10px] font-medium uppercase text-muted">Employee</label>
-          <UiSelect name="employeeProfileId" required defaultValue="">
-            <option value="" disabled>
-              Select employee
-            </option>
-            {profileOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-                {p.department ? ` · ${p.department}` : ""}
-              </option>
-            ))}
-          </UiSelect>
+          <SearchableSelect
+            name="employeeProfileId"
+            required
+            defaultValue=""
+            searchPlaceholder="Search employees…"
+            placeholder="Select employee"
+            groups={groupSearchableOptions(
+              profileOptions.map((p) => ({
+                value: p.id,
+                label: p.label,
+                group: p.department || "No department",
+                keywords: `${p.label} ${p.department}`,
+              })),
+            )}
+          />
         </div>
         <div className="sm:col-span-2">
           <label className="mb-1 block text-[10px] font-medium uppercase text-muted">Goal title</label>

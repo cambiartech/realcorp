@@ -222,11 +222,14 @@ export default async function ClientDetailPage({
   ];
 
   const depositSummary = summarizeClientDeposits(depositRows);
+  const assignedUnitIds = new Set(linkedUnitIds.map((link) => link.unitId));
   const paymentUnitOptions = projects.flatMap((project) =>
     project.units.map((unit) => ({
       id: unit.id,
-      label: `${project.name} · ${unit.label}`,
+      label: unit.label,
+      projectName: project.name,
       listPrice: Number(unit.pricingPlan?.price || 0),
+      assigned: assignedUnitIds.has(unit.id),
     })),
   );
 

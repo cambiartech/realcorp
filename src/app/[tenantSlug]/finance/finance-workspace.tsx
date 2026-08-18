@@ -71,6 +71,7 @@ import {
   normalizeFinanceExpenseCategory,
 } from "@/lib/finance-expense-category";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import {
   recurrenceFrequencyLabel,
   type VendorBillRecurrenceFrequency,
@@ -743,6 +744,14 @@ export function FinanceWorkspace({
       allocationOptions.find((project) => project.id === incomeProjectId)
         ?.units || [],
     [allocationOptions, incomeProjectId],
+  );
+  const searchableProjectOptions = useMemo(
+    () => allocationOptions.map((project) => ({ value: project.id, label: project.label })),
+    [allocationOptions],
+  );
+  const searchableDealOptions = useMemo(
+    () => dealOptions.map((deal) => ({ value: deal.id, label: deal.label })),
+    [dealOptions],
   );
   const [highlightFocusId, setHighlightFocusId] = useState<string | null>(null);
   const [autoMatching, setAutoMatching] = useState(false);
@@ -2029,6 +2038,36 @@ export function FinanceWorkspace({
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [allocationOptions, reportProjectFilter, invoices, payments, expenses, salesReceipts]);
+  const reportUnitSelectGroups = useMemo(() => {
+    const allOption = {
+      value: "all",
+      label:
+        reportProjectFilter === "all"
+          ? "All apartments / units"
+          : "All apartments / units in this project",
+    };
+    if (reportProjectFilter === "all") {
+      return [
+        { label: "", options: [allOption] },
+        ...allocationOptions
+          .filter((project) => project.units.length)
+          .map((project) => ({
+            label: project.label,
+            options: project.units.map((unit) => ({
+              value: unit.id,
+              label: unit.label,
+              keywords: project.label,
+            })),
+          })),
+      ];
+    }
+    return [
+      {
+        label: "",
+        options: [allOption, ...reportUnitOptions.map((unit) => ({ value: unit.id, label: unit.label }))],
+      },
+    ];
+  }, [allocationOptions, reportProjectFilter, reportUnitOptions]);
   const selectedReportProject =
     allocationOptions.find((project) => project.id === reportProjectFilter) ??
     null;
@@ -4422,29 +4461,29 @@ export function FinanceWorkspace({
                       <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
                         Project
                       </span>
-                      <UiSelect
+                      <SearchableSelect
                         value={reportProjectFilter}
-                        onChange={(e) => {
-                          setReportProjectFilter(e.target.value);
+                        onChange={(next) => {
+                          setReportProjectFilter(next);
                           setReportUnitFilter("all");
                         }}
-                      >
-                        <option value="all">All projects</option>
-                        {reportProjectOptions.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </UiSelect>
+                        searchPlaceholder="Search projects…"
+                        options={[
+                          { value: "all", label: "All projects" },
+                          ...reportProjectOptions.map((opt) => ({
+                            value: opt.id,
+                            label: opt.label,
+                          })),
+                        ]}
+                      />
                     </label>
                     <label className="space-y-1">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
                         Apartment / unit
                       </span>
-                      <UiSelect
+                      <SearchableSelect
                         value={reportUnitFilter}
-                        onChange={(e) => {
-                          const unitId = e.target.value;
+                        onChange={(unitId) => {
                           setReportUnitFilter(unitId);
                           if (unitId === "all") return;
                           const owner = allocationOptions.find((project) =>
@@ -4463,28 +4502,9 @@ export function FinanceWorkspace({
                           if (tagged?.projectId)
                             setReportProjectFilter(tagged.projectId);
                         }}
-                      >
-                        <option value="all">
-                          {reportProjectFilter === "all"
-                            ? "All apartments / units"
-                            : "All apartments / units in this project"}
-                        </option>
-                        {reportProjectFilter === "all"
-                          ? allocationOptions.map((project) => (
-                              <optgroup key={project.id} label={project.label}>
-                                {project.units.map((unit) => (
-                                  <option key={unit.id} value={unit.id}>
-                                    {unit.label}
-                                  </option>
-                                ))}
-                              </optgroup>
-                            ))
-                          : reportUnitOptions.map((opt) => (
-                              <option key={opt.id} value={opt.id}>
-                                {opt.label}
-                              </option>
-                            ))}
-                      </UiSelect>
+                        searchPlaceholder="Search units…"
+                        groups={reportUnitSelectGroups}
+                      />
                     </label>
                     <label className="space-y-1">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -6022,29 +6042,23 @@ export function FinanceWorkspace({
                                       </button>
                                     ) : (
                                       <div className="flex items-center gap-2">
-                                        <UiSelect
+                                        <SearchableSelect
                                           value={selected}
-                                          onChange={(e) =>
+                                          onChange={(next) =>
                                             setManualMatchSelection((curr) => ({
                                               ...curr,
-                                              [row.id]: e.target.value,
+                                              [row.id]: next,
                                             }))
                                           }
-                                        >
-                                          <option value="">Pick record</option>
-                                          {candidates.map((c) => (
-                                            <option
-                                              key={`${c.kind}:${c.id}`}
-                                              value={`${c.kind}:${c.id}`}
-                                            >
-                                              {c.kind === "payment"
-                                                ? "Payment"
-                                                : "Expense"}{" "}
-                                              | {c.amount.toLocaleString()} |{" "}
-                                              {c.label}
-                                            </option>
-                                          ))}
-                                        </UiSelect>
+                                          allowEmpty
+                                          emptyLabel="Pick record"
+                                          searchPlaceholder="Search records…"
+                                          options={candidates.map((c) => ({
+                                            value: `${c.kind}:${c.id}`,
+                                            label: `${c.kind === "payment" ? "Payment" : "Expense"} · ${c.amount.toLocaleString()} · ${c.label}`,
+                                            keywords: `${c.kind} ${c.label}`,
+                                          }))}
+                                        />
                                         <button
                                           type="button"
                                           disabled={
@@ -6401,14 +6415,14 @@ export function FinanceWorkspace({
             <label className="mb-1 block text-sm text-muted">
               Linked deal (optional)
             </label>
-            <UiSelect name="dealId" defaultValue="">
-              <option value="">None</option>
-              {dealOptions.map((deal) => (
-                <option key={deal.id} value={deal.id}>
-                  {deal.label}
-                </option>
-              ))}
-            </UiSelect>
+            <SearchableSelect
+              name="dealId"
+              defaultValue=""
+              allowEmpty
+              emptyLabel="None"
+              searchPlaceholder="Search deals…"
+              options={searchableDealOptions}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm text-muted">Income type</label>
@@ -6425,36 +6439,33 @@ export function FinanceWorkspace({
               <label className="mb-1 block text-sm text-muted">
                 Project (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 name="projectId"
                 value={invoiceProjectId}
-                onChange={(event) => setInvoiceProjectId(event.target.value)}
-              >
-                <option value="">Unassigned / from deal</option>
-                {allocationOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.label}
-                  </option>
-                ))}
-              </UiSelect>
+                onChange={setInvoiceProjectId}
+                allowEmpty
+                emptyLabel="Unassigned / from deal"
+                searchPlaceholder="Search projects…"
+                options={searchableProjectOptions}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">
                 Apartment / room (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 key={invoiceProjectId || "no-invoice-project"}
                 name="unitId"
                 defaultValue=""
                 disabled={!invoiceProjectId}
-              >
-                <option value="">Project-wide</option>
-                {invoiceUnitOptions.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.label}
-                  </option>
-                ))}
-              </UiSelect>
+                allowEmpty
+                emptyLabel="Project-wide"
+                searchPlaceholder="Search units…"
+                options={invoiceUnitOptions.map((unit) => ({
+                  value: unit.id,
+                  label: unit.label,
+                }))}
+              />
             </div>
           </div>
           <div>
@@ -6613,14 +6624,14 @@ export function FinanceWorkspace({
               <label className="mb-1 block text-sm text-muted">
                 Linked deal (optional)
               </label>
-              <UiSelect name="dealId" defaultValue="">
-                <option value="">None</option>
-                {dealOptions.map((deal) => (
-                  <option key={deal.id} value={deal.id}>
-                    {deal.label}
-                  </option>
-                ))}
-              </UiSelect>
+              <SearchableSelect
+                name="dealId"
+                defaultValue=""
+                allowEmpty
+                emptyLabel="None"
+                searchPlaceholder="Search deals…"
+                options={searchableDealOptions}
+              />
             </div>
           </div>
           <div>
@@ -6638,36 +6649,33 @@ export function FinanceWorkspace({
               <label className="mb-1 block text-sm text-muted">
                 Project (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 name="projectId"
                 value={receiptProjectId}
-                onChange={(event) => setReceiptProjectId(event.target.value)}
-              >
-                <option value="">Unassigned / from deal</option>
-                {allocationOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.label}
-                  </option>
-                ))}
-              </UiSelect>
+                onChange={setReceiptProjectId}
+                allowEmpty
+                emptyLabel="Unassigned / from deal"
+                searchPlaceholder="Search projects…"
+                options={searchableProjectOptions}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">
                 Apartment / room (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 key={receiptProjectId || "no-receipt-project"}
                 name="unitId"
                 defaultValue=""
                 disabled={!receiptProjectId}
-              >
-                <option value="">Project-wide</option>
-                {receiptUnitOptions.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.label}
-                  </option>
-                ))}
-              </UiSelect>
+                allowEmpty
+                emptyLabel="Project-wide"
+                searchPlaceholder="Search units…"
+                options={receiptUnitOptions.map((unit) => ({
+                  value: unit.id,
+                  label: unit.label,
+                }))}
+              />
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -6819,36 +6827,33 @@ export function FinanceWorkspace({
               <label className="mb-1 block text-sm text-muted">
                 Project (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 name="projectId"
                 value={expenseProjectId}
-                onChange={(event) => setExpenseProjectId(event.target.value)}
-              >
-                <option value="">Organization-wide expense</option>
-                {allocationOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.label}
-                  </option>
-                ))}
-              </UiSelect>
+                onChange={setExpenseProjectId}
+                allowEmpty
+                emptyLabel="Organization-wide expense"
+                searchPlaceholder="Search projects…"
+                options={searchableProjectOptions}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">
                 Apartment / unit (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 key={expenseProjectId || "no-project"}
                 name="unitId"
                 defaultValue=""
                 disabled={!expenseProjectId}
-              >
-                <option value="">Project-wide expense</option>
-                {expenseUnitOptions.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.label}
-                  </option>
-                ))}
-              </UiSelect>
+                allowEmpty
+                emptyLabel="Project-wide expense"
+                searchPlaceholder="Search units…"
+                options={expenseUnitOptions.map((unit) => ({
+                  value: unit.id,
+                  label: unit.label,
+                }))}
+              />
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -7063,24 +7068,21 @@ export function FinanceWorkspace({
                 <label className="mb-1 block text-sm text-muted">
                   Project (optional)
                 </label>
-                <UiSelect
+                <SearchableSelect
                   name="projectId"
                   value={expenseProjectId}
-                  onChange={(event) => setExpenseProjectId(event.target.value)}
-                >
-                  <option value="">Organization-wide expense</option>
-                  {allocationOptions.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.label}
-                    </option>
-                  ))}
-                </UiSelect>
+                  onChange={setExpenseProjectId}
+                  allowEmpty
+                  emptyLabel="Organization-wide expense"
+                  searchPlaceholder="Search projects…"
+                  options={searchableProjectOptions}
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm text-muted">
                   Apartment / unit (optional)
                 </label>
-                <UiSelect
+                <SearchableSelect
                   key={`edit-${expenseProjectId || "none"}`}
                   name="unitId"
                   defaultValue={
@@ -7089,14 +7091,14 @@ export function FinanceWorkspace({
                       : ""
                   }
                   disabled={!expenseProjectId}
-                >
-                  <option value="">Project-wide expense</option>
-                  {expenseUnitOptions.map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.label}
-                    </option>
-                  ))}
-                </UiSelect>
+                  allowEmpty
+                  emptyLabel="Project-wide expense"
+                  searchPlaceholder="Search units…"
+                  options={expenseUnitOptions.map((unit) => ({
+                    value: unit.id,
+                    label: unit.label,
+                  }))}
+                />
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -7613,36 +7615,33 @@ export function FinanceWorkspace({
               <label className="mb-1 block text-sm text-muted">
                 Project (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 name="projectId"
                 value={incomeProjectId}
-                onChange={(event) => setIncomeProjectId(event.target.value)}
-              >
-                <option value="">Unassigned</option>
-                {allocationOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.label}
-                  </option>
-                ))}
-              </UiSelect>
+                onChange={setIncomeProjectId}
+                allowEmpty
+                emptyLabel="Unassigned"
+                searchPlaceholder="Search projects…"
+                options={searchableProjectOptions}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">
                 Apartment / room (optional)
               </label>
-              <UiSelect
+              <SearchableSelect
                 key={incomeProjectId || "no-income-project"}
                 name="unitId"
                 defaultValue=""
                 disabled={!incomeProjectId}
-              >
-                <option value="">Project-wide</option>
-                {incomeUnitOptions.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.label}
-                  </option>
-                ))}
-              </UiSelect>
+                allowEmpty
+                emptyLabel="Project-wide"
+                searchPlaceholder="Search units…"
+                options={incomeUnitOptions.map((unit) => ({
+                  value: unit.id,
+                  label: unit.label,
+                }))}
+              />
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

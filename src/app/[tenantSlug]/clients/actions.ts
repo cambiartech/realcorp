@@ -28,6 +28,7 @@ import {
 } from "@/lib/validators/clients";
 import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
 import { sendPropertyClientPortalInvite } from "@/lib/client-portal-invite";
+import { agreedPriceFromCatchUp } from "@/lib/finance-income";
 import {
   detectUnitNamePattern,
   groupUnitsByExtractedClient,
@@ -513,8 +514,13 @@ export async function recordClientDeposit(
   });
   if (!unit) return { ok: false, error: "Unit not found." };
 
-  const adjustment = parsed.data.balanceAdjustment || "none";
+  const kind = parsed.data.paymentKind || "part_payment";
+  const adjustment =
+    kind === "set_sale_price" || kind === "waive_remaining"
+      ? kind
+      : parsed.data.balanceAdjustment || "none";
   const paymentAmount = parsed.data.amount || 0;
+  const openingPaid = kind === "catch_up" ? parsed.data.alreadyPaid || 0 : 0;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -534,25 +540,56 @@ export async function recordClientDeposit(
           select: { id: true },
         }));
 
-      if (adjustment !== "none") {
+      const paidWhere = {
+        tenantId: tenant.id,
+        voidedAt: null as Date | null,
+        unitId: unit.id,
+        OR: [
+          { propertyClientId: client.id },
+          { invoice: { deal: { propertyClient: { id: client.id } } } },
+        ],
+      };
+
+      async function collectedOnFile() {
+        const paidAgg = await tx.paymentRecord.aggregate({
+          where: paidWhere,
+          _sum: { amount: true },
+        });
+        return Number(paidAgg._sum.amount || 0);
+      }
+
+      if (kind === "catch_up") {
+        const alreadyOnFile = await collectedOnFile();
+        const remainingToPay = parsed.data.remainingToPay ?? 0;
+        const agreedPrice = agreedPriceFromCatchUp({
+          alreadyOnFile,
+          openingPaid,
+          payingNow: paymentAmount,
+          remainingToPay,
+        });
+        await tx.clientUnitLink.update({
+          where: { id: link.id },
+          data: {
+            agreedPrice,
+            priceAdjustmentReason:
+              parsed.data.adjustmentReason || "Sale price from paid + remaining (catch-up)",
+            priceAdjustedAt: new Date(),
+            priceAdjustedByUserId: session.user.id,
+          },
+        });
+        if (unit.deal?.id && (!unit.deal.propertyClient || unit.deal.propertyClient.id === client.id)) {
+          await tx.deal.update({
+            where: { id: unit.deal.id },
+            data: { value: agreedPrice },
+          });
+        }
+      } else if (adjustment !== "none") {
         let agreedPrice = parsed.data.agreedPrice || 0;
         const adjustmentReason =
           parsed.data.adjustmentReason ||
           (adjustment === "waive_remaining" ? "Balance waived" : "Discounted sale price");
         if (adjustment === "waive_remaining") {
-          const paidAgg = await tx.paymentRecord.aggregate({
-            where: {
-              tenantId: tenant.id,
-              voidedAt: null,
-              unitId: unit.id,
-              OR: [
-                { propertyClientId: client.id },
-                { invoice: { deal: { propertyClient: { id: client.id } } } },
-              ],
-            },
-            _sum: { amount: true },
-          });
-          agreedPrice = Number(paidAgg._sum.amount || 0) + paymentAmount;
+          agreedPrice = (await collectedOnFile()) + paymentAmount;
         }
         await tx.clientUnitLink.update({
           where: { id: link.id },
@@ -571,7 +608,8 @@ export async function recordClientDeposit(
         }
       }
 
-      if (paymentAmount > 0) {
+      async function writePayment(amount: number, titleSuffix: string, extraNote?: string) {
+        if (!(amount > 0)) return;
         await tx.paymentRecord.create({
           data: {
             tenantId: tenant.id,
@@ -580,19 +618,30 @@ export async function recordClientDeposit(
             projectId: unit.projectId,
             unitId: unit.id,
             incomeType: "CLIENT_DEPOSIT",
-            standaloneTitle: `Client deposit · ${client.fullName} · ${unit.project.name} ${unit.label}`,
+            standaloneTitle: `Client deposit · ${client.fullName} · ${unit.project.name} ${unit.label}${titleSuffix}`,
             payerName: client.fullName,
-            amount: paymentAmount,
+            amount,
             currency: tenantRecord?.defaultCurrency || "NGN",
             paidAt: new Date(parsed.data.paidAt),
             method: parsed.data.method || null,
             reference: parsed.data.reference || null,
-            note: parsed.data.note || null,
+            note: extraNote || parsed.data.note || null,
             recordedByUserId: session.user.id,
             recordedByLabel: session.user.name || session.user.email || "Unknown recorder",
           },
         });
       }
+
+      if (openingPaid > 0) {
+        await writePayment(
+          openingPaid,
+          " · previously paid",
+          [parsed.data.note, "Previously paid (opening balance brought onto books)."]
+            .filter(Boolean)
+            .join(" "),
+        );
+      }
+      await writePayment(paymentAmount, "");
     });
 
     await writeAuditLog({
@@ -609,9 +658,12 @@ export async function recordClientDeposit(
           : `Updated sale price for ${client.fullName} on ${unit.project.name} ${unit.label}.`,
       metadata: {
         amount: paymentAmount,
+        openingPaid,
+        remainingToPay: kind === "catch_up" ? parsed.data.remainingToPay ?? null : null,
         unitId: unit.id,
         projectId: unit.projectId,
         incomeType: "CLIENT_DEPOSIT",
+        paymentKind: kind,
         balanceAdjustment: adjustment,
         agreedPrice: parsed.data.agreedPrice ?? null,
         adjustmentReason: parsed.data.adjustmentReason ?? null,
@@ -623,6 +675,19 @@ export async function recordClientDeposit(
 
   revalidateClients(tenantSlug, clientId);
   revalidatePath(`/${tenantSlug}/finance`);
+  if (kind === "catch_up") {
+    if (openingPaid > 0 || paymentAmount > 0) {
+      return {
+        ok: true,
+        message:
+          "Catch-up saved. Previously paid and this payment are collections; leftover is the remaining balance. Any brochure gap is discount, not income.",
+      };
+    }
+    return {
+      ok: true,
+      message: "Sale price set from remaining balance. Brochure discount is not recorded as income.",
+    };
+  }
   if (paymentAmount > 0 && adjustment !== "none") {
     return { ok: true, message: "Payment saved. Remaining balance now uses the agreed sale price." };
   }
@@ -1095,9 +1160,9 @@ export type UnitLabelImportPreview =
     }
   | { ok: false; error: string };
 
-async function loadUnitsForLabelImport(tenantId: string) {
+async function loadUnitsForLabelImport(tenantId: string, projectId?: string) {
   const units = await prisma.unit.findMany({
-    where: { tenantId },
+    where: { tenantId, ...(projectId ? { projectId } : {}) },
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     take: 2000,
     select: {
@@ -1124,7 +1189,7 @@ async function loadUnitsForLabelImport(tenantId: string) {
 
 export async function previewClientsFromUnitLabels(
   tenantSlug: string,
-  input?: { preset?: UnitNamePatternPresetId; pattern?: string },
+  input?: { preset?: UnitNamePatternPresetId; pattern?: string; projectId?: string },
 ): Promise<UnitLabelImportPreview> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
@@ -1139,7 +1204,7 @@ export async function previewClientsFromUnitLabels(
     where: { id: tenant.id },
     select: { name: true },
   });
-  const units = await loadUnitsForLabelImport(tenant.id);
+  const units = await loadUnitsForLabelImport(tenant.id, input?.projectId);
   if (!units.length) {
     return { ok: false, error: "No project units found. Add units to a project first." };
   }
@@ -1212,6 +1277,7 @@ export async function importClientsFromUnitLabels(
     preset: UnitNamePatternPresetId;
     pattern?: string;
     selectedKeys: string[];
+    projectId?: string;
   },
 ): Promise<
   | { ok: true; created: number; reused: number; unitsLinked: number; skipped: number }
@@ -1231,6 +1297,7 @@ export async function importClientsFromUnitLabels(
   const preview = await previewClientsFromUnitLabels(tenantSlug, {
     preset: input.preset,
     pattern: input.pattern,
+    projectId: input.projectId,
   });
   if (!preview.ok) return preview;
 
