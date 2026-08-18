@@ -6,6 +6,7 @@ import { batchResolveClientPortalStatus, type ClientPortalStatus } from "@/lib/c
 import prisma from "@/lib/db";
 import { paginate, parsePage } from "@/lib/pagination";
 import { loadClientDepositRows, summarizeClientDeposits } from "@/lib/client-deposits";
+import { countImportableUnlinkedUnits } from "@/lib/unit-label-client-import";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { ClientsWorkspace } from "./clients-workspace";
@@ -60,14 +61,16 @@ export default async function ClientsPage({
   });
   assertTenantNavAccess(session, membership, tenant.settings, "clients");
 
-  const [totalClients, activeClients, totalUnitLinks, unlinkedUnitsCount, documents, documentClients] = await Promise.all([
+  const [totalClients, activeClients, totalUnitLinks, unlinkedUnits, documents, documentClients] = await Promise.all([
     prisma.propertyClient.count({ where: { tenantId: tenant.id } }),
     prisma.propertyClient.count({
       where: { tenantId: tenant.id, status: PropertyClientStatus.ACTIVE },
     }),
     prisma.clientUnitLink.count({ where: { tenantId: tenant.id } }),
-    prisma.unit.count({
+    prisma.unit.findMany({
       where: { tenantId: tenant.id, clientLinks: { none: {} } },
+      select: { label: true, project: { select: { name: true } } },
+      take: 2000,
     }),
     prisma.clientDocument.findMany({
       where: { tenantId: tenant.id },
@@ -129,7 +132,9 @@ export default async function ClientsPage({
       pagination={pagination}
       paginationSearchParams={query}
       clientStats={{ active: activeClients, totalUnits: totalUnitLinks }}
-      unlinkedUnitsCount={unlinkedUnitsCount}
+      namedUnlinkedUnitsCount={countImportableUnlinkedUnits(
+        unlinkedUnits.map((unit) => ({ label: unit.label, projectName: unit.project.name })),
+      )}
       clients={clients.map((c) => {
         const money = depositsByClient.get(c.id);
         return {

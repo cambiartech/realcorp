@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  countImportableUnlinkedUnits,
   detectUnitNamePattern,
   extractClientNameFromUnitLabel,
   formatClientDisplayName,
@@ -10,6 +11,7 @@ import {
   reservedOwnerNote,
   suggestedClientRole,
   suggestedClientStatus,
+  UNIT_IMPORT_HINT_MIN,
 } from "./unit-label-client-import";
 
 test("extracts the client from RM number then name labels", () => {
@@ -119,6 +121,20 @@ test("auto-detects room-then-name for BO Properties style labels", () => {
   ]);
   assert.equal(detected.preset, "room_then_name");
   assert.ok(detected.hits >= 3);
+});
+
+test("counts only unmapped units that look like a person, ignoring already linked and generic labels", () => {
+  assert.equal(UNIT_IMPORT_HINT_MIN, 12);
+  assert.equal(
+    countImportableUnlinkedUnits([
+      { label: "RM 26 MR EMANA EDET", alreadyLinked: false },
+      { label: "RM 6 MR BOLARINWA", alreadyLinked: false },
+      { label: "RM 5 MR BOLARINWA", alreadyLinked: true },
+      { label: "RM 12 PENTHOUSE FAMILY", alreadyLinked: false, projectName: "BO Properties" },
+      { label: "Becca's Deluxe 1", alreadyLinked: false },
+    ]),
+    2,
+  );
 });
 
 test("sold, short-let, and rental count as completed owners; reserved stays a prospect", () => {

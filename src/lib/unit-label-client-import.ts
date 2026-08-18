@@ -198,6 +198,23 @@ export function groupUnitsByExtractedClient(
   return { groups, skippedNoName, skippedAlreadyLinked };
 }
 
+/** Banner only when enough unmapped units still look like they contain a person name. */
+export const UNIT_IMPORT_HINT_MIN = 12;
+
+export function countImportableUnlinkedUnits(
+  units: Array<{ label: string; projectName?: string; alreadyLinked?: boolean }>,
+) {
+  const unlinked = units.filter((unit) => !unit.alreadyLinked);
+  const detected = detectUnitNamePattern(unlinked.map((unit) => unit.label));
+  let count = 0;
+  for (const unit of unlinked) {
+    const name = extractClientNameFromUnitLabel(unit.label, detected);
+    if (!name || nameLooksGeneric(name, unit.projectName)) continue;
+    count += 1;
+  }
+  return count;
+}
+
 export function scoreUnitNamePattern(
   labels: string[],
   options: { preset: UnitNamePatternPresetId; pattern?: string },

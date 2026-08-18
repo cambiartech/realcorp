@@ -1,4 +1,4 @@
-import type { EmployeeProfile, HrDocument } from "@/generated/prisma";
+import type { EmployeeProfile, HrDocumentCategory } from "@/generated/prisma";
 
 function hasJson(obj: unknown): boolean {
   if (!obj || typeof obj !== "object") return false;
@@ -12,6 +12,35 @@ export type ProfileChecklistItem = {
   hint?: string;
 };
 
+export type ProfileChecklistProfile = Pick<
+  EmployeeProfile,
+  | "fullName"
+  | "phoneMobile"
+  | "position"
+  | "bankAccount"
+  | "taxId"
+  | "rsaPin"
+  | "emergencyContact"
+  | "nextOfKin"
+  | "healthInfo"
+  | "additionalInfo"
+  | "guarantorInfo"
+>;
+
+export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
+  fullName: null,
+  phoneMobile: null,
+  position: null,
+  bankAccount: null,
+  taxId: null,
+  rsaPin: null,
+  emergencyContact: null,
+  nextOfKin: null,
+  healthInfo: null,
+  additionalInfo: null,
+  guarantorInfo: null,
+};
+
 export function checklistProgress(items: ProfileChecklistItem[]) {
   const done = items.filter((i) => i.done).length;
   const total = items.length;
@@ -19,8 +48,8 @@ export function checklistProgress(items: ProfileChecklistItem[]) {
 }
 
 export function buildProfileChecklist(
-  profile: EmployeeProfile,
-  documents: HrDocument[],
+  profile: ProfileChecklistProfile,
+  documents: Array<{ category: HrDocumentCategory }>,
 ): ProfileChecklistItem[] {
   const docCats = new Set(documents.map((d) => d.category));
   return [

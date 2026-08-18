@@ -19,6 +19,7 @@ import type { Pagination, SearchParamValue } from "@/lib/pagination";
 import { Pencil, Trash2 } from "lucide-react";
 import { downloadClientPortfolioXlsx } from "@/lib/client-report-xlsx";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { UNIT_IMPORT_HINT_MIN } from "@/lib/unit-label-client-import";
 import {
   createPropertyClient,
   deletePropertyClient,
@@ -91,7 +92,7 @@ export function ClientsWorkspace({
   pagination,
   paginationSearchParams,
   clientStats,
-  unlinkedUnitsCount,
+  namedUnlinkedUnitsCount,
 }: {
   tenantSlug: string;
   companyName: string;
@@ -112,7 +113,7 @@ export function ClientsWorkspace({
   pagination: Pagination;
   paginationSearchParams: Record<string, SearchParamValue>;
   clientStats: { active: number; totalUnits: number };
-  unlinkedUnitsCount: number;
+  namedUnlinkedUnitsCount: number;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -137,11 +138,20 @@ export function ClientsWorkspace({
   const [rowOverrides, setRowOverrides] = useState<Record<string, Partial<ClientRow>>>({});
   const [exporting, setExporting] = useState(false);
   const [importUnitsOpen, setImportUnitsOpen] = useState(false);
-  const [dismissUnitImportHint, setDismissUnitImportHint] = useState(false);
+  const unitImportHintKey = `clients-unit-import-hint:${tenantSlug}`;
+  const [dismissUnitImportHint, setDismissUnitImportHint] = useState(true);
   const [state, formAction, pending] = useActionState(createPropertyClient.bind(null, tenantSlug), initial);
   const [editPending, setEditPending] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
   const visibleClients = clients.map((row) => ({ ...row, ...rowOverrides[row.id] }));
+
+  useEffect(() => {
+    try {
+      setDismissUnitImportHint(window.localStorage.getItem(unitImportHintKey) === "1");
+    } catch {
+      setDismissUnitImportHint(false);
+    }
+  }, [unitImportHintKey]);
 
   useEffect(() => {
     setRowOverrides((prev) => {
@@ -308,20 +318,29 @@ export function ClientsWorkspace({
         ) : null}
       </div>
 
-      {canManage && tab === "clients" && unlinkedUnitsCount > 0 && !dismissUnitImportHint ? (
+      {canManage &&
+      tab === "clients" &&
+      namedUnlinkedUnitsCount >= UNIT_IMPORT_HINT_MIN &&
+      !dismissUnitImportHint ? (
         <div className="mt-5 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-foreground/15 bg-foreground/[0.03] px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-foreground">Import clients from units</p>
             <p className="mt-0.5 max-w-2xl text-sm text-muted">
-              {unlinkedUnitsCount} unit{unlinkedUnitsCount === 1 ? "" : "s"} look unassigned. If labels include the
-              person&apos;s name (for example RM 26 MR EMANA EDET), we can create those clients and assign their
-              units in one step.
+              {namedUnlinkedUnitsCount} unassigned units look like they include a person&apos;s name (for example
+              RM 26 MR EMANA EDET). Already mapped units are skipped so you won&apos;t create duplicates.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={() => setDismissUnitImportHint(true)}
+              onClick={() => {
+                setDismissUnitImportHint(true);
+                try {
+                  window.localStorage.setItem(unitImportHintKey, "1");
+                } catch {
+                  /* ignore */
+                }
+              }}
               className="rounded-md px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground"
             >
               Not now

@@ -7,7 +7,11 @@ import { absoluteAppUrl } from "@/lib/app-url";
 import { HR_FORM_DELIVERY_LABELS, HR_FORM_TYPE_LABELS } from "@/lib/hr-form-types";
 import { hrOfferSignPath } from "@/lib/hr-offer-path";
 import { profileToDetailRow } from "@/lib/hr-profile-form";
-import { buildProfileChecklist, checklistProgress } from "@/lib/hr-profile-checklist";
+import {
+  buildProfileChecklist,
+  checklistProgress,
+  EMPTY_PROFILE_CHECKLIST_PROFILE,
+} from "@/lib/hr-profile-checklist";
 import { buildHrAnalytics } from "@/lib/hr-analytics";
 import {
   buildStaffMonthlyPerformance,
@@ -21,7 +25,6 @@ import { ensureDefaultAppraisalCriteria } from "@/app/[tenantSlug]/hr/actions";
 import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
 import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
-import type { EmployeeProfile } from "@/generated/prisma";
 import { brandingFromSettings } from "@/lib/tenant-branding";
 import { mergeOrgDepartments } from "@/lib/org-departments";
 import { loadTenantRequest } from "@/lib/tenant-request";
@@ -485,8 +488,8 @@ export default async function HrQueuePage({
     const p = profileByUserId.get(person.userId);
     const docs = p ? documents.filter((d) => d.employeeProfileId === p.id) : [];
     const items = buildProfileChecklist(
-      (p ?? { fullName: person.name, phoneMobile: null, position: null }) as EmployeeProfile,
-      docs as Parameters<typeof buildProfileChecklist>[1],
+      p ?? { ...EMPTY_PROFILE_CHECKLIST_PROFILE, fullName: person.name },
+      docs.map((d) => ({ category: d.category })),
     );
     const { percent } = checklistProgress(items);
     return {
