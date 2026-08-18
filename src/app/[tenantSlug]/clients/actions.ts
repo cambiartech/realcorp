@@ -608,29 +608,43 @@ export async function recordClientDeposit(
         }
       }
 
-      async function writePayment(amount: number, titleSuffix: string, extraNote?: string) {
+      const tenantId = tenant.id;
+      const clientRecordId = client.id;
+      const clientName = client.fullName;
+      const unitRecordId = unit.id;
+      const unitProjectId = unit.projectId;
+      const unitTitle = `${unit.project.name} ${unit.label}`;
+      const paidAt = parsed.data.paidAt;
+      const method = parsed.data.method || null;
+      const reference = parsed.data.reference || null;
+      const note = parsed.data.note || null;
+      const recorderId = session.user.id;
+      const recorderLabel = session.user.name || session.user.email || "Unknown recorder";
+      const currency = tenantRecord?.defaultCurrency || "NGN";
+
+      const writePayment = async (amount: number, titleSuffix: string, extraNote?: string) => {
         if (!(amount > 0)) return;
         await tx.paymentRecord.create({
           data: {
-            tenantId: tenant.id,
+            tenantId,
             invoiceId: null,
-            propertyClientId: client.id,
-            projectId: unit.projectId,
-            unitId: unit.id,
+            propertyClientId: clientRecordId,
+            projectId: unitProjectId,
+            unitId: unitRecordId,
             incomeType: "CLIENT_DEPOSIT",
-            standaloneTitle: `Client deposit · ${client.fullName} · ${unit.project.name} ${unit.label}${titleSuffix}`,
-            payerName: client.fullName,
+            standaloneTitle: `Client deposit · ${clientName} · ${unitTitle}${titleSuffix}`,
+            payerName: clientName,
             amount,
-            currency: tenantRecord?.defaultCurrency || "NGN",
-            paidAt: new Date(parsed.data.paidAt),
-            method: parsed.data.method || null,
-            reference: parsed.data.reference || null,
-            note: extraNote || parsed.data.note || null,
-            recordedByUserId: session.user.id,
-            recordedByLabel: session.user.name || session.user.email || "Unknown recorder",
+            currency,
+            paidAt: new Date(paidAt),
+            method,
+            reference,
+            note: extraNote || note,
+            recordedByUserId: recorderId,
+            recordedByLabel: recorderLabel,
           },
         });
-      }
+      };
 
       if (openingPaid > 0) {
         await writePayment(
