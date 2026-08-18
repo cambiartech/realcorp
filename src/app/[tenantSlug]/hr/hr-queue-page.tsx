@@ -1,11 +1,10 @@
-import { auth } from "@/auth";
 import { MembershipStatus } from "@/generated/prisma";
 import { canManageHr, canViewHrModule } from "@/lib/hr-access";
 import { normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import prisma from "@/lib/db";
 import { payslipCalculationFromStored } from "@/lib/hr-payslip";
 import { absoluteAppUrl } from "@/lib/app-url";
-import { HR_FORM_DELIVERY_LABELS, HR_FORM_TYPE_LABELS, hrFormFillPath } from "@/lib/hr-form-types";
+import { HR_FORM_DELIVERY_LABELS, HR_FORM_TYPE_LABELS } from "@/lib/hr-form-types";
 import { hrOfferSignPath } from "@/lib/hr-offer-path";
 import { profileToDetailRow } from "@/lib/hr-profile-form";
 import { buildProfileChecklist, checklistProgress } from "@/lib/hr-profile-checklist";
@@ -25,6 +24,7 @@ import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archiv
 import type { EmployeeProfile } from "@/generated/prisma";
 import { brandingFromSettings } from "@/lib/tenant-branding";
 import { mergeOrgDepartments } from "@/lib/org-departments";
+import { loadTenantRequest } from "@/lib/tenant-request";
 import { redirect } from "next/navigation";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
@@ -49,46 +49,9 @@ export default async function HrQueuePage({
 }) {
   const { tenantSlug } = await params;
   const sp = searchParamsProp ? await searchParamsProp : {};
-  const session = await auth();
+  const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
   if (!session?.user?.id) notFound();
-
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug: tenantSlug },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      defaultCurrency: true,
-      settings: {
-        select: {
-          moduleSales: true,
-          moduleFinance: true,
-          moduleMarketing: true,
-          moduleCommunity: true,
-          moduleShortLets: true,
-          moduleHr: true,
-          moduleAi: true,
-          roleModuleGrants: true,
-          logoUrl: true,
-          primaryColor: true,
-          accentColor: true,
-          orgEmail: true,
-          orgPhone: true,
-          orgAddressLine: true,
-          orgCity: true,
-          orgState: true,
-          orgCountry: true,
-          orgDepartments: true,
-        },
-      },
-    },
-  });
   if (!tenant) notFound();
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
-  });
 
   const settingsNav = normalizeSettingsNavSlice(tenant.settings);
   if (!canViewHrModule(Boolean(session.user.isPlatformAdmin), membership, settingsNav.moduleHr)) {
@@ -101,7 +64,9 @@ export default async function HrQueuePage({
     redirect(`/${tenantSlug}/hr/dashboard`);
   }
 
-  await ensureDefaultAppraisalCriteria(tenant.id);
+  if (tab === "appraisals") {
+    await ensureDefaultAppraisalCriteria(tenant.id);
+  }
 
   const previewEmployeeUserId =
     canManage && tab === "my" && sp.employeeUserId?.trim() ? sp.employeeUserId.trim() : null;
@@ -117,10 +82,13 @@ export default async function HrQueuePage({
     }
   }
 
-  const myViewMember = await prisma.membership.findFirst({
-    where: { tenantId: tenant.id, userId: myViewUserId, status: MembershipStatus.ACTIVE },
-    include: { user: { select: { name: true, email: true } } },
-  });
+  const myViewMember =
+    tab === "my"
+      ? await prisma.membership.findFirst({
+          where: { tenantId: tenant.id, userId: myViewUserId, status: MembershipStatus.ACTIVE },
+          include: { user: { select: { name: true, email: true } } },
+        })
+      : null;
 
   if (tab === "my" && myViewMember) {
     await ensureEmployeeProfileForMember(tenant.id, myViewUserId, {
@@ -131,10 +99,28 @@ export default async function HrQueuePage({
 
   const myViewEmail = myViewMember?.user.email ?? session.user.email ?? null;
 
+  const loadDirectory = tab === "people" || tab === "documents" || tab === "insights" || tab === "payslips" || tab === "remittances" || tab === "appraisals";
+  const loadPayslipRuns = tab === "payslips" || tab === "remittances";
+  const loadAppraisals = tab === "appraisals" || tab === "insights";
+  const loadDocumentsFull = tab === "documents";
+  const loadChecklistDocs = tab === "people";
+  const loadMy = tab === "my";
+  const loadPeopleExtras = tab === "people";
+  const loadYtd = tab === "people" || tab === "payslips" || tab === "my";
+  const loadScores = tab === "appraisals";
+  const loadGoals = tab === "appraisals" || tab === "insights" || tab === "my";
+
+  const currentYear = new Date().getFullYear();
   const scoreDataSince = new Date();
   scoreDataSince.setMonth(scoreDataSince.getMonth() - 11);
   scoreDataSince.setDate(1);
   scoreDataSince.setHours(0, 0, 0, 0);
+
+  const emptyOnboarding = {
+    pendingItems: [] as Awaited<ReturnType<typeof loadHrOnboardingStatusForUser>>["pendingItems"],
+    summary: { state: "none" as const },
+    masterOnboardingUrl: null as string | null,
+  };
 
   const [
     members,
@@ -160,124 +146,164 @@ export default async function HrQueuePage({
     scoreDeals,
     scoreActivities,
   ] = await Promise.all([
-    prisma.membership.findMany({
-      where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
-      include: { user: { select: { id: true, name: true, email: true } } },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.employeeProfile.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { fullName: "asc" },
-    }),
-    prisma.hrPayTemplate.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-    }),
-    prisma.hrAppraisalAction.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ cycleType: "asc" }, { sortOrder: "asc" }],
-    }),
-    prisma.hrAppraisalCycle.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      take: 48,
-      include: {
-        appraisals: {
+    loadDirectory
+      ? prisma.membership.findMany({
+          where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
+          include: { user: { select: { id: true, name: true, email: true } } },
+          orderBy: { createdAt: "asc" },
+        })
+      : Promise.resolve([]),
+    loadDirectory || loadMy
+      ? prisma.employeeProfile.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { fullName: "asc" },
+        })
+      : Promise.resolve([]),
+    loadPeopleExtras || loadPayslipRuns
+      ? prisma.hrPayTemplate.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+        })
+      : Promise.resolve([]),
+    loadAppraisals || loadMy
+      ? prisma.hrAppraisalAction.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: [{ cycleType: "asc" }, { sortOrder: "asc" }],
+        })
+      : Promise.resolve([]),
+    loadAppraisals
+      ? prisma.hrAppraisalCycle.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { createdAt: "desc" },
+          take: 48,
           include: {
-            profile: {
-              select: { fullName: true, position: true, userId: true, department: true },
-            },
-          },
-        },
-      },
-    }),
-    prisma.hrPayslipRun.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ year: "desc" }, { month: "desc" }],
-      take: 24,
-      include: {
-        adjustments: { orderBy: { createdAt: "asc" } },
-        payslips: {
-          include: {
-            profile: {
-              select: {
-                fullName: true,
-                position: true,
-                paygroupName: true,
-                employeeNumber: true,
-                department: true,
-                taxId: true,
-                rsaPin: true,
-                pensionAdministrator: true,
-                nhfMembershipNumber: true,
-                bankAccount: true,
+            appraisals: {
+              include: {
+                profile: {
+                  select: { fullName: true, position: true, userId: true, department: true },
+                },
               },
             },
           },
-        },
-      },
-    }),
-    prisma.hrDocument.findMany({
-      where: { tenantId: tenant.id, deletedAt: null },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: { profile: { select: { fullName: true } } },
-    }),
-    prisma.hrPerformanceGoal.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      include: { profile: { select: { fullName: true, department: true } } },
-    }),
-    prisma.employeeProfile.findUnique({
-      where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
-    }),
-    prisma.hrPayslip.findMany({
-      where: {
-        tenantId: tenant.id,
-        profile: { userId: myViewUserId },
-        run: { status: "FINALIZED" },
-      },
-      include: { run: true, profile: true },
-      orderBy: { createdAt: "desc" },
-      take: 24,
-    }),
-    prisma.hrAppraisal.findMany({
-      where: { profile: { userId: myViewUserId }, tenantId: tenant.id },
-      include: { cycle: true },
-      orderBy: { updatedAt: "desc" },
-      take: 20,
-    }),
-    prisma.employeeProfile
-      .findUnique({
-        where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
-        select: { id: true },
-      })
-      .then((prof) =>
-        prof
-          ? prisma.hrDocument.findMany({
-              where: { tenantId: tenant.id, employeeProfileId: prof.id, deletedAt: null },
-              orderBy: { createdAt: "desc" },
-              take: 50,
-            })
-          : [],
-      ),
-    prisma.employeeProfile
-      .findUnique({
-        where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
-        select: { id: true },
-      })
-      .then((prof) =>
-        prof
-          ? prisma.hrPerformanceGoal.findMany({
-              where: { tenantId: tenant.id, employeeProfileId: prof.id },
-              orderBy: { createdAt: "desc" },
-              take: 20,
-            })
-          : [],
-      ),
-    loadHrOnboardingStatusForUser(tenant.id, myViewUserId, myViewEmail),
-    canManage
+        })
+      : Promise.resolve([]),
+    loadPayslipRuns
+      ? prisma.hrPayslipRun.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: [{ year: "desc" }, { month: "desc" }],
+          take: 24,
+          include: {
+            adjustments: { orderBy: { createdAt: "asc" } },
+            payslips: {
+              include: {
+                profile: {
+                  select: {
+                    fullName: true,
+                    position: true,
+                    paygroupName: true,
+                    employeeNumber: true,
+                    department: true,
+                    taxId: true,
+                    rsaPin: true,
+                    pensionAdministrator: true,
+                    nhfMembershipNumber: true,
+                    bankAccount: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
+    loadDocumentsFull
+      ? prisma.hrDocument.findMany({
+          where: { tenantId: tenant.id, deletedAt: null },
+          orderBy: { createdAt: "desc" },
+          take: 200,
+          include: { profile: { select: { fullName: true } } },
+        })
+      : loadChecklistDocs
+        ? prisma.hrDocument.findMany({
+            where: { tenantId: tenant.id, deletedAt: null },
+            select: {
+              id: true,
+              employeeProfileId: true,
+              category: true,
+              title: true,
+              fileUrl: true,
+              fileName: true,
+              createdAt: true,
+              profile: { select: { fullName: true } },
+            },
+          })
+        : Promise.resolve([]),
+    loadGoals
+      ? prisma.hrPerformanceGoal.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { createdAt: "desc" },
+          take: 100,
+          include: { profile: { select: { fullName: true, department: true } } },
+        })
+      : Promise.resolve([]),
+    loadMy
+      ? prisma.employeeProfile.findUnique({
+          where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
+        })
+      : Promise.resolve(null),
+    loadMy
+      ? prisma.hrPayslip.findMany({
+          where: {
+            tenantId: tenant.id,
+            profile: { userId: myViewUserId },
+            run: { status: "FINALIZED" },
+          },
+          include: { run: true, profile: true },
+          orderBy: { createdAt: "desc" },
+          take: 24,
+        })
+      : Promise.resolve([]),
+    loadMy
+      ? prisma.hrAppraisal.findMany({
+          where: { profile: { userId: myViewUserId }, tenantId: tenant.id },
+          include: { cycle: true },
+          orderBy: { updatedAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    loadMy
+      ? prisma.employeeProfile
+          .findUnique({
+            where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
+            select: { id: true },
+          })
+          .then((prof) =>
+            prof
+              ? prisma.hrDocument.findMany({
+                  where: { tenantId: tenant.id, employeeProfileId: prof.id, deletedAt: null },
+                  orderBy: { createdAt: "desc" },
+                  take: 50,
+                })
+              : [],
+          )
+      : Promise.resolve([]),
+    loadMy
+      ? prisma.employeeProfile
+          .findUnique({
+            where: { tenantId_userId: { tenantId: tenant.id, userId: myViewUserId } },
+            select: { id: true },
+          })
+          .then((prof) =>
+            prof
+              ? prisma.hrPerformanceGoal.findMany({
+                  where: { tenantId: tenant.id, employeeProfileId: prof.id },
+                  orderBy: { createdAt: "desc" },
+                  take: 20,
+                })
+              : [],
+          )
+      : Promise.resolve([]),
+    loadMy ? loadHrOnboardingStatusForUser(tenant.id, myViewUserId, myViewEmail) : Promise.resolve(emptyOnboarding),
+    loadPeopleExtras && canManage
       ? prisma.hrFormRequest.findMany({
           where: { tenantId: tenant.id },
           orderBy: { createdAt: "desc" },
@@ -287,69 +313,82 @@ export default async function HrQueuePage({
           },
         })
       : Promise.resolve([]),
-    prisma.hrPayslip.findMany({
-      where: {
-        tenantId: tenant.id,
-        run: { status: "FINALIZED" },
-      },
-      select: {
-        employeeProfileId: true,
-        grossPay: true,
-        payeeTax: true,
-        pensionDeduction: true,
-        otherDeductions: true,
-        netPay: true,
-        run: { select: { year: true, month: true } },
-      },
-    }),
-    canManage
+    loadYtd
+      ? prisma.hrPayslip.findMany({
+          where: {
+            tenantId: tenant.id,
+            run: { status: "FINALIZED", year: currentYear },
+          },
+          select: {
+            employeeProfileId: true,
+            grossPay: true,
+            payeeTax: true,
+            pensionDeduction: true,
+            otherDeductions: true,
+            netPay: true,
+            run: { select: { year: true, month: true } },
+          },
+        })
+      : Promise.resolve([]),
+    loadPeopleExtras && canManage
       ? prisma.hrOfferLetter.findMany({
           where: { tenantId: tenant.id },
           include: { profile: { select: { userId: true, id: true } } },
         })
       : Promise.resolve([]),
-    prisma.hrOfferLetter.findFirst({
-      where: {
-        tenantId: tenant.id,
-        status: "AWAITING_SIGNATURE",
-        profile: { userId: myViewUserId },
-      },
-      select: { token: true },
-    }),
-    prisma.workTask.findMany({
-      where: {
-        tenantId: tenant.id,
-        OR: [
-          { createdAt: { gte: scoreDataSince } },
-          { completedAt: { gte: scoreDataSince } },
-          { dueDate: { gte: scoreDataSince } },
-        ],
-      },
-      select: {
-        assigneeUserId: true,
-        status: true,
-        dueDate: true,
-        completedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    }),
-    prisma.lead.findMany({
-      where: { tenantId: tenant.id, createdAt: { gte: scoreDataSince } },
-      select: { assignedUserId: true, createdAt: true },
-    }),
-    prisma.deal.findMany({
-      where: { tenantId: tenant.id, updatedAt: { gte: scoreDataSince } },
-      select: { assignedUserId: true, stage: true, value: true, updatedAt: true },
-    }),
-    prisma.activity.findMany({
-      where: {
-        tenantId: tenant.id,
-        OR: [{ createdAt: { gte: scoreDataSince } }, { completedAt: { gte: scoreDataSince } }],
-      },
-      select: { assignedUserId: true, completedAt: true, createdAt: true },
-    }),
+    loadMy
+      ? prisma.hrOfferLetter.findFirst({
+          where: {
+            tenantId: tenant.id,
+            status: "AWAITING_SIGNATURE",
+            profile: { userId: myViewUserId },
+          },
+          select: { token: true },
+        })
+      : Promise.resolve(null),
+    loadScores
+      ? prisma.workTask.findMany({
+          where: {
+            tenantId: tenant.id,
+            OR: [
+              { createdAt: { gte: scoreDataSince } },
+              { completedAt: { gte: scoreDataSince } },
+              { dueDate: { gte: scoreDataSince } },
+            ],
+          },
+          select: {
+            assigneeUserId: true,
+            status: true,
+            dueDate: true,
+            completedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        })
+      : Promise.resolve([]),
+    loadScores
+      ? prisma.lead.findMany({
+          where: { tenantId: tenant.id, createdAt: { gte: scoreDataSince } },
+          select: { assignedUserId: true, createdAt: true },
+        })
+      : Promise.resolve([]),
+    loadScores
+      ? prisma.deal.findMany({
+          where: { tenantId: tenant.id, updatedAt: { gte: scoreDataSince } },
+          select: { assignedUserId: true, stage: true, value: true, updatedAt: true },
+        })
+      : Promise.resolve([]),
+    loadScores
+      ? prisma.activity.findMany({
+          where: {
+            tenantId: tenant.id,
+            OR: [{ createdAt: { gte: scoreDataSince } }, { completedAt: { gte: scoreDataSince } }],
+          },
+          select: { assignedUserId: true, completedAt: true, createdAt: true },
+        })
+      : Promise.resolve([]),
   ]);
+
 
   const myPendingForms = myOnboardingStatus.pendingItems;
   const myOnboardingSummary = myOnboardingStatus.summary;
@@ -392,7 +431,6 @@ export default async function HrQueuePage({
       },
     ]),
   );
-  const currentYear = new Date().getFullYear();
   const ytdByProfileId = new Map<string, PayslipYtdSummary>();
   const slipsGrouped = new Map<
     string,
@@ -448,7 +486,7 @@ export default async function HrQueuePage({
     const docs = p ? documents.filter((d) => d.employeeProfileId === p.id) : [];
     const items = buildProfileChecklist(
       (p ?? { fullName: person.name, phoneMobile: null, position: null }) as EmployeeProfile,
-      docs,
+      docs as Parameters<typeof buildProfileChecklist>[1],
     );
     const { percent } = checklistProgress(items);
     return {

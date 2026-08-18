@@ -1,7 +1,6 @@
-import { auth } from "@/auth";
 import { canManageHr, canViewHrModule } from "@/lib/hr-access";
 import { normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
-import prisma from "@/lib/db";
+import { loadTenantRequest } from "@/lib/tenant-request";
 import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -14,22 +13,9 @@ export default async function HrPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { tenantSlug } = await params;
-  const session = await auth();
+  const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
   if (!session?.user?.id) notFound();
-
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug: tenantSlug },
-    select: {
-      id: true,
-      settings: { select: { moduleHr: true, roleModuleGrants: true } },
-    },
-  });
   if (!tenant) notFound();
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
-  });
 
   const settingsNav = normalizeSettingsNavSlice(tenant.settings);
   if (!canViewHrModule(Boolean(session.user.isPlatformAdmin), membership, settingsNav.moduleHr)) {

@@ -1,6 +1,4 @@
-import { auth } from "@/auth";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
-import prisma from "@/lib/db";
 import { resolveTenantCurrencies } from "@/lib/finance-catalog";
 import { parseShortletPmsSettings } from "@/lib/shortlets-settings";
 import {
@@ -8,47 +6,13 @@ import {
   resolveShortletsAccess,
   type ShortletsAccessContext,
 } from "@/lib/shortlets-access";
+import { loadTenantRequest } from "@/lib/tenant-request";
 import { notFound } from "next/navigation";
 
-const TENANT_SELECT = {
-  id: true,
-  slug: true,
-  defaultCurrency: true,
-  settings: {
-    select: {
-      moduleSales: true,
-      moduleFinance: true,
-      moduleMarketing: true,
-      moduleCommunity: true,
-      moduleShortLets: true,
-      moduleHr: true,
-      moduleTasks: true,
-      moduleClients: true,
-      roleModuleGrants: true,
-      financeCurrencies: true,
-      shortletCheckInTime: true,
-      shortletCheckOutTime: true,
-      shortletEodTime: true,
-      shortletCheckoutAlertHours: true,
-      shortletFinanceSync: true,
-    },
-  },
-} as const;
-
 export async function loadShortletsContext(tenantSlug: string) {
-  const session = await auth();
+  const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
   if (!session?.user?.id) notFound();
-
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug: tenantSlug },
-    select: TENANT_SELECT,
-  });
   if (!tenant) notFound();
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { status: true, role: true, modulePermissions: true },
-  });
 
   assertTenantNavAccess(session, membership, tenant.settings, "shortlets");
 

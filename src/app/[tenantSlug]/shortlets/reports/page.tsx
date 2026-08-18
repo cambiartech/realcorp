@@ -27,54 +27,56 @@ export default async function ReportsPage({
   const toDate = new Date(`${to}T23:59:59`);
   const tab = sp.tab === "in-house" || sp.tab === "night-audit" ? sp.tab : "performance";
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug: tenantSlug },
-    select: { name: true },
-  });
-
-  const [units, reservations, payments, folioLines, businessDays, inHouseReservations] = await Promise.all([
-    prisma.shortletUnit.findMany({
-      where: { tenantId: ctx.tenant.id },
-      select: { housekeepingStatus: true },
-    }),
-    prisma.shortletReservation.findMany({
-      where: { tenantId: ctx.tenant.id },
-      select: {
-        status: true,
-        nights: true,
-        totalAmount: true,
-        checkIn: true,
-        checkOut: true,
-        balanceDue: true,
-      },
-    }),
-    prisma.shortletPayment.findMany({
-      where: { tenantId: ctx.tenant.id, voidedAt: null, paidAt: { gte: fromDate, lte: toDate } },
-      select: { amount: true, paidAt: true },
-    }),
-    prisma.shortletFolioLine.findMany({
-      where: { tenantId: ctx.tenant.id, postedAt: { gte: fromDate, lte: toDate } },
-      select: { department: true, amount: true, currency: true },
-    }),
-    prisma.shortletBusinessDay.findMany({
-      where: { tenantId: ctx.tenant.id },
-      orderBy: { businessDate: "desc" },
-      take: 30,
-    }),
-    prisma.shortletReservation.findMany({
-      where: { tenantId: ctx.tenant.id, status: "CHECKED_IN" },
-      include: { unit: { select: { name: true } } },
-      orderBy: { checkIn: "asc" },
-    }),
-  ]);
+  const [units, reservations, payments, folioLines, businessDays, inHouseReservations, totalRevenue] =
+    await Promise.all([
+      prisma.shortletUnit.findMany({
+        where: { tenantId: ctx.tenant.id },
+        select: { housekeepingStatus: true },
+      }),
+      prisma.shortletReservation.findMany({
+        where: {
+          tenantId: ctx.tenant.id,
+          OR: [
+            { checkIn: { lte: toDate }, checkOut: { gte: fromDate } },
+            { status: { in: ["CHECKED_IN", "CONFIRMED", "RESERVED"] } },
+          ],
+        },
+        select: {
+          status: true,
+          nights: true,
+          totalAmount: true,
+          checkIn: true,
+          checkOut: true,
+          balanceDue: true,
+        },
+      }),
+      prisma.shortletPayment.findMany({
+        where: { tenantId: ctx.tenant.id, voidedAt: null, paidAt: { gte: fromDate, lte: toDate } },
+        select: { amount: true, paidAt: true },
+      }),
+      prisma.shortletFolioLine.findMany({
+        where: { tenantId: ctx.tenant.id, postedAt: { gte: fromDate, lte: toDate } },
+        select: { department: true, amount: true, currency: true },
+      }),
+      prisma.shortletBusinessDay.findMany({
+        where: { tenantId: ctx.tenant.id },
+        orderBy: { businessDate: "desc" },
+        take: 30,
+      }),
+      prisma.shortletReservation.findMany({
+        where: { tenantId: ctx.tenant.id, status: "CHECKED_IN" },
+        include: { unit: { select: { name: true } } },
+        orderBy: { checkIn: "asc" },
+      }),
+      prisma.shortletPayment.aggregate({
+        where: { tenantId: ctx.tenant.id, voidedAt: null },
+        _sum: { amount: true },
+      }),
+    ]);
 
   const currency = ctx.tenant.defaultCurrency;
   const occupancy = computeOccupancyPercent(units);
   const adr = computeAdr(reservations, currency);
-  const totalRevenue = await prisma.shortletPayment.aggregate({
-    where: { tenantId: ctx.tenant.id, voidedAt: null },
-    _sum: { amount: true },
-  });
   const periodRevenue = payments.reduce((s, p) => s + Number(p.amount), 0);
   const outstanding = reservations
     .filter((r) => r.status !== "CANCELLED" && r.status !== "CHECKED_OUT")
@@ -90,7 +92,7 @@ export default async function ReportsPage({
   return (
     <ReportsWorkspace
       tenantSlug={ctx.tenant.slug}
-      tenantName={tenant?.name || ctx.tenant.slug}
+      tenantName={ctx.tenant.name || ctx.tenant.slug}
       tab={tab}
       from={from}
       to={to}

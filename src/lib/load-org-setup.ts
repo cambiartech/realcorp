@@ -1,41 +1,70 @@
+import { cache } from "react";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { buildOrgSetupSteps, orgSetupProgress } from "@/lib/org-setup-checklist";
 
-export async function loadOrgSetupForUser(tenantId: string, userId: string, isPlatformAdmin: boolean) {
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId, userId } },
-    select: { role: true, status: true },
-  });
+type MembershipSlice = { role: MembershipRole; status: MembershipStatus } | null | undefined;
+
+type TenantSetupSlice = {
+  slug: string;
+  name: string;
+  defaultCurrency: string;
+  settings: {
+    moduleFinance?: boolean | null;
+    logoUrl?: string | null;
+    orgEmail?: string | null;
+    orgPhone?: string | null;
+    financeCurrencies?: unknown;
+    financeBankAccounts?: unknown;
+    financePaymentModes?: unknown;
+  } | null;
+};
+
+export const loadOrgSetupForUser = cache(async function loadOrgSetupForUser(
+  tenantId: string,
+  userId: string,
+  isPlatformAdmin: boolean,
+  membership?: MembershipSlice,
+  preloadedTenant?: TenantSetupSlice | null,
+) {
+  const resolved =
+    membership === undefined
+      ? await prisma.membership.findUnique({
+          where: { tenantId_userId: { tenantId, userId } },
+          select: { role: true, status: true },
+        })
+      : membership;
 
   const canManageOrgSetup =
     isPlatformAdmin ||
-    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
+    (resolved?.status === MembershipStatus.ACTIVE && resolved.role === MembershipRole.ORG_ADMIN);
 
   if (!canManageOrgSetup) {
     return { canManageOrgSetup: false as const };
   }
 
   const [tenant, goal, activeMemberCount, pendingInviteCount] = await Promise.all([
-    prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: {
-        slug: true,
-        name: true,
-        defaultCurrency: true,
-        settings: {
+    preloadedTenant
+      ? Promise.resolve(preloadedTenant)
+      : prisma.tenant.findUnique({
+          where: { id: tenantId },
           select: {
-            moduleFinance: true,
-            logoUrl: true,
-            orgEmail: true,
-            orgPhone: true,
-            financeCurrencies: true,
-            financeBankAccounts: true,
-            financePaymentModes: true,
+            slug: true,
+            name: true,
+            defaultCurrency: true,
+            settings: {
+              select: {
+                moduleFinance: true,
+                logoUrl: true,
+                orgEmail: true,
+                orgPhone: true,
+                financeCurrencies: true,
+                financeBankAccounts: true,
+                financePaymentModes: true,
+              },
+            },
           },
-        },
-      },
-    }),
+        }),
     prisma.tenantGoal.findFirst({
       where: { tenantId, isActive: true },
       select: { id: true },
@@ -78,4 +107,4 @@ export async function loadOrgSetupForUser(tenantId: string, userId: string, isPl
     percent: progress.percent,
     allComplete: progress.completed === progress.total,
   };
-}
+});

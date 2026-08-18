@@ -1,15 +1,23 @@
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { TenantAppHeaderBrand } from "@/components/realcorp-brand";
 import { TenantHeaderActions } from "@/components/tenant-header-actions";
 import { TenantMobileDock, TenantSidebar } from "@/components/tenant-nav";
-import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { getVisibleNavKeys, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { resolveShortletsAccess } from "@/lib/shortlets-access";
 import { loadOrgSetupForUser } from "@/lib/load-org-setup";
 import { OrgSetupCoachBoundary } from "@/components/org-setup-coach-boundary";
+import { loadTenantRequest } from "@/lib/tenant-request";
+import prisma from "@/lib/db";
+import { cache } from "react";
+
+const getHrProfileId = cache(async (tenantId: string, userId: string) =>
+  prisma.employeeProfile.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { id: true },
+  }),
+);
 
 export default async function TenantLayout({
   children,
@@ -19,51 +27,15 @@ export default async function TenantLayout({
   params: Promise<{ tenantSlug: string }>;
 }) {
   const { tenantSlug } = await params;
-  const session = await auth();
+  const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
 
   if (!session?.user?.id) {
     redirect(`/login?callbackUrl=/${tenantSlug}`);
   }
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug: tenantSlug },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      settings: {
-        select: {
-          moduleSales: true,
-          moduleFinance: true,
-          moduleMarketing: true,
-          moduleCommunity: true,
-          moduleShortLets: true,
-          moduleHr: true,
-          moduleTasks: true,
-          moduleClients: true,
-          moduleInvestorPortal: true,
-          moduleListings: true,
-          moduleWhatsApp: true,
-          roleModuleGrants: true,
-          logoUrl: true,
-        },
-      },
-    },
-  });
-
   if (!tenant) {
     notFound();
   }
-
-  const membership = await prisma.membership.findUnique({
-    where: {
-      tenantId_userId: {
-        tenantId: tenant.id,
-        userId: session.user.id,
-      },
-    },
-    select: { role: true, status: true, modulePermissions: true },
-  });
 
   const allowed = session.user.isPlatformAdmin || (membership && membership.status === "ACTIVE");
   if (!allowed) {
@@ -81,17 +53,14 @@ export default async function TenantLayout({
 
   const userLabel = session.user.name || session.user.email || "Signed in";
   const manageHr = canManageHr(Boolean(session.user.isPlatformAdmin), membership);
-  const hrEmployeeProfile = manageHr
-    ? await prisma.employeeProfile.findUnique({
-        where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-        select: { id: true },
-      })
-    : null;
+  const hrEmployeeProfile = manageHr ? await getHrProfileId(tenant.id, session.user.id) : null;
 
   const orgSetup = await loadOrgSetupForUser(
     tenant.id,
     session.user.id,
     Boolean(session.user.isPlatformAdmin),
+    membership,
+    tenant,
   );
 
   const shortletsAccess = visibleNavKeys.includes("shortlets")

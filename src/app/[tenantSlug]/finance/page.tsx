@@ -1,6 +1,5 @@
-import { auth } from "@/auth";
 import { MembershipRole, MembershipStatus } from "@/generated/prisma";
-import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
+import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import {
   mergeCurrencyOptions,
@@ -10,6 +9,7 @@ import { parseFinanceControls } from "@/lib/finance-controls";
 import { loadClientDepositRows } from "@/lib/client-deposits";
 import { expensePnlAmount } from "@/lib/finance-vat";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { loadTenantRequest } from "@/lib/tenant-request";
 import { notFound } from "next/navigation";
 import { FinanceWorkspace } from "./finance-workspace";
 
@@ -51,44 +51,10 @@ export default async function FinanceQueuePage({
 }) {
   const { tenantSlug } = await params;
   const logsParams = await searchParams;
-  const session = await auth();
+  const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
   if (!session?.user?.id) notFound();
-
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug: tenantSlug },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      defaultCurrency: true,
-      settings: {
-        select: {
-          logoUrl: true,
-          moduleSales: true,
-          moduleFinance: true,
-          moduleMarketing: true,
-          moduleCommunity: true,
-          roleModuleGrants: true,
-          orgDepartments: true,
-          financeBankAccounts: true,
-          financePaymentModes: true,
-          financeCurrencies: true,
-          financeControls: true,
-        },
-      },
-      memberships: {
-        where: { userId: session.user.id },
-        take: 1,
-        select: MEMBERSHIP_FOR_NAV_SELECT,
-      },
-    },
-  });
   if (!tenant) notFound();
-  const financeControls = parseFinanceControls(
-    tenant.settings?.financeControls,
-  );
-
-  const membership = tenant.memberships[0] || null;
+  const financeControls = parseFinanceControls(tenant.settings?.financeControls);
 
   assertTenantNavAccess(session, membership, tenant.settings, "finance");
 
