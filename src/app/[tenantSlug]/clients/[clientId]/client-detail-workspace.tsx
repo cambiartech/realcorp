@@ -9,6 +9,7 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { GlobalLocationFields } from "@/components/global-location-fields";
 import { SearchableSelect, type SearchableSelectGroup } from "@/components/searchable-select";
 import { agreedPriceFromCatchUp } from "@/lib/finance-income";
 import {
@@ -942,6 +943,20 @@ export function ClientDetailWorkspace({
             <option value="ACTIVE">Active</option>
             <option value="FORMER">Former</option>
           </UiSelect>
+          <div>
+            <label className="mb-1 block text-sm text-muted">Street address</label>
+            <input
+              name="addressLine"
+              defaultValue={profile.addressLine}
+              placeholder="House number and street"
+              className="w-full border border-foreground/15 bg-field px-3 py-2"
+            />
+          </div>
+          <GlobalLocationFields
+            defaultCountry={profile.country || "Nigeria"}
+            defaultState={profile.state}
+            defaultCity={profile.city}
+          />
           <textarea
             name="notes"
             rows={3}

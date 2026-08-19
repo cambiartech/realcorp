@@ -36,8 +36,11 @@ import { INVITE_DEPARTMENT_OPTIONS } from "@/lib/team-membership-roles";
 import { downloadExcel } from "@/lib/table-export";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { GlobalLocationFields } from "@/components/global-location-fields";
+import { NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { SortTh, useTableSort } from "@/components/sort-th";
+import { sortTableRows } from "@/lib/table-sort";
 import { notifyPrefillResult, runPrefillFromUploadedDocs } from "@/lib/hr-prefill-client";
 
 type PeopleTab = "directory" | "onboard" | "record" | "send" | "requests";
@@ -180,6 +183,7 @@ export function HrPeopleWorkspace({
     searchParams.get("reviewForms") === "1" ? "requests" : "directory",
   );
   const [peopleQuery, setPeopleQuery] = useState("");
+  const { sortKey, sortDir, onSort } = useTableSort();
   const [recordTab, setRecordTab] = useState<RecordTab>("personal");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -217,15 +221,21 @@ export function HrPeopleWorkspace({
   const selectedMember = teamMembers.find((m) => m.userId === selectedUserId);
   const selectedOnboarding = selectedUserId ? onboardingByUserId.get(selectedUserId) : undefined;
   const submittedRequests = formRequests.filter((request) => request.statusValue === "SUBMITTED");
-  const visibleTeamMembers = useMemo(
-    () =>
-      filterTableRows(
-        teamMembers,
-        peopleQuery,
-        (m) => `${m.name} ${m.email} ${m.role}`,
-      ),
-    [teamMembers, peopleQuery],
-  );
+  const visibleTeamMembers = useMemo(() => {
+    const filtered = filterTableRows(
+      teamMembers,
+      peopleQuery,
+      (m) => `${m.name} ${m.email} ${m.role}`,
+    );
+    return sortTableRows(filtered, sortKey, sortDir, (m, key) => {
+      if (key === "name") return m.name;
+      if (key === "email") return m.email;
+      if (key === "role") return m.role;
+      if (key === "hr") return m.hasProfile ? 1 : 0;
+      if (key === "onboarding") return onboardingByUserId.get(m.userId)?.percent ?? 0;
+      return "";
+    });
+  }, [teamMembers, peopleQuery, sortKey, sortDir, onboardingByUserId]);
 
   async function runAction(fn: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     setPending(true);
@@ -635,11 +645,11 @@ export function HrPeopleWorkspace({
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-muted">
               <tr>
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Email</th>
-                <th className="px-3 py-2">Team role</th>
-                <th className="px-3 py-2">HR record</th>
-                <th className="px-3 py-2">Onboarding</th>
+                <SortTh label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={onSort} className="px-3 py-2" />
+                <SortTh label="Email" sortKey="email" activeKey={sortKey} dir={sortDir} onSort={onSort} className="px-3 py-2" />
+                <SortTh label="Team role" sortKey="role" activeKey={sortKey} dir={sortDir} onSort={onSort} className="px-3 py-2" />
+                <SortTh label="HR record" sortKey="hr" activeKey={sortKey} dir={sortDir} onSort={onSort} className="px-3 py-2" />
+                <SortTh label="Onboarding" sortKey="onboarding" activeKey={sortKey} dir={sortDir} onSort={onSort} className="px-3 py-2" />
                 <th className="px-3 py-2">Action</th>
               </tr>
             </thead>
@@ -1032,10 +1042,20 @@ export function HrPeopleWorkspace({
                       hint="NG is available now. Other countries require a reviewed rule pack before payroll can run."
                     />
                     <Field
-                      label="Tax region / state code"
+                      label="Tax region / state"
                       name="payrollRegionCode"
                       defaultValue={record.payrollRegionCode}
-                    />
+                      hint="Used for PAYE. Pick the state of tax residence."
+                    >
+                      <UiSelect name="payrollRegionCode" defaultValue={record.payrollRegionCode}>
+                        <option value="">Select state</option>
+                        {NIGERIA_STATES.map((state) => (
+                          <option key={state} value={state}>
+                            {state}
+                          </option>
+                        ))}
+                      </UiSelect>
+                    </Field>
                     <Field label="Tax identification number (TIN)" name="taxId" defaultValue={record.taxId} hint="Also on the onboarding wizard (Personal & job / Forms & documents)." />
                     <Field
                       label="RSA PIN"

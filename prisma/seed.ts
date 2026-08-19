@@ -73,12 +73,14 @@ async function main() {
       moduleFinance: true,
       moduleMarketing: true,
       moduleCommunity: true,
+      moduleFacility: true,
     },
     update: {
       monthlyRevenueTarget: "250000000",
       pipelineTarget: "500000000",
       moduleHr: true,
       moduleShortLets: true,
+      moduleFacility: true,
     },
   });
 

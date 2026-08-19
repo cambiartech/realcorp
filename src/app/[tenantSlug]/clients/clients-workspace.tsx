@@ -7,6 +7,7 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
+import { GlobalLocationFields } from "@/components/global-location-fields";
 import { PaginationControl } from "@/components/pagination";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -28,7 +29,9 @@ import {
 } from "./actions";
 import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
 import { SearchableSelect } from "@/components/searchable-select";
+import { SortTh, useTableSort } from "@/components/sort-th";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { sortTableRows } from "@/lib/table-sort";
 
 type ClientRow = {
   id: string;
@@ -118,6 +121,7 @@ export function ClientsWorkspace({
   projectOptions,
   selectedProjectId,
   selectedProjectName,
+  selectedStatus,
   clientStats,
   namedUnlinkedUnitsCount,
 }: {
@@ -142,6 +146,7 @@ export function ClientsWorkspace({
   projectOptions: Array<{ id: string; name: string }>;
   selectedProjectId: string;
   selectedProjectName: string;
+  selectedStatus: string;
   clientStats: { active: number; totalUnits: number };
   namedUnlinkedUnitsCount: number;
 }) {
@@ -174,17 +179,28 @@ export function ClientsWorkspace({
   const [editPending, setEditPending] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [tableQuery, setTableQuery] = useState("");
-  const visibleClients = useMemo(
-    () =>
-      filterTableRows(
-        clients.map((row) => ({ ...row, ...rowOverrides[row.id] })),
-        tableQuery,
-        (row) =>
-          `${row.fullName} ${row.email} ${row.phone} ${row.status} ${row.portalStatus} ${row.createdAtLabel} ${row.projects.map((project) => project.name).join(" ")}`,
-      ),
-    [clients, rowOverrides, tableQuery],
-  );
+  const { sortKey, sortDir, onSort } = useTableSort();
+  const visibleClients = useMemo(() => {
+    const filtered = filterTableRows(
+      clients.map((row) => ({ ...row, ...rowOverrides[row.id] })),
+      tableQuery,
+      (row) =>
+        `${row.fullName} ${row.email} ${row.phone} ${row.status} ${row.portalStatus} ${row.createdAtLabel} ${row.projects.map((project) => project.name).join(" ")}`,
+    );
+    return sortTableRows(filtered, sortKey, sortDir, (row, key) => {
+      if (key === "name") return row.fullName;
+      if (key === "projects") return row.projects.map((project) => project.name).join(" ");
+      if (key === "status") return row.status;
+      if (key === "portal") return row.portalStatus;
+      if (key === "units") return row.unitsCount;
+      if (key === "paid") return row.paid;
+      if (key === "remaining") return row.remaining;
+      if (key === "added") return row.createdAtLabel;
+      return "";
+    });
+  }, [clients, rowOverrides, tableQuery, sortKey, sortDir]);
   const clientGroups = useMemo(() => {
+    if (sortKey) return [{ id: "sorted", label: "", rows: visibleClients }];
     if (selectedProjectId === "none") {
       return [{ id: "none", label: "No project linked", rows: visibleClients }];
     }
@@ -198,14 +214,24 @@ export function ClientsWorkspace({
       ];
     }
     return groupClientsByProject(visibleClients);
-  }, [selectedProjectId, selectedProjectName, visibleClients]);
+  }, [selectedProjectId, selectedProjectName, visibleClients, sortKey]);
 
-  function applyProjectFilter(nextId: string) {
+  function applyListFilter(updates: { projectId?: string; status?: string }) {
     const params = { ...paginationSearchParams } as Record<string, SearchParamValue>;
-    if (nextId) params.projectId = nextId;
-    else delete params.projectId;
+    if (updates.projectId !== undefined) {
+      if (updates.projectId) params.projectId = updates.projectId;
+      else delete params.projectId;
+    }
+    if (updates.status !== undefined) {
+      if (updates.status) params.status = updates.status;
+      else delete params.status;
+    }
     delete params.clientsPage;
     router.push(buildPageUrl(`/${tenantSlug}/clients`, params, "clientsPage", 1));
+  }
+
+  function applyProjectFilter(nextId: string) {
+    applyListFilter({ projectId: nextId });
   }
 
   useEffect(() => {
@@ -325,20 +351,33 @@ export function ClientsWorkspace({
           <p className="mt-1 max-w-2xl text-sm text-muted">
             Property owners and investors — track units, pricing plans, and client documents in one place.
           </p>
-          {selectedProjectId ? (
+          {selectedProjectId || selectedStatus ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">
+              {selectedProjectId ? (
+                <button
+                  type="button"
+                  onClick={() => applyProjectFilter("")}
+                  className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
+                  title="Clear project filter"
+                >
+                  <span>Project: {selectedProjectName || selectedProjectId}</span>
+                  <span aria-hidden>×</span>
+                </button>
+              ) : null}
+              {selectedStatus ? (
+                <button
+                  type="button"
+                  onClick={() => applyListFilter({ status: "" })}
+                  className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
+                  title="Clear status filter"
+                >
+                  <span>Status: {formatEnumLabel(selectedStatus)}</span>
+                  <span aria-hidden>×</span>
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={() => applyProjectFilter("")}
-                className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
-                title="Clear project filter"
-              >
-                <span>Project: {selectedProjectName || selectedProjectId}</span>
-                <span aria-hidden>×</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => applyProjectFilter("")}
+                onClick={() => applyListFilter({ projectId: "", status: "" })}
                 className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
               >
                 Show all clients
@@ -498,6 +537,20 @@ export function ClientsWorkspace({
               resultCount={visibleClients.length}
               totalCount={clients.length}
             />
+            <div className="w-full sm:max-w-[200px]">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+                Status
+              </label>
+              <UiSelect
+                value={selectedStatus}
+                onChange={(event) => applyListFilter({ status: event.target.value })}
+              >
+                <option value="">All statuses</option>
+                <option value="PROSPECT">Prospect</option>
+                <option value="ACTIVE">Active</option>
+                <option value="FORMER">Former</option>
+              </UiSelect>
+            </div>
             <div className="w-full sm:max-w-xs">
               <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
                 Filter by project
@@ -523,15 +576,15 @@ export function ClientsWorkspace({
           <table className="w-full text-left text-sm">
             <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-4 py-3">Client</th>
-                <th className="px-4 py-3">Projects</th>
+                <SortTh label="Client" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Projects" sortKey="projects" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <th className="px-4 py-3">Contact</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Portal</th>
-                <th className="px-4 py-3">Units</th>
-                <th className="px-4 py-3">Paid</th>
-                <th className="px-4 py-3">Remaining</th>
-                <th className="px-4 py-3">Added</th>
+                <SortTh label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Portal" sortKey="portal" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Units" sortKey="units" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Paid" sortKey="paid" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Remaining" sortKey="remaining" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Added" sortKey="added" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 {canManage ? <th className="px-4 py-3" /> : null}
               </tr>
             </thead>
@@ -586,6 +639,7 @@ export function ClientsWorkspace({
               ) : (
                 clientGroups.map((group) => (
                   <Fragment key={group.id}>
+                    {group.label ? (
                     <tr className="bg-foreground/[0.035]">
                       <td
                         colSpan={canManage ? 10 : 9}
@@ -597,6 +651,7 @@ export function ClientsWorkspace({
                         </span>
                       </td>
                     </tr>
+                    ) : null}
                     {group.rows.map((client) => (
                   <tr key={client.id} className="hover:bg-foreground/[0.02]">
                     <td className="px-4 py-3">
@@ -799,6 +854,18 @@ export function ClientsWorkspace({
               <option value="FORMER">Former</option>
             </UiSelect>
           </div>
+          <div>
+            <label htmlFor="client-address" className="mb-1 block text-sm text-muted">
+              Street address (optional)
+            </label>
+            <input
+              id="client-address"
+              name="addressLine"
+              placeholder="House number and street"
+              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+            />
+          </div>
+          <GlobalLocationFields defaultCountry="Nigeria" />
           <div>
             <label htmlFor="client-notes" className="mb-1 block text-sm text-muted">
               Notes (optional)

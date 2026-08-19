@@ -156,7 +156,7 @@ export function HrPublicFormClient({
             : { background: "var(--hr-brand-primary)", color: "#fff" }
         }
       >
-        ← My dashboard
+        ← My HR
       </Link>
     ) : null;
 

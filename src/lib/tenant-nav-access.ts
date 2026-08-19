@@ -21,6 +21,7 @@ export type TenantNavKey =
   | "stakeholders"
   | "community"
   | "shortlets"
+  | "facility"
   | "finance"
   | "hr"
   | "team"
@@ -38,6 +39,7 @@ export type TenantSettingsNavSlice = {
   moduleListings?: boolean;
   moduleWhatsApp?: boolean;
   moduleInvestorPortal?: boolean;
+  moduleFacility?: boolean;
   roleModuleGrants: unknown;
 };
 
@@ -57,6 +59,7 @@ const NAV_ORDER: TenantNavKey[] = [
   "stakeholders",
   "community",
   "shortlets",
+  "facility",
   "finance",
   "hr",
   "team",
@@ -100,6 +103,7 @@ const GRANT_TO_NAV: Record<string, TenantNavKey> = {
   FINANCE: "finance",
   HR: "hr",
   TASKS: "tasks",
+  FACILITY: "facility",
 };
 
 function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): TenantNavKey[] {
@@ -124,6 +128,10 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
       return ["dashboard", "shortlets", "settings"];
     case MembershipRole.FNB_STAFF:
       return ["dashboard", "shortlets", "settings"];
+    case MembershipRole.FACILITY_MANAGER:
+      return ["dashboard", "projects", "facility", "tasks", "settings"];
+    case MembershipRole.FACILITY_STAFF:
+      return ["dashboard", "facility", "tasks", "settings"];
     case MembershipRole.SALES_MANAGER:
       return [...SALES_STACK, "clients", "tasks", "listings", "stakeholders", "settings"];
     case MembershipRole.SALES_EXECUTIVE:
@@ -142,6 +150,7 @@ function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice):
     if (k === "marketing") return s.moduleMarketing;
     if (k === "community") return s.moduleCommunity;
     if (k === "shortlets") return s.moduleShortLets;
+    if (k === "facility") return Boolean(s.moduleFacility);
     if (k === "finance") return s.moduleFinance;
     if (k === "hr") return s.moduleHr;
     if (k === "tasks") return s.moduleTasks;
@@ -174,6 +183,7 @@ function applyRoleGrants(
     if (nav === "finance" && s.moduleFinance) set.add("finance");
     if (nav === "hr" && s.moduleHr) set.add("hr");
     if (nav === "tasks" && s.moduleTasks) set.add("tasks");
+    if (nav === "facility" && s.moduleFacility) set.add("facility");
   }
   return NAV_ORDER.filter((k) => set.has(k));
 }
@@ -193,6 +203,7 @@ export function normalizeSettingsNavSlice(
     moduleListings: raw?.moduleListings,
     moduleWhatsApp: raw?.moduleWhatsApp,
     moduleInvestorPortal: raw?.moduleInvestorPortal,
+    moduleFacility: raw?.moduleFacility ?? false,
     roleModuleGrants: raw?.roleModuleGrants ?? null,
   };
 }

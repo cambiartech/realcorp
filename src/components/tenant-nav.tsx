@@ -39,6 +39,7 @@ import {
   Users,
   UsersRound,
   Home,
+  Warehouse,
   type LucideIcon,
 } from "lucide-react";
 import type { TenantNavKey } from "@/lib/tenant-nav-access";
@@ -79,6 +80,7 @@ const ALL_ITEMS: NavItem[] = [
   { key: "stakeholders", label: "Stakeholders", href: "/stakeholders", mobileLabel: "Stakeholders" },
   { key: "community", label: "Community", href: "/community", mobileLabel: "Community" },
   { key: "shortlets", label: "Short Lets", href: "/shortlets", mobileLabel: "Shortlets" },
+  { key: "facility", label: "Facility", href: "/facility", mobileLabel: "Facility" },
   { key: "finance", label: "Finance", href: "/finance", mobileLabel: "Finance" },
   { key: "hr", label: "People", href: "/hr", mobileLabel: "HR" },
   { key: "team", label: "Team", href: "/team", mobileLabel: "Team" },
@@ -101,6 +103,7 @@ const NAV_ICONS: Record<TenantNavKey, LucideIcon> = {
   stakeholders: Handshake,
   community: Users,
   shortlets: Home,
+  facility: Warehouse,
   finance: CircleDollarSign,
   hr: UsersRound,
   team: Users,
@@ -121,6 +124,7 @@ const TOP_LEVEL_KEYS: TenantNavKey[] = [
   "tasks",
   "stakeholders",
   "community",
+  "facility",
   "team",
   "settings",
 ];
@@ -407,12 +411,11 @@ export function TenantSidebar({
           { id: "documents", label: "Documents", href: `${hrItem.href}/documents`, icon: FileText },
           { id: "insights", label: "Insights", href: `${hrItem.href}/insights`, icon: BarChart2 },
           ...(hasHrEmployeeProfile
-            ? [{ id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard`, icon: UserCircle }]
+            ? [{ id: "my", label: "My HR", href: `${hrItem.href}/dashboard`, icon: UserCircle }]
             : []),
         ]
       : [
-          { id: "my", label: "My dashboard", href: `${hrItem.href}/dashboard`, icon: UserCircle },
-          { id: "leave", label: "Leave tracker", href: `${hrItem.href}/leave`, icon: CalendarDays },
+          { id: "my", label: "My HR", href: `${hrItem.href}/dashboard`, icon: UserCircle },
         ]
     : [];
   const hasFinanceItems = financeSubItems.length > 0;

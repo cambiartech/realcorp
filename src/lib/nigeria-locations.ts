@@ -884,7 +884,30 @@ const STATE_ALIASES: Record<string, string> = {
   "federal capital territory": "FCT",
   nassarawa: "Nasarawa",
   nasarawa: "Nasarawa",
+  "lagos state": "Lagos",
 };
+
+export function isNigeriaStateName(value: string): value is NigeriaState {
+  return (NIGERIA_STATES as readonly string[]).includes(value);
+}
+
+export function nigeriaStateOptions(): Array<{ code: string; name: string; type: "state" }> {
+  return NIGERIA_STATES.map((name) => ({ code: name, name, type: "state" }));
+}
+
+export function nigeriaCityOptions(stateInput: string): Array<{ id: number; name: string }> {
+  return citiesForState(stateInput).map((name, index) => ({ id: index + 1, name }));
+}
+
+/** If a city/LGA belongs to exactly one state, return that state. */
+export function inferNigeriaStateFromCity(city: string): NigeriaState | "" {
+  const target = city.trim().toLowerCase();
+  if (!target) return "";
+  const matches = NIGERIA_STATES.filter((state) =>
+    (NIGERIA_CITIES_BY_STATE[state] || []).some((name) => name.toLowerCase() === target),
+  );
+  return matches.length === 1 ? matches[0] : "";
+}
 
 export function resolveNigeriaStateName(state: string): string {
   const raw = state.trim();

@@ -23,6 +23,7 @@ import { aggregatePayslipYtd, type PayslipYtdSummary } from "@/lib/hr-payslip-yt
 import { ensureEmployeeProfileForMember } from "@/lib/hr-profile-ensure";
 import { ensureDefaultAppraisalCriteria } from "@/app/[tenantSlug]/hr/actions";
 import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
+import { ensureDefaultLeaveTypes, loadLeaveBalanceSummaries } from "@/lib/hr-leave-server";
 import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
 import { brandingFromSettings } from "@/lib/tenant-branding";
@@ -64,7 +65,9 @@ export default async function HrQueuePage({
   const canManage = canManageHr(Boolean(session.user.isPlatformAdmin), membership);
 
   if (!canManage && tab !== "my") {
-    redirect(`/${tenantSlug}/hr/dashboard`);
+    const selfView =
+      tab === "payslips" || tab === "documents" || tab === "appraisals" ? `?view=${tab}` : "";
+    redirect(`/${tenantSlug}/hr/dashboard${selfView}`);
   }
 
   if (tab === "appraisals") {
@@ -518,6 +521,81 @@ export default async function HrQueuePage({
     (p) => p.status === "ACTIVE" && (p.grossMonthly == null || Number(p.grossMonthly) <= 0),
   ).length;
 
+  const leaveYear = new Date().getUTCFullYear();
+  const dateFmt = new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeZone: "UTC" });
+  let myLeaveBalances: Array<{
+    leaveTypeId: string;
+    name: string;
+    dayUnit: string;
+    statutoryReference: string;
+    accrued: number | null;
+    carried: number;
+    adjustment: number;
+    approved: number;
+    pending: number;
+    available: number | null;
+    unlimited: boolean;
+  }> = [];
+  let myLeaveRequests: Array<{
+    id: string;
+    leaveTypeName: string;
+    dayUnit: string;
+    startDate: string;
+    endDate: string;
+    requestedUnits: number;
+    reason: string;
+    status: string;
+    reviewNote: string;
+  }> = [];
+  if (loadMy && myProfile) {
+    try {
+      const countryCode = myProfile.payrollCountryCode || tenant.settings?.payrollCountryCode || "NG";
+      await ensureDefaultLeaveTypes(tenant.id, countryCode);
+      const [summaries, requestRows] = await Promise.all([
+        loadLeaveBalanceSummaries({
+          tenantId: tenant.id,
+          employeeProfileId: myProfile.id,
+          payrollCountryCode: countryCode,
+          department: myProfile.department,
+          dateOfJoining: myProfile.dateOfJoining,
+          year: leaveYear,
+        }),
+        prisma.hrLeaveRequest.findMany({
+          where: { tenantId: tenant.id, employeeProfileId: myProfile.id },
+          include: { leaveType: { select: { name: true, dayUnit: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        }),
+      ]);
+      myLeaveBalances = summaries.map((balance) => ({
+        leaveTypeId: balance.leaveType.id,
+        name: balance.leaveType.name,
+        dayUnit: balance.leaveType.dayUnit,
+        statutoryReference: balance.leaveType.statutoryReference || "",
+        accrued: Number.isFinite(balance.accrued) ? balance.accrued : null,
+        carried: balance.carried,
+        adjustment: balance.adjustment,
+        approved: balance.approved,
+        pending: balance.pending,
+        available: Number.isFinite(balance.available) ? balance.available : null,
+        unlimited: balance.leaveType.unlimited,
+      }));
+      myLeaveRequests = requestRows.map((request) => ({
+        id: request.id,
+        leaveTypeName: request.leaveType.name,
+        dayUnit: request.leaveType.dayUnit,
+        startDate: dateFmt.format(request.startDate),
+        endDate: dateFmt.format(request.endDate),
+        requestedUnits: Number(request.requestedUnits),
+        reason: request.reason || "",
+        status: request.status,
+        reviewNote: request.reviewNote || "",
+      }));
+    } catch (error) {
+      console.error("[hr-my-leave]", error);
+    }
+  }
+
   const departments = mergeOrgDepartments([
     ...((tenant.settings?.orgDepartments as string[] | null | undefined) ?? []),
     ...profiles.map((p) => p.department?.trim() || ""),
@@ -659,6 +737,7 @@ export default async function HrQueuePage({
       tenantBrand={tenantBrand}
       currency={tenant.defaultCurrency}
       activeTab={tab}
+      initialMyTab={sp.view}
       canManageHr={canManage}
       aiEnabled={Boolean(tenant.settings?.moduleAi)}
       currentUserId={session.user.id}
@@ -835,6 +914,8 @@ export default async function HrQueuePage({
       }
       myView={{
         profile: myProfile ? profileToDetailRow(myProfile) : null,
+        leaveBalances: myLeaveBalances,
+        leaveRequests: myLeaveRequests,
         payslips: myPayslips.map((s) => {
           const calc = payslipCalculationFromStored(s);
           return {

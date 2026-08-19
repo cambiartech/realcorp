@@ -1,5 +1,6 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
+import { redirectToLogin } from "@/lib/login-redirect";
 import type { TenantNavKey } from "@/lib/tenant-nav-access";
 import { loadTenantRequest } from "@/lib/tenant-request";
 
@@ -7,7 +8,7 @@ import { loadTenantRequest } from "@/lib/tenant-request";
 export async function guardTenantModuleLayout(tenantSlug: string, required: TenantNavKey) {
   const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=/${tenantSlug}`);
+    await redirectToLogin(`/${tenantSlug}`);
   }
   if (!tenant) notFound();
 

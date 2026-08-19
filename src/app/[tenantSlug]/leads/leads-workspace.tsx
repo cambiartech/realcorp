@@ -16,6 +16,8 @@ import { PaginationControl } from "@/components/pagination";
 import type { Pagination, SearchParamValue } from "@/lib/pagination";
 import { createLead } from "./actions";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { SortTh, useTableSort } from "@/components/sort-th";
+import { sortTableRows } from "@/lib/table-sort";
 
 type LeadRow = {
   id: string;
@@ -99,16 +101,32 @@ export function LeadsWorkspace({
   const { showSnackbar } = useSnackbar();
   const formRef = useRef<HTMLFormElement | null>(null);
   const [tableQuery, setTableQuery] = useState("");
-  const visibleLeads = useMemo(
-    () =>
-      filterTableRows(
-        leads,
-        tableQuery,
-        (lead) =>
-          `${lead.name} ${lead.email} ${lead.phone} ${lead.source} ${lead.attribution} ${lead.owner}`,
-      ),
-    [leads, tableQuery],
-  );
+  const { sortKey, sortDir, onSort } = useTableSort("score", "desc");
+  const visibleLeads = useMemo(() => {
+    const filtered = filterTableRows(
+      leads,
+      tableQuery,
+      (lead) =>
+        `${lead.name} ${lead.email} ${lead.phone} ${lead.source} ${lead.attribution} ${lead.owner} ${lead.quality}`,
+    );
+    return sortTableRows(filtered, sortKey, sortDir, (lead, key) => {
+      if (key === "score") return lead.score;
+      if (key === "name") return lead.name;
+      if (key === "source") return lead.source;
+      if (key === "activity") return lead.lastActivityAt || "";
+      if (key === "owner") return lead.owner;
+      return "";
+    });
+  }, [leads, tableQuery, sortKey, sortDir]);
+
+  function applyLeadFilter(key: "campaign" | "source" | "project" | "owner", value: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    if (value) next.set(key, value);
+    else next.delete(key);
+    next.delete("leadsPage");
+    const q = next.toString();
+    router.push(`/${tenantSlug}/leads${q ? `?${q}` : ""}`);
+  }
 
   useEffect(() => {
     if (!state) return;
@@ -212,27 +230,54 @@ export function LeadsWorkspace({
         </div>
       </div>
 
-      {campaignOptions.length > 0 ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">Campaign</span>
-          <div className="min-w-[16rem]">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Source</label>
+          <SearchableSelect
+            value={searchParams.get("source") ?? ""}
+            onChange={(value) => applyLeadFilter("source", value)}
+            allowEmpty
+            emptyLabel="All sources"
+            searchPlaceholder="Search sources…"
+            options={sourceOptions.map((source) => ({ value: source, label: source }))}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Project</label>
+          <SearchableSelect
+            value={searchParams.get("project") ?? ""}
+            onChange={(value) => applyLeadFilter("project", value)}
+            allowEmpty
+            emptyLabel="All projects"
+            searchPlaceholder="Search projects…"
+            options={projectOptions.map((project) => ({ value: project.name, label: project.name }))}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Owner</label>
+          <SearchableSelect
+            value={searchParams.get("owner") ?? ""}
+            onChange={(value) => applyLeadFilter("owner", value)}
+            allowEmpty
+            emptyLabel="All owners"
+            searchPlaceholder="Search team…"
+            options={users.map((user) => ({ value: user.id, label: user.label }))}
+          />
+        </div>
+        {campaignOptions.length > 0 ? (
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Campaign</label>
             <SearchableSelect
               value={searchParams.get("campaign") ?? ""}
-              onChange={(id) => {
-                const next = new URLSearchParams(searchParams.toString());
-                if (id) next.set("campaign", id);
-                else next.delete("campaign");
-                const q = next.toString();
-                router.push(`/${tenantSlug}/leads${q ? `?${q}` : ""}`);
-              }}
+              onChange={(id) => applyLeadFilter("campaign", id)}
               allowEmpty
               emptyLabel="All campaigns"
               searchPlaceholder="Search campaigns…"
               options={campaignOptions.map((c) => ({ value: c.id, label: c.label }))}
             />
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {/* Hot leads priority band */}
       {leads.some((l) => l.score >= 70) && (
@@ -279,13 +324,13 @@ export function LeadsWorkspace({
         <table className="w-full text-left text-sm">
           <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
             <tr>
-              <th className="px-4 py-3">Score</th>
-              <th className="px-4 py-3">Lead</th>
+              <SortTh label="Score" sortKey="score" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+              <SortTh label="Lead" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={onSort} />
               <th className="px-4 py-3">Contact</th>
-              <th className="px-4 py-3">Source</th>
+              <SortTh label="Source" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={onSort} />
               <th className="px-4 py-3">Attribution</th>
-              <th className="px-4 py-3">Last activity</th>
-              <th className="px-4 py-3">Owner</th>
+              <SortTh label="Last activity" sortKey="activity" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+              <SortTh label="Owner" sortKey="owner" activeKey={sortKey} dir={sortDir} onSort={onSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>

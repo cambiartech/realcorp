@@ -4,7 +4,14 @@ import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  if (!path.startsWith("/platform")) return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", `${path}${request.nextUrl.search}`);
+
+  if (!path.startsWith("/platform")) {
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
 
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
@@ -27,9 +34,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 }
 
 export const config = {
-  matcher: ["/platform/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

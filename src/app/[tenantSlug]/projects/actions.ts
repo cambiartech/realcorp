@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { DealStage, MembershipRole, MembershipStatus, UnitPurpose, UnitStatus } from "@/generated/prisma";
+import { DealStage, InventoryLocationKind, MembershipRole, MembershipStatus, UnitPurpose, UnitStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import prisma from "@/lib/db";
 import {
@@ -89,6 +89,14 @@ export async function createProject(
       action: "CREATE",
       summary: `Created project ${project.name}.`,
     });
+    await prisma.inventoryLocation.create({
+      data: {
+        tenantId: tenant.id,
+        name: `${project.name} store`,
+        kind: InventoryLocationKind.PROJECT,
+        projectId: project.id,
+      },
+    }).catch(() => undefined);
   } catch (error) {
     logProjectActionError("createProject", tenantSlug, error);
     return { ok: false, error: "Could not create project right now." };

@@ -128,7 +128,7 @@ export function HrFormBundleClient({
             className="mt-4 inline-flex w-full items-center justify-center rounded-lg py-3 text-sm font-semibold text-white"
             style={{ background: "var(--hr-brand-primary)" }}
           >
-            Back to My dashboard
+            Back to My HR
           </Link>
         ) : (
           <p className="mt-4 text-sm text-slate-600">
@@ -151,7 +151,7 @@ export function HrFormBundleClient({
                 href={dashboardHref}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
               >
-                ← My dashboard
+                ← My HR
               </Link>
             ) : null}
             <p className="text-xs font-medium text-slate-500">
@@ -236,7 +236,7 @@ function Shell({
             href={dashboardHref}
             className="mb-4 inline-flex text-sm font-semibold text-slate-600 underline hover:text-slate-900"
           >
-            ← My dashboard
+            ← My HR
           </Link>
         ) : null}
         <BrandedDocumentShell brand={brand} title={title}>

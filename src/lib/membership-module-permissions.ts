@@ -13,7 +13,8 @@ export type MembershipModuleKey =
   | "clients"
   | "shortlets"
   | "listings"
-  | "investor";
+  | "investor"
+  | "facility";
 
 export type MembershipModuleAccessLevel = "none" | "read" | "edit" | "full";
 
@@ -104,6 +105,13 @@ export const MEMBERSHIP_ASSIGNABLE_MODULES: AssignableMemberModule[] = [
     description: "Portfolio and stakeholders",
     entitlement: "moduleInvestorPortal",
     navKeys: ["portal", "stakeholders"],
+  },
+  {
+    key: "facility",
+    label: "Facility",
+    description: "Site stores, usage, plant, and damages",
+    entitlement: "moduleFacility",
+    navKeys: ["facility"],
   },
 ];
 
@@ -226,6 +234,7 @@ export function applyUserModulePermissionsToNavKeys(
     "stakeholders",
     "community",
     "shortlets",
+    "facility",
     "finance",
     "hr",
     "team",

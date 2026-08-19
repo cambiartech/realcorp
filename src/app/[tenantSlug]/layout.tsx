@@ -3,6 +3,7 @@ import { TenantAppHeaderBrand } from "@/components/realcorp-brand";
 import { TenantHeaderActions } from "@/components/tenant-header-actions";
 import { TenantMobileDock, TenantSidebar } from "@/components/tenant-nav";
 import { canManageHr } from "@/lib/hr-access";
+import { redirectToLogin } from "@/lib/login-redirect";
 import { getVisibleNavKeys, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { resolveShortletsAccess } from "@/lib/shortlets-access";
@@ -30,7 +31,7 @@ export default async function TenantLayout({
   const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
 
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=/${tenantSlug}`);
+    await redirectToLogin(`/${tenantSlug}`);
   }
 
   if (!tenant) {

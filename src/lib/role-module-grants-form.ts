@@ -4,7 +4,7 @@ import { MembershipRole } from "@/generated/prisma";
  * Stored grant tokens — MARKETING/COMMUNITY/FINANCE map in tenant-nav-access;
  * SALES adds dashboard + projects + leads + deals when org moduleSales is on.
  */
-export const EXTRA_MODULE_GRANT_TOKENS = ["SALES", "MARKETING", "COMMUNITY", "FINANCE"] as const;
+export const EXTRA_MODULE_GRANT_TOKENS = ["SALES", "MARKETING", "COMMUNITY", "FINANCE", "FACILITY"] as const;
 export type ExtraModuleGrantToken = (typeof EXTRA_MODULE_GRANT_TOKENS)[number];
 
 export const MEMBERSHIP_ROLES_FOR_GRANT_MATRIX = (Object.values(MembershipRole) as MembershipRole[]).filter(

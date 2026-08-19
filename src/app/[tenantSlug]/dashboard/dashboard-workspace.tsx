@@ -314,6 +314,7 @@ const ROLE_WIDGETS: Record<RoleView, string[]> = {
   MARKETING: ["lead_source_quality", "lead_funnel", "unassigned_leads", "my_open_tasks"],
   COMMUNITY: ["my_open_tasks", "lead_funnel"],
   OPERATIONS: ["inventory_snapshot", "my_open_tasks"],
+  FACILITY: ["inventory_snapshot", "my_open_tasks"],
 };
 
 const ALL_WIDGET_IDS = new Set(Object.values(ROLE_WIDGETS).flat());
@@ -3424,6 +3425,33 @@ function DepartmentOverviewPanel({
           >
             Open short lets →
           </Link>
+        </section>
+      </div>
+    );
+  }
+
+  if (kind === "facility_stores") {
+    return (
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Facility</p>
+          <p className="mt-2 text-sm text-muted">
+            Site stores, cement usage, plant service dates, and damages.
+          </p>
+          <Link
+            href={`/${tenantSlug}/facility`}
+            className="mt-3 inline-block text-xs font-semibold text-[var(--info)] hover:underline"
+          >
+            Open Facility →
+          </Link>
+        </section>
+        <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Projects</p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <HrStat label="Available" value={values.availableUnits} />
+            <HrStat label="Reserved" value={values.reservedUnits} />
+            <HrStat label="Sold" value={values.soldUnits} />
+          </div>
         </section>
       </div>
     );

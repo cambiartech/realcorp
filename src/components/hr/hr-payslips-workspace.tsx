@@ -529,7 +529,7 @@ export function HrPayslipsWorkspace({
                       onClick={() =>
                         void runAction(
                           () => finalizePayslipRun(tenantSlug, selectedRun.id),
-                          "Payslips published — employees can view in My dashboard. Mark Paid after bank transfer.",
+                          "Payslips published — employees can view in My HR. Mark Paid after bank transfer.",
                         )
                       }
                       className="inline-flex items-center gap-1.5 rounded-md border border-[var(--success-line)] bg-[var(--success)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"

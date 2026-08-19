@@ -23,6 +23,8 @@ import { ListingImageUpload } from "@/components/listing-image-upload";
 import { AddStakeholderForm } from "@/components/stakeholders/add-stakeholder-form";
 import { createProject, deleteProject, removeProjectStakeholder, updateProject } from "./actions";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { SortTh, useTableSort } from "@/components/sort-th";
+import { sortTableRows } from "@/lib/table-sort";
 
 type ProjectRow = {
   id: string;
@@ -121,6 +123,7 @@ export function ProjectsWorkspace({
   const formRef = useRef<HTMLFormElement | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
   const [tableQuery, setTableQuery] = useState("");
+  const { sortKey, sortDir, onSort } = useTableSort();
 
   useEffect(() => {
     if (!state) return;
@@ -185,16 +188,22 @@ export function ProjectsWorkspace({
 
   const totalUnits = projects.reduce((s, p) => s + p.unitsCount, 0);
   const publishedCount = projects.filter((p) => p.isPublished).length;
-  const visibleProjects = useMemo(
-    () =>
-      filterTableRows(
-        projects,
-        tableQuery,
-        (p) =>
-          `${p.name} ${p.locationCity ?? ""} ${p.locationState ?? ""} ${p.locationCountry ?? ""} ${p.locationAddress ?? ""}`,
-      ),
-    [projects, tableQuery],
-  );
+  const visibleProjects = useMemo(() => {
+    const filtered = filterTableRows(
+      projects,
+      tableQuery,
+      (p) =>
+        `${p.name} ${p.locationCity ?? ""} ${p.locationState ?? ""} ${p.locationCountry ?? ""} ${p.locationAddress ?? ""}`,
+    );
+    return sortTableRows(filtered, sortKey, sortDir, (p, key) => {
+      if (key === "name") return p.name;
+      if (key === "price") return p.basePrice ?? -1;
+      if (key === "units") return p.unitsCount;
+      if (key === "listing") return p.isPublished ? 1 : 0;
+      if (key === "created") return p.createdAt;
+      return "";
+    });
+  }, [projects, tableQuery, sortKey, sortDir]);
 
   function submitCreateProject(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -316,11 +325,11 @@ export function ProjectsWorkspace({
         <table className="rc-table">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Base price</th>
-              <th>Units</th>
-              <th>Listing</th>
-              <th>Created</th>
+              <SortTh label="Project" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={onSort} className="" />
+              <SortTh label="Base price" sortKey="price" activeKey={sortKey} dir={sortDir} onSort={onSort} className="" />
+              <SortTh label="Units" sortKey="units" activeKey={sortKey} dir={sortDir} onSort={onSort} className="" />
+              <SortTh label="Listing" sortKey="listing" activeKey={sortKey} dir={sortDir} onSort={onSort} className="" />
+              <SortTh label="Created" sortKey="created" activeKey={sortKey} dir={sortDir} onSort={onSort} className="" />
               <th className="text-right">Actions</th>
             </tr>
           </thead>

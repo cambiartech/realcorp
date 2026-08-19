@@ -100,6 +100,7 @@ export default async function TenantHomePage({
     "MARKETING",
     "COMMUNITY",
     "OPERATIONS",
+    "FACILITY",
   ];
 
   const roleOptions: DashboardRoleView[] =

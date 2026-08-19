@@ -77,6 +77,7 @@ const DEPT_TASK_LABEL: Record<OrgDepartment, string> = {
   community: "Community task",
   hr: "People (HR) task",
   operations: "Operations task",
+  facility: "Facility task",
 };
 
 function defaultSpaceIdForDepartment(spaces: TaskSpaceRow[], department: OrgDepartment | null | undefined) {

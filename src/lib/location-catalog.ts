@@ -1,9 +1,5 @@
 import prisma from "@/lib/db";
-import {
-  NIGERIA_CITIES_BY_STATE,
-  NIGERIA_STATES,
-  resolveNigeriaStateName,
-} from "@/lib/nigeria-locations";
+import { nigeriaCityOptions, nigeriaStateOptions } from "@/lib/nigeria-locations";
 
 const CSC_DATA_CDN =
   "https://cdn.jsdelivr.net/npm/@countrystatecity/countries@1.0.9/dist/data";
@@ -57,13 +53,11 @@ async function fetchCscJson<T>(path: string): Promise<T> {
 }
 
 function nigeriaStates(): StateRow[] {
-  return NIGERIA_STATES.map((name) => ({ code: name, name, type: "state" }));
+  return nigeriaStateOptions();
 }
 
 function nigeriaCities(stateInput: string): CityRow[] {
-  const state = resolveNigeriaStateName(stateInput);
-  const names = NIGERIA_CITIES_BY_STATE[state] || [];
-  return names.map((name, index) => ({ id: index + 1, name }));
+  return nigeriaCityOptions(stateInput);
 }
 
 const NG_COUNTRY: CountryRow = { code: "NG", name: "Nigeria", emoji: "🇳🇬" };
@@ -103,49 +97,66 @@ export async function listLocationStates(countryCode: string): Promise<StateRow[
   const cached = memoryGet<StateRow[]>(cacheKey);
   if (cached) return cached;
 
-  const rows = await prisma.countryStateRef.findMany({
-    where: { countryCode },
-    orderBy: { name: "asc" },
-    select: { code: true, name: true, type: true },
-  });
-  const items = rows.map((row) => ({
-    code: row.code,
-    name: row.name,
-    type: row.type,
-  }));
-  memorySet(cacheKey, items);
-  return items;
+  try {
+    const rows = await withTimeout(
+      prisma.countryStateRef.findMany({
+        where: { countryCode },
+        orderBy: { name: "asc" },
+        select: { code: true, name: true, type: true },
+      }),
+      DB_WAIT_MS,
+    );
+    const items = rows.map((row) => ({
+      code: row.code,
+      name: row.name,
+      type: row.type,
+    }));
+    memorySet(cacheKey, items);
+    return items;
+  } catch {
+    return [];
+  }
 }
 
 export async function listLocationCities(countryCode: string, stateCode: string): Promise<CityRow[]> {
   if (countryCode === "NG") return nigeriaCities(stateCode);
 
-  const country = await prisma.countryRef.findUnique({
-    where: { code: countryCode },
-    select: { catalogDir: true },
-  });
-  if (!country?.catalogDir) return [];
+  try {
+    const country = await withTimeout(
+      prisma.countryRef.findUnique({
+        where: { code: countryCode },
+        select: { catalogDir: true },
+      }),
+      DB_WAIT_MS,
+    );
+    if (!country?.catalogDir) return [];
 
-  const state = await prisma.countryStateRef.findFirst({
-    where: {
-      countryCode,
-      OR: [
-        { code: { equals: stateCode, mode: "insensitive" } },
-        { name: { equals: stateCode, mode: "insensitive" } },
-      ],
-    },
-    select: { catalogDir: true },
-  });
-  if (!state?.catalogDir) return [];
+    const state = await withTimeout(
+      prisma.countryStateRef.findFirst({
+        where: {
+          countryCode,
+          OR: [
+            { code: { equals: stateCode, mode: "insensitive" } },
+            { name: { equals: stateCode, mode: "insensitive" } },
+          ],
+        },
+        select: { catalogDir: true },
+      }),
+      DB_WAIT_MS,
+    );
+    if (!state?.catalogDir) return [];
 
-  const rows = await fetchCscJson<Array<{ id?: number; name?: string }>>(
-    `${country.catalogDir}/${state.catalogDir}/cities.json`,
-  );
-  return rows
-    .map((row, index) => ({
-      id: typeof row.id === "number" ? row.id : index + 1,
-      name: String(row.name || "").trim(),
-    }))
-    .filter((row) => row.name)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    const rows = await fetchCscJson<Array<{ id?: number; name?: string }>>(
+      `${country.catalogDir}/${state.catalogDir}/cities.json`,
+    );
+    return rows
+      .map((row, index) => ({
+        id: typeof row.id === "number" ? row.id : index + 1,
+        name: String(row.name || "").trim(),
+      }))
+      .filter((row) => row.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
 }

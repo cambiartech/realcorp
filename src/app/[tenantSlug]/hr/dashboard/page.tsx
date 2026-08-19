@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import HrQueuePage from "../hr-queue-page";
 
-/** Employee self-service HR dashboard (payslips, record, forms). */
+/** Employee self-service HR dashboard (leave, payslips, salary bank, record). */
 export default function HrDashboardPage(props: {
   params: Promise<{ tenantSlug: string }>;
   searchParams: Promise<Record<string, string | undefined>>;

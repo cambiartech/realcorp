@@ -12,7 +12,7 @@ export async function ensureDefaultLeaveTypes(tenantId: string, countryCode: str
   const country = countryCode.trim().toUpperCase() || "NG";
   const existing = await prisma.hrLeaveType.findMany({
     where: { tenantId },
-    select: { code: true },
+    select: { id: true, code: true, annualEntitlement: true, minimumServiceMonths: true, paidPercentage: true },
   });
   const codes = new Set(existing.map((item) => item.code));
   const defaults = [
@@ -35,12 +35,12 @@ export async function ensureDefaultLeaveTypes(tenantId: string, countryCode: str
             countryCode: "NG",
             dayUnit: "WORKING_DAYS" as const,
             accrualMethod: "ANNUAL_GRANT" as const,
-            annualEntitlement: 6,
+            annualEntitlement: 22,
             paidPercentage: 100,
-            minimumServiceMonths: 12,
+            minimumServiceMonths: 0,
             carryoverEnabled: true,
             maxCarryoverUnits: 6,
-            statutoryReference: "Nigeria Labour Act, section 18 — statutory floor; company policy may be higher",
+            statutoryReference: "Organization policy (Labour Act s.18 floor is 6 working days after 12 months)",
           },
           {
             code: "SICK-NG",
@@ -59,19 +59,58 @@ export async function ensureDefaultLeaveTypes(tenantId: string, countryCode: str
             countryCode: "NG",
             dayUnit: "CALENDAR_DAYS" as const,
             accrualMethod: "ANNUAL_GRANT" as const,
-            annualEntitlement: 84,
-            paidPercentage: 50,
-            minimumServiceMonths: 6,
-            statutoryReference: "Nigeria Labour Act, section 54 — organization may provide better terms",
+            annualEntitlement: 90,
+            paidPercentage: 100,
+            minimumServiceMonths: 0,
+            statutoryReference: "Organization policy (Labour Act s.54 floor is 12 weeks at 50% pay)",
           },
         ]
       : []),
   ];
   const missing = defaults.filter((item) => !codes.has(item.code));
   if (missing.length) {
-    await prisma.hrLeaveType.createMany({
-      data: missing.map((item) => ({ tenantId, ...item })),
-      skipDuplicates: true,
+    try {
+      await prisma.hrLeaveType.createMany({
+        data: missing.map((item) => ({ tenantId, ...item })),
+        skipDuplicates: true,
+      });
+    } catch {
+      for (const item of missing) {
+        const found = await prisma.hrLeaveType.findFirst({
+          where: { tenantId, code: item.code },
+          select: { id: true },
+        });
+        if (!found) {
+          await prisma.hrLeaveType.create({ data: { tenantId, ...item } });
+        }
+      }
+    }
+  }
+
+  const now = new Date();
+  const annualFloor = existing.find((row) => row.code === "ANNUAL-NG");
+  if (annualFloor && Number(annualFloor.annualEntitlement) === 6 && annualFloor.minimumServiceMonths === 12) {
+    await prisma.hrLeaveType.update({
+      where: { id: annualFloor.id },
+      data: {
+        annualEntitlement: 22,
+        minimumServiceMonths: 0,
+        statutoryReference: "Organization policy (Labour Act s.18 floor is 6 working days after 12 months)",
+        lastReviewedAt: now,
+      },
+    });
+  }
+  const maternityFloor = existing.find((row) => row.code === "MATERNITY-NG");
+  if (maternityFloor && Number(maternityFloor.annualEntitlement) === 84) {
+    await prisma.hrLeaveType.update({
+      where: { id: maternityFloor.id },
+      data: {
+        annualEntitlement: 90,
+        paidPercentage: 100,
+        minimumServiceMonths: 0,
+        statutoryReference: "Organization policy (Labour Act s.54 floor is 12 weeks at 50% pay)",
+        lastReviewedAt: now,
+      },
     });
   }
 }

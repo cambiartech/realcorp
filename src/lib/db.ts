@@ -34,8 +34,14 @@ function createPrisma(pool: Pool) {
 /** Dev hot-reload keeps a global Prisma singleton; refresh if schema/client drift after `prisma generate`. */
 function isStaleDevClient(client: PrismaClient) {
   if (process.env.NODE_ENV === "production") return false;
-  const probe = client as PrismaClient & { financeDocument?: { findMany?: unknown } };
-  return typeof probe.financeDocument?.findMany !== "function";
+  const probe = client as PrismaClient & {
+    financeDocument?: { findMany?: unknown };
+    inventoryItem?: { findMany?: unknown };
+  };
+  return (
+    typeof probe.financeDocument?.findMany !== "function" ||
+    typeof probe.inventoryItem?.findMany !== "function"
+  );
 }
 
 function getPrismaClient() {

@@ -25,6 +25,7 @@ export function HrWorkspace(props: {
   tenantBrand: TenantBranding;
   currency: string;
   activeTab: HrTab;
+  initialMyTab?: string;
   canManageHr: boolean;
   aiEnabled: boolean;
   currentUserId: string;
@@ -224,6 +225,30 @@ export function HrWorkspace(props: {
   myDashboardPreview?: { userId: string; name: string; email: string } | null;
   myView: {
     profile: ProfileDetailRow | null;
+    leaveBalances: Array<{
+      leaveTypeId: string;
+      name: string;
+      dayUnit: string;
+      statutoryReference: string;
+      accrued: number | null;
+      carried: number;
+      adjustment: number;
+      approved: number;
+      pending: number;
+      available: number | null;
+      unlimited: boolean;
+    }>;
+    leaveRequests: Array<{
+      id: string;
+      leaveTypeName: string;
+      dayUnit: string;
+      startDate: string;
+      endDate: string;
+      requestedUnits: number;
+      reason: string;
+      status: string;
+      reviewNote: string;
+    }>;
     payslips: Array<{
       id: string;
       periodLabel: string;
@@ -335,6 +360,7 @@ export function HrWorkspace(props: {
     documentsReturnOnboardUserId,
     myDashboardPreview,
     myView,
+    initialMyTab,
   } = props;
 
   const headings: Record<HrTab, { title: string; subtitle: string }> = {
@@ -359,7 +385,7 @@ export function HrWorkspace(props: {
       title: "Insights",
       subtitle: "Headcount, joiners, appraisal backlog, and employee register export.",
     },
-    my: { title: "My dashboard", subtitle: "Your payslips, HR record, documents, and self-appraisals." },
+    my: { title: "My HR", subtitle: "Review your leave days, payslips, salary bank account, and HR record." },
   };
 
   const heading = headings[activeTab];
@@ -463,7 +489,7 @@ export function HrWorkspace(props: {
 
         {activeTab === "appraisals" && !canManageHr ? (
           <p className="text-sm text-muted">
-            Appraisals are completed from My dashboard when HR opens a review period.
+            Appraisals are completed from My HR when HR opens a review period.
           </p>
         ) : null}
 
@@ -493,6 +519,7 @@ export function HrWorkspace(props: {
 
         {activeTab === "my" ? (
           <HrMyDashboard
+            key={`${previewAs?.userId ?? "self"}:${initialMyTab ?? "overview"}`}
             tenantSlug={tenantSlug}
             companyName={companyName}
             tenantBrand={tenantBrand}
@@ -501,6 +528,7 @@ export function HrWorkspace(props: {
             myYtd={myYtd}
             myView={myView}
             previewAs={myDashboardPreview}
+            initialTab={initialMyTab}
           />
         ) : null}
       </section>

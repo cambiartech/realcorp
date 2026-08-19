@@ -62,9 +62,8 @@ import {
 import {
   buildBalanceExportLines,
   downloadFinanceReportPackXlsx,
-  downloadFinanceReportXlsx,
-  type ReportExportKind,
 } from "@/lib/finance-report-xlsx";
+import { downloadFinanceReportPdf } from "@/lib/finance-report-pdf";
 import { vendorNamesMatch } from "@/lib/finance-vendor";
 import {
   expenseCategoryNamesMatch,
@@ -263,6 +262,37 @@ const REPORT_TABS: { id: ReportKind; label: string }[] = [
   { id: "balance", label: "Balance sheet" },
   { id: "deposits", label: "Client deposits" },
 ];
+
+function ReportScopeExportButtons({
+  exporting,
+  onExcel,
+  onPdf,
+}: {
+  exporting: "excel" | "pdf" | null;
+  onExcel: () => void;
+  onPdf: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        disabled={exporting !== null}
+        onClick={onExcel}
+        className="rounded-md border border-foreground bg-foreground px-3.5 py-2 text-xs font-semibold text-background hover:opacity-90 disabled:opacity-60"
+      >
+        {exporting === "excel" ? "Preparing Excel…" : "Export Excel"}
+      </button>
+      <button
+        type="button"
+        disabled={exporting !== null}
+        onClick={onPdf}
+        className="rounded-md border border-foreground/20 px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-60"
+      >
+        {exporting === "pdf" ? "Preparing PDF…" : "Export PDF"}
+      </button>
+    </div>
+  );
+}
 type ReportDrilldownKind = "invoices" | "payments" | "expenses";
 type ReportCompareMode = "previous_period" | "same_period_last_year";
 
@@ -682,6 +712,9 @@ export function FinanceWorkspace({
   const [reportMonthWindow, setReportMonthWindow] =
     useState<ReportMonthWindow>(6);
   const [reportKind, setReportKind] = useState<ReportKind>("overview");
+  const [reportExporting, setReportExporting] = useState<"excel" | "pdf" | null>(
+    null,
+  );
   const [reportCompareMode, setReportCompareMode] =
     useState<ReportCompareMode>("previous_period");
   const [reportProjectFilter, setReportProjectFilter] = useState<string>("all");
@@ -1877,37 +1910,6 @@ export function FinanceWorkspace({
     };
   }
 
-  async function exportReportExcel(kind: ReportExportKind) {
-    const meta = reportExportMeta();
-    const payload = financeExportPayload();
-    try {
-      if (kind === "pnl") {
-        await downloadFinanceReportXlsx("pnl", meta, {
-          ...payload,
-          pnl: visiblePnlBreakdown,
-        });
-      } else if (kind === "cashflow") {
-        await downloadFinanceReportXlsx("cashflow", meta, {
-          ...payload,
-          cashflow: visibleCashflowBreakdown,
-          pnl: visiblePnlBreakdown,
-        });
-      } else if (kind === "expenses") {
-        await downloadFinanceReportXlsx("expenses", meta, {
-          ...payload,
-          expenses: visibleExpenseBreakdown,
-          pnl: visiblePnlBreakdown,
-        });
-      } else {
-        await downloadFinanceReportXlsx("balance", meta, {
-          balance: buildBalanceExportLines(balanceSheetSections),
-        });
-      }
-    } catch {
-      showSnackbar("Could not generate Excel export. Try again.", "error");
-    }
-  }
-
   function financeExportPayload() {
     const totals = visiblePnlBreakdown.reduce(
       (acc, r) => ({
@@ -1965,7 +1967,33 @@ export function FinanceWorkspace({
         ...financeExportPayload(),
       });
     } catch {
-      showSnackbar("Could not generate report pack. Try again.", "error");
+      showSnackbar("Could not generate Excel export. Try again.", "error");
+    }
+  }
+
+  async function exportScopedStatement(format: "excel" | "pdf") {
+    setReportExporting(format);
+    try {
+      if (format === "excel") {
+        await exportReportPack();
+      } else {
+        await downloadFinanceReportPdf(reportExportMeta(), {
+          pnl: visiblePnlBreakdown,
+          cashflow: visibleCashflowBreakdown,
+          expenses: visibleExpenseBreakdown,
+          balance: buildBalanceExportLines(balanceSheetSections),
+          ...financeExportPayload(),
+        });
+      }
+    } catch {
+      showSnackbar(
+        format === "pdf"
+          ? "Could not generate PDF. Try again."
+          : "Could not generate Excel export. Try again.",
+        "error",
+      );
+    } finally {
+      setReportExporting(null);
     }
   }
 
@@ -2072,16 +2100,22 @@ export function FinanceWorkspace({
     allocationOptions.find((project) => project.id === reportProjectFilter) ??
     null;
   const reportScopeLabel = (() => {
+    const parts: string[] = [];
     if (reportUnitFilter !== "all") {
       const unitLabel =
         reportUnitOptions.find((unit) => unit.id === reportUnitFilter)?.label ||
         "Selected unit";
-      return selectedReportProject
-        ? `${selectedReportProject.label} · ${unitLabel}`
-        : unitLabel;
+      if (selectedReportProject) parts.push(selectedReportProject.label);
+      parts.push(unitLabel);
+    } else if (selectedReportProject) {
+      parts.push(selectedReportProject.label);
+    } else {
+      parts.push("All projects");
     }
-    if (selectedReportProject) return selectedReportProject.label;
-    return "All projects";
+    if (reportDepartmentFilter !== "all") {
+      parts.push(reportDepartmentFilter);
+    }
+    return parts.join(" · ");
   })();
   const reportDepartmentOptions = useMemo(
     () =>
@@ -4380,13 +4414,11 @@ export function FinanceWorkspace({
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void exportReportPack()}
-                      className="rounded-md border border-foreground bg-foreground px-3.5 py-2 text-xs font-semibold text-background hover:opacity-90"
-                    >
-                      Export report pack
-                    </button>
+                    <ReportScopeExportButtons
+                      exporting={reportExporting}
+                      onExcel={() => void exportScopedStatement("excel")}
+                      onPdf={() => void exportScopedStatement("pdf")}
+                    />
                   </div>
                   <div className="mt-4 grid gap-3 border-t border-foreground/10 pt-4 sm:grid-cols-2">
                     <label className="space-y-1">
@@ -4555,16 +4587,25 @@ export function FinanceWorkspace({
                 </div>
 
                 <div className="rounded-xl border border-foreground/10 bg-background px-4 py-3">
-                  <p className="text-sm font-semibold text-foreground">
-                    Statement for {reportScopeLabel}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {reportUnitFilter !== "all"
-                      ? "Only invoices, collections, and expenses tagged to this apartment / unit."
-                      : reportProjectFilter !== "all"
-                        ? "Every apartment in this project is listed below. Click a row to open that unit’s statement."
-                        : "Company-wide figures. Choose a project or apartment above to pull that report."}
-                  </p>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Statement for {reportScopeLabel}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {reportUnitFilter !== "all"
+                          ? "Only invoices, collections, and expenses tagged to this apartment / unit."
+                          : reportProjectFilter !== "all"
+                            ? "Every apartment in this project is listed below. Click a row to open that unit’s statement."
+                            : "Company-wide figures. Choose a project or apartment above to pull that report."}
+                      </p>
+                    </div>
+                    <ReportScopeExportButtons
+                      exporting={reportExporting}
+                      onExcel={() => void exportScopedStatement("excel")}
+                      onPdf={() => void exportScopedStatement("pdf")}
+                    />
+                  </div>
                   {reportUnitFilter !== "all" &&
                   (projectWideOutsideUnit.expenses > 0 ||
                     projectWideOutsideUnit.collected > 0 ||
@@ -4880,13 +4921,11 @@ export function FinanceWorkspace({
                       <p className="text-sm font-semibold text-foreground">
                         Balance sheet
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => void exportReportExcel("balance")}
-                        className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
-                      >
-                        Export Excel
-                      </button>
+                      <ReportScopeExportButtons
+                        exporting={reportExporting}
+                        onExcel={() => void exportScopedStatement("excel")}
+                        onPdf={() => void exportScopedStatement("pdf")}
+                      />
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-3">
@@ -4990,13 +5029,11 @@ export function FinanceWorkspace({
                       <p className="text-sm font-semibold text-foreground">
                         Profit & loss by month (last {reportMonthWindow} months)
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => void exportReportExcel("pnl")}
-                        className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
-                      >
-                        Export Excel
-                      </button>
+                      <ReportScopeExportButtons
+                        exporting={reportExporting}
+                        onExcel={() => void exportScopedStatement("excel")}
+                        onPdf={() => void exportScopedStatement("pdf")}
+                      />
                     </div>
                     <div className="overflow-hidden rounded-lg border border-foreground/10">
                       <table className="w-full text-left text-sm">
@@ -5223,16 +5260,23 @@ export function FinanceWorkspace({
 
                 {reportKind === "deposits" ? (
                   <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-                    <div className="mb-3">
-                      <p className="text-sm font-semibold text-foreground">
-                        Client Deposit
-                      </p>
-                      <p className="text-xs text-muted">
-                        Sale amount, amount paid, and what is still outstanding for
-                        each client. Record part payments from the client profile.
-                        Promos and waived balances use the agreed sale price, not the
-                        brochure unit price.
-                      </p>
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          Client Deposit
+                        </p>
+                        <p className="text-xs text-muted">
+                          Sale amount, amount paid, and what is still outstanding for
+                          each client. Record part payments from the client profile.
+                          Promos and waived balances use the agreed sale price, not the
+                          brochure unit price.
+                        </p>
+                      </div>
+                      <ReportScopeExportButtons
+                        exporting={reportExporting}
+                        onExcel={() => void exportScopedStatement("excel")}
+                        onPdf={() => void exportScopedStatement("pdf")}
+                      />
                     </div>
                     {reportKind === "deposits" && filteredClientBalances.length > 0 ? (
                       <div className="mb-4 grid gap-3 sm:grid-cols-3">
@@ -5333,13 +5377,11 @@ export function FinanceWorkspace({
                         <p className="text-sm font-semibold text-foreground">
                           Cash flow by month
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => void exportReportExcel("cashflow")}
-                          className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
-                        >
-                          Export Excel
-                        </button>
+                        <ReportScopeExportButtons
+                          exporting={reportExporting}
+                          onExcel={() => void exportScopedStatement("excel")}
+                          onPdf={() => void exportScopedStatement("pdf")}
+                        />
                       </div>
                       <div className="overflow-hidden rounded-lg border border-foreground/10">
                         <table className="w-full text-left text-sm">
@@ -5396,13 +5438,11 @@ export function FinanceWorkspace({
                       <p className="text-sm font-semibold text-foreground">
                         Expense by category
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => void exportReportExcel("expenses")}
-                        className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
-                      >
-                        Export Excel
-                      </button>
+                      <ReportScopeExportButtons
+                        exporting={reportExporting}
+                        onExcel={() => void exportScopedStatement("excel")}
+                        onPdf={() => void exportScopedStatement("pdf")}
+                      />
                     </div>
                     <div className="overflow-hidden rounded-lg border border-foreground/10">
                       <table className="w-full text-left text-sm">

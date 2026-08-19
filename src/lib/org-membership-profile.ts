@@ -1,7 +1,14 @@
 import { MembershipRole } from "@/generated/prisma";
 
 /** Core org departments — invite UI and visibility are built on these. */
-export type OrgDepartment = "sales" | "finance" | "marketing" | "community" | "hr" | "operations";
+export type OrgDepartment =
+  | "sales"
+  | "finance"
+  | "marketing"
+  | "community"
+  | "hr"
+  | "operations"
+  | "facility";
 
 export const ORG_DEPARTMENT_OPTIONS: { value: OrgDepartment; label: string }[] = [
   { value: "sales", label: "Sales" },
@@ -10,6 +17,7 @@ export const ORG_DEPARTMENT_OPTIONS: { value: OrgDepartment; label: string }[] =
   { value: "community", label: "Community" },
   { value: "hr", label: "People (HR)" },
   { value: "operations", label: "Operations / Short lets" },
+  { value: "facility", label: "Facility" },
 ];
 
 export type DashboardRoleView =
@@ -20,7 +28,8 @@ export type DashboardRoleView =
   | "HR"
   | "MARKETING"
   | "COMMUNITY"
-  | "OPERATIONS";
+  | "OPERATIONS"
+  | "FACILITY";
 
 export type MembershipProfileInput =
   | { kind: "org_admin" }
@@ -48,6 +57,8 @@ export function resolveMembershipRole(input: MembershipProfileInput): Membership
       return MembershipRole.HR_MANAGER;
     case "operations":
       return isDepartmentLead ? MembershipRole.HOUSEKEEPING_MANAGER : MembershipRole.FNB_STAFF;
+    case "facility":
+      return isDepartmentLead ? MembershipRole.FACILITY_MANAGER : MembershipRole.FACILITY_STAFF;
     default:
       return MembershipRole.SALES_EXECUTIVE;
   }
@@ -76,6 +87,10 @@ export function profileFromMembershipRole(role: MembershipRole): {
       return { department: "operations", isDepartmentLead: true };
     case MembershipRole.FNB_STAFF:
       return { department: "operations", isDepartmentLead: false };
+    case MembershipRole.FACILITY_MANAGER:
+      return { department: "facility", isDepartmentLead: true };
+    case MembershipRole.FACILITY_STAFF:
+      return { department: "facility", isDepartmentLead: false };
     default:
       return { department: null, isDepartmentLead: false };
   }
@@ -85,6 +100,8 @@ export function membershipRoleLabel(role: MembershipRole, department?: string | 
   if (role === MembershipRole.ORG_ADMIN) return "Organization admin";
   if (role === MembershipRole.INVESTOR) return "Investor (portal)";
   if (role === MembershipRole.LISTING_OWNER) return "Listing owner (portal)";
+  if (role === MembershipRole.FACILITY_MANAGER) return "Facility Manager";
+  if (role === MembershipRole.FACILITY_STAFF) return "Facility staff";
 
   const dept = (department as OrgDepartment | null) ?? profileFromMembershipRole(role).department;
   const lead = isDepartmentLead ?? profileFromMembershipRole(role).isDepartmentLead;
@@ -105,6 +122,7 @@ export function normalizeLegacyDashboardRoleView(value?: string | null): Dashboa
     "MARKETING",
     "COMMUNITY",
     "OPERATIONS",
+    "FACILITY",
   ];
   return all.includes(value as DashboardRoleView) ? (value as DashboardRoleView) : null;
 }
@@ -128,6 +146,13 @@ export function dashboardRoleViewForMembership(
     role === MembershipRole.FNB_STAFF
   ) {
     return "OPERATIONS";
+  }
+  if (
+    dept === "facility" ||
+    role === MembershipRole.FACILITY_MANAGER ||
+    role === MembershipRole.FACILITY_STAFF
+  ) {
+    return "FACILITY";
   }
   if (dept === "sales" || role === MembershipRole.SALES_MANAGER || role === MembershipRole.SALES_EXECUTIVE) {
     return lead || role === MembershipRole.SALES_MANAGER ? "SALES_MANAGER" : "SALES";
@@ -162,4 +187,5 @@ export const DASHBOARD_ROLE_VIEW_LABELS: Record<DashboardRoleView, string> = {
   MARKETING: "Marketing",
   COMMUNITY: "Community",
   OPERATIONS: "Operations",
+  FACILITY: "Facility",
 };

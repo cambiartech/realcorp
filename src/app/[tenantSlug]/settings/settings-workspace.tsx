@@ -12,6 +12,7 @@ import {
   type ExtraModuleGrantToken,
 } from "@/lib/role-module-grants-form";
 import { TENANT_MODULE_DEFINITIONS, TENANT_MODULE_GROUPS } from "@/lib/tenant-module-definitions";
+import { membershipRoleLabel } from "@/lib/org-membership-profile";
 import { formatEnumLabel } from "@/lib/ui-format";
 import {
   getOrgLogoUploadSignature,
@@ -62,6 +63,7 @@ type SettingsWorkspaceProps = {
     moduleWhatsApp: boolean;
     moduleListings: boolean;
     moduleInvestorPortal: boolean;
+    moduleFacility: boolean;
   };
   roleModuleGrantsJson: string;
   orgDepartments: string[];
@@ -1033,6 +1035,7 @@ const EXTRA_COLUMN_META: Record<ExtraModuleGrantToken, { title: string; subtitle
   MARKETING: { title: "Marketing", subtitle: "Campaigns & insights" },
   COMMUNITY: { title: "Community", subtitle: "Community workspace" },
   FINANCE: { title: "Finance", subtitle: "Queue & invoices" },
+  FACILITY: { title: "Facility", subtitle: "Stores, plant, damages" },
 };
 
 const ROLE_GRANT_ROW_HINT: Partial<Record<MembershipRole, string>> = {
@@ -1043,6 +1046,8 @@ const ROLE_GRANT_ROW_HINT: Partial<Record<MembershipRole, string>> = {
   [MembershipRole.MARKETING_MANAGER]:
     "Default: projects, leads, Marketing, Settings. Tick Sales to add Deals (full CRM strip).",
   [MembershipRole.COMMUNITY_MANAGER]: "Default: Community, Settings.",
+  [MembershipRole.FACILITY_MANAGER]: "Default: Facility, Projects, Tasks, Settings.",
+  [MembershipRole.FACILITY_STAFF]: "Default: Facility, Tasks, Settings.",
 };
 
 function orgModuleAllowsGrant(
@@ -1051,12 +1056,14 @@ function orgModuleAllowsGrant(
     moduleMarketing: boolean;
     moduleCommunity: boolean;
     moduleFinance: boolean;
+    moduleFacility: boolean;
   },
   token: ExtraModuleGrantToken,
 ): boolean {
   if (token === "SALES") return modules.moduleSales;
   if (token === "MARKETING") return modules.moduleMarketing;
   if (token === "COMMUNITY") return modules.moduleCommunity;
+  if (token === "FACILITY") return modules.moduleFacility;
   return modules.moduleFinance;
 }
 
@@ -1069,6 +1076,7 @@ function RoleExtraAccessMatrix({
     moduleMarketing: boolean;
     moduleCommunity: boolean;
     moduleFinance: boolean;
+    moduleFacility: boolean;
   };
   initialGrants: Partial<Record<MembershipRole, ExtraModuleGrantToken[]>>;
 }) {
@@ -1076,8 +1084,8 @@ function RoleExtraAccessMatrix({
     <div className="mt-3 overflow-x-auto rounded-lg border border-foreground/10">
       <table className="w-full min-w-[780px] text-left text-sm">
         <caption className="sr-only">
-          Optional sidebar access: Sales, Marketing, Community, and Finance can be granted per role when org
-          modules are on.
+          Optional sidebar access: Sales, Marketing, Community, Finance, and Facility can be granted per role
+          when org modules are on.
         </caption>
         <thead>
           <tr className="border-b border-foreground/10 bg-foreground/[0.03] text-xs uppercase tracking-wide">
@@ -1109,7 +1117,7 @@ function RoleExtraAccessMatrix({
           {MEMBERSHIP_ROLES_FOR_GRANT_MATRIX.map((role) => (
             <tr key={role} className="border-b border-foreground/10 last:border-b-0">
               <td className="align-top px-3 py-3">
-                <p className="font-medium text-foreground">{formatEnumLabel(role)}</p>
+                <p className="font-medium text-foreground">{membershipRoleLabel(role)}</p>
                 {ROLE_GRANT_ROW_HINT[role] ? (
                   <p className="mt-1 max-w-[14rem] text-[11px] leading-snug text-muted">
                     {ROLE_GRANT_ROW_HINT[role]}
@@ -1129,7 +1137,7 @@ function RoleExtraAccessMatrix({
                       className="h-4 w-4 accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
                       title={
                         enabled
-                          ? `Allow ${formatEnumLabel(role)} to open ${EXTRA_COLUMN_META[token].title}`
+                          ? `Allow ${membershipRoleLabel(role)} to open ${EXTRA_COLUMN_META[token].title}`
                           : `Turn on ${EXTRA_COLUMN_META[token].title} for the organization first`
                       }
                     />

@@ -12,6 +12,7 @@ export default async function HrMyRedirectPage({
   const sp = await searchParams;
   const q = new URLSearchParams();
   if (sp.employeeUserId?.trim()) q.set("employeeUserId", sp.employeeUserId.trim());
+  if (sp.view?.trim()) q.set("view", sp.view.trim());
   const suffix = q.size > 0 ? `?${q.toString()}` : "";
   redirect(`/${tenantSlug}/hr/dashboard${suffix}`);
 }

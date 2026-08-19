@@ -23,7 +23,7 @@ export default async function ClientsPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ tab?: string; clientsPage?: string; projectId?: string }>;
+  searchParams: Promise<{ tab?: string; clientsPage?: string; projectId?: string; status?: string }>;
 }) {
   const { tenantSlug } = await params;
   const query = await searchParams;
@@ -31,6 +31,13 @@ export default async function ClientsPage({
   const projectIdRaw = String(query.projectId || "").trim();
   const unlinkedOnly = projectIdRaw === "none";
   const projectId = unlinkedOnly ? "" : projectIdRaw;
+  const statusRaw = String(query.status || "").trim().toUpperCase();
+  const statusFilter =
+    statusRaw === PropertyClientStatus.PROSPECT ||
+    statusRaw === PropertyClientStatus.ACTIVE ||
+    statusRaw === PropertyClientStatus.FORMER
+      ? statusRaw
+      : "";
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -68,6 +75,7 @@ export default async function ClientsPage({
     tenantId: tenant.id,
     ...(unlinkedOnly ? { unitLinks: { none: {} } } : {}),
     ...(projectId ? { unitLinks: { some: { unit: { projectId } } } } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
   };
   const unitLinkWhere = {
     tenantId: tenant.id,
@@ -171,6 +179,7 @@ export default async function ClientsPage({
       projectOptions={projects}
       selectedProjectId={projectIdRaw}
       selectedProjectName={selectedProjectName}
+      selectedStatus={statusFilter}
       clientStats={{ active: activeClients, totalUnits: totalUnitLinks }}
       namedUnlinkedUnitsCount={countImportableUnlinkedUnits(
         unlinkedUnits.map((unit) => ({ label: unit.label, projectName: unit.project.name })),

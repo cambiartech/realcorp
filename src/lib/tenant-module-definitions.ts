@@ -12,7 +12,8 @@ export type TenantModuleField =
   | "moduleClients"
   | "moduleWhatsApp"
   | "moduleListings"
-  | "moduleInvestorPortal";
+  | "moduleInvestorPortal"
+  | "moduleFacility";
 
 export type TenantModuleFlags = Record<TenantModuleField, boolean>;
 
@@ -123,6 +124,15 @@ export const TENANT_MODULE_DEFINITIONS: TenantModuleDefinition[] = [
       "Reports",
       "PMS settings",
     ],
+    group: "real-estate",
+    defaultOn: false,
+    platformOnly: true,
+  },
+  {
+    key: "moduleFacility",
+    label: "Facility",
+    description: "Site stores, material usage, plant service dates, and damages",
+    subpages: ["Overview", "Catalog", "Stock", "Usage", "Plant", "Damages"],
     group: "real-estate",
     defaultOn: false,
     platformOnly: true,

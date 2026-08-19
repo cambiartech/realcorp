@@ -35,6 +35,8 @@ import {
   type TeamInviteResult,
 } from "./actions";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { SortTh, useTableSort } from "@/components/sort-th";
+import { sortTableRows } from "@/lib/table-sort";
 
 const initial: TeamInviteResult | null = null;
 
@@ -190,15 +192,21 @@ function MembersTable({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [moduleAccessMember, setModuleAccessMember] = useState<TeamMemberRow | null>(null);
   const [tableQuery, setTableQuery] = useState("");
-  const visibleMembers = useMemo(
-    () =>
-      filterTableRows(
-        members,
-        tableQuery,
-        (member) => `${member.name} ${member.email} ${member.role} ${member.status}`,
-      ),
-    [members, tableQuery],
-  );
+  const { sortKey, sortDir, onSort } = useTableSort();
+  const visibleMembers = useMemo(() => {
+    const filtered = filterTableRows(
+      members,
+      tableQuery,
+      (member) => `${member.name} ${member.email} ${member.role} ${member.status}`,
+    );
+    return sortTableRows(filtered, sortKey, sortDir, (member, key) => {
+      if (key === "name") return member.name;
+      if (key === "email") return member.email;
+      if (key === "role") return member.role;
+      if (key === "status") return member.status;
+      return "";
+    });
+  }, [members, tableQuery, sortKey, sortDir]);
 
   async function handleRoleChange(memberId: string, previousRole: MembershipRole, nextRole: string) {
     if (nextRole === previousRole) return;
@@ -250,11 +258,11 @@ function MembersTable({
       <table className="w-full text-left text-sm">
         <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
           <tr>
-            <th className="px-4 py-3">Name</th>
-            <th className="px-4 py-3">Email</th>
-            <th className="min-w-[200px] px-4 py-3">Job role</th>
+            <SortTh label="Name" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+            <SortTh label="Email" sortKey="email" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+            <SortTh label="Job role" sortKey="role" activeKey={sortKey} dir={sortDir} onSort={onSort} className="min-w-[200px] px-4 py-3" />
             {canManageRoles ? <th className="min-w-[140px] px-4 py-3">Module access</th> : null}
-            <th className="px-4 py-3">Status</th>
+            <SortTh label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={onSort} />
             {canManageRoles ? <th className="px-4 py-3">Actions</th> : null}
           </tr>
         </thead>

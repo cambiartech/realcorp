@@ -28,6 +28,8 @@ import { buildPageUrl, type Pagination, type SearchParamValue } from "@/lib/pagi
 import { createDeal, moveDealStage, moveDealStageDirect } from "./actions";
 import { getEntityTimelineLogs } from "../finance/actions";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { SortTh, useTableSort } from "@/components/sort-th";
+import { sortTableRows } from "@/lib/table-sort";
 
 type DealCard = {
   id: string;
@@ -167,16 +169,24 @@ export function DealsWorkspace({
     }
   }, [moveState, showSnackbar]);
 
-  const visibleBoardDeals = useMemo(
-    () =>
-      filterTableRows(
-        boardDeals,
-        tableQuery,
-        (deal) =>
-          `${deal.leadName} ${deal.unitLabel} ${deal.projectName} ${deal.owner} ${deal.value} ${STAGE_LABEL[deal.stage]}`,
-      ),
-    [boardDeals, tableQuery],
-  );
+  const { sortKey, sortDir, onSort } = useTableSort();
+  const visibleBoardDeals = useMemo(() => {
+    const filtered = filterTableRows(
+      boardDeals,
+      tableQuery,
+      (deal) =>
+        `${deal.leadName} ${deal.unitLabel} ${deal.projectName} ${deal.owner} ${deal.value} ${STAGE_LABEL[deal.stage]}`,
+    );
+    return sortTableRows(filtered, sortKey, sortDir, (deal, key) => {
+      if (key === "lead") return deal.leadName;
+      if (key === "stage") return STAGE_LABEL[deal.stage];
+      if (key === "value") return Number(String(deal.value).replace(/[^\d.]/g, "")) || 0;
+      if (key === "unit") return `${deal.projectName} ${deal.unitLabel}`;
+      if (key === "owner") return deal.owner;
+      if (key === "created") return deal.createdAt;
+      return "";
+    });
+  }, [boardDeals, tableQuery, sortKey, sortDir]);
 
   const grouped = useMemo(() => {
     const out = new Map<DealStage, DealCard[]>();
@@ -417,12 +427,12 @@ export function DealsWorkspace({
           <table className="w-full text-left text-sm">
             <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-4 py-3">Lead</th>
-                <th className="px-4 py-3">Stage</th>
-                <th className="px-4 py-3">Value</th>
-                <th className="px-4 py-3">Unit / Project</th>
-                <th className="px-4 py-3">Owner</th>
-                <th className="px-4 py-3">Created</th>
+                <SortTh label="Lead" sortKey="lead" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Stage" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Value" sortKey="value" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Unit / Project" sortKey="unit" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Owner" sortKey="owner" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Created" sortKey="created" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>

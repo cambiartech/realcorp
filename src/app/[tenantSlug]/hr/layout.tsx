@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { canViewHrModule } from "@/lib/hr-access";
+import { redirectToLogin } from "@/lib/login-redirect";
 import { normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import { loadTenantRequest } from "@/lib/tenant-request";
 
@@ -13,7 +14,7 @@ export default async function HrLayout({
   const { tenantSlug } = await params;
   const { session, tenant, membership } = await loadTenantRequest(tenantSlug);
   if (!session?.user?.id) {
-    redirect(`/login?callbackUrl=/${tenantSlug}/hr/dashboard`);
+    await redirectToLogin(`/${tenantSlug}/hr`);
   }
   if (!tenant) {
     redirect(`/${tenantSlug}`);

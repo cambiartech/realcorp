@@ -183,7 +183,7 @@ export async function inviteTenantMember(
 const batchInviteRowSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   accessKind: z.literal("department"),
-  department: z.enum(["sales", "finance", "marketing", "community", "hr", "operations"]),
+  department: z.enum(["sales", "finance", "marketing", "community", "hr", "operations", "facility"]),
   isDepartmentLead: z.boolean().default(false),
 });
 const batchInviteSchema = z.array(z.unknown()).min(1).max(100);

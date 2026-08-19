@@ -3,6 +3,7 @@ import { MembershipRole } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import { mergeOrgDepartments } from "@/lib/org-departments";
+import { membershipRoleLabel } from "@/lib/org-membership-profile";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { SettingsWorkspace } from "./settings-workspace";
@@ -42,6 +43,7 @@ const settingsSelect = {
   moduleRealtorPortal: true,
   moduleShortLets: true,
   moduleHr: true,
+  moduleFacility: true,
   moduleTasks: true,
   moduleClients: true,
   roleModuleGrants: true,
@@ -118,7 +120,7 @@ export default async function TenantSettingsPage({
 
   const roleLabel = session.user.isPlatformAdmin
     ? "Platform Admin"
-    : formatEnumLabel(membership?.role ?? "SALES_EXECUTIVE");
+    : membershipRoleLabel(membership?.role ?? MembershipRole.SALES_EXECUTIVE);
 
   const canManageOrg = Boolean(session.user.isPlatformAdmin) || membership?.role === MembershipRole.ORG_ADMIN;
 
@@ -145,6 +147,7 @@ export default async function TenantSettingsPage({
     moduleWhatsApp: tenant.settings?.moduleWhatsApp !== false,
     moduleListings: tenant.settings?.moduleListings !== false,
     moduleInvestorPortal: tenant.settings?.moduleInvestorPortal ?? false,
+    moduleFacility: tenant.settings?.moduleFacility ?? false,
   };
 
   const roleModuleGrantsJson = JSON.stringify(

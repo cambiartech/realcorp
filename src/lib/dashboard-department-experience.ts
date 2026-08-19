@@ -6,7 +6,8 @@ export type DepartmentOverviewKind =
   | "finance_queue"
   | "marketing_pipeline"
   | "community_engagement"
-  | "operations_floor";
+  | "operations_floor"
+  | "facility_stores";
 
 export type DashboardQuickAction =
   | { type: "link"; label: string; href: string }
@@ -19,6 +20,7 @@ const OVERVIEW_LABELS: Record<DepartmentOverviewKind, string> = {
   marketing_pipeline: "campaigns & leads",
   community_engagement: "community pulse",
   operations_floor: "operations snapshot",
+  facility_stores: "facility stores",
 };
 
 export function departmentOverviewKind(
@@ -39,6 +41,8 @@ export function departmentOverviewKind(
       return "community_engagement";
     case "OPERATIONS":
       return "operations_floor";
+    case "FACILITY":
+      return "facility_stores";
     default:
       return null;
   }
@@ -90,6 +94,13 @@ export function departmentQuickActions(
         { type: "link", label: "Tasks board", href: `${base}/tasks` },
         { type: "link", label: "Short lets", href: `${base}/shortlets` },
         { type: "link", label: "Projects", href: `${base}/projects` },
+        { type: "button", label: "Dashboard filters", action: "filters" },
+      ];
+    case "FACILITY":
+      return [
+        { type: "link", label: "Facility", href: `${base}/facility` },
+        { type: "link", label: "Projects", href: `${base}/projects` },
+        { type: "link", label: "Tasks board", href: `${base}/tasks` },
         { type: "button", label: "Dashboard filters", action: "filters" },
       ];
     case "SALES":

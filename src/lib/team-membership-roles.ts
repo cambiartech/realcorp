@@ -26,6 +26,8 @@ export const TEAM_MEMBERSHIP_ROLE_OPTIONS: { value: MembershipRole; label: strin
   { value: MembershipRole.COMMUNITY_MANAGER, label: "Community · Lead" },
   { value: MembershipRole.HOUSEKEEPING_MANAGER, label: "Operations · Lead" },
   { value: MembershipRole.FNB_STAFF, label: "Operations" },
+  { value: MembershipRole.FACILITY_MANAGER, label: "Facility Manager" },
+  { value: MembershipRole.FACILITY_STAFF, label: "Facility staff" },
   { value: MembershipRole.INVESTOR, label: "Investor (portal only)" },
   { value: MembershipRole.LISTING_OWNER, label: "Listing owner (portal only)" },
 ];

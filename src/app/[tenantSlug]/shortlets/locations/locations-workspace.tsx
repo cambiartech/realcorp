@@ -216,6 +216,7 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
               />
             </label>
             <GlobalLocationFields
+              key={editId || "new"}
               defaultCountry={form.country}
               defaultState={form.state}
               defaultCity={form.city}

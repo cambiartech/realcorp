@@ -6,17 +6,26 @@ import {
 } from "@/lib/location-catalog";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function code(value: string | null) {
   return (value || "").trim().toUpperCase();
 }
 
-const CACHE = {
-  "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+/**
+ * Never let a CDN / Next static cache reuse one `/api/locations` response for
+ * another query. A cached countries payload on `?type=states` is what locked
+ * the state/city dropdowns (country loaded, states rejected).
+ */
+const NO_STORE = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "Netlify-CDN-Cache-Control": "no-store",
+  Vary: "Accept, Accept-Encoding",
 };
 
 function payload(type: "countries" | "states" | "cities", items: unknown[]) {
-  return NextResponse.json({ type, items }, { headers: CACHE });
+  return NextResponse.json({ type, items }, { headers: NO_STORE });
 }
 
 export async function GET(request: NextRequest) {
@@ -34,12 +43,15 @@ export async function GET(request: NextRequest) {
     if (type === "cities" && /^[A-Z]{2}$/.test(country) && state) {
       return payload("cities", await listLocationCities(country, state));
     }
-    return NextResponse.json({ error: "Invalid location query." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid location query." },
+      { status: 400, headers: NO_STORE },
+    );
   } catch (error) {
     console.error("Location catalog failed", error);
     return NextResponse.json(
       { error: "Location data is temporarily unavailable." },
-      { status: 503 },
+      { status: 503, headers: NO_STORE },
     );
   }
 }

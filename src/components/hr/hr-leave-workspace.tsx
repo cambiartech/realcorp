@@ -9,13 +9,14 @@ import {
   requestLeave,
   reviewLeaveRequest,
   saveLeaveHoliday,
+  updateLeaveType,
 } from "@/app/[tenantSlug]/hr/leave-actions";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
-import { CalendarDays, Check, Clock3, Plus, Settings2, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, Clock3, Pencil, Plus, Settings2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -61,6 +62,11 @@ type LeavePolicyRow = {
   annualEntitlement: number;
   paidPercentage: number;
   minimumServiceMonths: number;
+  carryoverEnabled: boolean;
+  maxCarryoverUnits: number;
+  allowNegativeBalance: boolean;
+  unlimited: boolean;
+  requiresDocumentAfterUnits: string;
   statutoryReference: string;
 };
 
@@ -115,6 +121,7 @@ export function HrLeaveWorkspace({
   const [tab, setTab] = useState<"team" | "mine" | "policies">(canManage ? "team" : "mine");
   const [showRequest, setShowRequest] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
+  const [editingPolicy, setEditingPolicy] = useState<LeavePolicyRow | null>(null);
   const [showHoliday, setShowHoliday] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<LeaveRequestRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<{ profileId?: string; typeId?: string } | null>(null);
@@ -182,7 +189,7 @@ export function HrLeaveWorkspace({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">People operations</p>
           <h1 className="mt-1 text-2xl font-bold text-foreground">Leave tracker</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Request time away, track balances, and keep every HR decision in one auditable workflow.
+            Request time away. HR sets how many days each leave type grants — then approves requests.
           </p>
         </div>
         {hasEmployeeProfile ? (
@@ -347,7 +354,10 @@ export function HrLeaveWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Leave policies</h2>
-              <p className="text-xs text-muted">Jurisdiction and department rules remain configurable.</p>
+              <p className="text-xs text-muted">
+                Set the days your organization actually grants — for example 22 annual days and 90 maternity days.
+                Staff file from My leave; you approve on Team requests.
+              </p>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => setAdjustTarget({})} className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold">
@@ -361,14 +371,21 @@ export function HrLeaveWorkspace({
           <div className="overflow-hidden rounded-lg border border-foreground/10">
             <div className="divide-y divide-foreground/10">
               {policies.map((policy) => (
-                <div key={policy.id} className="grid gap-3 px-4 py-3 md:grid-cols-[1.2fr_.7fr_.7fr_1.5fr] md:items-center">
+                <div key={policy.id} className="grid gap-3 px-4 py-3 md:grid-cols-[1.2fr_.7fr_.7fr_1.2fr_auto] md:items-center">
                   <div>
                     <p className="text-sm font-semibold text-foreground">{policy.name}</p>
                     <p className="text-xs text-muted">{policy.code} · {policy.countryCode || "All countries"}</p>
                   </div>
-                  <p className="text-xs text-muted">{policy.annualEntitlement} {unitLabel(policy.dayUnit, policy.annualEntitlement)} / year</p>
+                  <p className="text-xs text-muted">{policy.unlimited ? "Unlimited" : `${policy.annualEntitlement} ${unitLabel(policy.dayUnit, policy.annualEntitlement)} / year`}</p>
                   <p className="text-xs text-muted">{policy.paidPercentage}% paid · {policy.accrualMethod.toLowerCase().replace("_", " ")}</p>
                   <p className="text-xs text-muted">{policy.statutoryReference || "Organization policy"}</p>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPolicy(policy)}
+                    className="inline-flex items-center justify-center gap-1 rounded-md border border-foreground/15 px-2.5 py-1.5 text-xs font-semibold"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Set days
+                  </button>
                 </div>
               ))}
             </div>
@@ -473,35 +490,214 @@ export function HrLeaveWorkspace({
         </form>
       </ModalOverlay>
 
-      <ModalOverlay open={showPolicy} onClose={() => !pending && setShowPolicy(false)} panelClassName={MODAL_PANEL_FORM} aria-labelledby="leave-policy-title">
-        <form onSubmit={async (event) => {
-          event.preventDefault();
-          const data = Object.fromEntries(new FormData(event.currentTarget));
-          setPending(true);
-          try {
-            if (await finish(await createLeaveType(tenantSlug, data), "Leave policy created.")) setShowPolicy(false);
-          } finally { setPending(false); }
-        }}>
-          <div className="border-b border-foreground/10 px-5 py-4"><h2 id="leave-policy-title" className="text-lg font-semibold">Create leave policy</h2><p className="text-sm text-muted">Set a local rule without changing policies for other countries.</p></div>
+      <ModalOverlay
+        open={showPolicy || Boolean(editingPolicy)}
+        onClose={() => {
+          if (pending) return;
+          setShowPolicy(false);
+          setEditingPolicy(null);
+        }}
+        panelClassName={MODAL_PANEL_FORM}
+        aria-labelledby="leave-policy-title"
+      >
+        <form
+          key={editingPolicy?.id || "new"}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const data = new FormData(form);
+            const payload = {
+              id: editingPolicy?.id,
+              name: String(data.get("name") || ""),
+              code: String(data.get("code") || ""),
+              countryCode: String(data.get("countryCode") || ""),
+              department: String(data.get("department") || ""),
+              dayUnit: String(data.get("dayUnit") || ""),
+              accrualMethod: String(data.get("accrualMethod") || ""),
+              annualEntitlement: String(data.get("annualEntitlement") || ""),
+              paidPercentage: String(data.get("paidPercentage") || ""),
+              minimumServiceMonths: String(data.get("minimumServiceMonths") || ""),
+              maxCarryoverUnits: String(data.get("maxCarryoverUnits") || ""),
+              requiresDocumentAfterUnits: String(data.get("requiresDocumentAfterUnits") || ""),
+              statutoryReference: String(data.get("statutoryReference") || ""),
+              carryoverEnabled: data.get("carryoverEnabled") === "true",
+              allowNegativeBalance: data.get("allowNegativeBalance") === "true",
+              unlimited: data.get("unlimited") === "true",
+            };
+            setPending(true);
+            try {
+              const result = editingPolicy
+                ? await updateLeaveType(tenantSlug, payload)
+                : await createLeaveType(tenantSlug, payload);
+              if (
+                await finish(
+                  result,
+                  editingPolicy ? "Leave days saved. Staff can request against this balance." : "Leave policy created.",
+                )
+              ) {
+                setShowPolicy(false);
+                setEditingPolicy(null);
+              }
+            } finally {
+              setPending(false);
+            }
+          }}
+        >
+          <div className="border-b border-foreground/10 px-5 py-4">
+            <h2 id="leave-policy-title" className="text-lg font-semibold">
+              {editingPolicy ? `Set days · ${editingPolicy.name}` : "Create leave policy"}
+            </h2>
+            <p className="text-sm text-muted">
+              {editingPolicy
+                ? "Change the days and pay this organization grants. Existing approved leave is not rewritten."
+                : "Add a leave type, then staff can request it and HR can approve it."}
+            </p>
+          </div>
           <div className="grid gap-3 p-5 sm:grid-cols-2">
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Policy name</span><input name="name" required className={inputClass} /></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Code</span><input name="code" required className={inputClass} placeholder="ANNUAL_UK" /></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Country code</span><input name="countryCode" maxLength={2} className={inputClass} placeholder="Blank = global" /></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Department</span><input name="department" className={inputClass} placeholder="Blank = everyone" /></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Unit</span><select name="dayUnit" className={inputClass}><option value="WORKING_DAYS">Working days</option><option value="CALENDAR_DAYS">Calendar days</option><option value="HOURS">Hours</option></select></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Accrual</span><select name="accrualMethod" className={inputClass}><option value="ANNUAL_GRANT">Annual grant</option><option value="MONTHLY">Monthly</option><option value="NONE">No accrual</option></select></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Annual entitlement</span><input type="number" min="0" step="0.25" name="annualEntitlement" defaultValue="20" required className={inputClass} /></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Paid percentage</span><input type="number" min="0" max="100" step="0.01" name="paidPercentage" defaultValue="100" required className={inputClass} /></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Waiting period (months)</span><input type="number" min="0" name="minimumServiceMonths" defaultValue="0" required className={inputClass} /></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Evidence required after units</span><input type="number" min="0" step="0.25" name="requiresDocumentAfterUnits" className={inputClass} placeholder="Optional" /></label>
-            <label className="text-sm sm:col-span-2"><span className="mb-1 block text-xs font-medium">Legal or policy reference</span><textarea name="statutoryReference" rows={2} className={inputClass} /></label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Policy name</span>
+              <input name="name" required defaultValue={editingPolicy?.name} className={inputClass} />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Code</span>
+              <input
+                name="code"
+                required
+                defaultValue={editingPolicy?.code}
+                readOnly={Boolean(editingPolicy)}
+                className={inputClass}
+                placeholder="ANNUAL_NG"
+              />
+            </label>
+            {editingPolicy ? null : (
+              <>
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs font-medium">Country code</span>
+                  <input name="countryCode" maxLength={2} className={inputClass} placeholder="Blank = global" />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs font-medium">Department</span>
+                  <input name="department" className={inputClass} placeholder="Blank = everyone" />
+                </label>
+              </>
+            )}
+            {editingPolicy ? (
+              <>
+                <input type="hidden" name="countryCode" value={editingPolicy.countryCode} />
+                <input type="hidden" name="department" value={editingPolicy.department} />
+              </>
+            ) : null}
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Unit</span>
+              <select name="dayUnit" defaultValue={editingPolicy?.dayUnit || "WORKING_DAYS"} className={inputClass}>
+                <option value="WORKING_DAYS">Working days</option>
+                <option value="CALENDAR_DAYS">Calendar days</option>
+                <option value="HOURS">Hours</option>
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Accrual</span>
+              <select name="accrualMethod" defaultValue={editingPolicy?.accrualMethod || "ANNUAL_GRANT"} className={inputClass}>
+                <option value="ANNUAL_GRANT">Annual grant</option>
+                <option value="MONTHLY">Monthly</option>
+                <option value="NONE">No accrual</option>
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Days granted each year</span>
+              <input
+                type="number"
+                min="0"
+                step="0.25"
+                name="annualEntitlement"
+                defaultValue={editingPolicy?.annualEntitlement ?? 22}
+                required
+                className={inputClass}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Paid percentage</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                name="paidPercentage"
+                defaultValue={editingPolicy?.paidPercentage ?? 100}
+                required
+                className={inputClass}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Waiting period (months)</span>
+              <input
+                type="number"
+                min="0"
+                name="minimumServiceMonths"
+                defaultValue={editingPolicy?.minimumServiceMonths ?? 0}
+                required
+                className={inputClass}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Max carryover</span>
+              <input
+                type="number"
+                min="0"
+                step="0.25"
+                name="maxCarryoverUnits"
+                defaultValue={editingPolicy?.maxCarryoverUnits ?? 0}
+                className={inputClass}
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Evidence required after units</span>
+              <input
+                type="number"
+                min="0"
+                step="0.25"
+                name="requiresDocumentAfterUnits"
+                defaultValue={editingPolicy?.requiresDocumentAfterUnits}
+                className={inputClass}
+                placeholder="Optional"
+              />
+            </label>
+            <label className="text-sm sm:col-span-2">
+              <span className="mb-1 block text-xs font-medium">Legal or policy reference</span>
+              <textarea
+                name="statutoryReference"
+                rows={2}
+                defaultValue={editingPolicy?.statutoryReference}
+                className={inputClass}
+              />
+            </label>
             <div className="flex flex-wrap gap-4 text-xs sm:col-span-2">
-              <label className="flex items-center gap-2"><input type="checkbox" name="carryoverEnabled" value="true" /> Allow carryover</label>
-              <label className="flex items-center gap-2"><input type="checkbox" name="allowNegativeBalance" value="true" /> Allow negative balance</label>
-              <label className="flex items-center gap-2"><input type="checkbox" name="unlimited" value="true" /> Unlimited</label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="carryoverEnabled" value="true" defaultChecked={editingPolicy?.carryoverEnabled} /> Allow carryover
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="allowNegativeBalance" value="true" defaultChecked={editingPolicy?.allowNegativeBalance} /> Allow negative balance
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="unlimited" value="true" defaultChecked={editingPolicy?.unlimited} /> Unlimited
+              </label>
             </div>
           </div>
-          <div className="flex justify-end gap-2 border-t border-foreground/10 px-5 py-4"><button type="button" onClick={() => setShowPolicy(false)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold">Cancel</button><button type="submit" disabled={pending} className="rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">{pending ? "Creating…" : "Create policy"}</button></div>
+          <div className="flex justify-end gap-2 border-t border-foreground/10 px-5 py-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowPolicy(false);
+                setEditingPolicy(null);
+              }}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={pending} className="rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+              {pending ? "Saving…" : editingPolicy ? "Save days" : "Create policy"}
+            </button>
+          </div>
         </form>
       </ModalOverlay>
 

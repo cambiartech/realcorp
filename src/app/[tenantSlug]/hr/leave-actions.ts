@@ -31,6 +31,7 @@ const requestSchema = z.object({
 });
 
 const leaveTypeSchema = z.object({
+  id: z.string().min(1).optional(),
   name: z.string().trim().min(2).max(100),
   code: z.string().trim().min(2).max(40),
   countryCode: z.string().trim().toUpperCase().length(2).optional().or(z.literal("")),
@@ -420,6 +421,54 @@ export async function createLeaveType(
     entityId: type.id,
     action: "CREATE",
     summary: `Created leave policy ${type.name}.`,
+  });
+  revalidateLeave(tenantSlug);
+  return { ok: true };
+}
+
+export async function updateLeaveType(
+  tenantSlug: string,
+  input: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ctx = await leaveContext(tenantSlug);
+  if (!ctx.ok) return { ok: false, error: ctx.error };
+  if (!canManageHr(Boolean(ctx.session.user.isPlatformAdmin), ctx.membership)) {
+    return { ok: false, error: "You do not have permission to configure leave." };
+  }
+  const parsed = leaveTypeSchema.extend({ id: z.string().min(1) }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join(" ") };
+  const existing = await prisma.hrLeaveType.findFirst({
+    where: { id: parsed.data.id, tenantId: ctx.tenant.id },
+    select: { id: true, name: true },
+  });
+  if (!existing) return { ok: false, error: "That leave policy was not found." };
+  const type = await prisma.hrLeaveType.update({
+    where: { id: existing.id },
+    data: {
+      name: parsed.data.name,
+      dayUnit: parsed.data.dayUnit,
+      accrualMethod: parsed.data.accrualMethod,
+      annualEntitlement: parsed.data.annualEntitlement,
+      paidPercentage: parsed.data.paidPercentage,
+      minimumServiceMonths: parsed.data.minimumServiceMonths,
+      carryoverEnabled: parsed.data.carryoverEnabled ?? false,
+      maxCarryoverUnits: parsed.data.maxCarryoverUnits ?? 0,
+      allowNegativeBalance: parsed.data.allowNegativeBalance ?? false,
+      unlimited: parsed.data.unlimited ?? false,
+      requiresDocumentAfterUnits: parsed.data.requiresDocumentAfterUnits ?? null,
+      statutoryReference: parsed.data.statutoryReference || null,
+      lastReviewedAt: new Date(),
+    },
+  });
+  await writeAuditLog({
+    tenantId: ctx.tenant.id,
+    actorUserId: ctx.session.user.id,
+    actorLabel: ctx.session.user.name || ctx.session.user.email,
+    module: "HR",
+    entityType: "LEAVE_TYPE",
+    entityId: type.id,
+    action: "UPDATE",
+    summary: `Updated leave policy ${type.name} to ${parsed.data.annualEntitlement} days.`,
   });
   revalidateLeave(tenantSlug);
   return { ok: true };

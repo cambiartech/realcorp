@@ -32,6 +32,8 @@ import {
 import { AddUnitsModal } from "./add-units-modal";
 import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { SortTh, useTableSort } from "@/components/sort-th";
+import { sortTableRows } from "@/lib/table-sort";
 
 type UnitRow = {
   id: string;
@@ -97,6 +99,9 @@ export function ProjectUnitsWorkspace({
   const [importClientsOpen, setImportClientsOpen] = useState(false);
   const [unitQuery, setUnitQuery] = useState("");
   const [planQuery, setPlanQuery] = useState("");
+  const [unitStatusFilter, setUnitStatusFilter] = useState("");
+  const [unitPurposeFilter, setUnitPurposeFilter] = useState("");
+  const { sortKey, sortDir, onSort } = useTableSort();
   const [editState, editAction, editPending] = useActionState(
     updateUnit.bind(null, tenantSlug, projectId, editingUnit?.id ?? ""),
     initial,
@@ -131,15 +136,26 @@ export function ProjectUnitsWorkspace({
   const editFormRef = useRef<HTMLFormElement | null>(null);
   const pricingFormRef = useRef<HTMLFormElement | null>(null);
   const editPlanFormRef = useRef<HTMLFormElement | null>(null);
-  const visibleUnits = useMemo(
-    () =>
-      filterTableRows(
-        units,
-        unitQuery,
-        (unit) => `${unit.label} ${unit.purpose} ${unit.unitType} ${unit.pricingPlanName} ${unit.status}`,
-      ),
-    [units, unitQuery],
-  );
+  const visibleUnits = useMemo(() => {
+    const scoped = units.filter((unit) => {
+      if (unitStatusFilter && unit.statusValue !== unitStatusFilter) return false;
+      if (unitPurposeFilter && unit.purposeValue !== unitPurposeFilter) return false;
+      return true;
+    });
+    const filtered = filterTableRows(
+      scoped,
+      unitQuery,
+      (unit) => `${unit.label} ${unit.purpose} ${unit.unitType} ${unit.pricingPlanName} ${unit.status}`,
+    );
+    return sortTableRows(filtered, sortKey, sortDir, (unit, key) => {
+      if (key === "label") return unit.label;
+      if (key === "purpose") return unit.purpose;
+      if (key === "layout") return unit.unitType;
+      if (key === "plan") return unit.pricingPlanName;
+      if (key === "status") return unit.status;
+      return "";
+    });
+  }, [units, unitQuery, unitStatusFilter, unitPurposeFilter, sortKey, sortDir]);
   const visiblePlans = useMemo(
     () =>
       filterTableRows(pricingPlans, planQuery, (plan) => `${plan.name} ${plan.currency} ${plan.price}`),
@@ -401,7 +417,7 @@ export function ProjectUnitsWorkspace({
         </section>
       ) : (
         <div className="mt-5">
-          <div className="mb-3">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end">
             <TableSearch
               value={unitQuery}
               onChange={setUnitQuery}
@@ -409,16 +425,36 @@ export function ProjectUnitsWorkspace({
               resultCount={visibleUnits.length}
               totalCount={units.length}
             />
+            <div className="w-full sm:max-w-[160px]">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Purpose</label>
+              <UiSelect value={unitPurposeFilter} onChange={(event) => setUnitPurposeFilter(event.target.value)}>
+                <option value="">All purposes</option>
+                <option value={UnitPurpose.SALE}>Sale</option>
+                <option value={UnitPurpose.RENTAL}>Rental</option>
+                <option value={UnitPurpose.SHORT_LET}>Short-let</option>
+                <option value={UnitPurpose.HOSTEL}>Hostel</option>
+              </UiSelect>
+            </div>
+            <div className="w-full sm:max-w-[160px]">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Status</label>
+              <UiSelect value={unitStatusFilter} onChange={(event) => setUnitStatusFilter(event.target.value)}>
+                <option value="">All statuses</option>
+                <option value={UnitStatus.AVAILABLE}>Available</option>
+                <option value={UnitStatus.RESERVED}>Reserved</option>
+                <option value={UnitStatus.SOLD}>Sold</option>
+                <option value={UnitStatus.UNDER_CONSTRUCTION}>Under construction</option>
+              </UiSelect>
+            </div>
           </div>
           <div className="overflow-hidden rounded-lg border border-foreground/10">
           <table className="w-full text-left text-sm">
             <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-4 py-3">Label</th>
-                <th className="px-4 py-3">Purpose</th>
-                <th className="px-4 py-3">Layout</th>
-                <th className="px-4 py-3">Pricing plan</th>
-                <th className="px-4 py-3">Status</th>
+                <SortTh label="Label" sortKey="label" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Purpose" sortKey="purpose" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Layout" sortKey="layout" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Pricing plan" sortKey="plan" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -426,7 +462,7 @@ export function ProjectUnitsWorkspace({
               {visibleUnits.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-sm text-muted">
-                    {units.length === 0 ? "No units yet." : "No units match that search."}
+                    {units.length === 0 ? "No units yet." : "No units match that search or filter."}
                   </td>
                 </tr>
               ) : (

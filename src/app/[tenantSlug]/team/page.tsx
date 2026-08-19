@@ -4,7 +4,7 @@ import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { entitledMemberModules, parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { normalizeTenantModuleFlags } from "@/lib/tenant-module-definitions";
-import { formatEnumLabel } from "@/lib/ui-format";
+import { membershipRoleLabel } from "@/lib/org-membership-profile";
 import { notFound } from "next/navigation";
 import { TeamWorkspace } from "./team-workspace";
 
@@ -29,6 +29,7 @@ export default async function TenantTeamPage({ params }: { params: Promise<{ ten
           moduleCommunity: true,
           moduleShortLets: true,
           moduleHr: true,
+          moduleFacility: true,
           moduleTasks: true,
           moduleClients: true,
           moduleListings: true,
@@ -83,7 +84,7 @@ export default async function TenantTeamPage({ params }: { params: Promise<{ ten
         userId: member.user.id,
         name: member.user.name || member.user.email || "User",
         email: member.user.email || "No email",
-        role: formatEnumLabel(member.role),
+        role: membershipRoleLabel(member.role),
         roleValue: member.role,
         status: member.status,
         modulePermissions: parseMembershipModulePermissions(member.modulePermissions),
@@ -91,7 +92,7 @@ export default async function TenantTeamPage({ params }: { params: Promise<{ ten
       invites={invites.map((invite) => ({
         id: invite.id,
         email: invite.email,
-        role: formatEnumLabel(invite.role),
+        role: membershipRoleLabel(invite.role),
         roleValue: invite.role,
         expiresAt: invite.expiresAt.toISOString().slice(0, 10),
       }))}
