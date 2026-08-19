@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { ButtonSpinner } from "@/components/button-spinner";
@@ -15,7 +15,7 @@ import {
   type ClientDocumentItem,
 } from "@/components/clients/client-documents-workspace";
 import type { ClientPortalStatus } from "@/lib/client-portal-invite";
-import type { Pagination, SearchParamValue } from "@/lib/pagination";
+import { buildPageUrl, type Pagination, type SearchParamValue } from "@/lib/pagination";
 import { Pencil, Trash2 } from "lucide-react";
 import { downloadClientPortfolioXlsx } from "@/lib/client-report-xlsx";
 import { formatEnumLabel } from "@/lib/ui-format";
@@ -27,6 +27,7 @@ import {
   updatePropertyClient,
 } from "./actions";
 import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
+import { SearchableSelect } from "@/components/searchable-select";
 import { TableSearch, filterTableRows } from "@/components/table-search";
 
 type ClientRow = {
@@ -36,6 +37,7 @@ type ClientRow = {
   phone: string;
   status: string;
   statusValue: string;
+  projects: Array<{ id: string; name: string }>;
   unitsCount: number;
   documentsCount: number;
   paid: number;
@@ -80,6 +82,27 @@ function moneyLabel(currency: string, value: number) {
   return `${currency} ${value.toLocaleString("en-NG")}`;
 }
 
+function groupClientsByProject(rows: ClientRow[]) {
+  const groups = new Map<string, { id: string; label: string; rows: ClientRow[] }>();
+  const unlinked: ClientRow[] = [];
+  for (const row of rows) {
+    if (row.projects.length === 0) {
+      unlinked.push(row);
+      continue;
+    }
+    const primary = row.projects[0];
+    const existing = groups.get(primary.id);
+    if (existing) {
+      existing.rows.push(row);
+      continue;
+    }
+    groups.set(primary.id, { id: primary.id, label: primary.name, rows: [row] });
+  }
+  const ordered = Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
+  if (unlinked.length) ordered.push({ id: "none", label: "No project linked", rows: unlinked });
+  return ordered;
+}
+
 export function ClientsWorkspace({
   tenantSlug,
   companyName,
@@ -92,6 +115,9 @@ export function ClientsWorkspace({
   documentClients,
   pagination,
   paginationSearchParams,
+  projectOptions,
+  selectedProjectId,
+  selectedProjectName,
   clientStats,
   namedUnlinkedUnitsCount,
 }: {
@@ -113,6 +139,9 @@ export function ClientsWorkspace({
   documentClients: Array<{ id: string; fullName: string }>;
   pagination: Pagination;
   paginationSearchParams: Record<string, SearchParamValue>;
+  projectOptions: Array<{ id: string; name: string }>;
+  selectedProjectId: string;
+  selectedProjectName: string;
   clientStats: { active: number; totalUnits: number };
   namedUnlinkedUnitsCount: number;
 }) {
@@ -151,10 +180,33 @@ export function ClientsWorkspace({
         clients.map((row) => ({ ...row, ...rowOverrides[row.id] })),
         tableQuery,
         (row) =>
-          `${row.fullName} ${row.email} ${row.phone} ${row.status} ${row.portalStatus} ${row.createdAtLabel}`,
+          `${row.fullName} ${row.email} ${row.phone} ${row.status} ${row.portalStatus} ${row.createdAtLabel} ${row.projects.map((project) => project.name).join(" ")}`,
       ),
     [clients, rowOverrides, tableQuery],
   );
+  const clientGroups = useMemo(() => {
+    if (selectedProjectId === "none") {
+      return [{ id: "none", label: "No project linked", rows: visibleClients }];
+    }
+    if (selectedProjectId) {
+      return [
+        {
+          id: selectedProjectId,
+          label: selectedProjectName || "Selected project",
+          rows: visibleClients,
+        },
+      ];
+    }
+    return groupClientsByProject(visibleClients);
+  }, [selectedProjectId, selectedProjectName, visibleClients]);
+
+  function applyProjectFilter(nextId: string) {
+    const params = { ...paginationSearchParams } as Record<string, SearchParamValue>;
+    if (nextId) params.projectId = nextId;
+    else delete params.projectId;
+    delete params.clientsPage;
+    router.push(buildPageUrl(`/${tenantSlug}/clients`, params, "clientsPage", 1));
+  }
 
   useEffect(() => {
     try {
@@ -273,6 +325,26 @@ export function ClientsWorkspace({
           <p className="mt-1 max-w-2xl text-sm text-muted">
             Property owners and investors — track units, pricing plans, and client documents in one place.
           </p>
+          {selectedProjectId ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => applyProjectFilter("")}
+                className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
+                title="Clear project filter"
+              >
+                <span>Project: {selectedProjectName || selectedProjectId}</span>
+                <span aria-hidden>×</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => applyProjectFilter("")}
+                className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
+              >
+                Show all clients
+              </button>
+            </div>
+          ) : null}
         </div>
         {tab === "clients" ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -284,7 +356,7 @@ export function ClientsWorkspace({
                 void downloadClientPortfolioXlsx({
                   companyName,
                   currency,
-                  clients: clients.map((c) => ({
+                  clients: visibleClients.map((c) => ({
                     fullName: c.fullName,
                     email: c.email,
                     phone: c.phone,
@@ -371,6 +443,7 @@ export function ClientsWorkspace({
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Total clients</p>
           <p className="mt-1 text-2xl font-bold text-foreground">{pagination.total}</p>
+          {selectedProjectName ? <p className="mt-1 text-xs text-muted">{selectedProjectName}</p> : null}
         </div>
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Active</p>
@@ -417,20 +490,41 @@ export function ClientsWorkspace({
         </div>
       ) : (
         <div className="mt-5">
-          <div className="mb-3">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end">
             <TableSearch
               value={tableQuery}
               onChange={setTableQuery}
-              placeholder="Search clients by name, email, phone, or status…"
+              placeholder="Search clients by name, email, phone, project, or status…"
               resultCount={visibleClients.length}
               totalCount={clients.length}
             />
+            <div className="w-full sm:max-w-xs">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+                Filter by project
+              </label>
+              <SearchableSelect
+                value={selectedProjectId}
+                onChange={applyProjectFilter}
+                allowEmpty
+                emptyLabel="All projects"
+                searchPlaceholder="Search projects…"
+                placeholder="All projects"
+                options={[
+                  { value: "none", label: "No project linked" },
+                  ...projectOptions.map((project) => ({
+                    value: project.id,
+                    label: project.name,
+                  })),
+                ]}
+              />
+            </div>
           </div>
         <div className="overflow-hidden rounded-lg border border-foreground/10">
           <table className="w-full text-left text-sm">
             <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Client</th>
+                <th className="px-4 py-3">Projects</th>
                 <th className="px-4 py-3">Contact</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Portal</th>
@@ -447,8 +541,13 @@ export function ClientsWorkspace({
                   <td colSpan={canManage ? 10 : 9} className="px-4 py-10 text-center text-sm text-muted">
                     {clients.length === 0 ? (
                       <>
-                    No clients yet.{" "}
-                    {canManage ? (
+                    No clients yet
+                    {selectedProjectId
+                      ? selectedProjectId === "none"
+                        ? " without a linked project."
+                        : ` in ${selectedProjectName || "this project"}.`
+                      : "."}{" "}
+                    {canManage && !selectedProjectId ? (
                       <>
                         Import from{" "}
                         <button
@@ -467,6 +566,14 @@ export function ClientsWorkspace({
                         </Link>{" "}
                         or add one manually.
                       </>
+                    ) : selectedProjectId ? (
+                      <button
+                        type="button"
+                        onClick={() => applyProjectFilter("")}
+                        className="font-semibold text-foreground underline"
+                      >
+                        Show all clients
+                      </button>
                     ) : (
                       "Clients will appear here once added."
                     )}
@@ -477,7 +584,20 @@ export function ClientsWorkspace({
                   </td>
                 </tr>
               ) : (
-                visibleClients.map((client) => (
+                clientGroups.map((group) => (
+                  <Fragment key={group.id}>
+                    <tr className="bg-foreground/[0.035]">
+                      <td
+                        colSpan={canManage ? 10 : 9}
+                        className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted"
+                      >
+                        {group.label}
+                        <span className="ml-2 font-medium normal-case tracking-normal text-muted">
+                          {group.rows.length} {group.rows.length === 1 ? "client" : "clients"}
+                        </span>
+                      </td>
+                    </tr>
+                    {group.rows.map((client) => (
                   <tr key={client.id} className="hover:bg-foreground/[0.02]">
                     <td className="px-4 py-3">
                       <Link
@@ -486,6 +606,15 @@ export function ClientsWorkspace({
                       >
                         {client.fullName}
                       </Link>
+                    </td>
+                    <td className="max-w-[180px] px-4 py-3 text-xs text-muted">
+                      {client.projects.length ? (
+                        <span title={client.projects.map((project) => project.name).join(", ")}>
+                          {client.projects.map((project) => project.name).join(" · ")}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted">
                       <div>{client.phone || "—"}</div>
@@ -556,6 +685,8 @@ export function ClientsWorkspace({
                       </td>
                     ) : null}
                   </tr>
+                    ))}
+                  </Fragment>
                 ))
               )}
             </tbody>

@@ -23,11 +23,14 @@ export default async function ClientsPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ tab?: string; clientsPage?: string }>;
+  searchParams: Promise<{ tab?: string; clientsPage?: string; projectId?: string }>;
 }) {
   const { tenantSlug } = await params;
   const query = await searchParams;
   const { tab: tabRaw, clientsPage } = query;
+  const projectIdRaw = String(query.projectId || "").trim();
+  const unlinkedOnly = projectIdRaw === "none";
+  const projectId = unlinkedOnly ? "" : projectIdRaw;
   const session = await auth();
   if (!session?.user?.id) notFound();
 
@@ -61,12 +64,23 @@ export default async function ClientsPage({
   });
   assertTenantNavAccess(session, membership, tenant.settings, "clients");
 
-  const [totalClients, activeClients, totalUnitLinks, unlinkedUnits, documents, documentClients] = await Promise.all([
-    prisma.propertyClient.count({ where: { tenantId: tenant.id } }),
+  const clientWhere = {
+    tenantId: tenant.id,
+    ...(unlinkedOnly ? { unitLinks: { none: {} } } : {}),
+    ...(projectId ? { unitLinks: { some: { unit: { projectId } } } } : {}),
+  };
+  const unitLinkWhere = {
+    tenantId: tenant.id,
+    ...(projectId ? { unit: { projectId } } : {}),
+  };
+
+  const [totalClients, activeClients, totalUnitLinks, unlinkedUnits, documents, documentClients, projects] =
+    await Promise.all([
+    prisma.propertyClient.count({ where: clientWhere }),
     prisma.propertyClient.count({
-      where: { tenantId: tenant.id, status: PropertyClientStatus.ACTIVE },
+      where: { ...clientWhere, status: PropertyClientStatus.ACTIVE },
     }),
-    prisma.clientUnitLink.count({ where: { tenantId: tenant.id } }),
+    unlinkedOnly ? Promise.resolve(0) : prisma.clientUnitLink.count({ where: unitLinkWhere }),
     prisma.unit.findMany({
       where: { tenantId: tenant.id, clientLinks: { none: {} } },
       select: { label: true, project: { select: { name: true } } },
@@ -83,15 +97,30 @@ export default async function ClientsPage({
       orderBy: [{ fullName: "asc" }, { id: "asc" }],
       select: { id: true, fullName: true },
     }),
+    prisma.project.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+      take: 400,
+    }),
   ]);
   const pagination = paginate(totalClients, parsePage(clientsPage), CLIENTS_PAGE_SIZE);
   const clients = await prisma.propertyClient.findMany({
-    where: { tenantId: tenant.id },
+    where: clientWhere,
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     skip: pagination.skip,
     take: pagination.pageSize,
     include: {
       _count: { select: { unitLinks: true, documents: true } },
+      unitLinks: {
+        select: {
+          unit: {
+            select: {
+              project: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -100,8 +129,13 @@ export default async function ClientsPage({
     clients.map((c) => ({ id: c.id, email: c.email, userId: c.userId })),
   );
   const depositRows = await loadClientDepositRows(tenant.id);
+  const scopedDepositRows = unlinkedOnly
+    ? []
+    : projectId
+      ? depositRows.filter((row) => row.projectId === projectId)
+      : depositRows;
   const depositsByClient = new Map<string, ReturnType<typeof summarizeClientDeposits>>();
-  for (const row of depositRows) {
+  for (const row of scopedDepositRows) {
     const current = depositsByClient.get(row.clientId) ?? {
       contractValue: 0,
       collected: 0,
@@ -113,6 +147,9 @@ export default async function ClientsPage({
       remaining: current.remaining + row.remaining,
     });
   }
+  const selectedProjectName = unlinkedOnly
+    ? "No project linked"
+    : projects.find((project) => project.id === projectId)?.name || "";
 
   return (
     <ClientsWorkspace
@@ -120,7 +157,7 @@ export default async function ClientsPage({
       companyName={tenant.name}
       currency={tenant.defaultCurrency || "NGN"}
       canManage={canManageClients(Boolean(session.user.isPlatformAdmin), membership)}
-      unitBalances={depositRows.map((row) => ({
+      unitBalances={scopedDepositRows.map((row) => ({
         clientName: row.clientName,
         projectLabel: row.projectLabel,
         unitLabel: row.unitLabel,
@@ -131,12 +168,26 @@ export default async function ClientsPage({
       activeTab={parseTab(tabRaw)}
       pagination={pagination}
       paginationSearchParams={query}
+      projectOptions={projects}
+      selectedProjectId={projectIdRaw}
+      selectedProjectName={selectedProjectName}
       clientStats={{ active: activeClients, totalUnits: totalUnitLinks }}
       namedUnlinkedUnitsCount={countImportableUnlinkedUnits(
         unlinkedUnits.map((unit) => ({ label: unit.label, projectName: unit.project.name })),
       )}
       clients={clients.map((c) => {
         const money = depositsByClient.get(c.id);
+        const projectMap = new Map<string, { id: string; name: string }>();
+        for (const link of c.unitLinks) {
+          projectMap.set(link.unit.project.id, {
+            id: link.unit.project.id,
+            name: link.unit.project.name,
+          });
+        }
+        const clientProjects = Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+        const unitsCount = projectId
+          ? c.unitLinks.filter((link) => link.unit.project.id === projectId).length
+          : c._count.unitLinks;
         return {
           id: c.id,
           fullName: c.fullName,
@@ -144,7 +195,8 @@ export default async function ClientsPage({
           phone: c.phone ?? "",
           status: formatEnumLabel(c.status),
           statusValue: c.status,
-          unitsCount: c._count.unitLinks,
+          projects: clientProjects,
+          unitsCount,
           documentsCount: c._count.documents,
           paid: money?.collected ?? 0,
           remaining: money?.remaining ?? 0,
