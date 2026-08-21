@@ -30,6 +30,7 @@ import {
   canCheckInFromStatus,
 } from "@/lib/shortlets-reservation-status";
 import { buildNightAuditSnapshot } from "@/lib/shortlets-night-audit";
+import { resolveShortletServiceCharge, shortletStaySubtotal } from "@/lib/shortlet-pricing";
 import {
   assignShortletUnitPropertySchema,
   assignShortletReservationApartmentSchema,
@@ -68,6 +69,7 @@ async function getTenantAndMembership(tenantSlug: string, userId: string) {
         select: {
           shortletFinanceSync: true,
           moduleFinance: true,
+          shortletServiceCharge: true,
         },
       },
     },
@@ -84,6 +86,30 @@ function financeSyncEnabled(tenant: {
   settings: { shortletFinanceSync?: boolean | null; moduleFinance?: boolean | null } | null;
 }) {
   return Boolean(tenant.settings?.moduleFinance && tenant.settings?.shortletFinanceSync);
+}
+
+function tenantDefaultServiceCharge(tenant: {
+  settings?: { shortletServiceCharge?: { toString(): string } | number | null } | null;
+}) {
+  const raw = tenant.settings?.shortletServiceCharge;
+  if (raw == null) return null;
+  const value = Number(raw.toString());
+  return Number.isFinite(value) ? value : null;
+}
+
+function unitStayTotal(
+  unit: { nightlyRate: unknown; cleaningFee: unknown; serviceCharge?: unknown } | null,
+  nights: number,
+  tenantDefault: number | null,
+) {
+  if (!unit) return 0;
+  const stored = unit.serviceCharge == null ? null : Number(unit.serviceCharge);
+  return shortletStaySubtotal({
+    nightlyRate: Number(unit.nightlyRate),
+    nights,
+    cleaningFee: Number(unit.cleaningFee || 0),
+    serviceCharge: resolveShortletServiceCharge(Number.isFinite(stored as number) ? stored : null, tenantDefault),
+  });
 }
 
 function accessCtx(
@@ -119,6 +145,7 @@ export async function createShortletUnit(
     isActive?: boolean;
     nightlyRate: number;
     cleaningFee?: number;
+    serviceCharge?: number;
     cautionFee?: number;
     currency: string;
   },
@@ -185,6 +212,7 @@ export async function createShortletUnit(
       isActive: parsed.data.isActive ?? true,
       nightlyRate: parsed.data.nightlyRate,
       cleaningFee: parsed.data.cleaningFee ?? null,
+      serviceCharge: parsed.data.serviceCharge ?? null,
       cautionFee: parsed.data.cautionFee ?? null,
       currency: parsed.data.currency.toUpperCase(),
       housekeepingStatus: ShortletHousekeepingStatus.VACANT_CLEAN,
@@ -219,6 +247,7 @@ export async function saveShortletUnit(
     isActive?: boolean;
     nightlyRate: number;
     cleaningFee?: number;
+    serviceCharge?: number;
     cautionFee?: number;
     currency: string;
   },
@@ -263,6 +292,7 @@ export async function saveShortletUnit(
       isActive: parsed.data.isActive ?? true,
       nightlyRate: parsed.data.nightlyRate,
       cleaningFee: parsed.data.cleaningFee ?? null,
+      serviceCharge: parsed.data.serviceCharge ?? null,
       cautionFee: parsed.data.cautionFee ?? null,
       currency: parsed.data.currency.toUpperCase(),
     },
@@ -401,6 +431,7 @@ export async function listAvailableShortletApartments(
         propertyName: string;
         nightlyRate: number;
         cleaningFee: number;
+        serviceCharge: number;
         cautionFee: number | null;
         currency: string;
       }>;
@@ -440,6 +471,7 @@ export async function listAvailableShortletApartments(
       propertyId: true,
       nightlyRate: true,
       cleaningFee: true,
+      serviceCharge: true,
       cautionFee: true,
       currency: true,
       property: { select: { name: true } },
@@ -467,6 +499,10 @@ export async function listAvailableShortletApartments(
       propertyName: u.property?.name || "",
       nightlyRate: Number(u.nightlyRate),
       cleaningFee: Number(u.cleaningFee || 0),
+      serviceCharge: resolveShortletServiceCharge(
+        u.serviceCharge != null ? Number(u.serviceCharge) : null,
+        tenantDefaultServiceCharge(tenant),
+      ),
       cautionFee: u.cautionFee != null ? Number(u.cautionFee) : null,
       currency: u.currency,
     }));
@@ -551,6 +587,7 @@ export async function createShortletReservation(
     name: string;
     nightlyRate: unknown;
     cleaningFee: unknown;
+    serviceCharge?: unknown;
     cautionFee: unknown;
     currency: string;
     housekeepingStatus: ShortletHousekeepingStatus;
@@ -564,6 +601,7 @@ export async function createShortletReservation(
         name: true,
         nightlyRate: true,
         cleaningFee: true,
+        serviceCharge: true,
         cautionFee: true,
         currency: true,
         housekeepingStatus: true,
@@ -597,15 +635,13 @@ export async function createShortletReservation(
     if (!property) return { ok: false, error: "Location not found." };
   }
 
-  const nightly = unit ? Number(unit.nightlyRate) : 0;
-  const cleaning = unit ? Number(unit.cleaningFee || 0) : 0;
   const cautionFee =
     parsed.data.cautionFee != null
       ? parsed.data.cautionFee
       : unit?.cautionFee != null
         ? Number(unit.cautionFee)
         : null;
-  const totalAmount = unit ? nightly * nights + cleaning : 0;
+  const totalAmount = unitStayTotal(unit, nights, tenantDefaultServiceCharge(tenant));
   const currency = unit?.currency || tenant.defaultCurrency;
   const initialPayment = parsed.data.collectPaymentNow ? Number(parsed.data.paymentAmount || 0) : 0;
   const cautionFeePaid = parsed.data.collectPaymentNow ? Number(parsed.data.cautionFeePaid || 0) : 0;
@@ -767,6 +803,7 @@ export async function createShortletBookings(
       name: string;
       nightlyRate: unknown;
       cleaningFee: unknown;
+      serviceCharge?: unknown;
       cautionFee: unknown;
       currency: string;
       housekeepingStatus: ShortletHousekeepingStatus;
@@ -800,6 +837,7 @@ export async function createShortletBookings(
           name: true,
           nightlyRate: true,
           cleaningFee: true,
+          serviceCharge: true,
           cautionFee: true,
           currency: true,
           housekeepingStatus: true,
@@ -828,10 +866,8 @@ export async function createShortletBookings(
       if (!property) return { ok: false, error: "Location not found." };
     }
 
-    const nightly = unit ? Number(unit.nightlyRate) : 0;
-    const cleaning = unit ? Number(unit.cleaningFee || 0) : 0;
     const cautionFee = unit?.cautionFee != null ? Number(unit.cautionFee) : null;
-    const totalAmount = unit ? nightly * nights + cleaning : 0;
+    const totalAmount = unitStayTotal(unit, nights, tenantDefaultServiceCharge(tenant));
     const currency = unit?.currency || tenant.defaultCurrency;
     grandTotal += totalAmount;
     grandCaution += cautionFee || 0;
@@ -1001,6 +1037,7 @@ export async function assignShortletReservationApartment(
       name: true,
       nightlyRate: true,
       cleaningFee: true,
+      serviceCharge: true,
       cautionFee: true,
       currency: true,
       propertyId: true,
@@ -1021,7 +1058,7 @@ export async function assignShortletReservationApartment(
   });
   if (overlap) return { ok: false, error: "Selected apartment is not available for these dates." };
 
-  const totalAmount = Number(unit.nightlyRate) * reservation.nights + Number(unit.cleaningFee || 0);
+  const totalAmount = unitStayTotal(unit, reservation.nights, tenantDefaultServiceCharge(tenant));
   const amountPaid = Number(reservation.amountPaid);
   const cautionFee =
     reservation.cautionFee != null
@@ -1587,6 +1624,7 @@ export async function saveShortletPmsSettings(
     eodTime: string;
     checkoutAlertHours: number;
     financeSync?: boolean;
+    serviceCharge?: number | null;
   },
 ): Promise<ActionResult> {
   const session = await auth();
@@ -1608,6 +1646,7 @@ export async function saveShortletPmsSettings(
       shortletEodTime: parsed.data.eodTime,
       shortletCheckoutAlertHours: parsed.data.checkoutAlertHours,
       shortletFinanceSync: parsed.data.financeSync ?? false,
+      shortletServiceCharge: parsed.data.serviceCharge ?? null,
     },
   });
 
@@ -1950,6 +1989,7 @@ export async function importChannelLeadAsReservation(
     name: string;
     nightlyRate: unknown;
     cleaningFee: unknown;
+    serviceCharge?: unknown;
     cautionFee: unknown;
     currency: string;
     propertyId: string | null;
@@ -1963,6 +2003,7 @@ export async function importChannelLeadAsReservation(
         name: true,
         nightlyRate: true,
         cleaningFee: true,
+        serviceCharge: true,
         cautionFee: true,
         currency: true,
         propertyId: true,
@@ -1992,7 +2033,7 @@ export async function importChannelLeadAsReservation(
     if (!property) return { ok: false, error: "Location not found." };
   }
 
-  const totalAmount = unit ? Number(unit.nightlyRate) * nights + Number(unit.cleaningFee || 0) : 0;
+  const totalAmount = unitStayTotal(unit, nights, tenantDefaultServiceCharge(tenant));
   const cautionFee = unit?.cautionFee != null ? Number(unit.cautionFee) : null;
   const currency = unit?.currency || tenant.defaultCurrency;
   const source = lead.source?.toLowerCase().includes("explore")

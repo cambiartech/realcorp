@@ -292,7 +292,7 @@ export function suggestedClientStatus(statuses: string[], purposes: string[] = [
   if (
     purposes.some(
       (purpose) =>
-        purpose === "SHORT_LET" || purpose === "RENTAL" || purpose === "HOSTEL",
+        purpose === "SHORT_LET" || purpose === "RENTAL" || purpose === "HOSTEL" || purpose === "LIVING",
     )
   ) {
     return "ACTIVE" as const;

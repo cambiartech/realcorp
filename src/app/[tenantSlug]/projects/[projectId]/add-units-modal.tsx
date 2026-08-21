@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { UnitPurpose, UnitStatus } from "@/generated/prisma";
+import { UNIT_PURPOSE_OPTIONS } from "@/lib/ui-format";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { FormAlert } from "@/components/form-message";
 import { UiSelect } from "@/components/ui-select";
@@ -244,10 +245,11 @@ export function AddUnitsModal({
               value={purpose}
               onChange={(e) => setPurpose(e.target.value as UnitPurpose)}
             >
-              <option value={UnitPurpose.SALE}>For sale</option>
-              <option value={UnitPurpose.SHORT_LET}>Short let</option>
-              <option value={UnitPurpose.RENTAL}>Rental</option>
-              <option value={UnitPurpose.HOSTEL}>Hostel</option>
+              {UNIT_PURPOSE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </UiSelect>
           </label>
           <label className="text-sm text-muted">

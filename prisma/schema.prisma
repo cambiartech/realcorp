@@ -231,6 +231,8 @@ model TenantSettings {
   shortletEodTime            String  @default("23:59")
   shortletCheckoutAlertHours Int     @default(2)
   shortletFinanceSync        Boolean @default(false)
+  /// Default service charge applied to every short-let stay unless the apartment overrides it.
+  shortletServiceCharge      Decimal? @db.Decimal(18, 2)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -435,6 +437,7 @@ enum UnitPurpose {
   SHORT_LET
   RENTAL
   HOSTEL
+  LIVING
 }
 
 enum ActivityType {
@@ -1128,6 +1131,7 @@ model ShortletUnit {
   isActive            Boolean                    @default(true)
   nightlyRate         Decimal                    @db.Decimal(18, 2)
   cleaningFee         Decimal?                   @db.Decimal(18, 2)
+  serviceCharge       Decimal?                   @db.Decimal(18, 2)
   cautionFee          Decimal?                   @db.Decimal(18, 2)
   currency            String                     @default("NGN")
   housekeepingStatus  ShortletHousekeepingStatus @default(VACANT_CLEAN)

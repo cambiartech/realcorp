@@ -10,6 +10,7 @@ const PURPOSE_LABELS: Record<string, string> = {
   SHORT_LET: "Short Let",
   RENTAL: "Rental",
   HOSTEL: "Hostel",
+  LIVING: "Living",
 };
 
 function formatPrice(value: number, currency: string) {
@@ -93,7 +94,7 @@ export function ExploreWorkspace({
           className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20 sm:max-w-xs"
         />
         <div className="flex flex-wrap gap-1.5">
-          {["ALL", "SALE", "SHORT_LET", "RENTAL"].map((p) => (
+          {["ALL", "SALE", "SHORT_LET", "RENTAL", "HOSTEL", "LIVING"].map((p) => (
             <button
               key={p}
               type="button"

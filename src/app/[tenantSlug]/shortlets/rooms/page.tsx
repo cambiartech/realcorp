@@ -1,6 +1,7 @@
 import prisma from "@/lib/db";
 import { MembershipStatus } from "@/generated/prisma";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { sortByUnitLabel } from "@/lib/unit-label-sort";
 import { loadShortletsContext } from "@/lib/shortlets-loaders";
 import { countByHousekeepingStatus } from "@/lib/shortlets-analytics";
 import { isCheckoutDueSoon, isCheckoutOverdue } from "@/lib/shortlets-settings";
@@ -69,7 +70,7 @@ export default async function RoomsPage({ params }: { params: Promise<{ tenantSl
     <RoomsWorkspace
       tenantSlug={ctx.tenant.slug}
       canHousekeeping={ctx.access.canHousekeeping}
-      rooms={rooms}
+      rooms={sortByUnitLabel(rooms, (room) => room.name)}
       summary={summary}
       teamOptions={teamMembers.map((m) => ({
         id: m.user.id,

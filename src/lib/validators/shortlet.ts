@@ -17,6 +17,7 @@ export const createShortletUnitSchema = z
     isActive: z.boolean().default(true),
     nightlyRate: z.number().positive(),
     cleaningFee: z.number().min(0).optional(),
+    serviceCharge: z.number().min(0).optional(),
     cautionFee: z.number().min(0).optional(),
     currency: z.string().trim().min(3).max(8),
   })
@@ -51,6 +52,7 @@ export const saveShortletUnitSchema = z.object({
   isActive: z.boolean().default(true),
   nightlyRate: z.number().positive(),
   cleaningFee: z.number().min(0).optional(),
+  serviceCharge: z.number().min(0).optional(),
   cautionFee: z.number().min(0).optional(),
   currency: z.string().trim().min(3).max(8),
 });
@@ -258,6 +260,7 @@ export const saveShortletPmsSettingsSchema = z.object({
     .regex(/^\d{2}:\d{2}$/),
   checkoutAlertHours: z.number().int().min(1).max(24),
   financeSync: z.boolean().default(false),
+  serviceCharge: z.number().min(0).nullable().optional(),
 });
 
 export const saveShortletPropertySchema = z.object({

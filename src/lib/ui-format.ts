@@ -11,7 +11,16 @@ const UNIT_PURPOSE_LABELS: Record<string, string> = {
   SHORT_LET: "Short let",
   RENTAL: "Rental",
   HOSTEL: "Hostel",
+  LIVING: "Living",
 };
+
+export const UNIT_PURPOSE_OPTIONS = [
+  { value: "SALE", label: "For sale" },
+  { value: "SHORT_LET", label: "Short let" },
+  { value: "RENTAL", label: "Rental" },
+  { value: "HOSTEL", label: "Hostel" },
+  { value: "LIVING", label: "Living" },
+] as const;
 
 /** Display label for inventory unit purpose (sale vs rental use cases). */
 export function formatUnitPurpose(value: string): string {

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { UnitPurpose, UnitStatus } from "@/generated/prisma";
+import { UNIT_PURPOSE_OPTIONS } from "@/lib/ui-format";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -101,7 +102,7 @@ export function ProjectUnitsWorkspace({
   const [planQuery, setPlanQuery] = useState("");
   const [unitStatusFilter, setUnitStatusFilter] = useState("");
   const [unitPurposeFilter, setUnitPurposeFilter] = useState("");
-  const { sortKey, sortDir, onSort } = useTableSort();
+  const { sortKey, sortDir, onSort } = useTableSort("label", "asc");
   const [editState, editAction, editPending] = useActionState(
     updateUnit.bind(null, tenantSlug, projectId, editingUnit?.id ?? ""),
     initial,
@@ -429,10 +430,11 @@ export function ProjectUnitsWorkspace({
               <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Purpose</label>
               <UiSelect value={unitPurposeFilter} onChange={(event) => setUnitPurposeFilter(event.target.value)}>
                 <option value="">All purposes</option>
-                <option value={UnitPurpose.SALE}>Sale</option>
-                <option value={UnitPurpose.RENTAL}>Rental</option>
-                <option value={UnitPurpose.SHORT_LET}>Short-let</option>
-                <option value={UnitPurpose.HOSTEL}>Hostel</option>
+                {UNIT_PURPOSE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </UiSelect>
             </div>
             <div className="w-full sm:max-w-[160px]">
@@ -583,10 +585,11 @@ export function ProjectUnitsWorkspace({
                   Purpose
                 </label>
                 <UiSelect id="unit-edit-purpose" name="purpose" defaultValue={editingUnit.purposeValue}>
-                  <option value={UnitPurpose.SALE}>For sale</option>
-                  <option value={UnitPurpose.SHORT_LET}>Short let</option>
-                  <option value={UnitPurpose.RENTAL}>Rental</option>
-                  <option value={UnitPurpose.HOSTEL}>Hostel</option>
+                  {UNIT_PURPOSE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </UiSelect>
               </div>
               <div>

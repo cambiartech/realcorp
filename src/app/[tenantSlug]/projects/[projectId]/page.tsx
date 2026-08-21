@@ -7,6 +7,7 @@ import { resolveTenantCurrencies } from "@/lib/finance-catalog";
 import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { canManageClients } from "@/lib/clients-access";
 import { suggestUnitLabels } from "@/lib/unit-label-suggestions";
+import { sortByUnitLabel } from "@/lib/unit-label-sort";
 import { notFound } from "next/navigation";
 import { ProjectUnitsWorkspace } from "./project-units-workspace";
 
@@ -60,7 +61,6 @@ export default async function ProjectUnitsPage({
       id: true,
       name: true,
       units: {
-        orderBy: { createdAt: "desc" },
         take: 400,
         select: {
           id: true,
@@ -106,7 +106,8 @@ export default async function ProjectUnitsPage({
       currencies={currencies}
       defaultCurrency={tenant.defaultCurrency || currencies[0] || "NGN"}
       suggestedLabels={suggestedLabels}
-      units={project.units.map((unit) => ({
+      units={sortByUnitLabel(
+        project.units.map((unit) => ({
         id: unit.id,
         label: unit.label,
         purpose: formatUnitPurpose(unit.purpose),
@@ -119,7 +120,9 @@ export default async function ProjectUnitsPage({
         canDelete: !unit.deal?.id && unit.status !== "RESERVED" && unit.status !== "SOLD",
         canReserve: !unit.deal?.id && unit.status === "AVAILABLE",
         canUnreserve: unit.status === "RESERVED",
-      }))}
+      })),
+        (unit) => unit.label,
+      )}
       pricingPlans={project.pricingPlans.map((plan) => ({
         id: plan.id,
         name: plan.name,

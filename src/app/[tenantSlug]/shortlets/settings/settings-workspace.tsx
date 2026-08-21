@@ -33,6 +33,7 @@ type Props = {
     eodTime: string;
     checkoutAlertHours: number;
     financeSync: boolean;
+    serviceCharge: number | null;
   };
   moduleFinance: boolean;
   serviceItems: ServiceRow[];
@@ -166,6 +167,26 @@ export function SettingsWorkspace({
               />
             </label>
           </div>
+          <label className="mt-4 block max-w-xs text-sm">
+            <span className="mb-1 block text-muted">Service charge (all short-lets)</span>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="w-full rounded-md border px-3 py-2"
+              placeholder="0"
+              value={settings.serviceCharge ?? ""}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  serviceCharge: e.target.value === "" ? null : Number(e.target.value),
+                }))
+              }
+            />
+            <span className="mt-1 block text-xs text-muted">
+              Added once per stay. An apartment can override this on its own record.
+            </span>
+          </label>
           {moduleFinance ? (
             <label className="mt-4 flex items-center gap-2 text-sm">
               <input

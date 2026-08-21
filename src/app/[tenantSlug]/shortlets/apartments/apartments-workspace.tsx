@@ -35,6 +35,7 @@ type ApartmentRow = {
   linkedProjectUnit: string | null;
   nightlyRate: number;
   cleaningFee: number | null;
+  serviceCharge: number | null;
   cautionFee: number | null;
   currency: string;
   sizeSqFt: number | null;
@@ -70,6 +71,7 @@ type FormState = {
   isActive: boolean;
   nightlyRate: string;
   cleaningFee: string;
+  serviceCharge: string;
   cautionFee: string;
   currency: string;
 };
@@ -90,6 +92,7 @@ function emptyForm(defaultCurrency: string, locationId: string): FormState {
     isActive: true,
     nightlyRate: "",
     cleaningFee: "",
+    serviceCharge: "",
     cautionFee: "",
     currency: defaultCurrency,
   };
@@ -111,6 +114,7 @@ function rowToForm(row: ApartmentRow): FormState {
     isActive: row.isActive,
     nightlyRate: String(row.nightlyRate),
     cleaningFee: row.cleaningFee != null ? String(row.cleaningFee) : "",
+    serviceCharge: row.serviceCharge != null ? String(row.serviceCharge) : "",
     cautionFee: row.cautionFee != null ? String(row.cautionFee) : "",
     currency: row.currency,
   };
@@ -173,6 +177,7 @@ export function ApartmentsWorkspace({
     isActive: form.isActive,
     nightlyRate: Number(form.nightlyRate),
     cleaningFee: form.cleaningFee ? Number(form.cleaningFee) : undefined,
+    serviceCharge: form.serviceCharge ? Number(form.serviceCharge) : undefined,
     cautionFee: form.cautionFee ? Number(form.cautionFee) : undefined,
     currency: form.currency,
   };
@@ -464,6 +469,13 @@ export function ApartmentsWorkspace({
                 placeholder="Cleaning fee"
                 value={form.cleaningFee}
                 onChange={(e) => setForm((f) => ({ ...f, cleaningFee: e.target.value }))}
+              />
+              <input
+                type="number"
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                placeholder="Service charge"
+                value={form.serviceCharge}
+                onChange={(e) => setForm((f) => ({ ...f, serviceCharge: e.target.value }))}
               />
               <input
                 type="number"

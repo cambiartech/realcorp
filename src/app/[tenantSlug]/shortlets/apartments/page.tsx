@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { sortByUnitLabel } from "@/lib/unit-label-sort";
 import { loadShortletsContext } from "@/lib/shortlets-loaders";
 import { ApartmentsWorkspace } from "./apartments-workspace";
 import { notFound } from "next/navigation";
@@ -43,7 +44,8 @@ export default async function ApartmentsPage({ params }: { params: Promise<{ ten
         id: u.id,
         label: `${u.project.name} · ${u.label}${u.unitType ? ` (${u.unitType})` : ""}`,
       }))}
-      apartments={apartments.map((u) => ({
+      apartments={sortByUnitLabel(
+        apartments.map((u) => ({
         id: u.id,
         name: u.name,
         locationName: u.property?.name || "",
@@ -53,6 +55,7 @@ export default async function ApartmentsPage({ params }: { params: Promise<{ ten
         nightlyRate: Number(u.nightlyRate),
         nightlyRateLabel: `${u.currency} ${Number(u.nightlyRate).toLocaleString()}`,
         cleaningFee: u.cleaningFee != null ? Number(u.cleaningFee) : null,
+        serviceCharge: u.serviceCharge != null ? Number(u.serviceCharge) : null,
         cautionFee: u.cautionFee != null ? Number(u.cautionFee) : null,
         currency: u.currency,
         sizeSqFt: u.sizeSqFt,
@@ -64,7 +67,9 @@ export default async function ApartmentsPage({ params }: { params: Promise<{ ten
         housekeepingStatus: formatEnumLabel(u.housekeepingStatus),
         isActive: u.isActive,
         linkedProjectUnit: u.projectUnit ? `${u.projectUnit.project.name} · ${u.projectUnit.label}` : null,
-      }))}
+      })),
+        (row) => row.name,
+      )}
     />
   );
 }

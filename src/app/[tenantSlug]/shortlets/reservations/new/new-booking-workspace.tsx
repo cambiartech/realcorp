@@ -26,6 +26,7 @@ type ApartmentOption = {
   propertyId: string | null;
   nightlyRate: number;
   cleaningFee: number;
+  serviceCharge: number;
   cautionFee: number | null;
   currency: string;
 };
@@ -196,7 +197,7 @@ export function NewBookingWorkspace({
       const apt = stay.available.find((a) => a.id === stay.unitId);
       if (!apt) continue;
       const nights = nightsBetween(stay.checkIn, stay.checkInTime, stay.checkOut, stay.checkOutTime);
-      subtotal += apt.nightlyRate * nights + apt.cleaningFee;
+      subtotal += apt.nightlyRate * nights + apt.cleaningFee + (apt.serviceCharge || 0);
       cautionTotal += apt.cautionFee || 0;
       currency = apt.currency;
     }

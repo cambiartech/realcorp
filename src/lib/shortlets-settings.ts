@@ -4,6 +4,7 @@ export type ShortletPmsSettings = {
   eodTime: string;
   checkoutAlertHours: number;
   financeSync: boolean;
+  serviceCharge: number | null;
 };
 
 export const DEFAULT_SHORTLET_PMS_SETTINGS: ShortletPmsSettings = {
@@ -12,6 +13,7 @@ export const DEFAULT_SHORTLET_PMS_SETTINGS: ShortletPmsSettings = {
   eodTime: "23:59",
   checkoutAlertHours: 2,
   financeSync: false,
+  serviceCharge: null,
 };
 
 export function parseShortletPmsSettings(
@@ -22,16 +24,21 @@ export function parseShortletPmsSettings(
         shortletEodTime?: string | null;
         shortletCheckoutAlertHours?: number | null;
         shortletFinanceSync?: boolean | null;
+        shortletServiceCharge?: { toString(): string } | number | null;
       }
     | null
     | undefined,
 ): ShortletPmsSettings {
+  const serviceRaw = raw && "shortletServiceCharge" in raw ? raw.shortletServiceCharge : null;
+  const serviceCharge =
+    serviceRaw == null || serviceRaw === undefined ? null : Number(serviceRaw.toString());
   return {
     checkInTime: raw?.shortletCheckInTime?.trim() || DEFAULT_SHORTLET_PMS_SETTINGS.checkInTime,
     checkOutTime: raw?.shortletCheckOutTime?.trim() || DEFAULT_SHORTLET_PMS_SETTINGS.checkOutTime,
     eodTime: raw?.shortletEodTime?.trim() || DEFAULT_SHORTLET_PMS_SETTINGS.eodTime,
     checkoutAlertHours: raw?.shortletCheckoutAlertHours ?? DEFAULT_SHORTLET_PMS_SETTINGS.checkoutAlertHours,
     financeSync: raw?.shortletFinanceSync ?? DEFAULT_SHORTLET_PMS_SETTINGS.financeSync,
+    serviceCharge: Number.isFinite(serviceCharge) ? serviceCharge : null,
   };
 }
 
