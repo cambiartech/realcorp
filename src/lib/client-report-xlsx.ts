@@ -13,6 +13,7 @@ export type ClientExportRow = {
   status: string;
   unitsCount: number;
   paid: number;
+  earnings: number;
   remaining: number;
   createdAtLabel: string;
 };
@@ -23,6 +24,7 @@ export type ClientUnitBalanceExportRow = {
   unitLabel: string;
   contractValue: number;
   collected: number;
+  earnings: number;
   remaining: number;
 };
 
@@ -38,6 +40,7 @@ export async function downloadClientPortfolioXlsx(input: {
   const generatedAtLabel = new Date().toLocaleString("en-NG");
   const stamp = new Date().toISOString().slice(0, 10);
   const totalPaid = input.clients.reduce((sum, row) => sum + row.paid, 0);
+  const totalEarnings = input.clients.reduce((sum, row) => sum + row.earnings, 0);
   const totalRemaining = input.clients.reduce((sum, row) => sum + row.remaining, 0);
   const totalContract = input.unitBalances.reduce((sum, row) => sum + row.contractValue, 0);
 
@@ -49,7 +52,7 @@ export async function downloadClientPortfolioXlsx(input: {
       companyName: input.companyName,
       generatedAtLabel,
       currency: input.currency,
-      subtitle: "Units, amounts paid, and remaining balances",
+      subtitle: "Units, amounts paid, property earnings, and remaining balances",
     },
     8,
   );
@@ -60,6 +63,7 @@ export async function downloadClientPortfolioXlsx(input: {
       { label: "Clients", value: input.clients.length },
       { label: "Unit amount", value: totalContract, tone: "highlight" },
       { label: "Paid", value: totalPaid, tone: "positive" },
+      { label: "Earnings", value: totalEarnings },
       { label: "Remaining", value: totalRemaining, tone: "negative" },
     ],
     input.currency,
@@ -78,7 +82,7 @@ export async function downloadClientPortfolioXlsx(input: {
   );
   addStyledDataTable(
     clientsSheet,
-    ["Client", "Phone", "Email", "Status", "Units", "Paid", "Remaining", "Added"],
+    ["Client", "Phone", "Email", "Status", "Units", "Paid", "Earnings", "Remaining", "Added"],
     input.clients.map((row) => [
       row.fullName,
       row.phone,
@@ -86,10 +90,11 @@ export async function downloadClientPortfolioXlsx(input: {
       row.status,
       row.unitsCount,
       row.paid,
+      row.earnings,
       row.remaining,
       row.createdAtLabel,
     ]),
-    { startRow: 5, currency: input.currency, moneyColumns: [6, 7] },
+    { startRow: 5, currency: input.currency, moneyColumns: [6, 7, 8] },
   );
 
   const unitsSheet = workbook.addWorksheet("Unit balances");
@@ -100,22 +105,23 @@ export async function downloadClientPortfolioXlsx(input: {
       companyName: input.companyName,
       generatedAtLabel,
       currency: input.currency,
-      subtitle: "What each client has paid and what is left on each unit",
+      subtitle: "What each client has paid toward the sale, property earnings, and remaining balances",
     },
     6,
   );
   addStyledDataTable(
     unitsSheet,
-    ["Client", "Project", "Unit", "Amount", "Paid", "Remaining"],
+    ["Client", "Project", "Unit", "Amount", "Paid", "Earnings", "Remaining"],
     input.unitBalances.map((row) => [
       row.clientName,
       row.projectLabel,
       row.unitLabel,
       row.contractValue,
       row.collected,
+      row.earnings,
       row.remaining,
     ]),
-    { startRow: 5, currency: input.currency, moneyColumns: [4, 5, 6] },
+    { startRow: 5, currency: input.currency, moneyColumns: [4, 5, 6, 7] },
   );
 
   await downloadWorkbook(workbook, `client-portfolio-${stamp}.xlsx`);
@@ -131,6 +137,7 @@ export async function downloadClientStatementXlsx(input: {
   contractValue: number;
   collected: number;
   remaining: number;
+  earnings: number;
   unitBalances: ClientUnitBalanceExportRow[];
   payments: Array<{
     paidAtLabel: string;
@@ -138,6 +145,7 @@ export async function downloadClientStatementXlsx(input: {
     amount: number;
     method: string;
     reference: string;
+    kind?: "Payment" | "Earning";
   }>;
 }) {
   const workbook = new ExcelJS.Workbook();
@@ -157,7 +165,7 @@ export async function downloadClientStatementXlsx(input: {
       currency: input.currency,
       subtitle: [input.phone, input.email, input.status].filter(Boolean).join(" · ") || "Client statement",
     },
-    6,
+    8,
   );
   addKpiCards(
     summary,
@@ -165,8 +173,12 @@ export async function downloadClientStatementXlsx(input: {
     [
       { label: "Unit amount", value: input.contractValue, tone: "highlight" },
       { label: "Paid", value: input.collected, tone: "positive" },
+      { label: "Earnings", value: input.earnings },
       { label: "Remaining", value: input.remaining, tone: "negative" },
-      { label: "Payments", value: input.payments.length },
+      {
+        label: "Transactions",
+        value: input.payments.length,
+      },
     ],
     input.currency,
   );
@@ -184,22 +196,23 @@ export async function downloadClientStatementXlsx(input: {
   );
   addStyledDataTable(
     unitsSheet,
-    ["Project", "Unit", "Amount", "Paid", "Remaining"],
+    ["Project", "Unit", "Amount", "Paid", "Earnings", "Remaining"],
     input.unitBalances.map((row) => [
       row.projectLabel,
       row.unitLabel,
       row.contractValue,
       row.collected,
+      row.earnings,
       row.remaining,
     ]),
-    { startRow: 5, currency: input.currency, moneyColumns: [3, 4, 5] },
+    { startRow: 5, currency: input.currency, moneyColumns: [3, 4, 5, 6] },
   );
 
   const paymentsSheet = workbook.addWorksheet("Payments");
   addReportBanner(
     paymentsSheet,
     {
-      title: "Payment history",
+      title: "Payments and earnings",
       companyName: input.companyName,
       generatedAtLabel,
       currency: input.currency,
@@ -208,15 +221,16 @@ export async function downloadClientStatementXlsx(input: {
   );
   addStyledDataTable(
     paymentsSheet,
-    ["Date", "Unit", "Amount", "Method", "Reference"],
+    ["Date", "Kind", "Unit", "Amount", "Method", "Reference"],
     input.payments.map((row) => [
       row.paidAtLabel,
+      row.kind || "Payment",
       row.unitLabel,
       row.amount,
       row.method || "—",
       row.reference || "—",
     ]),
-    { startRow: 5, currency: input.currency, moneyColumns: [3] },
+    { startRow: 5, currency: input.currency, moneyColumns: [4] },
   );
 
   await downloadWorkbook(workbook, `client-${safeName || "statement"}-${stamp}.xlsx`);

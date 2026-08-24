@@ -23,6 +23,23 @@ export function parseFinanceIncomeType(value: unknown): FinanceIncomeType {
   return isFinanceIncomeType(raw) ? raw : "OTHER";
 }
 
+/** Income generated on a property (e.g. short-let stays), not money the client paid toward a sale. */
+export function isPropertyEarningIncomeType(value: unknown): boolean {
+  return parseFinanceIncomeType(value) === "SHORTLET_REVENUE";
+}
+
+export function allocateClientCash(incomeType: unknown, amount: number) {
+  const value = money(Number(amount) || 0);
+  if (isPropertyEarningIncomeType(incomeType)) {
+    return { collected: 0, earnings: value, isDeposit: false };
+  }
+  return {
+    collected: value,
+    earnings: 0,
+    isDeposit: parseFinanceIncomeType(incomeType) === "CLIENT_DEPOSIT",
+  };
+}
+
 export function remainingClientBalance(input: {
   contractValue: number;
   collected: number;
@@ -62,17 +79,25 @@ export function resolveClientUnitSalePrice(input: {
   };
 }
 
+export type ClientDepositTotals = {
+  contractValue: number;
+  collected: number;
+  remaining: number;
+  earnings: number;
+};
+
 export function summarizeClientDeposits(
-  rows: Array<{ contractValue: number; collected: number; remaining: number }>,
-) {
-  return rows.reduce(
+  rows: Array<{ contractValue: number; collected: number; remaining: number; earnings?: number }>,
+): ClientDepositTotals {
+  return rows.reduce<ClientDepositTotals>(
     (acc, row) => {
       acc.contractValue = money(acc.contractValue + row.contractValue);
       acc.collected = money(acc.collected + row.collected);
       acc.remaining = money(acc.remaining + row.remaining);
+      acc.earnings = money(acc.earnings + (row.earnings || 0));
       return acc;
     },
-    { contractValue: 0, collected: 0, remaining: 0 },
+    { contractValue: 0, collected: 0, remaining: 0, earnings: 0 },
   );
 }
 

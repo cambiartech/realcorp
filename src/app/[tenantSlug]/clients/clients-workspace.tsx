@@ -44,6 +44,7 @@ type ClientRow = {
   unitsCount: number;
   documentsCount: number;
   paid: number;
+  earnings: number;
   remaining: number;
   createdAtLabel: string;
   portalStatus: ClientPortalStatus;
@@ -137,6 +138,7 @@ export function ClientsWorkspace({
     unitLabel: string;
     contractValue: number;
     collected: number;
+    earnings: number;
     remaining: number;
   }>;
   documents: ClientDocumentItem[];
@@ -194,6 +196,7 @@ export function ClientsWorkspace({
       if (key === "portal") return row.portalStatus;
       if (key === "units") return row.unitsCount;
       if (key === "paid") return row.paid;
+      if (key === "earnings") return row.earnings;
       if (key === "remaining") return row.remaining;
       if (key === "added") return row.createdAtLabel;
       return "";
@@ -402,6 +405,7 @@ export function ClientsWorkspace({
                     status: c.status,
                     unitsCount: c.unitsCount,
                     paid: c.paid,
+                    earnings: c.earnings,
                     remaining: c.remaining,
                     createdAtLabel: c.createdAtLabel,
                   })),
@@ -583,6 +587,7 @@ export function ClientsWorkspace({
                 <SortTh label="Portal" sortKey="portal" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <SortTh label="Units" sortKey="units" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <SortTh label="Paid" sortKey="paid" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Earnings" sortKey="earnings" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <SortTh label="Remaining" sortKey="remaining" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <SortTh label="Added" sortKey="added" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 {canManage ? <th className="px-4 py-3" /> : null}
@@ -591,7 +596,7 @@ export function ClientsWorkspace({
             <tbody className="divide-y divide-foreground/10">
               {visibleClients.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 10 : 9} className="px-4 py-10 text-center text-sm text-muted">
+                  <td colSpan={canManage ? 11 : 10} className="px-4 py-10 text-center text-sm text-muted">
                     {clients.length === 0 ? (
                       <>
                     No clients yet
@@ -642,7 +647,7 @@ export function ClientsWorkspace({
                     {group.label ? (
                     <tr className="bg-foreground/[0.035]">
                       <td
-                        colSpan={canManage ? 10 : 9}
+                        colSpan={canManage ? 11 : 10}
                         className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted"
                       >
                         {group.label}
@@ -691,6 +696,7 @@ export function ClientsWorkspace({
                     </td>
                     <td className="px-4 py-3 text-foreground">{client.unitsCount}</td>
                     <td className="px-4 py-3 text-foreground">{moneyLabel(currency, client.paid)}</td>
+                    <td className="px-4 py-3 text-foreground">{moneyLabel(currency, client.earnings)}</td>
                     <td className="px-4 py-3 font-medium text-foreground">
                       {moneyLabel(currency, client.remaining)}
                     </td>

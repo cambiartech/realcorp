@@ -484,6 +484,7 @@ type ReportView = {
     remaining: number;
     isDiscounted?: boolean;
     adjustmentReason?: string | null;
+    earnings?: number;
   }>;
 };
 
@@ -5279,7 +5280,7 @@ export function FinanceWorkspace({
                       />
                     </div>
                     {reportKind === "deposits" && filteredClientBalances.length > 0 ? (
-                      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="rounded-md border border-foreground/10 bg-background px-3 py-2">
                           <p className="text-[11px] uppercase text-muted">Sale amount</p>
                           <p className="mt-1 text-sm font-semibold">
@@ -5295,6 +5296,15 @@ export function FinanceWorkspace({
                             {reportView.currency}{" "}
                             {filteredClientBalances
                               .reduce((sum, row) => sum + row.collected, 0)
+                              .toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-foreground/10 bg-background px-3 py-2">
+                          <p className="text-[11px] uppercase text-muted">Earnings</p>
+                          <p className="mt-1 text-sm font-semibold">
+                            {reportView.currency}{" "}
+                            {filteredClientBalances
+                              .reduce((sum, row) => sum + (row.earnings || 0), 0)
                               .toLocaleString()}
                           </p>
                         </div>
@@ -5322,6 +5332,7 @@ export function FinanceWorkspace({
                               <th className="px-3 py-2">Unit</th>
                               <th className="px-3 py-2">Amount</th>
                               <th className="px-3 py-2">Paid</th>
+                              <th className="px-3 py-2">Earnings</th>
                               <th className="px-3 py-2">Remaining</th>
                             </tr>
                           </thead>
@@ -5350,6 +5361,10 @@ export function FinanceWorkspace({
                                 <td className="px-3 py-2">
                                   {reportView.currency}{" "}
                                   {row.collected.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {(row.earnings || 0).toLocaleString()}
                                 </td>
                                 <td className="px-3 py-2 font-semibold">
                                   {reportView.currency}{" "}

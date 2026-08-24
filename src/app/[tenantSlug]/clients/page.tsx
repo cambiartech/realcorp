@@ -148,11 +148,13 @@ export default async function ClientsPage({
       contractValue: 0,
       collected: 0,
       remaining: 0,
+      earnings: 0,
     };
     depositsByClient.set(row.clientId, {
       contractValue: current.contractValue + row.contractValue,
       collected: current.collected + row.collected,
       remaining: current.remaining + row.remaining,
+      earnings: current.earnings + row.earnings,
     });
   }
   const selectedProjectName = unlinkedOnly
@@ -171,6 +173,7 @@ export default async function ClientsPage({
         unitLabel: row.unitLabel,
         contractValue: row.contractValue,
         collected: row.collected,
+        earnings: row.earnings,
         remaining: row.remaining,
       }))}
       activeTab={parseTab(tabRaw)}
@@ -208,6 +211,7 @@ export default async function ClientsPage({
           unitsCount,
           documentsCount: c._count.documents,
           paid: money?.collected ?? 0,
+          earnings: money?.earnings ?? 0,
           remaining: money?.remaining ?? 0,
           createdAtLabel: c.createdAt.toISOString().slice(0, 10),
           portalStatus: portalStatusByClient.get(c.id) ?? ("none" as ClientPortalStatus),

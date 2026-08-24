@@ -519,7 +519,7 @@ export function HrWorkspace(props: {
 
         {activeTab === "my" ? (
           <HrMyDashboard
-            key={`${previewAs?.userId ?? "self"}:${initialMyTab ?? "overview"}`}
+            key={`${myDashboardPreview?.userId ?? "self"}:${initialMyTab ?? "overview"}`}
             tenantSlug={tenantSlug}
             companyName={companyName}
             tenantBrand={tenantBrand}

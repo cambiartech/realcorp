@@ -69,6 +69,18 @@ type ShortletPropertyOption = {
   }[];
 };
 
+type CashRow = {
+  id: string;
+  title: string;
+  unitLabel: string;
+  amount: number;
+  currency: string;
+  paidAtLabel: string;
+  method: string;
+  reference: string;
+  canVoid: boolean;
+};
+
 type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 const initial: ActionResult | null = null;
 
@@ -149,6 +161,7 @@ export function ClientDetailWorkspace({
   depositSummary,
   depositRows,
   payments,
+  earnings,
   paymentUnitOptions,
   unitLinks,
   shortletLinks,
@@ -175,7 +188,7 @@ export function ClientDetailWorkspace({
     statusValue: string;
     notes: string;
   };
-  depositSummary: { contractValue: number; collected: number; remaining: number };
+  depositSummary: { contractValue: number; collected: number; remaining: number; earnings: number };
   depositRows: Array<{
     id: string;
     unitId: string;
@@ -184,20 +197,13 @@ export function ClientDetailWorkspace({
     listPrice: number;
     contractValue: number;
     collected: number;
+    earnings: number;
     remaining: number;
     isDiscounted: boolean;
     adjustmentReason: string | null;
   }>;
-  payments: Array<{
-    id: string;
-    title: string;
-    unitLabel: string;
-    amount: number;
-    currency: string;
-    paidAtLabel: string;
-    method: string;
-    reference: string;
-  }>;
+  payments: CashRow[];
+  earnings: CashRow[];
   paymentUnitOptions: Array<{
     id: string;
     label: string;
@@ -327,6 +333,7 @@ export function ClientDetailWorkspace({
   );
   const pagedBalances = usePaged(depositRows, `${client.id}-balances-${depositRows.length}`);
   const pagedPayments = usePaged(payments, `${client.id}-payments-${payments.length}`);
+  const pagedEarnings = usePaged(earnings, `${client.id}-earnings-${earnings.length}`);
   const pagedLinks = usePaged(linkedRows, `${client.id}-links-${linkedRows.length}`);
   const selectedPayUnit = paymentUnitOptions.find((unit) => unit.id === payUnitId) ?? paymentUnitOptions[0];
   const selectedPayBalance = depositRows.find((row) => row.unitId === selectedPayUnit?.id);
@@ -539,21 +546,34 @@ export function ClientDetailWorkspace({
                 contractValue: depositSummary.contractValue,
                 collected: depositSummary.collected,
                 remaining: depositSummary.remaining,
+                earnings: depositSummary.earnings,
                 unitBalances: depositRows.map((row) => ({
                   clientName: profile.fullName,
                   projectLabel: row.projectLabel,
                   unitLabel: row.unitLabel,
                   contractValue: row.contractValue,
                   collected: row.collected,
+                  earnings: row.earnings,
                   remaining: row.remaining,
                 })),
-                payments: payments.map((payment) => ({
-                  paidAtLabel: payment.paidAtLabel,
-                  unitLabel: payment.unitLabel,
-                  amount: payment.amount,
-                  method: payment.method,
-                  reference: payment.reference,
-                })),
+                payments: [
+                  ...payments.map((payment) => ({
+                    paidAtLabel: payment.paidAtLabel,
+                    unitLabel: payment.unitLabel,
+                    amount: payment.amount,
+                    method: payment.method,
+                    reference: payment.reference,
+                    kind: "Payment" as const,
+                  })),
+                  ...earnings.map((row) => ({
+                    paidAtLabel: row.paidAtLabel,
+                    unitLabel: row.unitLabel,
+                    amount: row.amount,
+                    method: row.method,
+                    reference: row.reference,
+                    kind: "Earning" as const,
+                  })),
+                ],
               }).finally(() => setExporting(false));
             }}
             className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold disabled:opacity-50"
@@ -595,7 +615,7 @@ export function ClientDetailWorkspace({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Status</p>
           <p className="mt-1 font-semibold">{profile.status}</p>
@@ -610,10 +630,16 @@ export function ClientDetailWorkspace({
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Paid</p>
           <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.collected)}</p>
+          <p className="mt-1 text-xs text-muted">Toward the sale</p>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Remaining</p>
           <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.remaining)}</p>
+        </div>
+        <div className="rounded-lg border border-foreground/10 p-4">
+          <p className="text-xs uppercase text-muted">Earnings</p>
+          <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.earnings)}</p>
+          <p className="mt-1 text-xs text-muted">Income on linked properties</p>
         </div>
       </div>
 
@@ -679,10 +705,10 @@ export function ClientDetailWorkspace({
         <section className="mt-5 overflow-hidden rounded-lg border border-foreground/10">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/10 px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold">Payments & balance</h2>
+              <h2 className="text-sm font-semibold">Payments, earnings & balance</h2>
               <p className="mt-0.5 text-xs text-muted">
-                Part payments for a project unit. Remaining follows the sale price for this client, including
-                any promo or waived balance.
+                Paid is what the client paid toward the sale. Earnings are income generated on that
+                property, such as short-let stays. Earnings do not reduce remaining.
               </p>
             </div>
             {canManage ? (
@@ -695,9 +721,9 @@ export function ClientDetailWorkspace({
               </button>
             ) : null}
           </div>
-          {depositRows.length === 0 && payments.length === 0 ? (
+          {depositRows.length === 0 && payments.length === 0 && earnings.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted">
-              No payments yet. Link a unit, then record a part payment.
+              No payments or earnings yet. Link a unit, then record a part payment.
             </p>
           ) : (
             <div className="divide-y divide-foreground/10">
@@ -709,6 +735,7 @@ export function ClientDetailWorkspace({
                         <th className="px-4 py-2">Unit</th>
                         <th className="px-4 py-2">Amount</th>
                         <th className="px-4 py-2">Paid</th>
+                        <th className="px-4 py-2">Earnings</th>
                         <th className="px-4 py-2">Remaining</th>
                       </tr>
                     </thead>
@@ -729,6 +756,7 @@ export function ClientDetailWorkspace({
                             ) : null}
                           </td>
                           <td className="px-4 py-3">{moneyLabel(currency, row.collected)}</td>
+                          <td className="px-4 py-3">{moneyLabel(currency, row.earnings)}</td>
                           <td className="px-4 py-3 font-semibold">
                             {moneyLabel(currency, row.remaining)}
                           </td>
@@ -765,7 +793,7 @@ export function ClientDetailWorkspace({
                           <p className="font-semibold">
                             {moneyLabel(payment.currency || currency, payment.amount)}
                           </p>
-                          {canManage ? (
+                          {canManage && payment.canVoid ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -787,6 +815,56 @@ export function ClientDetailWorkspace({
                     total={pagedPayments.total}
                     itemLabel="payments"
                     onPage={pagedPayments.setPage}
+                  />
+                </div>
+              ) : null}
+              {earnings.length > 0 ? (
+                <div>
+                  <p className="px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted">
+                    Property earnings
+                  </p>
+                  <p className="px-4 pt-1 text-xs text-muted">
+                    Income generated on linked properties. Not a client payment and not organisation profit.
+                  </p>
+                  <ul className="space-y-2 px-4 py-3">
+                    {pagedEarnings.rows.map((row) => (
+                      <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                        <div>
+                          <p className="font-medium">{row.unitLabel}</p>
+                          <p className="text-xs text-muted">
+                            {row.title}
+                            {row.title ? " · " : ""}
+                            {row.paidAtLabel}
+                            {row.method ? ` · ${row.method}` : ""}
+                            {row.reference ? ` · ${row.reference}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p className="font-semibold">
+                            {moneyLabel(row.currency || currency, row.amount)}
+                          </p>
+                          {canManage && row.canVoid ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVoidReason("");
+                                setVoidPayment(row);
+                              }}
+                              className="text-xs font-semibold text-[var(--danger)] hover:underline"
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <LocalPager
+                    page={pagedEarnings.page}
+                    totalPages={pagedEarnings.totalPages}
+                    total={pagedEarnings.total}
+                    itemLabel="earnings"
+                    onPage={pagedEarnings.setPage}
                   />
                 </div>
               ) : null}

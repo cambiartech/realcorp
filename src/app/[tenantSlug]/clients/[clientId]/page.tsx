@@ -3,6 +3,7 @@ import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-te
 import { canManageClients } from "@/lib/clients-access";
 import prisma from "@/lib/db";
 import { loadClientDepositRows, summarizeClientDeposits } from "@/lib/client-deposits";
+import { isPropertyEarningIncomeType } from "@/lib/finance-income";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { ClientDetailWorkspace } from "./client-detail-workspace";
@@ -77,7 +78,7 @@ export default async function ClientDetailPage({
   });
   if (!client) notFound();
 
-  const [projects, linkedUnitIds, linkedShortletIds, shortletProperties, standaloneShortlets, depositRows, payments] =
+  const [projects, linkedUnitIds, linkedShortletIds, shortletProperties, standaloneShortlets, depositRows, payments, earningReceipts] =
     await Promise.all([
       prisma.project.findMany({
         where: { tenantId: tenant.id },
@@ -164,6 +165,32 @@ export default async function ClientDetailPage({
           reference: true,
           standaloneTitle: true,
           incomeType: true,
+          unit: { select: { label: true, project: { select: { name: true } } } },
+        },
+      }),
+      prisma.salesReceipt.findMany({
+        where: {
+          tenantId: tenant.id,
+          voidedAt: null,
+          NOT: { status: "VOID" },
+          incomeType: "SHORTLET_REVENUE",
+          OR: [
+            { deal: { propertyClient: { id: client.id } } },
+            ...(client.unitLinks.length
+              ? [{ unitId: { in: client.unitLinks.map((link) => link.unitId) } }]
+              : []),
+          ],
+        },
+        orderBy: { issuedAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          issuedAt: true,
+          paymentMode: true,
+          reference: true,
+          title: true,
           unit: { select: { label: true, project: { select: { name: true } } } },
         },
       }),
@@ -263,22 +290,56 @@ export default async function ClientDetailPage({
         listPrice: row.listPrice,
         contractValue: row.contractValue,
         collected: row.collected,
+        earnings: row.earnings,
         remaining: row.remaining,
         isDiscounted: row.isDiscounted,
         adjustmentReason: row.adjustmentReason,
       }))}
-      payments={payments.map((payment) => ({
-        id: payment.id,
-        title: payment.standaloneTitle || "Client deposit",
-        unitLabel: payment.unit
-          ? `${payment.unit.project.name} · ${payment.unit.label}`
-          : "Unassigned unit",
-        amount: Number(payment.amount),
-        currency: payment.currency,
-        paidAtLabel: payment.paidAt.toISOString().slice(0, 10),
-        method: payment.method ?? "",
-        reference: payment.reference ?? "",
-      }))}
+      payments={payments
+        .filter((payment) => !isPropertyEarningIncomeType(payment.incomeType))
+        .map((payment) => ({
+          id: payment.id,
+          title: payment.standaloneTitle || "Client payment",
+          unitLabel: payment.unit
+            ? `${payment.unit.project.name} · ${payment.unit.label}`
+            : "Unassigned unit",
+          amount: Number(payment.amount),
+          currency: payment.currency,
+          paidAtLabel: payment.paidAt.toISOString().slice(0, 10),
+          method: payment.method ?? "",
+          reference: payment.reference ?? "",
+          canVoid: true,
+        }))}
+      earnings={[
+        ...payments
+          .filter((payment) => isPropertyEarningIncomeType(payment.incomeType))
+          .map((payment) => ({
+            id: payment.id,
+            title: payment.standaloneTitle || "Property earning",
+            unitLabel: payment.unit
+              ? `${payment.unit.project.name} · ${payment.unit.label}`
+              : "Unassigned unit",
+            amount: Number(payment.amount),
+            currency: payment.currency,
+            paidAtLabel: payment.paidAt.toISOString().slice(0, 10),
+            method: payment.method ?? "",
+            reference: payment.reference ?? "",
+            canVoid: true,
+          })),
+        ...earningReceipts.map((receipt) => ({
+          id: receipt.id,
+          title: receipt.title || "Property earning",
+          unitLabel: receipt.unit
+            ? `${receipt.unit.project.name} · ${receipt.unit.label}`
+            : "Unassigned unit",
+          amount: Number(receipt.amount),
+          currency: receipt.currency,
+          paidAtLabel: receipt.issuedAt.toISOString().slice(0, 10),
+          method: receipt.paymentMode ?? "",
+          reference: receipt.reference ?? "",
+          canVoid: false,
+        })),
+      ].sort((a, b) => b.paidAtLabel.localeCompare(a.paidAtLabel) || a.id.localeCompare(b.id))}
       paymentUnitOptions={paymentUnitOptions}
       unitLinks={client.unitLinks.map((link) => ({
         id: link.id,

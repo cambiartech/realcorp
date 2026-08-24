@@ -1,5 +1,10 @@
 import prisma from "@/lib/db";
-import { remainingClientBalance, resolveClientUnitSalePrice, summarizeClientDeposits } from "@/lib/finance-income";
+import {
+  allocateClientCash,
+  remainingClientBalance,
+  resolveClientUnitSalePrice,
+  summarizeClientDeposits,
+} from "@/lib/finance-income";
 
 export { summarizeClientDeposits };
 
@@ -16,6 +21,7 @@ export type ClientDepositRow = {
   expectedDeposit: number;
   depositsPaid: number;
   collected: number;
+  earnings: number;
   remaining: number;
   isDiscounted: boolean;
   adjustmentReason: string | null;
@@ -161,7 +167,7 @@ export async function loadClientDepositRows(
     }
   }
 
-  type Cash = { collected: number; deposits: number };
+  type Cash = { collected: number; deposits: number; earnings: number };
   const cashByClientUnit = new Map<string, Cash>();
 
   const addCash = (clientId: string | null | undefined, projectId: string, unitId: string, amount: number, incomeType: string) => {
@@ -172,9 +178,11 @@ export async function loadClientDepositRows(
     }
     if (!resolvedClientId) return;
     const key = `${resolvedClientId}|${allocationKey(projectId, unitId)}`;
-    const current = cashByClientUnit.get(key) || { collected: 0, deposits: 0 };
-    current.collected = money(current.collected + amount);
-    if (incomeType === "CLIENT_DEPOSIT") current.deposits = money(current.deposits + amount);
+    const current = cashByClientUnit.get(key) || { collected: 0, deposits: 0, earnings: 0 };
+    const split = allocateClientCash(incomeType, amount);
+    current.collected = money(current.collected + split.collected);
+    current.earnings = money(current.earnings + split.earnings);
+    if (split.isDeposit) current.deposits = money(current.deposits + split.collected);
     cashByClientUnit.set(key, current);
   };
 
@@ -274,6 +282,7 @@ export async function loadClientDepositRows(
         expectedDeposit: unit.expectedDeposit,
         depositsPaid: cash?.deposits || 0,
         collected: cash?.collected || 0,
+        earnings: cash?.earnings || 0,
         remaining: remainingClientBalance({
           contractValue: unit.contractValue,
           collected: cash?.collected || 0,
@@ -302,6 +311,7 @@ export async function loadClientDepositRows(
       expectedDeposit: 0,
       depositsPaid: cash.deposits,
       collected: cash.collected,
+      earnings: cash.earnings,
       remaining: 0,
       isDiscounted: false,
       adjustmentReason: null,
@@ -309,6 +319,6 @@ export async function loadClientDepositRows(
   }
 
   return rows
-    .filter((row) => row.contractValue > 0 || row.collected > 0 || row.isDiscounted)
+    .filter((row) => row.contractValue > 0 || row.collected > 0 || row.earnings > 0 || row.isDiscounted)
     .sort((a, b) => b.remaining - a.remaining || a.clientName.localeCompare(b.clientName));
 }

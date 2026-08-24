@@ -552,7 +552,10 @@ export async function recordClientDeposit(
 
       async function collectedOnFile() {
         const paidAgg = await tx.paymentRecord.aggregate({
-          where: paidWhere,
+          where: {
+            ...paidWhere,
+            incomeType: { not: "SHORTLET_REVENUE" },
+          },
           _sum: { amount: true },
         });
         return Number(paidAgg._sum.amount || 0);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, summarizeClientDeposits, agreedPriceFromCatchUp } from "./finance-income";
+import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, summarizeClientDeposits, agreedPriceFromCatchUp, allocateClientCash, isPropertyEarningIncomeType } from "./finance-income";
 
 test("parses known income types and falls back to other", () => {
   assert.equal(parseFinanceIncomeType("CLIENT_DEPOSIT"), "CLIENT_DEPOSIT");
@@ -66,4 +66,34 @@ test("summarizes client deposit rows for list and reports", () => {
   assert.equal(totals.contractValue, 15_000_000);
   assert.equal(totals.collected, 7_000_000);
   assert.equal(totals.remaining, 8_000_000);
+  assert.equal(totals.earnings, 0);
+});
+
+test("short-let earnings stay off paid and remaining", () => {
+  assert.equal(isPropertyEarningIncomeType("SHORTLET_REVENUE"), true);
+  assert.equal(isPropertyEarningIncomeType("CLIENT_DEPOSIT"), false);
+
+  const earning = allocateClientCash("SHORTLET_REVENUE", 493_000);
+  assert.equal(earning.collected, 0);
+  assert.equal(earning.earnings, 493_000);
+  assert.equal(earning.isDeposit, false);
+
+  const payment = allocateClientCash("CLIENT_DEPOSIT", 20_000_000);
+  assert.equal(payment.collected, 20_000_000);
+  assert.equal(payment.earnings, 0);
+  assert.equal(payment.isDeposit, true);
+
+  const remaining = remainingClientBalance({
+    contractValue: 40_000_000,
+    collected: payment.collected,
+  });
+  assert.equal(remaining, 20_000_000);
+
+  const totals = summarizeClientDeposits([
+    { contractValue: 40_000_000, collected: 20_000_000, remaining: 20_000_000, earnings: 0 },
+    { contractValue: 0, collected: 0, remaining: 0, earnings: 493_000 },
+  ]);
+  assert.equal(totals.collected, 20_000_000);
+  assert.equal(totals.earnings, 493_000);
+  assert.equal(totals.remaining, 20_000_000);
 });
