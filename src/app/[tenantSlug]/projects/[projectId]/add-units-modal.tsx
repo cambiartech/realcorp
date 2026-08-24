@@ -234,6 +234,7 @@ export function AddUnitsModal({
           <div className="rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2">
             <p className="text-xs font-medium text-foreground">Preview ({previewLabels.length} units)</p>
             <p className="mt-1 text-xs text-muted">{previewLabels.join(" · ")}</p>
+            <p className="mt-1 text-xs text-muted">After save, the unit list stays in this numbered order.</p>
           </div>
         ) : null}
 

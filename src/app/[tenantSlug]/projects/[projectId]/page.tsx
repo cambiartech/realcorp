@@ -60,8 +60,9 @@ export default async function ProjectUnitsPage({
     select: {
       id: true,
       name: true,
+      currency: true,
+      serviceCharge: true,
       units: {
-        take: 400,
         select: {
           id: true,
           label: true,
@@ -101,6 +102,8 @@ export default async function ProjectUnitsPage({
       tenantSlug={tenant.slug}
       projectId={project.id}
       projectName={project.name}
+      projectCurrency={project.currency}
+      serviceCharge={project.serviceCharge != null ? Number(project.serviceCharge) : null}
       canManage={canManage}
       canImportClients={canManageClients(Boolean(session.user.isPlatformAdmin), membership)}
       currencies={currencies}

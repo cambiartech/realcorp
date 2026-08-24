@@ -14,6 +14,12 @@ export const createProjectSchema = z.object({
     .transform((v) => (v && v !== "" ? v : undefined))
     .refine((v) => !v || !Number.isNaN(Number(v)), "Base price must be a valid number."),
   currency: z.string().trim().min(3).max(3).optional(),
+  serviceCharge: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined))
+    .refine((v) => !v || !Number.isNaN(Number(v)), "Service charge must be a valid number."),
 });
 
 export const createUnitSchema = z.object({
@@ -59,6 +65,7 @@ export function parseCreateProjectForm(formData: FormData) {
     name: formData.get("name"),
     basePrice: formData.get("basePrice"),
     currency: formData.get("currency"),
+    serviceCharge: formData.get("serviceCharge"),
   });
 }
 

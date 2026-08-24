@@ -137,6 +137,7 @@ model Tenant {
   hrLeaveRequests             HrLeaveRequest[]
   hrLeaveBalances             HrLeaveBalance[]
   hrHolidays                  HrHoliday[]
+  celebrationSendLogs         CelebrationSendLog[]
   hrDocuments                 HrDocument[]
   hrPerformanceGoals          HrPerformanceGoal[]
   hrFormRequests              HrFormRequest[]
@@ -348,6 +349,8 @@ model Project {
   tenantId  String
   name      String
   basePrice Decimal? @db.Decimal(18, 2)
+  /// Estate / management service charge for this development (not the unit sale price).
+  serviceCharge Decimal? @db.Decimal(18, 2)
   currency  String   @default("NGN")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1833,18 +1836,39 @@ model HrLeaveBalance {
 }
 
 model HrHoliday {
-  id          String   @id @default(cuid())
-  tenantId    String
-  countryCode String?
-  regionCode  String?
-  date        DateTime
-  name        String
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  tenantId      String
+  countryCode   String?
+  regionCode    String?
+  date          DateTime
+  name          String
+  /// MANUAL = HR-entered. PUBLIC = synced from the free public-holiday API (shown as tentative).
+  source        String   @default("MANUAL")
+  /// Synced public holidays are shown as tentative until HR confirms or removes them.
+  tentative     Boolean  @default(false)
+  /// External id from the public-holiday feed (kept as googleEventId for existing rows).
+  googleEventId String?
+  createdAt     DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, date, countryCode, regionCode])
+  @@unique([tenantId, googleEventId])
   @@index([tenantId, date])
+}
+
+model CelebrationSendLog {
+  id                String   @id @default(cuid())
+  tenantId          String
+  employeeProfileId String
+  kind              String
+  sentOn            String
+  createdAt         DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeProfileId, kind, sentOn])
+  @@index([tenantId, sentOn])
 }
 
 model HrPayslip {

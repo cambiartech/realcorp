@@ -40,10 +40,14 @@ export default async function ApartmentsPage({ params }: { params: Promise<{ ten
       defaultCurrency={ctx.tenant.defaultCurrency}
       currencies={ctx.currencies}
       locationOptions={locations.map((l) => ({ id: l.id, label: l.name }))}
-      projectUnitOptions={projectUnits.map((u) => ({
-        id: u.id,
-        label: `${u.project.name} · ${u.label}${u.unitType ? ` (${u.unitType})` : ""}`,
-      }))}
+      defaultServiceCharge={ctx.pmsSettings.serviceCharge}
+      projectUnitOptions={sortByUnitLabel(
+        projectUnits.map((u) => ({
+          id: u.id,
+          label: `${u.project.name} · ${u.label}${u.unitType ? ` (${u.unitType})` : ""}`,
+        })),
+        (u) => u.label,
+      )}
       apartments={sortByUnitLabel(
         apartments.map((u) => ({
         id: u.id,

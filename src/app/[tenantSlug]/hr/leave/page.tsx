@@ -10,8 +10,10 @@ import {
 import { redirectToLogin } from "@/lib/login-redirect";
 import { paginate, parsePage } from "@/lib/pagination";
 import { normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
+import { syncPublicHolidaysForTenant } from "@/lib/org-calendar-jobs";
 import { loadTenantRequest } from "@/lib/tenant-request";
 import { notFound, redirect } from "next/navigation";
+import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +98,9 @@ export default async function HrLeavePage({
     redirect(`/${tenantSlug}/hr/dashboard?view=leave`);
   }
   const countryCode = tenant.settings?.payrollCountryCode || "NG";
+  after(() => {
+    void syncPublicHolidaysForTenant({ tenantId: tenant.id, countryCode });
+  });
 
   try {
     await ensureDefaultLeaveTypes(tenant.id, countryCode);
@@ -226,6 +231,8 @@ export default async function HrLeavePage({
             date: dateLabel(holiday.date),
             countryCode: holiday.countryCode || "",
             regionCode: holiday.regionCode || "",
+            tentative: holiday.tentative,
+            source: holiday.source,
           }))}
           employeeOptions={employees.map((employee) => ({
             id: employee.id,

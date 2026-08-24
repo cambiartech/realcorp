@@ -54,6 +54,7 @@ type Props = {
   apartments: ApartmentRow[];
   locationOptions: LocationOption[];
   projectUnitOptions: Array<{ id: string; label: string }>;
+  defaultServiceCharge?: number | null;
 };
 
 type FormState = {
@@ -127,6 +128,7 @@ export function ApartmentsWorkspace({
   apartments,
   locationOptions,
   projectUnitOptions,
+  defaultServiceCharge,
 }: Props) {
   const { showSnackbar } = useSnackbar();
   const [isPending, startTransition] = useTransition();
@@ -365,40 +367,55 @@ export function ApartmentsWorkspace({
               ) : null}
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  className="rounded-md border px-3 py-2 text-sm"
-                  placeholder="Floor (e.g. 2nd Floor)"
-                  value={form.floor}
-                  onChange={(e) => setForm((f) => ({ ...f, floor: e.target.value }))}
-                />
-                <input
-                  className="rounded-md border px-3 py-2 text-sm"
-                  placeholder="Rooms (e.g. Studio, 2 Bed 1 Bath)"
-                  value={form.roomLayout}
-                  onChange={(e) => setForm((f) => ({ ...f, roomLayout: e.target.value }))}
-                />
-                <input
-                  type="number"
-                  className="rounded-md border px-3 py-2 text-sm"
-                  placeholder="Size (sq ft)"
-                  value={form.sizeSqFt}
-                  onChange={(e) => setForm((f) => ({ ...f, sizeSqFt: e.target.value }))}
-                />
-                <input
-                  type="number"
-                  className="rounded-md border px-3 py-2 text-sm"
-                  placeholder="Max occupancy"
-                  value={form.maxOccupancy}
-                  onChange={(e) => setForm((f) => ({ ...f, maxOccupancy: e.target.value }))}
-                />
+                <label className="block text-sm text-muted">
+                  Floor
+                  <input
+                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="e.g. 2nd Floor"
+                    value={form.floor}
+                    onChange={(e) => setForm((f) => ({ ...f, floor: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-sm text-muted">
+                  Rooms / layout
+                  <input
+                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="e.g. Studio, 2 Bed 1 Bath"
+                    value={form.roomLayout}
+                    onChange={(e) => setForm((f) => ({ ...f, roomLayout: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-sm text-muted">
+                  Size (sq ft)
+                  <input
+                    type="number"
+                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="Optional"
+                    value={form.sizeSqFt}
+                    onChange={(e) => setForm((f) => ({ ...f, sizeSqFt: e.target.value }))}
+                  />
+                </label>
+                <label className="block text-sm text-muted">
+                  Max occupancy
+                  <input
+                    type="number"
+                    className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="Optional"
+                    value={form.maxOccupancy}
+                    onChange={(e) => setForm((f) => ({ ...f, maxOccupancy: e.target.value }))}
+                  />
+                </label>
               </div>
-              <textarea
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                rows={3}
-                placeholder="Description"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
+              <label className="block text-sm text-muted">
+                Description
+                <textarea
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  rows={3}
+                  placeholder="Optional notes for the listing"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </label>
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted">Amenities</p>
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -455,35 +472,76 @@ export function ApartmentsWorkspace({
                 />
                 Active listing
               </label>
-              <input
-                type="number"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="Rate per night"
-                value={form.nightlyRate}
-                onChange={(e) => setForm((f) => ({ ...f, nightlyRate: e.target.value }))}
-                required
-              />
-              <input
-                type="number"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="Cleaning fee"
-                value={form.cleaningFee}
-                onChange={(e) => setForm((f) => ({ ...f, cleaningFee: e.target.value }))}
-              />
-              <input
-                type="number"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="Service charge"
-                value={form.serviceCharge}
-                onChange={(e) => setForm((f) => ({ ...f, serviceCharge: e.target.value }))}
-              />
-              <input
-                type="number"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="Caution fee"
-                value={form.cautionFee}
-                onChange={(e) => setForm((f) => ({ ...f, cautionFee: e.target.value }))}
-              />
+              <label className="block text-sm text-muted">
+                Rate per night
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Guest pays this each night"
+                  value={form.nightlyRate}
+                  onChange={(e) => setForm((f) => ({ ...f, nightlyRate: e.target.value }))}
+                  required
+                />
+                <span className="mt-1 block text-xs text-muted">
+                  Stay income for this apartment (owner / operator). Added to the guest bill for each night.
+                </span>
+              </label>
+              <label className="block text-sm text-muted">
+                Cleaning fee
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Once per stay"
+                  value={form.cleaningFee}
+                  onChange={(e) => setForm((f) => ({ ...f, cleaningFee: e.target.value }))}
+                />
+                <span className="mt-1 block text-xs text-muted">
+                  Guest pays once per stay. This is housekeeping / ops — not refundable, not owner nightly
+                  income.
+                </span>
+              </label>
+              <label className="block text-sm text-muted">
+                Service charge
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder={
+                    defaultServiceCharge != null
+                      ? `Org default ${defaultServiceCharge.toLocaleString()}`
+                      : "Once per stay, or leave blank"
+                  }
+                  value={form.serviceCharge}
+                  onChange={(e) => setForm((f) => ({ ...f, serviceCharge: e.target.value }))}
+                />
+                <span className="mt-1 block text-xs text-muted">
+                  Guest pays once per stay to the organisation / estate (management), not the apartment
+                  owner’s nightly rate. Leave blank to use the all-short-lets default in Short-lets →
+                  Settings
+                  {defaultServiceCharge != null ? ` (${form.currency} ${defaultServiceCharge.toLocaleString()})` : ""}
+                  . A filled value on this apartment overrides that default and stays on the guest bill.
+                </span>
+              </label>
+              <label className="block text-sm text-muted">
+                Caution fee
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="Refundable deposit"
+                  value={form.cautionFee}
+                  onChange={(e) => setForm((f) => ({ ...f, cautionFee: e.target.value }))}
+                />
+                <span className="mt-1 block text-xs text-muted">
+                  Held for the guest as a refundable deposit. Not income unless it is forfeited.
+                </span>
+              </label>
               <label className="block text-sm text-muted">
                 Currency
                 <UiSelect

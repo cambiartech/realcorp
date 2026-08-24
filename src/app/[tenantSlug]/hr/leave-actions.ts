@@ -18,6 +18,7 @@ import {
   ensureDefaultLeaveTypes,
   loadLeaveBalanceSummaries,
 } from "@/lib/hr-leave-server";
+import { syncPublicHolidaysForTenant } from "@/lib/org-calendar-jobs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -631,4 +632,22 @@ export async function deleteLeaveHoliday(
   });
   revalidateLeave(tenantSlug);
   return { ok: true };
+}
+
+export async function syncLeavePublicHolidays(
+  tenantSlug: string,
+): Promise<{ ok: true; upserted: number } | { ok: false; error: string }> {
+  const ctx = await leaveContext(tenantSlug);
+  if (!ctx.ok) return { ok: false, error: ctx.error };
+  if (!canManageHr(Boolean(ctx.session.user.isPlatformAdmin), ctx.membership)) {
+    return { ok: false, error: "You do not have permission to configure holidays." };
+  }
+  const countryCode = ctx.tenant.settings?.payrollCountryCode || "NG";
+  const result = await syncPublicHolidaysForTenant({
+    tenantId: ctx.tenant.id,
+    countryCode,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidateLeave(tenantSlug);
+  return { ok: true, upserted: result.upserted };
 }

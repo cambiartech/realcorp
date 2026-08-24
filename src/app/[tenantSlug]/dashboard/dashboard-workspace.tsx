@@ -31,6 +31,7 @@ import {
   MODAL_PANEL_2XL,
 } from "@/lib/modal-panel";
 import { TenantPageShell } from "@/components/tenant-page-shell";
+import { TodayPeopleBoard } from "@/components/today-people-board";
 import type { OrgSetupStep } from "@/lib/org-setup-checklist";
 import { UiSelect } from "@/components/ui-select";
 import { formatEnumLabel } from "@/lib/ui-format";
@@ -492,6 +493,7 @@ export function DashboardWorkspace({
   orgSetupPercent,
   userId,
   initialOpenGoals,
+  todayBoard,
 }: {
   tenantSlug: string;
   tenantName: string;
@@ -507,6 +509,11 @@ export function DashboardWorkspace({
   orgSetupPercent: number;
   userId: string;
   initialOpenGoals?: boolean;
+  todayBoard: {
+    birthdays: Array<{ name: string; department: string }>;
+    anniversaries: Array<{ name: string; department: string; years: number }>;
+    holidays: Array<{ name: string; tentative: boolean }>;
+  };
 }) {
   const initialUi = useMemo(
     () => getServerAlignedDashboardUi(initialRoleView, initialWidgetIds, values.hrModuleEnabled),
@@ -1112,6 +1119,8 @@ export function DashboardWorkspace({
           ) : null}
         </div>
       </div>
+
+      <TodayPeopleBoard board={todayBoard} />
 
       {values.hrOnboarding.state !== "none" ? (
         <section

@@ -9,6 +9,7 @@ import {
   requestLeave,
   reviewLeaveRequest,
   saveLeaveHoliday,
+  syncLeavePublicHolidays,
   updateLeaveType,
 } from "@/app/[tenantSlug]/hr/leave-actions";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
@@ -112,6 +113,8 @@ export function HrLeaveWorkspace({
     date: string;
     countryCode: string;
     regionCode: string;
+    tentative?: boolean;
+    source?: string;
   }>;
   employeeOptions: Array<{ id: string; name: string }>;
   pendingTeamCount: number;
@@ -394,25 +397,67 @@ export function HrLeaveWorkspace({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-foreground/10 px-4 py-3">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Public holiday calendar</h2>
-                <p className="text-xs text-muted">Matching holidays are excluded from working-day requests.</p>
+                <p className="text-xs text-muted">
+                  Staff leave excludes weekends and these dates. Public holidays for the organisation
+                  country are pulled automatically and marked tentative — add custom dates here too.
+                  Short-let operations are not affected.
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowHoliday(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add holiday
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setPending(true);
+                    try {
+                      const res = await syncLeavePublicHolidays(tenantSlug);
+                      if (res.ok) {
+                        showSnackbar(
+                          res.upserted
+                            ? `Updated ${res.upserted} public holiday${res.upserted === 1 ? "" : "s"} (tentative).`
+                            : "Public holiday calendar is up to date.",
+                          "success",
+                        );
+                        router.refresh();
+                      } else {
+                        showSnackbar(res.error, "error");
+                      }
+                    } finally {
+                      setPending(false);
+                    }
+                  }}
+                  disabled={pending}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+                >
+                  Sync public holidays
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowHoliday(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add custom holiday
+                </button>
+              </div>
             </div>
             {holidays.length ? (
               <div className="divide-y divide-foreground/10">
                 {holidays.map((holiday) => (
                   <div key={holiday.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-foreground">{holiday.name}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {holiday.name}
+                        {holiday.tentative ? (
+                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                            Tentative
+                          </span>
+                        ) : null}
+                      </p>
                       <p className="text-xs text-muted">
                         {holiday.date} · {holiday.countryCode || "All countries"}
                         {holiday.regionCode ? ` / ${holiday.regionCode}` : ""}
+                        {holiday.source === "PUBLIC" || holiday.source === "GOOGLE"
+                          ? " · Public holidays (tentative)"
+                          : " · Custom"}
                       </p>
                     </div>
                     <button

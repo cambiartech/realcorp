@@ -184,7 +184,8 @@ export function SettingsWorkspace({
               }
             />
             <span className="mt-1 block text-xs text-muted">
-              Added once per stay. An apartment can override this on its own record.
+              Guest pays this once per stay to the organisation / estate (management). Apartments can
+              override it on their own record. Leave empty for none.
             </span>
           </label>
           {moduleFinance ? (

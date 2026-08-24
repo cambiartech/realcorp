@@ -18,5 +18,8 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions."org-calendar-cron"]
+  schedule = "0 7 * * *"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

@@ -17,3 +17,9 @@ test("room labels sort by number, not creation or lexicographic order", () => {
     "RM 10 MR TEN",
   ]);
 });
+
+test("Room 1–10 stay in numbered order after a lexicographic shuffle", () => {
+  const labels = ["Room 10", "Room 1", "Room 2", "Room 11", "Room 3"];
+  const sorted = [...labels].sort(compareByUnitLabel);
+  assert.deepEqual(sorted, ["Room 1", "Room 2", "Room 3", "Room 10", "Room 11"]);
+});

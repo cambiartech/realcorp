@@ -13,6 +13,7 @@ import {
 } from "@/lib/org-membership-profile";
 import { buildOrgSetupSteps, orgSetupProgress } from "@/lib/org-setup-checklist";
 import { loadHrDashboardMetrics } from "@/lib/hr-dashboard-metrics";
+import { loadTodayBoard } from "@/lib/org-calendar-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -292,7 +293,10 @@ export default async function TenantHomePage({
     }),
   ]);
 
-  const hrMetrics = await loadHrDashboardMetrics(tenant.id, tenantSlug, moduleHrEnabled);
+  const [hrMetrics, todayBoard] = await Promise.all([
+    loadHrDashboardMetrics(tenant.id, tenantSlug, moduleHrEnabled),
+    loadTodayBoard(tenant.id),
+  ]);
 
   const orgSetupSteps = buildOrgSetupSteps({
     tenantSlug: tenant.slug,
@@ -616,6 +620,7 @@ export default async function TenantHomePage({
       orgSetupPercent={orgSetup.percent}
       userId={session.user.id}
       initialOpenGoals={sp.openGoals === "1"}
+      todayBoard={todayBoard}
       values={{
         revenueMtd,
         pipelineOpen,

@@ -121,6 +121,7 @@ export default async function TenantProjectsPage({
         unitsCount: project._count.units,
         createdAt: project.createdAt.toISOString().slice(0, 10),
         basePrice: project.basePrice ? Number(project.basePrice) : null,
+        serviceCharge: project.serviceCharge != null ? Number(project.serviceCharge) : null,
         currency: project.currency,
         isPublished: project.isPublished,
         listingDescription: project.listingDescription,

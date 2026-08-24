@@ -274,3 +274,30 @@ export async function sendInvoiceEmail(input: {
     return { ok: false as const, error: msg };
   }
 }
+
+export async function sendCelebrationEmail(input: {
+  to: string;
+  subject: string;
+  html: string;
+  fromName?: string;
+}) {
+  const resend = getResendClient();
+  if (!resend) {
+    return { ok: false as const, error: "Email is not configured (RESEND_API_KEY)." };
+  }
+  const from = `${input.fromName || getFromName()} <${getFromAddress()}>`;
+  const replyTo = getReplyToAddress();
+  try {
+    const result = await resend.emails.send({
+      from,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      ...(replyTo ? { replyTo } : {}),
+    });
+    return parseResendSendResult(result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to send email.";
+    return { ok: false as const, error: msg };
+  }
+}

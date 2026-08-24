@@ -19,6 +19,7 @@ import {
   ensureClientsFromUnitLabels,
   wantsImportAsClient,
 } from "@/lib/ensure-client-from-unit-label";
+import { compareByUnitLabel } from "@/lib/unit-label-sort";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -76,6 +77,7 @@ export async function createProject(
         tenantId: tenant.id,
         name: parsed.data.name,
         basePrice: parsed.data.basePrice ? Number(parsed.data.basePrice) : null,
+        serviceCharge: parsed.data.serviceCharge ? Number(parsed.data.serviceCharge) : null,
         currency: (parsed.data.currency || "NGN").toUpperCase(),
       },
     });
@@ -219,7 +221,7 @@ export async function createUnitsBulk(
   if (!project) return { ok: false, error: "Project not found." };
 
   const existing = new Set(project.units.map((u) => u.label.toLowerCase()));
-  const uniqueLabels = [...new Set(parsed.data.labels.map((l) => l.trim()))];
+  const uniqueLabels = [...new Set(parsed.data.labels.map((l) => l.trim()))].sort(compareByUnitLabel);
   const duplicate = uniqueLabels.find((l) => existing.has(l.toLowerCase()));
   if (duplicate) {
     return { ok: false, error: `Unit "${duplicate}" already exists in this project.` };
@@ -328,6 +330,7 @@ export async function updateProject(
       data: {
         name: parsed.data.name,
         basePrice: parsed.data.basePrice ? Number(parsed.data.basePrice) : null,
+        serviceCharge: parsed.data.serviceCharge ? Number(parsed.data.serviceCharge) : null,
         currency: (parsed.data.currency || "NGN").toUpperCase(),
         coverImageUrl,
         galleryUrls,

@@ -44,7 +44,7 @@ export function generateBulkUnitLabels(opts: {
   projectName: string;
 }): string[] {
   const count = Math.min(Math.max(opts.count, 1), 50);
-  const start = maxTrailingNumber(opts.existingLabels) + 1;
+  const existing = new Set(opts.existingLabels.map((label) => label.trim().toLowerCase()));
 
   let prefix = opts.baseLabel?.trim();
   if (!prefix && opts.pricingPlanName?.trim()) {
@@ -57,12 +57,20 @@ export function generateBulkUnitLabels(opts: {
   const trailingNum = prefix.match(/^(.*?)(\d+)$/);
   const stem = trailingNum ? trailingNum[1].trimEnd() : prefix;
   const padWidth = trailingNum ? trailingNum[2].length : 2;
+  // Honour "Room 1" as the start. Otherwise continue after the highest existing number.
+  let n = trailingNum ? Number(trailingNum[2]) : maxTrailingNumber(opts.existingLabels) + 1;
+  if (!Number.isFinite(n) || n < 1) n = 1;
 
   const out: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const n = start + i;
+  let guard = 0;
+  while (out.length < count && guard < 500) {
+    guard += 1;
     const num = String(n).padStart(padWidth, "0");
-    out.push(stem ? `${stem} ${num}` : num);
+    const label = stem ? `${stem} ${num}` : num;
+    n += 1;
+    if (existing.has(label.toLowerCase())) continue;
+    existing.add(label.toLowerCase());
+    out.push(label);
   }
   return out;
 }

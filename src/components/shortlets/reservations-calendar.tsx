@@ -40,7 +40,11 @@ export function ReservationsCalendar({
   const startOffset = firstDay.getDay();
   const monthLabel = new Intl.DateTimeFormat("en-NG", { month: "long", year: "numeric" }).format(firstDay);
 
-  const cells: Array<{ day: number | null; dateStr: string | null; events: CalendarEvent[] }> = [];
+  const cells: Array<{
+    day: number | null;
+    dateStr: string | null;
+    events: CalendarEvent[];
+  }> = [];
   for (let i = 0; i < startOffset; i += 1) cells.push({ day: null, dateStr: null, events: [] });
   for (let d = 1; d <= totalDays; d += 1) {
     const dayStr = `${month}-${String(d).padStart(2, "0")}`;
@@ -131,7 +135,8 @@ export function ReservationsCalendar({
         ))}
       </div>
       <p className="mt-3 text-xs text-muted">
-        Click a booking to open the guest bill. Click an empty day to start a new reservation.
+        Click a booking to open the guest bill. Click an empty day to start a new reservation. Short-lets run
+        every day — this calendar is occupancy only.
       </p>
     </div>
   );

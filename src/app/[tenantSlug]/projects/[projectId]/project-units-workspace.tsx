@@ -67,6 +67,8 @@ export function ProjectUnitsWorkspace({
   tenantSlug,
   projectId,
   projectName,
+  projectCurrency,
+  serviceCharge,
   canManage,
   canImportClients,
   suggestedLabels,
@@ -78,6 +80,8 @@ export function ProjectUnitsWorkspace({
   tenantSlug: string;
   projectId: string;
   projectName: string;
+  projectCurrency?: string;
+  serviceCharge?: number | null;
   canManage: boolean;
   canImportClients?: boolean;
   suggestedLabels: string[];
@@ -273,6 +277,12 @@ export function ProjectUnitsWorkspace({
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-muted">Project units</p>
           <h1 className="mt-1 text-2xl font-bold text-foreground">{projectName}</h1>
+          {serviceCharge != null ? (
+            <p className="mt-1 text-sm text-muted">
+              Estate service charge: {projectCurrency || defaultCurrency} {serviceCharge.toLocaleString()} — set on the project,
+              not added to a unit sale automatically.
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <Link

@@ -32,6 +32,7 @@ type ProjectRow = {
   unitsCount: number;
   createdAt: string;
   basePrice: number | null;
+  serviceCharge: number | null;
   currency: string;
   isPublished: boolean;
   listingDescription: string | null;
@@ -174,6 +175,7 @@ export function ProjectsWorkspace({
         name: p.name,
         units: p.unitsCount,
         basePrice: p.basePrice != null ? `${p.currency} ${p.basePrice.toLocaleString()}` : "—",
+        serviceCharge: p.serviceCharge != null ? `${p.currency} ${p.serviceCharge.toLocaleString()}` : "—",
         location: [p.locationCity, p.locationState, p.locationCountry].filter(Boolean).join(", ") || "—",
         published: p.isPublished ? "Yes" : "No",
         createdAt: p.createdAt,
@@ -495,6 +497,21 @@ export function ProjectsWorkspace({
                 defaultCurrency={defaultCurrency}
               />
             </div>
+            <div>
+              <label htmlFor="project-service-charge" className="mb-1 block text-sm text-muted">
+                Service charge (optional)
+              </label>
+              <input
+                id="project-service-charge"
+                name="serviceCharge"
+                inputMode="decimal"
+                placeholder="e.g. 50000"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+              <p className="mt-1 text-xs text-muted">
+                Estate / management fee for this project. Not added to the unit sale price automatically.
+              </p>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -571,6 +588,23 @@ export function ProjectsWorkspace({
                   defaultValue={editingProject.currency}
                 />
               </div>
+            </div>
+            <div>
+              <label htmlFor="project-edit-service-charge" className="mb-1 block text-sm text-muted">
+                Service charge (optional)
+              </label>
+              <input
+                id="project-edit-service-charge"
+                name="serviceCharge"
+                inputMode="decimal"
+                defaultValue={editingProject.serviceCharge != null ? String(editingProject.serviceCharge) : ""}
+                placeholder="e.g. 50000"
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+              <p className="mt-1 text-xs text-muted">
+                Estate / management fee for this development — who the organisation charges unit owners. Not
+                mixed into the sale price.
+              </p>
             </div>
 
             <ListingImageUpload
