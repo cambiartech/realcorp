@@ -104,6 +104,7 @@ const GRANT_TO_NAV: Record<string, TenantNavKey> = {
   HR: "hr",
   TASKS: "tasks",
   FACILITY: "facility",
+  CLIENTS: "clients",
 };
 
 function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): TenantNavKey[] {
@@ -136,7 +137,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
       return [...SALES_STACK, "clients", "tasks", "listings", "stakeholders", "settings"];
     case MembershipRole.SALES_EXECUTIVE:
     default:
-      return [...SALES_STACK, "clients", "tasks", "settings"];
+      return [...SALES_STACK, "tasks", "settings"];
   }
 }
 
@@ -184,6 +185,7 @@ function applyRoleGrants(
     if (nav === "hr" && s.moduleHr) set.add("hr");
     if (nav === "tasks" && s.moduleTasks) set.add("tasks");
     if (nav === "facility" && s.moduleFacility) set.add("facility");
+    if (nav === "clients" && s.moduleClients) set.add("clients");
   }
   return NAV_ORDER.filter((k) => set.has(k));
 }

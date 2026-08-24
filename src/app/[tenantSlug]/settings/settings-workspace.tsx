@@ -703,8 +703,9 @@ export function SettingsWorkspace({
                   Optional add-ons by role
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  Grant extra sidebar areas beyond each role&apos;s defaults. Greyed out = that module is not
-                  on your plan.
+                  Grant extra sidebar areas beyond each role&apos;s defaults. Clients is sensitive — Sales
+                  people do not get it unless you tick it here or assign it on the person in Team. Greyed out
+                  = that module is not on your plan.
                 </p>
                 <RoleExtraAccessMatrix modules={modules} initialGrants={initialRoleGrants} />
               </div>
@@ -1036,12 +1037,14 @@ const EXTRA_COLUMN_META: Record<ExtraModuleGrantToken, { title: string; subtitle
   COMMUNITY: { title: "Community", subtitle: "Community workspace" },
   FINANCE: { title: "Finance", subtitle: "Queue & invoices" },
   FACILITY: { title: "Facility", subtitle: "Stores, plant, damages" },
+  CLIENTS: { title: "Clients", subtitle: "Owners, balances, documents" },
 };
 
 const ROLE_GRANT_ROW_HINT: Partial<Record<MembershipRole, string>> = {
-  [MembershipRole.SALES_EXECUTIVE]: "Default: core CRM, Settings.",
-  [MembershipRole.SALES_MANAGER]: "Default: core CRM, Settings.",
-  [MembershipRole.FINANCE_MANAGER]: "Default: core CRM, Finance, Settings.",
+  [MembershipRole.SALES_EXECUTIVE]:
+    "Default: pipeline only (dashboard, projects, leads, deals, activities, tasks, Settings). Clients is off — grant it here or on the person in Team.",
+  [MembershipRole.SALES_MANAGER]: "Default: core CRM, Clients, Settings.",
+  [MembershipRole.FINANCE_MANAGER]: "Default: Clients, Finance, Settings.",
   [MembershipRole.HR_MANAGER]: "Default: People (HR), Team, Settings.",
   [MembershipRole.MARKETING_MANAGER]:
     "Default: projects, leads, Marketing, Settings. Tick Sales to add Deals (full CRM strip).",
@@ -1057,6 +1060,7 @@ function orgModuleAllowsGrant(
     moduleCommunity: boolean;
     moduleFinance: boolean;
     moduleFacility: boolean;
+    moduleClients: boolean;
   },
   token: ExtraModuleGrantToken,
 ): boolean {
@@ -1064,6 +1068,7 @@ function orgModuleAllowsGrant(
   if (token === "MARKETING") return modules.moduleMarketing;
   if (token === "COMMUNITY") return modules.moduleCommunity;
   if (token === "FACILITY") return modules.moduleFacility;
+  if (token === "CLIENTS") return modules.moduleClients;
   return modules.moduleFinance;
 }
 
@@ -1077,6 +1082,7 @@ function RoleExtraAccessMatrix({
     moduleCommunity: boolean;
     moduleFinance: boolean;
     moduleFacility: boolean;
+    moduleClients: boolean;
   };
   initialGrants: Partial<Record<MembershipRole, ExtraModuleGrantToken[]>>;
 }) {
@@ -1084,8 +1090,8 @@ function RoleExtraAccessMatrix({
     <div className="mt-3 overflow-x-auto rounded-lg border border-foreground/10">
       <table className="w-full min-w-[780px] text-left text-sm">
         <caption className="sr-only">
-          Optional sidebar access: Sales, Marketing, Community, Finance, and Facility can be granted per role
-          when org modules are on.
+          Optional sidebar access: Sales, Marketing, Community, Finance, Facility, and Clients can be granted
+          per role when org modules are on.
         </caption>
         <thead>
           <tr className="border-b border-foreground/10 bg-foreground/[0.03] text-xs uppercase tracking-wide">

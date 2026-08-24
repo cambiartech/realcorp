@@ -191,6 +191,41 @@ export function parseRecordClientDepositForm(formData: FormData) {
   });
 }
 
+export const recordClientEarningSchema = z.object({
+  unitId: z.string().trim().min(1, "Select the property this income came from."),
+  amount: z.coerce.number().positive("Earning amount must be greater than zero."),
+  paidAt: z.string().trim().min(1, "Date is required."),
+  method: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  reference: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  note: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+});
+
+export function parseRecordClientEarningForm(formData: FormData) {
+  return recordClientEarningSchema.safeParse({
+    unitId: formData.get("unitId"),
+    amount: formData.get("amount"),
+    paidAt: formData.get("paidAt"),
+    method: formData.get("method") || undefined,
+    reference: formData.get("reference") || undefined,
+    note: formData.get("note") || undefined,
+  });
+}
+
 export function parseLinkClientUnitForm(formData: FormData) {
   const roleRaw = formData.get("role");
   const roleValues = Object.values(ClientUnitLinkRole) as string[];

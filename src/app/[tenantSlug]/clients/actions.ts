@@ -24,6 +24,7 @@ import {
   parseLinkClientUnitForm,
   parseLinkClientShortletForm,
   parseRecordClientDepositForm,
+  parseRecordClientEarningForm,
   parseUpdatePropertyClientForm,
 } from "@/lib/validators/clients";
 import { ensureClientFromDeal } from "@/lib/ensure-client-from-deal";
@@ -710,6 +711,95 @@ export async function recordClientDeposit(
   }
   if (paymentAmount > 0) return { ok: true, message: "Payment recorded." };
   return { ok: true, message: "Sale price updated. Remaining balance no longer uses the full unit price." };
+}
+
+export async function recordClientEarning(
+  tenantSlug: string,
+  clientId: string,
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = parseRecordClientEarningForm(formData);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+  }
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageClients(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to record property earnings." };
+  }
+
+  const tenantRecord = await prisma.tenant.findUnique({
+    where: { id: tenant.id },
+    select: { defaultCurrency: true },
+  });
+
+  const client = await prisma.propertyClient.findFirst({
+    where: { id: clientId, tenantId: tenant.id },
+    select: { id: true, fullName: true },
+  });
+  if (!client) return { ok: false, error: "Client not found." };
+
+  const unit = await prisma.unit.findFirst({
+    where: { id: parsed.data.unitId, tenantId: tenant.id },
+    select: {
+      id: true,
+      label: true,
+      projectId: true,
+      project: { select: { name: true } },
+    },
+  });
+  if (!unit) return { ok: false, error: "Unit not found." };
+
+  try {
+    await prisma.paymentRecord.create({
+      data: {
+        tenantId: tenant.id,
+        invoiceId: null,
+        propertyClientId: client.id,
+        projectId: unit.projectId,
+        unitId: unit.id,
+        incomeType: "SHORTLET_REVENUE",
+        standaloneTitle: `Property earning · ${client.fullName} · ${unit.project.name} ${unit.label}`,
+        payerName: client.fullName,
+        amount: parsed.data.amount,
+        currency: tenantRecord?.defaultCurrency || "NGN",
+        paidAt: new Date(parsed.data.paidAt),
+        method: parsed.data.method || null,
+        reference: parsed.data.reference || null,
+        note: parsed.data.note || null,
+        recordedByUserId: session.user.id,
+        recordedByLabel: session.user.name || session.user.email || "Unknown recorder",
+      },
+    });
+
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "FINANCE",
+      entityType: "PAYMENT",
+      entityId: client.id,
+      action: "CREATE",
+      summary: `Recorded property earning for ${client.fullName} on ${unit.project.name} ${unit.label}.`,
+      metadata: {
+        amount: parsed.data.amount,
+        unitId: unit.id,
+        projectId: unit.projectId,
+        incomeType: "SHORTLET_REVENUE",
+      },
+    });
+  } catch {
+    return { ok: false, error: "Could not record this earning right now." };
+  }
+
+  revalidateClients(tenantSlug, clientId);
+  revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true, message: "Earning recorded. It does not reduce remaining on the sale." };
 }
 
 export async function voidClientPayment(

@@ -81,7 +81,7 @@ export const MEMBERSHIP_ASSIGNABLE_MODULES: AssignableMemberModule[] = [
   {
     key: "clients",
     label: "Clients",
-    description: "Property owners and client documents",
+    description: "Property owners, sale balances, and client documents",
     entitlement: "moduleClients",
     navKeys: ["clients"],
   },

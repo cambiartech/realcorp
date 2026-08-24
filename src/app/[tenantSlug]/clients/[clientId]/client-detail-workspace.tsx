@@ -23,6 +23,7 @@ import {
   linkClientShortlet,
   linkClientUnit,
   recordClientDeposit,
+  recordClientEarning,
   unlinkClientShortlet,
   unlinkClientUnit,
   updatePropertyClient,
@@ -233,6 +234,7 @@ export function ClientDetailWorkspace({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
   const [isPayOpen, setIsPayOpen] = useState(false);
+  const [isEarnOpen, setIsEarnOpen] = useState(false);
   const defaultPayUnitId =
     paymentUnitOptions.find((unit) => unit.assigned)?.id ?? paymentUnitOptions[0]?.id ?? "";
   const [payUnitId, setPayUnitId] = useState(defaultPayUnitId);
@@ -274,6 +276,10 @@ export function ClientDetailWorkspace({
   );
   const [payState, payAction, payPending] = useActionState(
     recordClientDeposit.bind(null, tenantSlug, client.id),
+    initial,
+  );
+  const [earnState, earnAction, earnPending] = useActionState(
+    recordClientEarning.bind(null, tenantSlug, client.id),
     initial,
   );
 
@@ -444,6 +450,15 @@ export function ClientDetailWorkspace({
     } else showSnackbar(payState.error, "error");
   }, [payState, router, showSnackbar]);
 
+  useEffect(() => {
+    if (!earnState) return;
+    if (earnState.ok) {
+      showSnackbar(earnState.message || "Earning recorded.", "success");
+      setIsEarnOpen(false);
+      router.refresh();
+    } else showSnackbar(earnState.error, "error");
+  }, [earnState, router, showSnackbar]);
+
   function openEditModal() {
     setEditDraft({
       fullName: profile.fullName,
@@ -462,6 +477,11 @@ export function ClientDetailWorkspace({
     setPayingNow("");
     setRemainingToPay("");
     setIsPayOpen(true);
+  }
+
+  function openEarnModal() {
+    setPayUnitId(paymentUnitOptions.find((unit) => unit.assigned)?.id ?? paymentUnitOptions[0]?.id ?? "");
+    setIsEarnOpen(true);
   }
 
   function openLinkModal() {
@@ -598,6 +618,13 @@ export function ClientDetailWorkspace({
             </button>
             <button
               type="button"
+              onClick={openEarnModal}
+              className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
+            >
+              Add earnings
+            </button>
+            <button
+              type="button"
               onClick={openLinkModal}
               className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
             >
@@ -712,13 +739,22 @@ export function ClientDetailWorkspace({
               </p>
             </div>
             {canManage ? (
-              <button
-                type="button"
-                onClick={openPayModal}
-                className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
-              >
-                Add payment
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={openPayModal}
+                  className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+                >
+                  Add payment
+                </button>
+                <button
+                  type="button"
+                  onClick={openEarnModal}
+                  className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold"
+                >
+                  Add earnings
+                </button>
+              </div>
             ) : null}
           </div>
           {depositRows.length === 0 && payments.length === 0 && earnings.length === 0 ? (
@@ -820,12 +856,25 @@ export function ClientDetailWorkspace({
               ) : null}
               {earnings.length > 0 ? (
                 <div>
-                  <p className="px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-muted">
-                    Property earnings
-                  </p>
-                  <p className="px-4 pt-1 text-xs text-muted">
-                    Income generated on linked properties. Not a client payment and not organisation profit.
-                  </p>
+                  <div className="flex flex-wrap items-start justify-between gap-2 px-4 pt-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                        Property earnings
+                      </p>
+                      <p className="pt-1 text-xs text-muted">
+                        Income generated on linked properties. Not a client payment and not organisation profit.
+                      </p>
+                    </div>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        onClick={openEarnModal}
+                        className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold"
+                      >
+                        Add earnings
+                      </button>
+                    ) : null}
+                  </div>
                   <ul className="space-y-2 px-4 py-3">
                     {pagedEarnings.rows.map((row) => (
                       <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
@@ -1201,6 +1250,101 @@ export function ClientDetailWorkspace({
             </div>
           </form>
         )}
+      </ModalOverlay>
+
+      <ModalOverlay open={isEarnOpen} onClose={() => setIsEarnOpen(false)} panelClassName={MODAL_PANEL_XL}>
+        <h2 className="text-lg font-semibold">Add earnings</h2>
+        <p className="mt-1 text-sm text-muted">
+          Record income generated on this client&apos;s property — for example a short-let stay. This is not a
+          client payment and does not reduce remaining on the sale.
+        </p>
+        <form action={earnAction} className="mt-4 space-y-3">
+          {earnState && !earnState.ok ? <FormAlert>{earnState.error}</FormAlert> : null}
+          <div>
+            <label className="mb-1 block text-sm text-muted">Property / unit</label>
+            <SearchableSelect
+              name="unitId"
+              value={selectedPayUnit?.id ?? ""}
+              onChange={setPayUnitId}
+              searchPlaceholder="Search project or unit…"
+              placeholder="Select a unit"
+              groups={paymentUnitGroups}
+              required
+            />
+            {selectedPayBalance ? (
+              <p className="mt-1 text-xs text-muted">
+                Earnings on file {moneyLabel(currency, selectedPayBalance.earnings)} · Paid toward sale{" "}
+                {moneyLabel(currency, selectedPayBalance.collected)}
+              </p>
+            ) : null}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Amount</label>
+              <input
+                name="amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                placeholder="0.00"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Date</label>
+              <input
+                name="paidAt"
+                type="date"
+                required
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Method</label>
+              <UiSelect name="method" defaultValue="Bank Transfer">
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cash">Cash</option>
+                <option value="POS">POS</option>
+                <option value="Cheque">Cheque</option>
+              </UiSelect>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-muted">Reference (optional)</label>
+              <input
+                name="reference"
+                placeholder="Transfer ref"
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+          </div>
+          <textarea
+            name="note"
+            rows={2}
+            placeholder="Note (optional)"
+            className="w-full border border-foreground/15 bg-field px-3 py-2"
+          />
+          <div className="flex justify-end gap-2 border-t border-foreground/10 pt-4">
+            <button
+              type="button"
+              onClick={() => setIsEarnOpen(false)}
+              className="rounded-md border px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={earnPending}
+              className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+            >
+              {earnPending ? <ButtonSpinner /> : null}
+              Save earning
+            </button>
+          </div>
+        </form>
       </ModalOverlay>
 
       <ModalOverlay open={isPayOpen} onClose={() => setIsPayOpen(false)} panelClassName={MODAL_PANEL_XL}>
