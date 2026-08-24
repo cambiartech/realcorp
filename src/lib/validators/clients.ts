@@ -19,6 +19,17 @@ export const createPropertyClientSchema = z.object({
   country: z.string().trim().max(80).optional(),
   status: z.nativeEnum(PropertyClientStatus).optional(),
   notes: z.string().trim().max(5000).optional(),
+  nextOfKin: z.string().trim().max(120).optional(),
+  emergencyPhone: z.string().trim().max(40).optional(),
+  declaredUnitsCount: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v !== "" ? Number(v) : undefined))
+    .refine(
+      (v) => v == null || (Number.isInteger(v) && v >= 0 && v <= 5000),
+      "Total units must be a whole number.",
+    ),
   sendPortalInvite: z.boolean().optional(),
 });
 
@@ -56,6 +67,9 @@ export function parseCreatePropertyClientForm(formData: FormData) {
     country: formData.get("country") || undefined,
     status: formData.get("status") || PropertyClientStatus.PROSPECT,
     notes: formData.get("notes") || undefined,
+    nextOfKin: formData.get("nextOfKin") || undefined,
+    emergencyPhone: formData.get("emergencyPhone") || undefined,
+    declaredUnitsCount: formData.get("declaredUnitsCount") || undefined,
     sendPortalInvite:
       formData.get("sendPortalInvite") === "on" || formData.get("sendPortalInvite") === "true",
   });
@@ -73,6 +87,9 @@ export function parseUpdatePropertyClientForm(formData: FormData) {
     country: formData.get("country") || undefined,
     status: formData.get("status") || PropertyClientStatus.ACTIVE,
     notes: formData.get("notes") || undefined,
+    nextOfKin: formData.get("nextOfKin") || undefined,
+    emergencyPhone: formData.get("emergencyPhone") || undefined,
+    declaredUnitsCount: formData.get("declaredUnitsCount") || undefined,
   });
 }
 

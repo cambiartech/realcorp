@@ -7,7 +7,6 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_XL } from "@/lib/modal-panel";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
-import { GlobalLocationFields } from "@/components/global-location-fields";
 import { PaginationControl } from "@/components/pagination";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -28,6 +27,7 @@ import {
   updatePropertyClient,
 } from "./actions";
 import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
+import { ClientProfileFields } from "@/components/clients/client-profile-fields";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SortTh, useTableSort } from "@/components/sort-th";
 import { TableSearch, filterTableRows } from "@/components/table-search";
@@ -40,6 +40,14 @@ type ClientRow = {
   phone: string;
   status: string;
   statusValue: string;
+  addressLine: string;
+  city: string;
+  state: string;
+  country: string;
+  nextOfKin: string;
+  emergencyPhone: string;
+  declaredUnitsCount: number | null;
+  notes: string;
   projects: Array<{ id: string; name: string }>;
   unitsCount: number;
   documentsCount: number;
@@ -159,7 +167,6 @@ export function ClientsWorkspace({
   const [createName, setCreateName] = useState("");
   const [createPhone, setCreatePhone] = useState("");
   const [createEmail, setCreateEmail] = useState("");
-  const [createNotes, setCreateNotes] = useState("");
   const [createStatus, setCreateStatus] = useState("PROSPECT");
   const [sendPortalInvite, setSendPortalInvite] = useState(false);
   const [invitingClientId, setInvitingClientId] = useState<string | null>(null);
@@ -278,7 +285,6 @@ export function ClientsWorkspace({
         setCreateName("");
         setCreatePhone("");
         setCreateEmail("");
-        setCreateNotes("");
         setCreateStatus("PROSPECT");
         setSendPortalInvite(false);
         setIsCreateOpen(false);
@@ -694,7 +700,12 @@ export function ClientsWorkspace({
                         {portalStatusLabel(client.portalStatus)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-foreground">{client.unitsCount}</td>
+                    <td className="px-4 py-3 text-foreground">
+                      {client.declaredUnitsCount != null ? client.declaredUnitsCount : client.unitsCount}
+                      {client.declaredUnitsCount != null && client.declaredUnitsCount !== client.unitsCount ? (
+                        <span className="block text-xs font-normal text-muted">{client.unitsCount} linked</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3 text-foreground">{moneyLabel(currency, client.paid)}</td>
                     <td className="px-4 py-3 text-foreground">{moneyLabel(currency, client.earnings)}</td>
                     <td className="px-4 py-3 font-medium text-foreground">
@@ -813,7 +824,7 @@ export function ClientsWorkspace({
             </div>
             <div>
               <label htmlFor="client-email" className="mb-1 block text-sm text-muted">
-                Email <span className="font-normal text-muted">(optional)</span>
+                Email address <span className="font-normal text-muted">(optional)</span>
               </label>
               <input
                 id="client-email"
@@ -860,31 +871,7 @@ export function ClientsWorkspace({
               <option value="FORMER">Former</option>
             </UiSelect>
           </div>
-          <div>
-            <label htmlFor="client-address" className="mb-1 block text-sm text-muted">
-              Street address (optional)
-            </label>
-            <input
-              id="client-address"
-              name="addressLine"
-              placeholder="House number and street"
-              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
-            />
-          </div>
-          <GlobalLocationFields defaultCountry="Nigeria" />
-          <div>
-            <label htmlFor="client-notes" className="mb-1 block text-sm text-muted">
-              Notes (optional)
-            </label>
-            <textarea
-              id="client-notes"
-              name="notes"
-              rows={3}
-              value={createNotes}
-              onChange={(e) => setCreateNotes(e.target.value)}
-              className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
-            />
-          </div>
+          <ClientProfileFields />
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -913,41 +900,76 @@ export function ClientsWorkspace({
       >
         <h2 className="text-lg font-semibold">Edit client</h2>
         {clientToEdit ? (
-          <form action={handleEditClient} className="mt-4 space-y-3">
-            <input
-              name="fullName"
-              value={editDraft.fullName}
-              onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
-              required
-              className="w-full border border-foreground/15 bg-field px-3 py-2"
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
+          <form action={handleEditClient} className="mt-4 space-y-4">
+            <div>
+              <label htmlFor="edit-client-name" className="mb-1 block text-sm text-muted">
+                Full name
+              </label>
               <input
-                name="phone"
-                value={editDraft.phone}
-                onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
-                placeholder="Phone"
-                className="w-full border border-foreground/15 bg-field px-3 py-2"
-              />
-              <input
-                name="email"
-                type="text"
-                inputMode="email"
-                value={editDraft.email}
-                onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
-                placeholder="Email (optional)"
+                id="edit-client-name"
+                name="fullName"
+                value={editDraft.fullName}
+                onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
+                required
                 className="w-full border border-foreground/15 bg-field px-3 py-2"
               />
             </div>
-            <UiSelect
-              name="status"
-              value={editDraft.status}
-              onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value }))}
-            >
-              <option value="PROSPECT">Prospect</option>
-              <option value="ACTIVE">Active</option>
-              <option value="FORMER">Former</option>
-            </UiSelect>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="edit-client-phone" className="mb-1 block text-sm text-muted">
+                  Phone <span className="font-normal">(optional)</span>
+                </label>
+                <input
+                  id="edit-client-phone"
+                  name="phone"
+                  value={editDraft.phone}
+                  onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-client-email" className="mb-1 block text-sm text-muted">
+                  Email address <span className="font-normal">(optional)</span>
+                </label>
+                <input
+                  id="edit-client-email"
+                  name="email"
+                  type="text"
+                  inputMode="email"
+                  value={editDraft.email}
+                  onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="edit-client-status" className="mb-1 block text-sm text-muted">
+                Status
+              </label>
+              <UiSelect
+                id="edit-client-status"
+                name="status"
+                value={editDraft.status}
+                onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value }))}
+              >
+                <option value="PROSPECT">Prospect</option>
+                <option value="ACTIVE">Active</option>
+                <option value="FORMER">Former</option>
+              </UiSelect>
+            </div>
+            <ClientProfileFields
+              locationKey={clientToEdit.id}
+              defaults={{
+                addressLine: clientToEdit.addressLine,
+                city: clientToEdit.city,
+                state: clientToEdit.state,
+                country: clientToEdit.country,
+                nextOfKin: clientToEdit.nextOfKin,
+                emergencyPhone: clientToEdit.emergencyPhone,
+                declaredUnitsCount: clientToEdit.declaredUnitsCount,
+                notes: clientToEdit.notes,
+              }}
+            />
             <div className="flex justify-end gap-2">
               <button
                 type="button"

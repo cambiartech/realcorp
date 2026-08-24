@@ -2161,6 +2161,10 @@ model PropertyClient {
   country        String?              @default("Nigeria")
   status         PropertyClientStatus @default(PROSPECT)
   notes          String?              @db.Text
+  nextOfKin      String?
+  emergencyPhone String?
+  /// Stated unit count when not every unit is linked yet.
+  declaredUnitsCount Int?
   assignedUserId String?
   userId         String?
   createdAt      DateTime             @default(now())

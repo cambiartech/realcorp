@@ -107,6 +107,9 @@ export async function createPropertyClient(
         country: parsed.data.country || "Nigeria",
         status: parsed.data.status ?? PropertyClientStatus.PROSPECT,
         notes: parsed.data.notes || null,
+        nextOfKin: parsed.data.nextOfKin || null,
+        emergencyPhone: parsed.data.emergencyPhone || null,
+        declaredUnitsCount: parsed.data.declaredUnitsCount ?? null,
       },
     });
     await writeAuditLog({
@@ -219,6 +222,9 @@ export async function updatePropertyClient(
         country: parsed.data.country || "Nigeria",
         status: parsed.data.status ?? PropertyClientStatus.ACTIVE,
         notes: parsed.data.notes || null,
+        nextOfKin: parsed.data.nextOfKin || null,
+        emergencyPhone: parsed.data.emergencyPhone || null,
+        declaredUnitsCount: parsed.data.declaredUnitsCount ?? null,
         ...(clearUserId ? { userId: null } : {}),
       },
     });
@@ -1110,6 +1116,9 @@ export type ImportClientRow = {
   country?: string;
   status?: string;
   notes?: string;
+  nextOfKin?: string;
+  emergencyPhone?: string;
+  declaredUnitsCount?: string;
   projectName?: string;
   unitLabel?: string;
   pricingPlanName?: string;
@@ -1121,6 +1130,12 @@ function parseImportClientStatus(raw?: string): PropertyClientStatus {
   if (v === "ACTIVE") return PropertyClientStatus.ACTIVE;
   if (v === "FORMER") return PropertyClientStatus.FORMER;
   return PropertyClientStatus.PROSPECT;
+}
+
+function parseDeclaredUnits(raw?: string) {
+  const n = Number((raw ?? "").trim());
+  if (!Number.isInteger(n) || n < 0 || n > 5000) return null;
+  return n;
 }
 
 function parseImportUnitRole(raw?: string) {
@@ -1180,6 +1195,9 @@ export async function importClients(
         country: row.country?.trim() || "Nigeria",
         status: parseImportClientStatus(row.status),
         notes: row.notes?.trim() || null,
+        nextOfKin: row.nextOfKin?.trim() || null,
+        emergencyPhone: row.emergencyPhone?.trim() || null,
+        declaredUnitsCount: parseDeclaredUnits(row.declaredUnitsCount),
       },
     });
     count += 1;

@@ -9,9 +9,9 @@ import { ButtonSpinner } from "@/components/button-spinner";
 import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
-import { GlobalLocationFields } from "@/components/global-location-fields";
 import { SearchableSelect, type SearchableSelectGroup } from "@/components/searchable-select";
 import { agreedPriceFromCatchUp } from "@/lib/finance-income";
+import { ClientProfileFields } from "@/components/clients/client-profile-fields";
 import {
   ClientDocumentsWorkspace,
   type ClientDocumentItem,
@@ -185,6 +185,9 @@ export function ClientDetailWorkspace({
     city: string;
     state: string;
     country: string;
+    nextOfKin: string;
+    emergencyPhone: string;
+    declaredUnitsCount: number | null;
     status: string;
     statusValue: string;
     notes: string;
@@ -707,10 +710,40 @@ export function ClientDetailWorkspace({
             <h2 className="text-sm font-semibold">Contact & address</h2>
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
               <div>
+                <dt className="text-muted">Email address</dt>
+                <dd>{profile.email || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Phone</dt>
+                <dd>{profile.phone || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Emergency number</dt>
+                <dd>{profile.emergencyPhone || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Next of kin</dt>
+                <dd>{profile.nextOfKin || "—"}</dd>
+              </div>
+              <div>
                 <dt className="text-muted">Alternate phone</dt>
                 <dd>{profile.alternatePhone || "—"}</dd>
               </div>
               <div>
+                <dt className="text-muted">Total units</dt>
+                <dd>
+                  {profile.declaredUnitsCount != null ? profile.declaredUnitsCount : unitLinks.length + shortletLinks.length}
+                  {profile.declaredUnitsCount != null ? (
+                    <span className="text-muted">
+                      {" "}
+                      · {unitLinks.length + shortletLinks.length} linked
+                    </span>
+                  ) : (
+                    <span className="text-muted"> linked</span>
+                  )}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
                 <dt className="text-muted">Address</dt>
                 <dd>
                   {[profile.addressLine, profile.city, profile.state, profile.country]
@@ -1034,62 +1067,76 @@ export function ClientDetailWorkspace({
 
       <ModalOverlay open={isEditOpen} onClose={() => setIsEditOpen(false)} panelClassName={MODAL_PANEL_XL}>
         <h2 className="text-lg font-semibold">Edit client</h2>
-        <form action={editAction} className="mt-4 space-y-3">
+        <form action={editAction} className="mt-4 space-y-4">
           {editState && !editState.ok ? <FormAlert>{editState.error}</FormAlert> : null}
-          <input
-            name="fullName"
-            value={editDraft.fullName}
-            onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
-            required
-            className="w-full border border-foreground/15 bg-field px-3 py-2"
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <input
-              name="phone"
-              value={editDraft.phone}
-              onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
-              placeholder="Phone"
-              className="w-full border border-foreground/15 bg-field px-3 py-2"
-            />
-            <input
-              name="email"
-              type="text"
-              inputMode="email"
-              value={editDraft.email}
-              onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
-              placeholder="Email (optional)"
-              className="w-full border border-foreground/15 bg-field px-3 py-2"
-            />
-          </div>
-          <UiSelect
-            name="status"
-            value={editDraft.status}
-            onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value }))}
-          >
-            <option value="PROSPECT">Prospect</option>
-            <option value="ACTIVE">Active</option>
-            <option value="FORMER">Former</option>
-          </UiSelect>
           <div>
-            <label className="mb-1 block text-sm text-muted">Street address</label>
+            <label htmlFor="detail-client-name" className="mb-1 block text-sm text-muted">
+              Full name
+            </label>
             <input
-              name="addressLine"
-              defaultValue={profile.addressLine}
-              placeholder="House number and street"
+              id="detail-client-name"
+              name="fullName"
+              value={editDraft.fullName}
+              onChange={(e) => setEditDraft((d) => ({ ...d, fullName: e.target.value }))}
+              required
               className="w-full border border-foreground/15 bg-field px-3 py-2"
             />
           </div>
-          <GlobalLocationFields
-            defaultCountry={profile.country || "Nigeria"}
-            defaultState={profile.state}
-            defaultCity={profile.city}
-          />
-          <textarea
-            name="notes"
-            rows={3}
-            value={editDraft.notes}
-            onChange={(e) => setEditDraft((d) => ({ ...d, notes: e.target.value }))}
-            className="w-full border border-foreground/15 bg-field px-3 py-2"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="detail-client-phone" className="mb-1 block text-sm text-muted">
+                Phone <span className="font-normal">(optional)</span>
+              </label>
+              <input
+                id="detail-client-phone"
+                name="phone"
+                value={editDraft.phone}
+                onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+            <div>
+              <label htmlFor="detail-client-email" className="mb-1 block text-sm text-muted">
+                Email address <span className="font-normal">(optional)</span>
+              </label>
+              <input
+                id="detail-client-email"
+                name="email"
+                type="text"
+                inputMode="email"
+                value={editDraft.email}
+                onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
+                className="w-full border border-foreground/15 bg-field px-3 py-2"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="detail-client-status" className="mb-1 block text-sm text-muted">
+              Status
+            </label>
+            <UiSelect
+              id="detail-client-status"
+              name="status"
+              value={editDraft.status}
+              onChange={(e) => setEditDraft((d) => ({ ...d, status: e.target.value }))}
+            >
+              <option value="PROSPECT">Prospect</option>
+              <option value="ACTIVE">Active</option>
+              <option value="FORMER">Former</option>
+            </UiSelect>
+          </div>
+          <ClientProfileFields
+            locationKey={profile.id}
+            defaults={{
+              addressLine: profile.addressLine,
+              city: profile.city,
+              state: profile.state,
+              country: profile.country,
+              nextOfKin: profile.nextOfKin,
+              emergencyPhone: profile.emergencyPhone,
+              declaredUnitsCount: profile.declaredUnitsCount,
+              notes: profile.notes,
+            }}
           />
           <div className="flex justify-end gap-2">
             <button
