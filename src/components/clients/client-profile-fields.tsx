@@ -12,7 +12,6 @@ export type ClientProfileDefaults = {
   country?: string;
   nextOfKin?: string;
   emergencyPhone?: string;
-  declaredUnitsCount?: number | null;
   notes?: string;
 };
 
@@ -70,26 +69,6 @@ export function ClientProfileFields({
             className={fieldClass}
           />
         </div>
-      </div>
-      <div>
-        <label htmlFor="client-units-total" className="mb-1 block text-sm text-muted">
-          Total units <span className="font-normal">(optional)</span>
-        </label>
-        <input
-          id="client-units-total"
-          name="declaredUnitsCount"
-          type="number"
-          min={0}
-          max={5000}
-          step={1}
-          defaultValue={defaults?.declaredUnitsCount ?? ""}
-          placeholder="How many units this client has"
-          className={fieldClass}
-        />
-        <p className="mt-1 text-xs text-muted">
-          Use this when you know the total but have not linked every unit yet. Linked units still show
-          separately.
-        </p>
       </div>
       {showNotes ? (
         <div>

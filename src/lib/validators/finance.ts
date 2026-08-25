@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FINANCE_INCOME_TYPES } from "@/lib/finance-income";
 
 const optionalId = z
   .string()
@@ -6,9 +7,7 @@ const optionalId = z
   .optional()
   .transform((v) => (v && v !== "" ? v : undefined));
 
-const financeIncomeTypeSchema = z
-  .enum(["CLIENT_DEPOSIT", "MILESTONE", "SHORTLET_REVENUE", "OTHER"])
-  .default("OTHER");
+const financeIncomeTypeSchema = z.enum(FINANCE_INCOME_TYPES).default("OTHER");
 
 const voidReasonSchema = z
   .string()

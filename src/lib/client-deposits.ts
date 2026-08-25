@@ -3,6 +3,7 @@ import {
   allocateClientCash,
   remainingClientBalance,
   resolveClientUnitSalePrice,
+  resolveUnitServiceFee,
   summarizeClientDeposits,
 } from "@/lib/finance-income";
 
@@ -23,6 +24,9 @@ export type ClientDepositRow = {
   collected: number;
   earnings: number;
   remaining: number;
+  serviceFee: number;
+  serviceFeePaid: number;
+  serviceFeeRemaining: number;
   isDiscounted: boolean;
   adjustmentReason: string | null;
 };
@@ -57,7 +61,8 @@ export async function loadClientDepositRows(
               id: true,
               label: true,
               projectId: true,
-              project: { select: { name: true } },
+              serviceFee: true,
+              project: { select: { name: true, serviceCharge: true } },
               pricingPlan: { select: { price: true, initialDeposit: true } },
             },
           },
@@ -73,8 +78,9 @@ export async function loadClientDepositRows(
               id: true,
               label: true,
               projectId: true,
-              project: { select: { name: true } },
+              project: { select: { name: true, serviceCharge: true } },
               pricingPlan: { select: { price: true, initialDeposit: true } },
+              serviceFee: true,
               deal: { select: { id: true, value: true } },
             },
           },
@@ -167,7 +173,7 @@ export async function loadClientDepositRows(
     }
   }
 
-  type Cash = { collected: number; deposits: number; earnings: number };
+  type Cash = { collected: number; deposits: number; earnings: number; serviceFeePaid: number };
   const cashByClientUnit = new Map<string, Cash>();
 
   const addCash = (clientId: string | null | undefined, projectId: string, unitId: string, amount: number, incomeType: string) => {
@@ -178,10 +184,11 @@ export async function loadClientDepositRows(
     }
     if (!resolvedClientId) return;
     const key = `${resolvedClientId}|${allocationKey(projectId, unitId)}`;
-    const current = cashByClientUnit.get(key) || { collected: 0, deposits: 0, earnings: 0 };
+    const current = cashByClientUnit.get(key) || { collected: 0, deposits: 0, earnings: 0, serviceFeePaid: 0 };
     const split = allocateClientCash(incomeType, amount);
     current.collected = money(current.collected + split.collected);
     current.earnings = money(current.earnings + split.earnings);
+    current.serviceFeePaid = money(current.serviceFeePaid + split.serviceFeePaid);
     if (split.isDeposit) current.deposits = money(current.deposits + split.collected);
     cashByClientUnit.set(key, current);
   };
@@ -221,6 +228,7 @@ export async function loadClientDepositRows(
         expectedDeposit: number;
         isDiscounted: boolean;
         adjustmentReason: string | null;
+        serviceFee: number;
       }
     >();
 
@@ -240,6 +248,10 @@ export async function loadClientDepositRows(
         expectedDeposit: Number(link.unit.pricingPlan?.initialDeposit) || 0,
         isDiscounted: priced.isDiscounted,
         adjustmentReason: link.priceAdjustmentReason || null,
+        serviceFee: resolveUnitServiceFee(
+          link.unit.serviceFee != null ? Number(link.unit.serviceFee) : null,
+          link.unit.project.serviceCharge != null ? Number(link.unit.project.serviceCharge) : null,
+        ),
       });
     }
 
@@ -261,6 +273,10 @@ export async function loadClientDepositRows(
           expectedDeposit: Number(unit.pricingPlan?.initialDeposit) || 0,
           isDiscounted: priced.isDiscounted,
           adjustmentReason: null,
+          serviceFee: resolveUnitServiceFee(
+            unit.serviceFee != null ? Number(unit.serviceFee) : null,
+            unit.project.serviceCharge != null ? Number(unit.project.serviceCharge) : null,
+          ),
         });
       }
     }
@@ -269,6 +285,7 @@ export async function loadClientDepositRows(
       const cashKey = `${client.id}|${allocationKey(unit.projectId, unit.unitId)}`;
       const cash = cashByClientUnit.get(cashKey);
       seen.add(cashKey);
+      const serviceFeePaid = cash?.serviceFeePaid || 0;
       rows.push({
         id: cashKey,
         clientId: client.id,
@@ -286,6 +303,12 @@ export async function loadClientDepositRows(
         remaining: remainingClientBalance({
           contractValue: unit.contractValue,
           collected: cash?.collected || 0,
+        }),
+        serviceFee: unit.serviceFee,
+        serviceFeePaid,
+        serviceFeeRemaining: remainingClientBalance({
+          contractValue: unit.serviceFee,
+          collected: serviceFeePaid,
         }),
         isDiscounted: unit.isDiscounted,
         adjustmentReason: unit.adjustmentReason,
@@ -313,12 +336,23 @@ export async function loadClientDepositRows(
       collected: cash.collected,
       earnings: cash.earnings,
       remaining: 0,
+      serviceFee: 0,
+      serviceFeePaid: cash.serviceFeePaid,
+      serviceFeeRemaining: 0,
       isDiscounted: false,
       adjustmentReason: null,
     });
   }
 
   return rows
-    .filter((row) => row.contractValue > 0 || row.collected > 0 || row.earnings > 0 || row.isDiscounted)
+    .filter(
+      (row) =>
+        row.contractValue > 0 ||
+        row.collected > 0 ||
+        row.earnings > 0 ||
+        row.isDiscounted ||
+        row.serviceFee > 0 ||
+        row.serviceFeePaid > 0,
+    )
     .sort((a, b) => b.remaining - a.remaining || a.clientName.localeCompare(b.clientName));
 }

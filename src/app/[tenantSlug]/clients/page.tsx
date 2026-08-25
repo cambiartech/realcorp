@@ -149,12 +149,18 @@ export default async function ClientsPage({
       collected: 0,
       remaining: 0,
       earnings: 0,
+      serviceFee: 0,
+      serviceFeePaid: 0,
+      serviceFeeRemaining: 0,
     };
     depositsByClient.set(row.clientId, {
       contractValue: current.contractValue + row.contractValue,
       collected: current.collected + row.collected,
       remaining: current.remaining + row.remaining,
       earnings: current.earnings + row.earnings,
+      serviceFee: current.serviceFee + row.serviceFee,
+      serviceFeePaid: current.serviceFeePaid + row.serviceFeePaid,
+      serviceFeeRemaining: current.serviceFeeRemaining + row.serviceFeeRemaining,
     });
   }
   const selectedProjectName = unlinkedOnly
@@ -213,7 +219,6 @@ export default async function ClientsPage({
           country: c.country ?? "",
           nextOfKin: c.nextOfKin ?? "",
           emergencyPhone: c.emergencyPhone ?? "",
-          declaredUnitsCount: c.declaredUnitsCount,
           notes: c.notes ?? "",
           projects: clientProjects,
           unitsCount,

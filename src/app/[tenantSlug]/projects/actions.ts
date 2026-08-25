@@ -156,6 +156,7 @@ export async function createUnit(
         purpose: parsed.data.purpose ?? UnitPurpose.SALE,
         unitType: parsed.data.unitType || null,
         status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
+        serviceFee: parsed.data.serviceFee != null ? Number(parsed.data.serviceFee) : null,
       },
     });
     if (wantsImportAsClient(formData)) {
@@ -249,6 +250,7 @@ export async function createUnitsBulk(
             purpose: parsed.data.purpose ?? UnitPurpose.SALE,
             unitType: parsed.data.unitType || null,
             status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
+            serviceFee: parsed.data.serviceFee != null ? Number(parsed.data.serviceFee) : null,
           },
           select: {
             id: true,
@@ -697,6 +699,7 @@ export async function updateUnit(
         purpose: parsed.data.purpose ?? UnitPurpose.SALE,
         unitType: parsed.data.unitType || null,
         status: (parsed.data.status as UnitStatus) || UnitStatus.AVAILABLE,
+        serviceFee: parsed.data.serviceFee != null ? Number(parsed.data.serviceFee) : null,
       },
     });
     await writeAuditLog({

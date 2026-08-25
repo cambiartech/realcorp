@@ -23,6 +23,8 @@ type Props = {
   pending: boolean;
   error: string | null;
   onSubmit: (formData: FormData) => void;
+  projectServiceFee?: number | null;
+  currency?: string;
 };
 
 export function AddUnitsModal({
@@ -35,6 +37,8 @@ export function AddUnitsModal({
   pending,
   error,
   onSubmit,
+  projectServiceFee,
+  currency,
 }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [namingMode, setNamingMode] = useState<"sequential" | "custom">("sequential");
@@ -45,6 +49,7 @@ export function AddUnitsModal({
   const [unitType, setUnitType] = useState("");
   const [customLabels, setCustomLabels] = useState<string[]>([""]);
   const [importAsClient, setImportAsClient] = useState(true);
+  const [serviceFee, setServiceFee] = useState("");
 
   const selectedPlan = pricingPlans.find((p) => p.id === pricingPlanId);
 
@@ -59,6 +64,7 @@ export function AddUnitsModal({
     setUnitType("");
     setCustomLabels([""]);
     setImportAsClient(true);
+    setServiceFee("");
   }, [open, suggestedLabels]);
 
   useEffect(() => {
@@ -111,6 +117,7 @@ export function AddUnitsModal({
     fd.set("status", status);
     if (unitType.trim()) fd.set("unitType", unitType.trim());
     if (pricingPlanId) fd.set("pricingPlanId", pricingPlanId);
+    if (serviceFee.trim()) fd.set("serviceFee", serviceFee.trim());
     if (importAsClient) fd.set("importAsClient", "1");
 
     if (quantity === 1 && namingMode === "sequential") {
@@ -294,6 +301,27 @@ export function AddUnitsModal({
             </UiSelect>
           </label>
         </div>
+
+        <label className="text-sm text-muted">
+          Service fee (optional)
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={serviceFee}
+            onChange={(e) => setServiceFee(e.target.value)}
+            placeholder={
+              projectServiceFee != null
+                ? `Leave blank to use project fee (${currency || "NGN"} ${projectServiceFee.toLocaleString()})`
+                : "Amount charged for these units"
+            }
+            className="mt-1 w-full border border-foreground/15 bg-field px-3 py-2 text-sm"
+          />
+          <span className="mt-1 block text-xs text-muted">
+            Estate / management fee. Track payments from the client record. This does not change the sale
+            price.
+          </span>
+        </label>
 
         <label className="flex items-start gap-2 rounded-md border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5 text-sm">
           <input

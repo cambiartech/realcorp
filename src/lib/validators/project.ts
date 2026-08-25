@@ -22,6 +22,13 @@ export const createProjectSchema = z.object({
     .refine((v) => !v || !Number.isNaN(Number(v)), "Service charge must be a valid number."),
 });
 
+const optionalServiceFee = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v !== "" ? v : undefined))
+  .refine((v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= 0), "Service fee must be a valid number.");
+
 export const createUnitSchema = z.object({
   label: z.string().trim().min(1, "Unit label is required.").max(80, "Unit label is too long."),
   purpose: z.nativeEnum(UnitPurpose),
@@ -32,6 +39,7 @@ export const createUnitSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
+  serviceFee: optionalServiceFee,
 });
 
 export const createPricingPlanSchema = z.object({
@@ -83,6 +91,7 @@ export function parseCreateUnitForm(formData: FormData) {
     unitType: formData.get("unitType") || undefined,
     status: formData.get("status") || UnitStatus.AVAILABLE,
     pricingPlanId: formData.get("pricingPlanId") || undefined,
+    serviceFee: formData.get("serviceFee") || undefined,
   });
 }
 
@@ -95,6 +104,7 @@ const bulkUnitSharedSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
+  serviceFee: optionalServiceFee,
 });
 
 export const createUnitsBulkSchema = bulkUnitSharedSchema.extend({
@@ -134,6 +144,7 @@ export function parseCreateUnitsBulkForm(formData: FormData) {
     unitType: formData.get("unitType") || undefined,
     status: formData.get("status") || UnitStatus.AVAILABLE,
     pricingPlanId: formData.get("pricingPlanId") || undefined,
+    serviceFee: formData.get("serviceFee") || undefined,
   });
 }
 

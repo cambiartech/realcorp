@@ -46,7 +46,6 @@ type ClientRow = {
   country: string;
   nextOfKin: string;
   emergencyPhone: string;
-  declaredUnitsCount: number | null;
   notes: string;
   projects: Array<{ id: string; name: string }>;
   unitsCount: number;
@@ -700,12 +699,7 @@ export function ClientsWorkspace({
                         {portalStatusLabel(client.portalStatus)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-foreground">
-                      {client.declaredUnitsCount != null ? client.declaredUnitsCount : client.unitsCount}
-                      {client.declaredUnitsCount != null && client.declaredUnitsCount !== client.unitsCount ? (
-                        <span className="block text-xs font-normal text-muted">{client.unitsCount} linked</span>
-                      ) : null}
-                    </td>
+                    <td className="px-4 py-3 text-foreground">{client.unitsCount}</td>
                     <td className="px-4 py-3 text-foreground">{moneyLabel(currency, client.paid)}</td>
                     <td className="px-4 py-3 text-foreground">{moneyLabel(currency, client.earnings)}</td>
                     <td className="px-4 py-3 font-medium text-foreground">
@@ -966,7 +960,6 @@ export function ClientsWorkspace({
                 country: clientToEdit.country,
                 nextOfKin: clientToEdit.nextOfKin,
                 emergencyPhone: clientToEdit.emergencyPhone,
-                declaredUnitsCount: clientToEdit.declaredUnitsCount,
                 notes: clientToEdit.notes,
               }}
             />

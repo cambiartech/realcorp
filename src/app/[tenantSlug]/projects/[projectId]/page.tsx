@@ -70,6 +70,7 @@ export default async function ProjectUnitsPage({
           unitType: true,
           status: true,
           pricingPlanId: true,
+          serviceFee: true,
           pricingPlan: { select: { name: true } },
           deal: { select: { id: true } },
         },
@@ -120,6 +121,13 @@ export default async function ProjectUnitsPage({
         statusValue: unit.status,
         pricingPlanId: unit.pricingPlanId,
         pricingPlanName: unit.pricingPlan?.name ?? "No plan",
+        serviceFee: unit.serviceFee != null ? Number(unit.serviceFee) : null,
+        resolvedServiceFee:
+          unit.serviceFee != null
+            ? Number(unit.serviceFee)
+            : project.serviceCharge != null
+              ? Number(project.serviceCharge)
+              : 0,
         canDelete: !unit.deal?.id && unit.status !== "RESERVED" && unit.status !== "SOLD",
         canReserve: !unit.deal?.id && unit.status === "AVAILABLE",
         canUnreserve: unit.status === "RESERVED",

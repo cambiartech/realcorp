@@ -46,6 +46,8 @@ type UnitRow = {
   statusValue: UnitStatus;
   pricingPlanId: string | null;
   pricingPlanName: string;
+  serviceFee: number | null;
+  resolvedServiceFee: number;
   canDelete: boolean;
   canReserve: boolean;
   canUnreserve: boolean;
@@ -150,7 +152,7 @@ export function ProjectUnitsWorkspace({
     const filtered = filterTableRows(
       scoped,
       unitQuery,
-      (unit) => `${unit.label} ${unit.purpose} ${unit.unitType} ${unit.pricingPlanName} ${unit.status}`,
+      (unit) => `${unit.label} ${unit.purpose} ${unit.unitType} ${unit.pricingPlanName} ${unit.status} ${unit.resolvedServiceFee}`,
     );
     return sortTableRows(filtered, sortKey, sortDir, (unit, key) => {
       if (key === "label") return unit.label;
@@ -158,6 +160,7 @@ export function ProjectUnitsWorkspace({
       if (key === "layout") return unit.unitType;
       if (key === "plan") return unit.pricingPlanName;
       if (key === "status") return unit.status;
+      if (key === "serviceFee") return unit.resolvedServiceFee;
       return "";
     });
   }, [units, unitQuery, unitStatusFilter, unitPurposeFilter, sortKey, sortDir]);
@@ -279,10 +282,14 @@ export function ProjectUnitsWorkspace({
           <h1 className="mt-1 text-2xl font-bold text-foreground">{projectName}</h1>
           {serviceCharge != null ? (
             <p className="mt-1 text-sm text-muted">
-              Estate service charge: {projectCurrency || defaultCurrency} {serviceCharge.toLocaleString()} — set on the project,
-              not added to a unit sale automatically.
+              Project service fee: {projectCurrency || defaultCurrency} {serviceCharge.toLocaleString()} — units
+              inherit this unless you set a different amount on the unit.
             </p>
-          ) : null}
+          ) : (
+            <p className="mt-1 text-sm text-muted">
+              Set a service fee on each unit, or add a project-level service fee under Projects.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -466,6 +473,7 @@ export function ProjectUnitsWorkspace({
                 <SortTh label="Purpose" sortKey="purpose" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <SortTh label="Layout" sortKey="layout" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <SortTh label="Pricing plan" sortKey="plan" activeKey={sortKey} dir={sortDir} onSort={onSort} />
+                <SortTh label="Service fee" sortKey="serviceFee" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <SortTh label="Status" sortKey="status" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 <th className="px-4 py-3">Actions</th>
               </tr>
@@ -473,7 +481,7 @@ export function ProjectUnitsWorkspace({
             <tbody className="divide-y divide-foreground/10">
               {visibleUnits.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-sm text-muted">
+                  <td colSpan={7} className="px-4 py-8 text-sm text-muted">
                     {units.length === 0 ? "No units yet." : "No units match that search or filter."}
                   </td>
                 </tr>
@@ -484,6 +492,14 @@ export function ProjectUnitsWorkspace({
                     <td className="px-4 py-3 text-foreground/90">{unit.purpose}</td>
                     <td className="px-4 py-3 text-muted">{unit.unitType}</td>
                     <td className="px-4 py-3 text-muted">{unit.pricingPlanName}</td>
+                    <td className="px-4 py-3 text-muted">
+                      {unit.resolvedServiceFee > 0
+                        ? `${projectCurrency || defaultCurrency} ${unit.resolvedServiceFee.toLocaleString()}`
+                        : "—"}
+                      {unit.serviceFee == null && serviceCharge != null && serviceCharge > 0 ? (
+                        <span className="block text-[11px] text-muted">Project default</span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3 text-foreground/90">{unit.status}</td>
                     <td className="px-4 py-3">
                       {canManage ? (
@@ -544,6 +560,8 @@ export function ProjectUnitsWorkspace({
         pending={createPending}
         error={createError}
         onSubmit={submitCreateUnits}
+        projectServiceFee={serviceCharge}
+        currency={projectCurrency || defaultCurrency}
       />
 
       {canImportClients ? (
@@ -643,6 +661,29 @@ export function ProjectUnitsWorkspace({
                   ))}
                 </UiSelect>
               </div>
+            </div>
+            <div>
+              <label htmlFor="unit-edit-service-fee" className="mb-1 block text-sm text-muted">
+                Service fee (optional)
+              </label>
+              <input
+                id="unit-edit-service-fee"
+                name="serviceFee"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={editingUnit.serviceFee != null ? String(editingUnit.serviceFee) : ""}
+                placeholder={
+                  serviceCharge != null
+                    ? `Leave blank to use project fee (${projectCurrency || defaultCurrency} ${serviceCharge.toLocaleString()})`
+                    : "Amount charged for this unit"
+                }
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-foreground/20"
+              />
+              <p className="mt-1 text-xs text-muted">
+                Estate / management fee for this unit. Track payments from the client record. This does not
+                change the sale price.
+              </p>
             </div>
             <div className="flex justify-end gap-2">
               <button

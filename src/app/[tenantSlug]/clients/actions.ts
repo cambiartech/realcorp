@@ -109,7 +109,6 @@ export async function createPropertyClient(
         notes: parsed.data.notes || null,
         nextOfKin: parsed.data.nextOfKin || null,
         emergencyPhone: parsed.data.emergencyPhone || null,
-        declaredUnitsCount: parsed.data.declaredUnitsCount ?? null,
       },
     });
     await writeAuditLog({
@@ -224,7 +223,6 @@ export async function updatePropertyClient(
         notes: parsed.data.notes || null,
         nextOfKin: parsed.data.nextOfKin || null,
         emergencyPhone: parsed.data.emergencyPhone || null,
-        declaredUnitsCount: parsed.data.declaredUnitsCount ?? null,
         ...(clearUserId ? { userId: null } : {}),
       },
     });
@@ -561,14 +559,14 @@ export async function recordClientDeposit(
         const paidAgg = await tx.paymentRecord.aggregate({
           where: {
             ...paidWhere,
-            incomeType: { not: "SHORTLET_REVENUE" },
+            incomeType: { notIn: ["SHORTLET_REVENUE", "SERVICE_FEE"] },
           },
           _sum: { amount: true },
         });
         return Number(paidAgg._sum.amount || 0);
       }
 
-      if (kind === "catch_up") {
+      if (kind !== "service_fee" && kind === "catch_up") {
         const alreadyOnFile = await collectedOnFile();
         const remainingToPay = parsed.data.remainingToPay ?? 0;
         const agreedPrice = agreedPriceFromCatchUp({
@@ -593,7 +591,7 @@ export async function recordClientDeposit(
             data: { value: agreedPrice },
           });
         }
-      } else if (adjustment !== "none") {
+      } else if (kind !== "service_fee" && adjustment !== "none") {
         let agreedPrice = parsed.data.agreedPrice || 0;
         const adjustmentReason =
           parsed.data.adjustmentReason ||
@@ -632,6 +630,10 @@ export async function recordClientDeposit(
       const recorderLabel = session.user.name || session.user.email || "Unknown recorder";
       const currency = tenantRecord?.defaultCurrency || "NGN";
 
+      const isServiceFee = kind === "service_fee";
+      const incomeType = isServiceFee ? "SERVICE_FEE" : "CLIENT_DEPOSIT";
+      const titlePrefix = isServiceFee ? "Service fee" : "Client deposit";
+
       const writePayment = async (amount: number, titleSuffix: string, extraNote?: string) => {
         if (!(amount > 0)) return;
         await tx.paymentRecord.create({
@@ -641,8 +643,8 @@ export async function recordClientDeposit(
             propertyClientId: clientRecordId,
             projectId: unitProjectId,
             unitId: unitRecordId,
-            incomeType: "CLIENT_DEPOSIT",
-            standaloneTitle: `Client deposit · ${clientName} · ${unitTitle}${titleSuffix}`,
+            incomeType,
+            standaloneTitle: `${titlePrefix} · ${clientName} · ${unitTitle}${titleSuffix}`,
             payerName: clientName,
             amount,
             currency,
@@ -678,7 +680,9 @@ export async function recordClientDeposit(
       action: paymentAmount > 0 ? "CREATE" : "UPDATE",
       summary:
         paymentAmount > 0
-          ? `Recorded client deposit for ${client.fullName} on ${unit.project.name} ${unit.label}.`
+          ? kind === "service_fee"
+            ? `Recorded service fee for ${client.fullName} on ${unit.project.name} ${unit.label}.`
+            : `Recorded client deposit for ${client.fullName} on ${unit.project.name} ${unit.label}.`
           : `Updated sale price for ${client.fullName} on ${unit.project.name} ${unit.label}.`,
       metadata: {
         amount: paymentAmount,
@@ -686,7 +690,7 @@ export async function recordClientDeposit(
         remainingToPay: kind === "catch_up" ? parsed.data.remainingToPay ?? null : null,
         unitId: unit.id,
         projectId: unit.projectId,
-        incomeType: "CLIENT_DEPOSIT",
+        incomeType: kind === "service_fee" ? "SERVICE_FEE" : "CLIENT_DEPOSIT",
         paymentKind: kind,
         balanceAdjustment: adjustment,
         agreedPrice: parsed.data.agreedPrice ?? null,

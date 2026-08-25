@@ -21,15 +21,6 @@ export const createPropertyClientSchema = z.object({
   notes: z.string().trim().max(5000).optional(),
   nextOfKin: z.string().trim().max(120).optional(),
   emergencyPhone: z.string().trim().max(40).optional(),
-  declaredUnitsCount: z
-    .string()
-    .trim()
-    .optional()
-    .transform((v) => (v && v !== "" ? Number(v) : undefined))
-    .refine(
-      (v) => v == null || (Number.isInteger(v) && v >= 0 && v <= 5000),
-      "Total units must be a whole number.",
-    ),
   sendPortalInvite: z.boolean().optional(),
 });
 
@@ -69,7 +60,6 @@ export function parseCreatePropertyClientForm(formData: FormData) {
     notes: formData.get("notes") || undefined,
     nextOfKin: formData.get("nextOfKin") || undefined,
     emergencyPhone: formData.get("emergencyPhone") || undefined,
-    declaredUnitsCount: formData.get("declaredUnitsCount") || undefined,
     sendPortalInvite:
       formData.get("sendPortalInvite") === "on" || formData.get("sendPortalInvite") === "true",
   });
@@ -89,7 +79,6 @@ export function parseUpdatePropertyClientForm(formData: FormData) {
     notes: formData.get("notes") || undefined,
     nextOfKin: formData.get("nextOfKin") || undefined,
     emergencyPhone: formData.get("emergencyPhone") || undefined,
-    declaredUnitsCount: formData.get("declaredUnitsCount") || undefined,
   });
 }
 
@@ -138,7 +127,7 @@ export const recordClientDepositSchema = z
       .optional()
       .transform((v) => (v && v !== "" ? v : undefined)),
     paymentKind: z
-      .enum(["part_payment", "catch_up", "set_sale_price", "waive_remaining"])
+      .enum(["part_payment", "catch_up", "set_sale_price", "waive_remaining", "service_fee"])
       .optional()
       .default("part_payment"),
     alreadyPaid: z.coerce.number().min(0, "Already-paid amount cannot be negative.").optional().default(0),
@@ -154,10 +143,10 @@ export const recordClientDepositSchema = z
   })
   .superRefine((data, ctx) => {
     const kind = data.paymentKind || "part_payment";
-    if (kind === "part_payment" && !(data.amount > 0)) {
+    if ((kind === "part_payment" || kind === "service_fee") && !(data.amount > 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Payment amount must be greater than zero.",
+        message: kind === "service_fee" ? "Service fee amount must be greater than zero." : "Payment amount must be greater than zero.",
         path: ["amount"],
       });
     }
@@ -186,7 +175,11 @@ export function parseRecordClientDepositForm(formData: FormData) {
   const remainingRaw = String(formData.get("remainingToPay") ?? "").trim();
   const kindRaw = String(formData.get("paymentKind") || formData.get("balanceAdjustment") || "part_payment").trim();
   const paymentKind =
-    kindRaw === "set_sale_price" || kindRaw === "waive_remaining" || kindRaw === "catch_up" || kindRaw === "part_payment"
+    kindRaw === "set_sale_price" ||
+    kindRaw === "waive_remaining" ||
+    kindRaw === "catch_up" ||
+    kindRaw === "part_payment" ||
+    kindRaw === "service_fee"
       ? kindRaw
       : kindRaw === "none"
         ? "part_payment"

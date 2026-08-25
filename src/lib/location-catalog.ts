@@ -1,3 +1,4 @@
+import { getCitiesOfState, getCountries, getStatesOfCountry } from "@countrystatecity/countries";
 import prisma from "@/lib/db";
 import { nigeriaCityOptions, nigeriaStateOptions } from "@/lib/nigeria-locations";
 
@@ -62,9 +63,66 @@ function nigeriaCities(stateInput: string): CityRow[] {
 
 const NG_COUNTRY: CountryRow = { code: "NG", name: "Nigeria", emoji: "🇳🇬" };
 
+function mapPackageCountries(
+  rows: Array<{ iso2?: string; name?: string; emoji?: string }>,
+): CountryRow[] {
+  return rows
+    .map((row) => ({
+      code: String(row.iso2 || "").toUpperCase(),
+      name: String(row.name || "").trim(),
+      emoji: row.emoji || undefined,
+    }))
+    .filter((row) => /^[A-Z]{2}$/.test(row.code) && row.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function packageCountries(): Promise<CountryRow[]> {
+  return mapPackageCountries(await getCountries());
+}
+
+async function cdnCountries(): Promise<CountryRow[]> {
+  const rows = await fetchCscJson<Array<{ iso2?: string; name?: string; emoji?: string }>>(
+    "countries.json",
+  );
+  return mapPackageCountries(rows);
+}
+
+async function packageStates(countryCode: string): Promise<StateRow[]> {
+  const rows = await getStatesOfCountry(countryCode);
+  return rows
+    .map((row) => ({
+      code: String(row.iso2 || row.name || "").trim(),
+      name: String(row.name || "").trim(),
+      type: row.type,
+    }))
+    .filter((row) => row.code && row.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function packageCities(countryCode: string, stateCode: string): Promise<CityRow[]> {
+  const rows = await getCitiesOfState(countryCode, stateCode);
+  return rows
+    .map((row, index) => ({
+      id: typeof row.id === "number" ? row.id : index + 1,
+      name: String(row.name || "").trim(),
+    }))
+    .filter((row) => row.name)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function listCatalogCountries(): Promise<CountryRow[]> {
   const cached = memoryGet<CountryRow[]>("countries");
-  if (cached?.length) return cached;
+  if (cached && cached.length > 1) return cached;
+
+  try {
+    const items = await packageCountries();
+    if (items.length > 1) {
+      memorySet("countries", items);
+      return items;
+    }
+  } catch {
+    // Fall through to DB / CDN.
+  }
 
   try {
     const rows = await withTimeout(
@@ -79,12 +137,22 @@ export async function listCatalogCountries(): Promise<CountryRow[]> {
       name: row.name,
       emoji: row.emoji || undefined,
     }));
-    if (items.length) {
+    if (items.length > 1) {
       memorySet("countries", items);
       return items;
     }
   } catch {
-    // Paused or slow DB — keep the form usable for Nigeria without waiting.
+    // Paused or slow DB — keep the form usable from the packaged catalog.
+  }
+
+  try {
+    const items = await cdnCountries();
+    if (items.length > 1) {
+      memorySet("countries", items);
+      return items;
+    }
+  } catch {
+    // Last resort below.
   }
 
   return [NG_COUNTRY];
@@ -96,6 +164,14 @@ export async function listLocationStates(countryCode: string): Promise<StateRow[
   const cacheKey = `states:${countryCode}`;
   const cached = memoryGet<StateRow[]>(cacheKey);
   if (cached) return cached;
+
+  try {
+    const items = await packageStates(countryCode);
+    memorySet(cacheKey, items);
+    return items;
+  } catch {
+    // Fall through to DB.
+  }
 
   try {
     const rows = await withTimeout(
@@ -120,6 +196,13 @@ export async function listLocationStates(countryCode: string): Promise<StateRow[
 
 export async function listLocationCities(countryCode: string, stateCode: string): Promise<CityRow[]> {
   if (countryCode === "NG") return nigeriaCities(stateCode);
+
+  try {
+    const items = await packageCities(countryCode, stateCode);
+    if (items.length) return items;
+  } catch {
+    // Fall through to catalogDir + CDN.
+  }
 
   try {
     const country = await withTimeout(

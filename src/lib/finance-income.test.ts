@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, summarizeClientDeposits, agreedPriceFromCatchUp, allocateClientCash, isPropertyEarningIncomeType } from "./finance-income";
+import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, resolveUnitServiceFee, summarizeClientDeposits, agreedPriceFromCatchUp, allocateClientCash, isPropertyEarningIncomeType, isServiceFeeIncomeType } from "./finance-income";
 
 test("parses known income types and falls back to other", () => {
   assert.equal(parseFinanceIncomeType("CLIENT_DEPOSIT"), "CLIENT_DEPOSIT");
@@ -96,4 +96,35 @@ test("short-let earnings stay off paid and remaining", () => {
   assert.equal(totals.collected, 20_000_000);
   assert.equal(totals.earnings, 493_000);
   assert.equal(totals.remaining, 20_000_000);
+});
+
+test("service fee stays off the sale remaining", () => {
+  assert.equal(isServiceFeeIncomeType("SERVICE_FEE"), true);
+  assert.equal(isPropertyEarningIncomeType("SERVICE_FEE"), false);
+  assert.equal(parseFinanceIncomeType("service_fee"), "SERVICE_FEE");
+
+  const fee = allocateClientCash("SERVICE_FEE", 150_000);
+  assert.equal(fee.collected, 0);
+  assert.equal(fee.earnings, 0);
+  assert.equal(fee.serviceFeePaid, 150_000);
+  assert.equal(fee.isDeposit, false);
+
+  assert.equal(resolveUnitServiceFee(null, 200_000), 200_000);
+  assert.equal(resolveUnitServiceFee(50_000, 200_000), 50_000);
+  assert.equal(resolveUnitServiceFee(0, 200_000), 0);
+
+  const totals = summarizeClientDeposits([
+    {
+      contractValue: 10_000_000,
+      collected: 2_000_000,
+      remaining: 8_000_000,
+      serviceFee: 150_000,
+      serviceFeePaid: 50_000,
+      serviceFeeRemaining: 100_000,
+    },
+  ]);
+  assert.equal(totals.remaining, 8_000_000);
+  assert.equal(totals.serviceFee, 150_000);
+  assert.equal(totals.serviceFeePaid, 50_000);
+  assert.equal(totals.serviceFeeRemaining, 100_000);
 });

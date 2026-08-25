@@ -279,7 +279,6 @@ export default async function ClientDetailPage({
         country: client.country ?? "",
         nextOfKin: client.nextOfKin ?? "",
         emergencyPhone: client.emergencyPhone ?? "",
-        declaredUnitsCount: client.declaredUnitsCount,
         status: formatEnumLabel(client.status),
         statusValue: client.status,
         notes: client.notes ?? "",
@@ -295,6 +294,9 @@ export default async function ClientDetailPage({
         collected: row.collected,
         earnings: row.earnings,
         remaining: row.remaining,
+        serviceFee: row.serviceFee,
+        serviceFeePaid: row.serviceFeePaid,
+        serviceFeeRemaining: row.serviceFeeRemaining,
         isDiscounted: row.isDiscounted,
         adjustmentReason: row.adjustmentReason,
       }))}
@@ -311,6 +313,7 @@ export default async function ClientDetailPage({
           paidAtLabel: payment.paidAt.toISOString().slice(0, 10),
           method: payment.method ?? "",
           reference: payment.reference ?? "",
+          kindLabel: payment.incomeType === "SERVICE_FEE" ? "Service fee" : undefined,
           canVoid: true,
         }))}
       earnings={[

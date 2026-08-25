@@ -79,6 +79,7 @@ type CashRow = {
   paidAtLabel: string;
   method: string;
   reference: string;
+  kindLabel?: string;
   canVoid: boolean;
 };
 
@@ -187,12 +188,19 @@ export function ClientDetailWorkspace({
     country: string;
     nextOfKin: string;
     emergencyPhone: string;
-    declaredUnitsCount: number | null;
     status: string;
     statusValue: string;
     notes: string;
   };
-  depositSummary: { contractValue: number; collected: number; remaining: number; earnings: number };
+  depositSummary: {
+    contractValue: number;
+    collected: number;
+    remaining: number;
+    earnings: number;
+    serviceFee: number;
+    serviceFeePaid: number;
+    serviceFeeRemaining: number;
+  };
   depositRows: Array<{
     id: string;
     unitId: string;
@@ -203,6 +211,9 @@ export function ClientDetailWorkspace({
     collected: number;
     earnings: number;
     remaining: number;
+    serviceFee: number;
+    serviceFeePaid: number;
+    serviceFeeRemaining: number;
     isDiscounted: boolean;
     adjustmentReason: string | null;
   }>;
@@ -242,7 +253,7 @@ export function ClientDetailWorkspace({
     paymentUnitOptions.find((unit) => unit.assigned)?.id ?? paymentUnitOptions[0]?.id ?? "";
   const [payUnitId, setPayUnitId] = useState(defaultPayUnitId);
   const [paymentKind, setPaymentKind] = useState<
-    "part_payment" | "catch_up" | "set_sale_price" | "waive_remaining"
+    "part_payment" | "catch_up" | "set_sale_price" | "waive_remaining" | "service_fee"
   >("part_payment");
   const [alreadyPaid, setAlreadyPaid] = useState("");
   const [payingNow, setPayingNow] = useState("");
@@ -645,7 +656,7 @@ export function ClientDetailWorkspace({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Status</p>
           <p className="mt-1 font-semibold">{profile.status}</p>
@@ -665,6 +676,13 @@ export function ClientDetailWorkspace({
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Remaining</p>
           <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.remaining)}</p>
+        </div>
+        <div className="rounded-lg border border-foreground/10 p-4">
+          <p className="text-xs uppercase text-muted">Service fee left</p>
+          <p className="mt-1 text-2xl font-bold">{moneyLabel(currency, depositSummary.serviceFeeRemaining)}</p>
+          <p className="mt-1 text-xs text-muted">
+            {moneyLabel(currency, depositSummary.serviceFeePaid)} of {moneyLabel(currency, depositSummary.serviceFee)} paid
+          </p>
         </div>
         <div className="rounded-lg border border-foreground/10 p-4">
           <p className="text-xs uppercase text-muted">Earnings</p>
@@ -730,17 +748,9 @@ export function ClientDetailWorkspace({
                 <dd>{profile.alternatePhone || "—"}</dd>
               </div>
               <div>
-                <dt className="text-muted">Total units</dt>
+                <dt className="text-muted">Linked properties</dt>
                 <dd>
-                  {profile.declaredUnitsCount != null ? profile.declaredUnitsCount : unitLinks.length + shortletLinks.length}
-                  {profile.declaredUnitsCount != null ? (
-                    <span className="text-muted">
-                      {" "}
-                      · {unitLinks.length + shortletLinks.length} linked
-                    </span>
-                  ) : (
-                    <span className="text-muted"> linked</span>
-                  )}
+                  {unitLinks.length + shortletLinks.length}
                 </dd>
               </div>
               <div className="sm:col-span-2">
@@ -767,8 +777,9 @@ export function ClientDetailWorkspace({
             <div>
               <h2 className="text-sm font-semibold">Payments, earnings & balance</h2>
               <p className="mt-0.5 text-xs text-muted">
-                Paid is what the client paid toward the sale. Earnings are income generated on that
-                property, such as short-let stays. Earnings do not reduce remaining.
+                Paid is what the client paid toward the sale. Service fee is the estate/management
+                charge on the unit and does not reduce remaining sale. Earnings are income generated on
+                that property, such as short-let stays.
               </p>
             </div>
             {canManage ? (
@@ -804,6 +815,7 @@ export function ClientDetailWorkspace({
                         <th className="px-4 py-2">Unit</th>
                         <th className="px-4 py-2">Amount</th>
                         <th className="px-4 py-2">Paid</th>
+                        <th className="px-4 py-2">Service fee</th>
                         <th className="px-4 py-2">Earnings</th>
                         <th className="px-4 py-2">Remaining</th>
                       </tr>
@@ -825,6 +837,21 @@ export function ClientDetailWorkspace({
                             ) : null}
                           </td>
                           <td className="px-4 py-3">{moneyLabel(currency, row.collected)}</td>
+                          <td className="px-4 py-3">
+                            {row.serviceFee > 0 || row.serviceFeePaid > 0 ? (
+                              <>
+                                <p>{moneyLabel(currency, row.serviceFeePaid)}</p>
+                                <p className="text-xs text-muted">
+                                  of {moneyLabel(currency, row.serviceFee)}
+                                  {row.serviceFeeRemaining > 0
+                                    ? ` · ${moneyLabel(currency, row.serviceFeeRemaining)} left`
+                                    : ""}
+                                </p>
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
                           <td className="px-4 py-3">{moneyLabel(currency, row.earnings)}</td>
                           <td className="px-4 py-3 font-semibold">
                             {moneyLabel(currency, row.remaining)}
@@ -853,6 +880,7 @@ export function ClientDetailWorkspace({
                         <div>
                           <p className="font-medium">{payment.unitLabel}</p>
                           <p className="text-xs text-muted">
+                            {payment.kindLabel ? `${payment.kindLabel} · ` : ""}
                             {payment.paidAtLabel}
                             {payment.method ? ` · ${payment.method}` : ""}
                             {payment.reference ? ` · ${payment.reference}` : ""}
@@ -1134,7 +1162,6 @@ export function ClientDetailWorkspace({
               country: profile.country,
               nextOfKin: profile.nextOfKin,
               emergencyPhone: profile.emergencyPhone,
-              declaredUnitsCount: profile.declaredUnitsCount,
               notes: profile.notes,
             }}
           />
@@ -1413,11 +1440,15 @@ export function ClientDetailWorkspace({
                 groups={paymentUnitGroups}
                 required
               />
-            {selectedPayBalance || selectedPayUnit?.listPrice ? (
+            {selectedPayBalance || selectedPayUnit?.listPrice || paymentKind === "service_fee" ? (
               <p className="mt-1 text-xs text-muted">
-                {selectedPayBalance
-                  ? `Sale ${moneyLabel(currency, selectedPayBalance.contractValue)} · On file ${moneyLabel(currency, selectedPayBalance.collected)} · Remaining ${moneyLabel(currency, selectedPayBalance.remaining)}`
-                  : `List ${moneyLabel(currency, selectedPayUnit?.listPrice || 0)}`}
+                {paymentKind === "service_fee"
+                  ? selectedPayBalance
+                    ? `Service fee ${moneyLabel(currency, selectedPayBalance.serviceFee)} · Paid ${moneyLabel(currency, selectedPayBalance.serviceFeePaid)} · Remaining ${moneyLabel(currency, selectedPayBalance.serviceFeeRemaining)}`
+                    : "Set a service fee on the unit to track what is due."
+                  : selectedPayBalance
+                    ? `Sale ${moneyLabel(currency, selectedPayBalance.contractValue)} · On file ${moneyLabel(currency, selectedPayBalance.collected)} · Remaining ${moneyLabel(currency, selectedPayBalance.remaining)}`
+                    : `List ${moneyLabel(currency, selectedPayUnit?.listPrice || 0)}`}
               </p>
             ) : null}
           </div>
@@ -1427,11 +1458,16 @@ export function ClientDetailWorkspace({
               name="paymentKind"
               value={paymentKind}
               onChange={(next) =>
-                setPaymentKind(next as "part_payment" | "catch_up" | "set_sale_price" | "waive_remaining")
+                setPaymentKind(next as "part_payment" | "catch_up" | "set_sale_price" | "waive_remaining" | "service_fee")
               }
               searchPlaceholder="Search payment type…"
               options={[
                 { value: "part_payment", label: "Part payment", hint: "This installment only" },
+                {
+                  value: "service_fee",
+                  label: "Service fee",
+                  hint: "Estate / management fee on this unit",
+                },
                 {
                   value: "catch_up",
                   label: "Already paid, paying now, remaining",
@@ -1495,14 +1531,16 @@ export function ClientDetailWorkspace({
               <div>
                 <label className="mb-1 block text-sm text-muted">
                   Amount
-                  {paymentKind === "part_payment" ? "" : " (optional if you are only adjusting the sale price)"}
+                  {paymentKind === "part_payment" || paymentKind === "service_fee"
+                    ? ""
+                    : " (optional if you are only adjusting the sale price)"}
                 </label>
                 <input
                   name="amount"
                   type="number"
                   min="0"
                   step="0.01"
-                  required={paymentKind === "part_payment"}
+                  required={paymentKind === "part_payment" || paymentKind === "service_fee"}
                   placeholder="0.00"
                   className="w-full border border-foreground/15 bg-field px-3 py-2"
                 />
@@ -1634,7 +1672,7 @@ export function ClientDetailWorkspace({
               className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
             >
               {payPending ? <ButtonSpinner /> : null}
-              {paymentKind === "part_payment" ? "Save payment" : "Save"}
+              {paymentKind === "part_payment" || paymentKind === "service_fee" ? "Save payment" : "Save"}
             </button>
           </div>
         </form>
