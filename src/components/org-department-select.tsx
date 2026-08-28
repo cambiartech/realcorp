@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addOrgDepartment } from "@/app/[tenantSlug]/settings/actions";
 import { UiSelect } from "@/components/ui-select";
 import { normalizeOrgDepartmentName } from "@/lib/org-departments";
@@ -53,6 +53,16 @@ export function OrgDepartmentSelect({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalDepartments((list) => {
+      const next = [...list];
+      for (const department of departments) {
+        if (!next.some((item) => item.toLowerCase() === department.toLowerCase())) next.push(department);
+      }
+      return withCurrentDepartment(next, value ?? defaultValue);
+    });
+  }, [departments, value, defaultValue]);
 
   const sorted = useMemo(
     () => [...localDepartments].sort((a, b) => a.localeCompare(b)),

@@ -371,9 +371,9 @@ export function HrPayslipsWorkspace({
               <Link href={`/${tenantSlug}/hr/settings`} className="font-semibold underline">
                 People → Settings
               </Link>{" "}
-              (Nigeria Tax Act 2026: first ₦800,000 of annual chargeable income is untaxed). Pension is 8%
-              of basic + housing + transport. Change a single person only for a documented exception. After
-              you publish, file statutory remittances from{" "}
+              (Nigeria Tax Act 2026: first ₦800,000 a year is untaxed; payslips annualize earnings then
+              deduct PAYE monthly). Pension is 8% of basic + housing + transport. Change a single person
+              only for a documented exception. After you publish, file statutory remittances from{" "}
               <Link href={`/${tenantSlug}/hr/remittances`} className="font-semibold underline">
                 Remittances
               </Link>

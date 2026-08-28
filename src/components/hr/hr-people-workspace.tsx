@@ -32,7 +32,7 @@ import {
 import { createHrOnlyEmployee } from "@/app/[tenantSlug]/hr/document-intake-actions";
 import { inviteTenantMembersBatch } from "@/app/[tenantSlug]/team/actions";
 import { HR_FORM_OPTIONS } from "@/lib/hr-form-types";
-import { INVITE_DEPARTMENT_OPTIONS } from "@/lib/team-membership-roles";
+import { inviteDepartmentChoices } from "@/lib/org-department-access";
 import { downloadExcel } from "@/lib/table-export";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { GlobalLocationFields } from "@/components/global-location-fields";
@@ -324,7 +324,7 @@ export function HrPeopleWorkspace({
   const [showHrOnlyForm, setShowHrOnlyForm] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteMode, setInviteMode] = useState<InviteMode>("single");
-  const [inviteDepartment, setInviteDepartment] = useState("operations");
+  const [inviteDepartment, setInviteDepartment] = useState("");
   const [inviteLead, setInviteLead] = useState(false);
   const [bulkInviteEmails, setBulkInviteEmails] = useState("");
   const [excelInviteRows, setExcelInviteRows] = useState<InviteRow[]>([]);
@@ -341,6 +341,10 @@ export function HrPeopleWorkspace({
     [profileOnboarding],
   );
   const ytdByUser = useMemo(() => new Map(ytdByUserId.map((o) => [o.userId, o.ytd])), [ytdByUserId]);
+  const inviteDepartmentNames = useMemo(
+    () => inviteDepartmentChoices(departments).map((row) => row.label),
+    [departments],
+  );
   const selectedMember = teamMembers.find((m) => m.userId === selectedUserId);
   const selectedOnboarding = selectedUserId ? onboardingByUserId.get(selectedUserId) : undefined;
   const submittedRequests = formRequests.filter((request) => request.statusValue === "SUBMITTED");
@@ -396,9 +400,25 @@ export function HrPeopleWorkspace({
     }));
   }
 
+  function resolveWorkbookDepartment(text: string) {
+    const value = text.trim();
+    if (!value) return inviteDepartment;
+    const match = inviteDepartmentChoices(departments).find(
+      (option) =>
+        option.value.toLowerCase() === value.toLowerCase() || option.label.toLowerCase() === value.toLowerCase(),
+    );
+    if (match) return match.label;
+    const existing = departments.find((department) => department.toLowerCase() === value.toLowerCase());
+    return existing || value;
+  }
+
   async function sendInvites(rows: InviteRow[]) {
     if (!rows.length) {
       showSnackbar("Add at least one email address.", "error");
+      return;
+    }
+    if (rows.some((row) => !row.department.trim())) {
+      showSnackbar("Select a department before sending invitations.", "error");
       return;
     }
     setPending(true);
@@ -449,12 +469,8 @@ export function HrPeopleWorkspace({
         if (rowNumber === 1) return;
         const email = row.getCell(emailColumn).text.trim().toLowerCase();
         if (!email) return;
-        const departmentText = departmentColumn ? row.getCell(departmentColumn).text.trim().toLowerCase() : "";
-        const department =
-          INVITE_DEPARTMENT_OPTIONS.find(
-            (option) =>
-              option.value.toLowerCase() === departmentText || option.label.toLowerCase() === departmentText,
-          )?.value || inviteDepartment;
+        const departmentText = departmentColumn ? row.getCell(departmentColumn).text.trim() : "";
+        const department = resolveWorkbookDepartment(departmentText);
         const leadText = leadColumn ? row.getCell(leadColumn).text.trim().toLowerCase() : "";
         rows.push({
           email,
@@ -482,8 +498,8 @@ export function HrPeopleWorkspace({
       "Invites",
       ["Email", "Department", "Department Lead"],
       [
-        { email: "employee@company.com", department: "operations", lead: "No" },
-        { email: "manager@company.com", department: "hr", lead: "Yes" },
+        { email: "employee@company.com", department: "Operations / Short lets", lead: "No" },
+        { email: "manager@company.com", department: "Human Resources", lead: "Yes" },
       ],
       ["email", "department", "lead"],
     );
@@ -2157,18 +2173,21 @@ export function HrPeopleWorkspace({
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium text-foreground">
-                {inviteMode === "excel" ? "Fallback department" : "Department"}
-              </span>
-              <UiSelect value={inviteDepartment} onChange={(event) => setInviteDepartment(event.target.value)}>
-                {INVITE_DEPARTMENT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </UiSelect>
-            </label>
+            <div>
+              <OrgDepartmentSelect
+                tenantSlug={tenantSlug}
+                departments={inviteDepartmentNames}
+                value={inviteDepartment}
+                onChange={setInviteDepartment}
+                name="inviteDepartment"
+                label={inviteMode === "excel" ? "Fallback department" : "Department"}
+                required
+                allowCreate
+              />
+              <p className="mt-1 text-[11px] text-muted">
+                Same department list as Team and People → Settings.
+              </p>
+            </div>
             <label className="flex items-center gap-3 rounded-md border border-foreground/10 bg-field px-3 py-2.5 text-sm">
               <input
                 type="checkbox"

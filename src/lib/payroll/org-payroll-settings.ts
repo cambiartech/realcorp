@@ -25,7 +25,7 @@ export const DEFAULT_ORG_PAYROLL_SETTINGS: OrgPayrollSettings = {
 };
 
 export const PAYROLL_COUNTRY_OPTIONS = [
-  { value: "NG", label: "Nigeria — Tax Act 2026 (first ₦800,000 untaxed)" },
+  { value: "NG", label: "Nigeria — Tax Act 2026 (₦800,000 untaxed per year, PAYE deducted monthly)" },
 ] as const;
 
 function rateFromContributions(value: unknown, code: string, fallback: number) {

@@ -80,9 +80,9 @@ export function HrPeopleSettingsWorkspace({
       <section className="mt-8 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-foreground">PAYE and payroll country</h2>
         <p className="mt-1 text-xs text-muted">
-          Everyone is taxed by this country&apos;s law. Nigeria Tax Act 2026: first ₦800,000 of annual
-          chargeable income is untaxed; pension comes off before tax. You do not enter PAYE on each
-          record.
+          The first ₦800,000 untaxed is a yearly figure, not monthly. Each payslip annualizes this
+          month&apos;s earnings (×12, after pension), applies the yearly tax bands, then deducts one
+          month of that tax. Pension comes off before tax. You do not enter PAYE on each record.
         </p>
         <form action={saveAction} className="mt-4 space-y-4">
           {saveState && !saveState.ok ? <FormAlert>{saveState.error}</FormAlert> : null}
