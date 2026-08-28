@@ -40,18 +40,17 @@ export function InvestorShortletsWorkspace({
         </Link>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <StatCard label="Linked apartments" value={String(totals.units)} />
-        <StatCard label="Total collected" value={formatMoney(totals.collected, totals.currency)} />
-        <StatCard label="Your earnings" value={formatMoney(totals.earnings, totals.currency)} highlight />
+        <StatCard label="Remitted to you" value={formatMoney(totals.earnings, totals.currency)} highlight />
       </div>
 
       {units.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-foreground/15 px-6 py-14 text-center">
           <p className="text-sm font-medium text-foreground">No short-let apartments linked yet</p>
           <p className="mt-1 text-sm text-muted">
-            When an admin links a short-let apartment to your client profile, it appears here with reservation
-            earnings.
+            When an admin links a short-let apartment to your client profile, it appears here.
+            Remittances from {tenantName} show as amounts sent to you.
           </p>
         </div>
       ) : (
@@ -62,8 +61,7 @@ export function InvestorShortletsWorkspace({
                 <th className="px-4 py-3">Apartment</th>
                 <th className="px-4 py-3">Project</th>
                 <th className="px-4 py-3 text-right">Stays</th>
-                <th className="px-4 py-3 text-right">Collected</th>
-                <th className="px-4 py-3 text-right">Your share</th>
+                <th className="px-4 py-3 text-right">Remitted to you</th>
               </tr>
             </thead>
             <tbody>
@@ -72,9 +70,6 @@ export function InvestorShortletsWorkspace({
                   <td className="px-4 py-3 font-medium">{unit.unitName}</td>
                   <td className="px-4 py-3 text-muted">{unit.projectName}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{unit.reservationCount}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {formatMoney(unit.totalCollected, unit.currency)}
-                  </td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums text-[var(--success)]">
                     {formatMoney(unit.yourEarnings, unit.currency)}
                   </td>

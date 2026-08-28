@@ -1,4 +1,5 @@
 import { MembershipRole } from "@/generated/prisma";
+import { normalizeOrgDepartmentName } from "@/lib/org-departments";
 
 /** Core org departments — invite UI and visibility are built on these. */
 export type OrgDepartment =
@@ -19,6 +20,26 @@ export const ORG_DEPARTMENT_OPTIONS: { value: OrgDepartment; label: string }[] =
   { value: "operations", label: "Operations / Short lets" },
   { value: "facility", label: "Facility" },
 ];
+
+/** Map a saved org department name (or invite slug) onto the access area used for roles and nav. */
+export function mapOrgDepartmentToAccess(name: string): OrgDepartment | null {
+  const n = normalizeOrgDepartmentName(name).toLowerCase();
+  if (!n) return null;
+
+  const byValue = ORG_DEPARTMENT_OPTIONS.find((option) => option.value === n);
+  if (byValue) return byValue.value;
+  const byLabel = ORG_DEPARTMENT_OPTIONS.find((option) => option.label.toLowerCase() === n);
+  if (byLabel) return byLabel.value;
+
+  if (n.includes("human resource") || n === "hr" || /\bhr\b/.test(n) || n.includes("people")) return "hr";
+  if (n.includes("facility") || n.includes("site") || n.includes("supervisor")) return "facility";
+  if (n.includes("operation") || n.includes("short let") || n.includes("housekeep")) return "operations";
+  if (n.includes("finance") || n.includes("account")) return "finance";
+  if (n.includes("market")) return "marketing";
+  if (n.includes("community")) return "community";
+  if (n.includes("sales") || n.includes("commercial")) return "sales";
+  return null;
+}
 
 export type DashboardRoleView =
   | "ORG_ADMIN"
@@ -103,9 +124,12 @@ export function membershipRoleLabel(role: MembershipRole, department?: string | 
   if (role === MembershipRole.FACILITY_MANAGER) return "Facility Manager";
   if (role === MembershipRole.FACILITY_STAFF) return "Facility staff";
 
-  const dept = (department as OrgDepartment | null) ?? profileFromMembershipRole(role).department;
+  const mapped = department ? mapOrgDepartmentToAccess(department) : null;
+  const dept = mapped ?? profileFromMembershipRole(role).department;
   const lead = isDepartmentLead ?? profileFromMembershipRole(role).isDepartmentLead;
-  const deptLabel = ORG_DEPARTMENT_OPTIONS.find((d) => d.value === dept)?.label ?? "Team member";
+  const deptLabel =
+    ORG_DEPARTMENT_OPTIONS.find((d) => d.value === dept)?.label ||
+    (department && !mapped ? department : "Team member");
   return lead ? `${deptLabel} · Lead` : deptLabel;
 }
 
@@ -133,7 +157,8 @@ export function dashboardRoleViewForMembership(
 ): DashboardRoleView {
   if (opts?.isPlatformAdmin || role === MembershipRole.ORG_ADMIN) return "ORG_ADMIN";
 
-  const dept = (opts?.department as OrgDepartment | null) ?? profileFromMembershipRole(role).department;
+  const mapped = opts?.department ? mapOrgDepartmentToAccess(opts.department) : null;
+  const dept = mapped ?? profileFromMembershipRole(role).department;
   const lead = opts?.isDepartmentLead ?? profileFromMembershipRole(role).isDepartmentLead;
 
   if (dept === "finance" || role === MembershipRole.FINANCE_MANAGER) return "FINANCE";

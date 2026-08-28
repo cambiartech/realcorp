@@ -20,6 +20,7 @@ function canAddOrgDepartment(isPlatformAdmin: boolean, role: MembershipRole | un
   return (
     isPlatformAdmin ||
     role === MembershipRole.ORG_ADMIN ||
+    role === MembershipRole.HR_MANAGER ||
     role === MembershipRole.FINANCE_MANAGER
   );
 }
@@ -290,8 +291,8 @@ export async function saveOrgDepartments(tenantSlug: string, _prev: unknown, for
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { role: true, status: true },
   });
-  if (!canManageOrgModules(Boolean(session.user.isPlatformAdmin), membership?.role)) {
-    return { ok: false, error: "Only an organization admin can manage departments." };
+  if (!canAddOrgDepartment(Boolean(session.user.isPlatformAdmin), membership?.role)) {
+    return { ok: false, error: "You do not have permission to manage departments." };
   }
   if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
     return { ok: false, error: "No access." };
@@ -318,6 +319,25 @@ export async function saveOrgDepartments(tenantSlug: string, _prev: unknown, for
   revalidatePath(`/${tenantSlug}/settings`);
   revalidatePath(`/${tenantSlug}/finance`);
   revalidatePath(`/${tenantSlug}/hr`);
+  revalidatePath(`/${tenantSlug}/hr/settings`);
+  revalidatePath(`/${tenantSlug}/team`);
+  return { ok: true };
+}
+
+export async function syncCustomOrgDepartments(
+  tenantSlug: string,
+  customDepartments: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const formData = new FormData();
+  formData.set(
+    "orgDepartmentsCsv",
+    customDepartments
+      .map((name) => normalizeOrgDepartmentName(name))
+      .filter(Boolean)
+      .join("\n"),
+  );
+  const result = await saveOrgDepartments(tenantSlug, null, formData);
+  if (!result.ok) return { ok: false, error: result.error ?? "Could not save departments." };
   return { ok: true };
 }
 
@@ -395,6 +415,8 @@ export async function addOrgDepartment(
   revalidatePath(`/${tenantSlug}/settings`);
   revalidatePath(`/${tenantSlug}/finance`);
   revalidatePath(`/${tenantSlug}/hr`);
+  revalidatePath(`/${tenantSlug}/hr/settings`);
+  revalidatePath(`/${tenantSlug}/team`);
   return { ok: true, name: next };
 }
 

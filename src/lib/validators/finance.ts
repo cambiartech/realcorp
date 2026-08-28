@@ -208,6 +208,38 @@ export const updateExpenseInputSchema = createExpenseInputSchema.extend({
   editReason: z.string().trim().min(3, "Give a reason for this correction.").max(500),
 });
 
+export const createClientRemittanceInputSchema = z.object({
+  propertyClientId: z.string().trim().min(1, "Select the client this remittance is for."),
+  projectId: optionalId,
+  unitId: optionalId,
+  amount: z.coerce.number().positive("Remittance amount must be greater than zero."),
+  currency: z
+    .string()
+    .trim()
+    .min(3, "Currency must be 3 letters.")
+    .max(3, "Currency must be 3 letters.")
+    .transform((v) => v.toUpperCase()),
+  remittedAt: z.string().trim().min(1, "Remittance date is required."),
+  method: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  reference: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+  note: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
+});
+
 export const voidFinanceEntrySchema = z.object({
   reason: voidReasonSchema,
 });

@@ -13,5 +13,6 @@ export function mergeOrgDepartments(existing: string[] | null | undefined): stri
 }
 
 export function isDefaultOrgDepartment(name: string): boolean {
-  return (DEFAULT_ORG_DEPARTMENTS as readonly string[]).includes(name);
+  const n = normalizeOrgDepartmentName(name).toLowerCase();
+  return DEFAULT_ORG_DEPARTMENTS.some((department) => department.toLowerCase() === n);
 }

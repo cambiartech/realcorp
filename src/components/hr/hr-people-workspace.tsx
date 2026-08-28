@@ -36,6 +36,7 @@ import { INVITE_DEPARTMENT_OPTIONS } from "@/lib/team-membership-roles";
 import { downloadExcel } from "@/lib/table-export";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { GlobalLocationFields } from "@/components/global-location-fields";
+import { calculatePayroll } from "@/lib/payroll/engine";
 import { NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
 import { TableSearch, filterTableRows } from "@/components/table-search";
@@ -92,6 +93,128 @@ function Field({
       )}
       {hint ? <span className="mt-0.5 block text-[11px] text-muted">{hint}</span> : null}
     </label>
+  );
+}
+
+function PayeSettingsFields({
+  record,
+  currency,
+  tenantSlug,
+}: {
+  record: ProfileDetailRow;
+  currency: string;
+  tenantSlug: string;
+}) {
+  const [mode, setMode] = useState<"STATUTORY" | "MANUAL">(
+    record.payeeTaxMonthly && record.taxOverrideReason ? "MANUAL" : "STATUTORY",
+  );
+
+  useEffect(() => {
+    setMode(record.payeeTaxMonthly && record.taxOverrideReason ? "MANUAL" : "STATUTORY");
+  }, [record.id, record.payeeTaxMonthly, record.taxOverrideReason]);
+
+  const statutory = useMemo(() => {
+    const gross = Number(record.grossMonthly);
+    if (!gross || !Number.isFinite(gross)) return null;
+    try {
+      return calculatePayroll({
+        countryCode: record.payrollCountryCode || "NG",
+        year: new Date().getFullYear(),
+        month: new Date().getMonth() + 1,
+        grossMonthly: gross,
+        basicPercent: Number(record.basicPercent) || 30,
+        housingPercent: Number(record.housingPercent) || 20,
+        transportPercent: Number(record.transportPercent) || 15,
+        otherPercent: Number(record.otherPercent) || 35,
+        pensionEnabled: record.pensionEnabled !== "no",
+        employeePensionRate: Number(record.employeePensionRate) || 8,
+        employerPensionRate: Number(record.employerPensionRate) || 10,
+        nhfMonthly: Number(record.nhfMonthly) || 0,
+        nhiaMonthly: Number(record.nhiaMonthly) || 0,
+        annualRent: Number(record.annualRent) || 0,
+        annualLifeInsurance: Number(record.annualLifeInsurance) || 0,
+        annualMortgageInterest: Number(record.annualMortgageInterest) || 0,
+        otherPreTaxMonthly: Number(record.otherPreTaxMonthly) || 0,
+      });
+    } catch {
+      return null;
+    }
+  }, [record]);
+
+  return (
+    <div className="sm:col-span-2 space-y-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
+      <Field
+        label="PAYE calculation"
+        name="payeCalculationMode"
+        hint="Organization default is on People → Settings. Only switch this person for a documented exception."
+      >
+        <UiSelect
+          name="payeCalculationMode"
+          value={mode}
+          onChange={(e) => setMode(e.target.value === "MANUAL" ? "MANUAL" : "STATUTORY")}
+        >
+          <option value="STATUTORY">Country tax law (default)</option>
+          <option value="MANUAL">Enter monthly PAYE manually</option>
+        </UiSelect>
+      </Field>
+      <p className="text-[11px] text-muted">
+        <Link href={`/${tenantSlug}/hr/settings`} className="font-semibold underline">
+          Open People settings
+        </Link>{" "}
+        to set tax law for everyone.
+      </p>
+      {statutory ? (
+        <p className="text-xs text-muted">
+          Under {record.payrollCountryCode || "NG"} tax law this gross is about{" "}
+          <span className="font-semibold text-foreground">
+            {currency} {statutory.tax.toLocaleString("en-NG")} PAYE
+          </span>
+          , {currency} {statutory.employeePension.toLocaleString("en-NG")} pension, net{" "}
+          {currency} {statutory.netPay.toLocaleString("en-NG")}. Nigeria 2026: first ₦800,000 of
+          annual chargeable income is untaxed; pension is deducted first.
+        </p>
+      ) : (
+        <p className="text-xs text-muted">
+          Set gross pay to see the statutory PAYE for this country. Save, then generate payslips.
+        </p>
+      )}
+      {mode === "MANUAL" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field
+            label={`Manual PAYE (${currency})`}
+            name="payeeTaxMonthly"
+            defaultValue={record.payeeTaxMonthly}
+            hint="Replaces the tax-law amount on every payslip until you switch back."
+          >
+            <input
+              name="payeeTaxMonthly"
+              type="number"
+              min={0}
+              step={0.01}
+              inputMode="decimal"
+              required
+              defaultValue={record.payeeTaxMonthly}
+              className={inputClass}
+              onKeyDown={(e) => {
+                if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+              }}
+            />
+          </Field>
+          <Field
+            label="Reason for manual PAYE"
+            name="taxOverrideReason"
+            defaultValue={record.taxOverrideReason}
+            required
+            hint="Required. Example: tax authority directive, or a court order."
+          />
+        </div>
+      ) : (
+        <>
+          <input type="hidden" name="payeeTaxMonthly" value="" />
+          <input type="hidden" name="taxOverrideReason" value="" />
+        </>
+      )}
+    </div>
   );
 }
 
@@ -1016,36 +1139,18 @@ export function HrPeopleWorkspace({
                       defaultValue={record.otherPercent}
                       hint="The four salary allocation percentages must total 100%."
                     />
-                    <Field
-                      label={`PAYE tax override (${currency})`}
-                      name="payeeTaxMonthly"
-                      defaultValue={record.payeeTaxMonthly}
-                      hint="Leave blank for the reviewed country tax engine. Overrides are audited."
-                    >
-                      <input
-                        name="payeeTaxMonthly"
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        inputMode="decimal"
-                        defaultValue={record.payeeTaxMonthly}
-                        className={inputClass}
-                        onKeyDown={(e) => {
-                          if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
-                        }}
-                      />
-                    </Field>
+                    <PayeSettingsFields record={record} currency={currency} tenantSlug={tenantSlug} />
                     <Field
                       label="Payroll country (ISO code)"
                       name="payrollCountryCode"
                       defaultValue={record.payrollCountryCode}
-                      hint="NG is available now. Other countries require a reviewed rule pack before payroll can run."
+                      hint="NG uses Nigeria Tax Act 2026. Other countries need a reviewed rule pack before payroll can run."
                     />
                     <Field
                       label="Tax region / state"
                       name="payrollRegionCode"
                       defaultValue={record.payrollRegionCode}
-                      hint="Used for PAYE. Pick the state of tax residence."
+                      hint="State of tax residence for PAYE filing."
                     >
                       <UiSelect name="payrollRegionCode" defaultValue={record.payrollRegionCode}>
                         <option value="">Select state</option>
@@ -1073,12 +1178,6 @@ export function HrPeopleWorkspace({
                       label="NHF membership number"
                       name="nhfMembershipNumber"
                       defaultValue={record.nhfMembershipNumber}
-                    />
-                    <Field
-                      label="Tax override reason"
-                      name="taxOverrideReason"
-                      defaultValue={record.taxOverrideReason}
-                      hint="Required operational evidence whenever a manual PAYE amount is used."
                     />
                   </div>
                   <details className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
@@ -1111,7 +1210,13 @@ export function HrPeopleWorkspace({
                       />
                       <Field label={`NHF monthly (${currency})`} name="nhfMonthly" type="number" defaultValue={record.nhfMonthly} />
                       <Field label={`NHIA monthly (${currency})`} name="nhiaMonthly" type="number" defaultValue={record.nhiaMonthly} />
-                      <Field label={`Annual rent paid (${currency})`} name="annualRent" type="number" defaultValue={record.annualRent} />
+                      <Field
+                        label={`Annual rent paid (${currency})`}
+                        name="annualRent"
+                        type="number"
+                        defaultValue={record.annualRent}
+                        hint="Only with rent evidence. Relief is 20% of this amount, capped at ₦500,000 a year. Leave blank if unused — it reduces PAYE."
+                      />
                       <Field
                         label={`Annual life insurance (${currency})`}
                         name="annualLifeInsurance"

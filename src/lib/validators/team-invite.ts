@@ -1,17 +1,12 @@
 import { z } from "zod";
-import {
-  ORG_DEPARTMENT_OPTIONS,
-  resolveMembershipRole,
-  type OrgDepartment,
-} from "@/lib/org-membership-profile";
-
-const departmentValues = ORG_DEPARTMENT_OPTIONS.map((d) => d.value) as [OrgDepartment, ...OrgDepartment[]];
+import { resolveInviteDepartmentRole } from "@/lib/org-department-access";
+import { resolveMembershipRole } from "@/lib/org-membership-profile";
 
 export const teamInviteSchema = z
   .object({
     email: z.string().trim().toLowerCase().min(1, "Email is required.").email("Enter a valid email address."),
     accessKind: z.enum(["org_admin", "department", "portal"]),
-    department: z.enum(departmentValues).optional(),
+    department: z.string().trim().min(1).max(80).optional(),
     isDepartmentLead: z
       .union([z.literal("on"), z.literal("true"), z.literal("1"), z.literal("")])
       .optional()
@@ -46,11 +41,7 @@ export function resolveRoleFromTeamInviteForm(data: z.infer<typeof teamInviteSch
   if (data.accessKind === "portal") {
     return resolveMembershipRole({ kind: "portal", portalRole: data.portalRole! });
   }
-  return resolveMembershipRole({
-    kind: "department",
-    department: data.department!,
-    isDepartmentLead: data.isDepartmentLead ?? false,
-  });
+  return resolveInviteDepartmentRole(data.department!, data.isDepartmentLead ?? false).role;
 }
 
 export function inviteProfileFromForm(data: z.infer<typeof teamInviteSchema>) {
@@ -60,8 +51,9 @@ export function inviteProfileFromForm(data: z.infer<typeof teamInviteSchema>) {
   if (data.accessKind === "portal") {
     return { department: null as string | null, isDepartmentLead: false };
   }
+  const resolved = resolveInviteDepartmentRole(data.department!, data.isDepartmentLead ?? false);
   return {
-    department: data.department!,
+    department: resolved.storedDepartment,
     isDepartmentLead: data.isDepartmentLead ?? false,
   };
 }

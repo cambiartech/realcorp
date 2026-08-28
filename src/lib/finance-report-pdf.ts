@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { FinanceReportKpis, ReportExportMeta } from "@/lib/finance-report-xlsx";
 
-type PnlRow = { month: string; invoiced: number; collected: number; expenses: number; net: number };
+type PnlRow = { month: string; invoiced: number; collected: number; expenses: number; remitted?: number; net: number };
 type CashflowRow = { month: string; inflow: number; outflow: number; net: number };
 type ExpenseRow = { category: string; count: number; total: number };
 type BalanceLine = { section: string; label: string; amount: number };
@@ -237,14 +237,16 @@ export async function downloadFinanceReportPdf(meta: ReportExportMeta, data: Rep
       invoiced: acc.invoiced + row.invoiced,
       collected: acc.collected + row.collected,
       expenses: acc.expenses + row.expenses,
+      remitted: acc.remitted + Number(row.remitted || 0),
       net: acc.net + row.net,
     }),
-    { invoiced: 0, collected: 0, expenses: 0, net: 0 },
+    { invoiced: 0, collected: 0, expenses: 0, remitted: 0, net: 0 },
   );
   const kpis = data.kpis ?? {
     totalInvoiced: pnlTotals.invoiced,
     totalCollected: pnlTotals.collected,
     totalExpenses: pnlTotals.expenses,
+    totalRemitted: pnlTotals.remitted,
     netCashflow: pnlTotals.net,
     receivables: 0,
     overdueReceivables: 0,
@@ -254,26 +256,27 @@ export async function downloadFinanceReportPdf(meta: ReportExportMeta, data: Rep
   drawSectionTitle(ctx, "Statement summary");
   drawTable(
     ctx,
-    ["Invoiced", "Collected", "Expenses", "Money left", "Receivables", "Overdue"],
+    ["Invoiced", "Collected", "Expenses", "Remitted", "Money left", "Receivables"],
     [
       [
         money(meta.currency, kpis.totalInvoiced),
         money(meta.currency, kpis.totalCollected),
         money(meta.currency, kpis.totalExpenses),
+        money(meta.currency, kpis.totalRemitted ?? pnlTotals.remitted),
         money(meta.currency, kpis.netCashflow),
         money(meta.currency, kpis.receivables),
-        money(meta.currency, kpis.overdueReceivables),
       ],
     ],
   );
 
   drawSectionTitle(ctx, "Profit & loss");
-  drawTable(ctx, ["Month", "Invoiced", "Collected", "Expenses", "Net"], [
+  drawTable(ctx, ["Month", "Invoiced", "Collected", "Expenses", "Remitted", "Net"], [
     ...data.pnl.map((row) => [
       row.month,
       money(meta.currency, row.invoiced),
       money(meta.currency, row.collected),
       money(meta.currency, row.expenses),
+      money(meta.currency, Number(row.remitted || 0)),
       money(meta.currency, row.net),
     ]),
     [
@@ -281,6 +284,7 @@ export async function downloadFinanceReportPdf(meta: ReportExportMeta, data: Rep
       money(meta.currency, pnlTotals.invoiced),
       money(meta.currency, pnlTotals.collected),
       money(meta.currency, pnlTotals.expenses),
+      money(meta.currency, pnlTotals.remitted),
       money(meta.currency, pnlTotals.net),
     ],
   ]);

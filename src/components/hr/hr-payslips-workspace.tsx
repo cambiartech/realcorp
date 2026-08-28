@@ -367,8 +367,13 @@ export function HrPayslipsWorkspace({
               Generate monthly payslips
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Bo split: Basic 30%, Housing 20%, Transport 15%, Other 35%, Pension 8% of BHT, PAYE per
-              employee. After you publish, file statutory remittances from{" "}
+              PAYE follows the organization tax law on{" "}
+              <Link href={`/${tenantSlug}/hr/settings`} className="font-semibold underline">
+                People → Settings
+              </Link>{" "}
+              (Nigeria Tax Act 2026: first ₦800,000 of annual chargeable income is untaxed). Pension is 8%
+              of basic + housing + transport. Change a single person only for a documented exception. After
+              you publish, file statutory remittances from{" "}
               <Link href={`/${tenantSlug}/hr/remittances`} className="font-semibold underline">
                 Remittances
               </Link>
@@ -665,6 +670,9 @@ export function HrPayslipsWorkspace({
                             </td>
                             <td className="px-4 py-3 text-right tabular-nums text-muted">
                               {currency} {p.calc.payeeTax.toLocaleString("en-NG")}
+                              {p.calc.taxOverrideApplied ? (
+                                <p className="text-[10px] font-medium text-[var(--warn)]">Manual PAYE</p>
+                              ) : null}
                             </td>
                             <td className="px-4 py-3 text-right tabular-nums text-muted">
                               {currency} {p.calc.pensionDeduction.toLocaleString("en-NG")}

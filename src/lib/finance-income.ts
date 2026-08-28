@@ -148,3 +148,14 @@ export function summarizeClientDeposits(
 function money(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
+
+/** Org operating result: collections in, expenses and owner remittances out. */
+export function operatingNet(input: {
+  collected: number;
+  expenses: number;
+  remitted?: number;
+}) {
+  return money(
+    Number(input.collected || 0) - Number(input.expenses || 0) - Number(input.remitted || 0),
+  );
+}

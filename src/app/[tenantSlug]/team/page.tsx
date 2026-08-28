@@ -4,6 +4,7 @@ import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { entitledMemberModules, parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { normalizeTenantModuleFlags } from "@/lib/tenant-module-definitions";
+import { mergeOrgDepartments } from "@/lib/org-departments";
 import { membershipRoleLabel } from "@/lib/org-membership-profile";
 import { notFound } from "next/navigation";
 import { TeamWorkspace } from "./team-workspace";
@@ -35,6 +36,7 @@ export default async function TenantTeamPage({ params }: { params: Promise<{ ten
           moduleListings: true,
           moduleInvestorPortal: true,
           roleModuleGrants: true,
+          orgDepartments: true,
         },
       },
     },
@@ -78,6 +80,7 @@ export default async function TenantTeamPage({ params }: { params: Promise<{ ten
       tenantName={tenant.name}
       tenantSlug={tenant.slug}
       canInvite={canInvite}
+      orgDepartments={mergeOrgDepartments(tenant.settings?.orgDepartments as string[] | null | undefined)}
       entitledModules={entitledModules}
       members={members.map((member) => ({
         id: member.id,

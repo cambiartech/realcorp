@@ -382,6 +382,7 @@ export function TenantSidebar({
         { id: "invoices", label: "Invoices", href: `${financeItem.href}/invoices`, icon: CreditCard },
         { id: "payments", label: "Payments", href: `${financeItem.href}/payments`, icon: Banknote },
         { id: "expenses", label: "Expenses", href: `${financeItem.href}/expenses`, icon: ShoppingBag },
+        { id: "remittances", label: "Remittances", href: `${financeItem.href}/remittances`, icon: CircleDollarSign },
         { id: "banking", label: "Banking", href: `${financeItem.href}/banking`, icon: Landmark },
         { id: "reports", label: "Reports", href: `${financeItem.href}/reports`, icon: BarChart2 },
         {
@@ -410,6 +411,7 @@ export function TenantSidebar({
           { id: "appraisals", label: "Appraisals", href: `${hrItem.href}/appraisals`, icon: Star },
           { id: "documents", label: "Documents", href: `${hrItem.href}/documents`, icon: FileText },
           { id: "insights", label: "Insights", href: `${hrItem.href}/insights`, icon: BarChart2 },
+          { id: "settings", label: "Settings", href: `${hrItem.href}/settings`, icon: Settings },
           ...(hasHrEmployeeProfile
             ? [{ id: "my", label: "My HR", href: `${hrItem.href}/dashboard`, icon: UserCircle }]
             : []),

@@ -150,7 +150,7 @@ export function PortalWorkspace({
 
       {/* Stats */}
       <div
-        className={`mt-6 grid gap-3 sm:grid-cols-2 ${showShortlets ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+        className={`mt-6 grid gap-3 sm:grid-cols-2 ${showShortlets ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}
       >
         <StatCard label="Your projects" value={String(totals.projects)} />
         {showShortlets ? <StatCard label="Your shortlets" value={String(shortletTotals.units)} /> : null}
@@ -159,12 +159,8 @@ export function PortalWorkspace({
           value={totals.allocated > 0 ? formatMoney(totals.allocated, totals.currency) : "—"}
         />
         <StatCard
-          label="Total collected"
-          value={formatMoney(totals.collected + shortletTotals.collected, totals.currency)}
-        />
-        <StatCard
-          label="Your earnings"
-          value={formatMoney(totals.earnings + shortletTotals.earnings, totals.currency)}
+          label="Remitted to you"
+          value={formatMoney(totals.earnings, totals.currency)}
           highlight
         />
       </div>
@@ -216,13 +212,13 @@ export function PortalWorkspace({
           {recentPayments.length > 0 ? (
             <div className="mt-10">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Recent payments</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Remitted to you</h2>
                 <div className="relative w-full max-w-xs">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
                   <input
                     value={paymentQuery}
                     onChange={(e) => setPaymentQuery(e.target.value)}
-                    placeholder="Filter payments…"
+                    placeholder="Filter remittances…"
                     className="w-full rounded-lg border border-foreground/15 bg-field py-1.5 pl-8 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   />
                 </div>
@@ -268,14 +264,10 @@ export function PortalWorkspace({
             </div>
           ) : (
             <>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <StatCard label="Linked apartments" value={String(shortletTotals.units)} />
                 <StatCard
-                  label="Total collected"
-                  value={formatMoney(shortletTotals.collected, shortletTotals.currency)}
-                />
-                <StatCard
-                  label="Your earnings"
+                  label="Remitted to you"
                   value={formatMoney(shortletTotals.earnings, shortletTotals.currency)}
                   highlight
                 />
@@ -561,10 +553,8 @@ function ProjectCard({ tenantSlug, project }: { tenantSlug: string; project: Por
             <div className="h-full rounded-full bg-[var(--success)]" style={{ width: `${soldPct}%` }} />
           </div>
         </div>
-        <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <Metric label="Invoiced" value={formatMoney(project.totalInvoiced, project.currency)} />
-          <Metric label="Collected" value={formatMoney(project.totalCollected, project.currency)} />
-          <Metric label="Earnings" value={formatMoney(project.yourEarnings, project.currency)} highlight />
+        <dl className="mt-4 grid grid-cols-1 gap-2 text-center">
+          <Metric label="Remitted to you" value={formatMoney(project.yourEarnings, project.currency)} highlight />
         </dl>
         <p className="mt-3 text-center text-xs font-medium text-muted group-hover:text-foreground">
           View project details →
@@ -609,10 +599,9 @@ function ShortletCard({ tenantSlug, unit }: { tenantSlug: string; unit: Investor
       </div>
       <div className="p-4">
         <p className="text-xs text-muted">{unit.projectName}</p>
-        <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
           <Metric label="Stays" value={String(unit.reservationCount)} />
-          <Metric label="Collected" value={formatMoney(unit.totalCollected, unit.currency)} />
-          <Metric label="Earnings" value={formatMoney(unit.yourEarnings, unit.currency)} highlight />
+          <Metric label="Remitted to you" value={formatMoney(unit.yourEarnings, unit.currency)} highlight />
         </dl>
         <p className="mt-3 text-center text-xs font-medium text-muted group-hover:text-foreground">
           View shortlet details →

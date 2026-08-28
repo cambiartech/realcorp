@@ -72,6 +72,11 @@ export function formDataToEmployeeProfilePayload(fd: FormData): Record<string, u
       payload[key] = parsed.value;
     }
   }
+  if (str(fd.get("payeCalculationMode")) !== "MANUAL") {
+    payload.payeeTaxMonthly = undefined;
+    payload.taxOverrideReason = "";
+  }
+
   for (const key of [
     "basicPercent",
     "housingPercent",

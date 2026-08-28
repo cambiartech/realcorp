@@ -29,6 +29,8 @@ export type PayslipCalculation = {
     incomeInBand: number;
     taxInBand: number;
   }>;
+  taxOverrideApplied?: boolean;
+  taxOverrideReason?: string | null;
 };
 
 /**
@@ -82,6 +84,8 @@ export function calculateNigeriaPayslip(input: {
     appliedTaxBands: Array.isArray(result.calculationBreakdown.appliedTaxBands)
       ? (result.calculationBreakdown.appliedTaxBands as PayslipCalculation["appliedTaxBands"])
       : undefined,
+    taxOverrideApplied: result.taxOverrideApplied,
+    taxOverrideReason: result.taxOverrideReason,
   };
 }
 
@@ -96,6 +100,8 @@ export function payslipCalculationFromStored(input: {
   deductionsBreakdown: unknown;
   jurisdictionCode?: string;
   taxRuleVersion?: string | null;
+  taxOverrideApplied?: boolean;
+  taxOverrideReason?: string | null;
   chargeableIncome?: { toString(): string } | number;
   employerCost?: { toString(): string } | number;
   employerContributions?: unknown;
@@ -122,6 +128,8 @@ export function payslipCalculationFromStored(input: {
       ? (input.employerContributions as NonNullable<PayslipCalculation["employerContributions"]>)
       : undefined,
     ...payslipTaxBandsFromBreakdown(input.calculationBreakdown),
+    taxOverrideApplied: Boolean(input.taxOverrideApplied),
+    taxOverrideReason: input.taxOverrideReason || null,
   };
 }
 

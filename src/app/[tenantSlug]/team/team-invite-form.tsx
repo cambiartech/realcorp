@@ -3,10 +3,11 @@
 import { useActionState, useState } from "react";
 import { FormAlert, FormFieldError } from "@/components/form-message";
 import { ButtonSpinner } from "@/components/button-spinner";
+import { OrgDepartmentSelect } from "@/components/org-department-select";
 import { UiSelect } from "@/components/ui-select";
+import { inviteDepartmentChoices } from "@/lib/org-department-access";
 import {
   INVITE_ACCESS_KIND_OPTIONS,
-  INVITE_DEPARTMENT_OPTIONS,
   INVITE_PORTAL_ROLE_OPTIONS,
 } from "@/lib/team-membership-roles";
 import {
@@ -31,7 +32,13 @@ function fieldClass(invalid: boolean) {
   ].join(" ");
 }
 
-export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
+export function TeamInviteForm({
+  tenantSlug,
+  orgDepartments = [],
+}: {
+  tenantSlug: string;
+  orgDepartments?: string[];
+}) {
   const [state, formAction, pending] = useActionState(inviteTenantMember.bind(null, tenantSlug), initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<TeamInviteFieldName, string>>>({});
   const [accessKind, setAccessKind] = useState<"department" | "org_admin" | "portal">("department");
@@ -110,16 +117,14 @@ export function TeamInviteForm({ tenantSlug }: { tenantSlug: string }) {
       {accessKind === "department" ? (
         <>
           <div>
-            <label htmlFor="team-invite-department" className="mb-1 block text-sm text-muted">
-              Department
-            </label>
-            <UiSelect id="team-invite-department" name="department" defaultValue="sales">
-              {INVITE_DEPARTMENT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </UiSelect>
+            <OrgDepartmentSelect
+              tenantSlug={tenantSlug}
+              departments={inviteDepartmentChoices(orgDepartments).map((row) => row.label)}
+              name="department"
+              label="Department"
+              required
+              allowCreate
+            />
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="isDepartmentLead" value="on" />

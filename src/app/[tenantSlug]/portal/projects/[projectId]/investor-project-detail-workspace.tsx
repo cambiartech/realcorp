@@ -92,7 +92,7 @@ export function InvestorProjectDetailWorkspace({
       </div>
 
       {/* Your stake */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Stat
           label="Your allocation"
           value={project.allocationAmount > 0 ? formatMoney(project.allocationAmount, project.currency) : "—"}
@@ -106,8 +106,7 @@ export function InvestorProjectDetailWorkspace({
               : undefined
           }
         />
-        <Stat label="Your earnings" value={formatMoney(project.yourEarnings, project.currency)} highlight />
-        <Stat label="Outstanding" value={formatMoney(project.outstanding, project.currency)} />
+        <Stat label="Remitted to you" value={formatMoney(project.yourEarnings, project.currency)} highlight />
       </div>
 
       {/* Sales progress */}
@@ -125,11 +124,9 @@ export function InvestorProjectDetailWorkspace({
             style={{ width: `${soldPct}%` }}
           />
         </div>
-        <dl className="mt-4 grid grid-cols-3 gap-3">
-          <MetricBox label="Invoiced" value={formatMoney(project.totalInvoiced, project.currency)} />
-          <MetricBox label="Collected" value={formatMoney(project.totalCollected, project.currency)} />
+        <dl className="mt-4 grid grid-cols-1 gap-3">
           <MetricBox
-            label="Your earnings"
+            label="Remitted to you"
             value={formatMoney(project.yourEarnings, project.currency)}
             highlight
           />
@@ -175,10 +172,10 @@ export function InvestorProjectDetailWorkspace({
 
       {/* Payments */}
       <section className="mt-8">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Payment history</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Remittances</h2>
         {project.payments.length === 0 ? (
           <p className="mt-3 rounded-xl border border-dashed border-foreground/15 px-4 py-8 text-center text-sm text-muted">
-            No payments recorded on this project yet. Earnings update when collections are logged.
+            No remittances recorded on this project yet. Amounts sent to you by finance appear here.
           </p>
         ) : (
           <div className="mt-3 overflow-hidden rounded-xl border border-foreground/10">

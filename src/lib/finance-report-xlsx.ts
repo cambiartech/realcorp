@@ -26,7 +26,7 @@ export type ReportExportMeta = {
   scopeLabel?: string;
 };
 
-type PnlRow = { month: string; invoiced: number; collected: number; expenses: number; net: number };
+type PnlRow = { month: string; invoiced: number; collected: number; expenses: number; remitted?: number; net: number };
 type CashflowRow = { month: string; inflow: number; outflow: number; net: number };
 type ExpenseRow = { category: string; count: number; total: number };
 type BalanceLine = { section: string; label: string; amount: number; tone?: "overdue" | "equity" };
@@ -60,6 +60,7 @@ export type FinanceReportKpis = {
   totalInvoiced: number;
   totalCollected: number;
   totalExpenses: number;
+  totalRemitted?: number;
   netCashflow: number;
   receivables: number;
   overdueReceivables: number;
@@ -96,9 +97,10 @@ function sum(rows: PnlRow[]) {
       invoiced: acc.invoiced + r.invoiced,
       collected: acc.collected + r.collected,
       expenses: acc.expenses + r.expenses,
+      remitted: acc.remitted + Number(r.remitted || 0),
       net: acc.net + r.net,
     }),
-    { invoiced: 0, collected: 0, expenses: 0, net: 0 },
+    { invoiced: 0, collected: 0, expenses: 0, remitted: 0, net: 0 },
   );
 }
 
@@ -128,6 +130,11 @@ function addFinanceSummarySheet(
     [
       { label: "Total collected", value: kpis.totalCollected, tone: "highlight" },
       { label: "Total expenses", value: kpis.totalExpenses, tone: "default" },
+      {
+        label: "Remitted to clients",
+        value: kpis.totalRemitted ?? totals.remitted,
+        tone: "default",
+      },
       {
         label: "Net cash flow",
         value: kpis.netCashflow,
@@ -199,19 +206,28 @@ function addFinanceSummarySheet(
 }
 
 function addPnlSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows: PnlRow[]) {
-  addReportBanner(sheet, metaToReport(meta, "Profit & Loss"), 6);
-  const header = sheet.addRow(["Month", "Invoiced", "Collected", "Expenses", "Net"]);
+  addReportBanner(sheet, metaToReport(meta, "Profit & Loss"), 7);
+  const header = sheet.addRow(["Month", "Invoiced", "Collected", "Expenses", "Remitted", "Net"]);
   styleHeaderRow(header);
   for (const row of rows) {
-    const excelRow = sheet.addRow([row.month, row.invoiced, row.collected, row.expenses, row.net]);
+    const remitted = Number(row.remitted || 0);
+    const excelRow = sheet.addRow([row.month, row.invoiced, row.collected, row.expenses, remitted, row.net]);
     excelRow.getCell(2).numFmt = moneyFormat(meta.currency);
     excelRow.getCell(3).numFmt = moneyFormat(meta.currency);
     excelRow.getCell(4).numFmt = moneyFormat(meta.currency);
     excelRow.getCell(5).numFmt = moneyFormat(meta.currency);
-    excelRow.getCell(5).font = toneFont(row.net, true);
+    excelRow.getCell(6).numFmt = moneyFormat(meta.currency);
+    excelRow.getCell(6).font = toneFont(row.net, true);
   }
   const totals = sum(rows);
-  const totalRow = sheet.addRow(["Total", totals.invoiced, totals.collected, totals.expenses, totals.net]);
+  const totalRow = sheet.addRow([
+    "Total",
+    totals.invoiced,
+    totals.collected,
+    totals.expenses,
+    totals.remitted,
+    totals.net,
+  ]);
   totalRow.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: REPORT_THEME.green } };
     cell.fill = solidFill(REPORT_THEME.greenLight);
@@ -220,6 +236,7 @@ function addPnlSheet(sheet: ExcelJS.Worksheet, meta: ReportExportMeta, rows: Pnl
   totalRow.getCell(3).numFmt = moneyFormat(meta.currency);
   totalRow.getCell(4).numFmt = moneyFormat(meta.currency);
   totalRow.getCell(5).numFmt = moneyFormat(meta.currency);
+  totalRow.getCell(6).numFmt = moneyFormat(meta.currency);
   autoWidth(sheet);
 }
 

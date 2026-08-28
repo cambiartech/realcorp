@@ -47,6 +47,11 @@ import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { ensureEmployeeNumber } from "@/lib/hr-employee-number";
 import { calculatePayroll, PayrollConfigurationError } from "@/lib/payroll/engine";
+import { resolveManualPayeOverride } from "@/lib/payroll/tax-override";
+import {
+  orgPayrollSettingsPayload,
+  parseOrgPayrollSettings,
+} from "@/lib/payroll/org-payroll-settings";
 import {
   addHrDocumentSchema,
   applyPayTemplateSchema,
@@ -56,6 +61,7 @@ import {
   createPayslipRunSchema,
   markPayslipPaymentsSchema,
   savePayrollAdjustmentSchema,
+  savePeopleOrgSettingsSchema,
   upsertEmployeeProfileSchema,
   updatePerformanceGoalSchema,
   upsertPerformanceGoalSchema,
@@ -93,6 +99,7 @@ function revalidateHr(tenantSlug: string) {
   revalidatePath(`/${tenantSlug}/hr/dashboard`);
   revalidatePath(`/${tenantSlug}/hr/my`);
   revalidatePath(`/${tenantSlug}/hr/insights`);
+  revalidatePath(`/${tenantSlug}/hr/settings`);
 }
 
 export async function getHrUploadSignature(
@@ -153,6 +160,10 @@ export async function upsertEmployeeProfile(
   if (parsed.data.payTemplateId && !selectedPayTemplate) {
     return { ok: false, error: "The selected pay template is not available in this organization." };
   }
+  const orgPay = parseOrgPayrollSettings(
+    tenant.settings?.payrollCountryCode,
+    tenant.settings?.payrollSettings,
+  );
   const resultingTaxOverride = has("payeeTaxMonthly")
     ? parsed.data.payeeTaxMonthly
     : existingRow?.payeeTaxMonthly != null
@@ -312,16 +323,16 @@ export async function upsertEmployeeProfile(
     payTemplateId: selectedPayTemplate?.id ?? null,
     grossMonthly: parsed.data.grossMonthly ?? null,
     payeeTaxMonthly: parsed.data.payeeTaxMonthly ?? null,
-    payrollCountryCode: parsed.data.payrollCountryCode || tenant.settings?.payrollCountryCode || "NG",
+    payrollCountryCode: parsed.data.payrollCountryCode || orgPay.payrollCountryCode,
     payrollRegionCode: parsed.data.payrollRegionCode || null,
     taxId: parsed.data.taxId || null,
     taxOverrideReason: parsed.data.taxOverrideReason || null,
     rsaPin: parsed.data.rsaPin || null,
     pensionAdministrator: parsed.data.pensionAdministrator || null,
     nhfMembershipNumber: parsed.data.nhfMembershipNumber || null,
-    pensionEnabled: parsed.data.pensionEnabled ?? true,
-    employeePensionRate: parsed.data.employeePensionRate ?? 8,
-    employerPensionRate: parsed.data.employerPensionRate ?? 10,
+    pensionEnabled: parsed.data.pensionEnabled ?? orgPay.pensionEnabled,
+    employeePensionRate: parsed.data.employeePensionRate ?? orgPay.employeePensionRate,
+    employerPensionRate: parsed.data.employerPensionRate ?? orgPay.employerPensionRate,
     nhfMonthly: parsed.data.nhfMonthly ?? 0,
     nhiaMonthly: parsed.data.nhiaMonthly ?? 0,
     annualRent: parsed.data.annualRent ?? 0,
@@ -329,10 +340,10 @@ export async function upsertEmployeeProfile(
     annualMortgageInterest: parsed.data.annualMortgageInterest ?? 0,
     otherPreTaxMonthly: parsed.data.otherPreTaxMonthly ?? 0,
     otherPostTaxMonthly: parsed.data.otherPostTaxMonthly ?? 0,
-    basicPercent: parsed.data.basicPercent ?? 30,
-    housingPercent: parsed.data.housingPercent ?? 20,
-    transportPercent: parsed.data.transportPercent ?? 15,
-    otherPercent: parsed.data.otherPercent ?? 35,
+    basicPercent: parsed.data.basicPercent ?? orgPay.basicPercent,
+    housingPercent: parsed.data.housingPercent ?? orgPay.housingPercent,
+    transportPercent: parsed.data.transportPercent ?? orgPay.transportPercent,
+    otherPercent: parsed.data.otherPercent ?? orgPay.otherPercent,
     emergencyContact: parsed.data.emergencyContactJson as Prisma.InputJsonValue | undefined,
     education: parsed.data.educationJson as Prisma.InputJsonValue | undefined,
     nextOfKin: parsed.data.nextOfKinJson as Prisma.InputJsonValue | undefined,
@@ -739,6 +750,171 @@ export async function applyPayTemplate(
   return { ok: true };
 }
 
+export async function savePeopleOrgSettings(
+  tenantSlug: string,
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult & { appliedCount?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const parsed = savePeopleOrgSettingsSchema.safeParse({
+    payrollCountryCode: formData.get("payrollCountryCode"),
+    basicPercent: formData.get("basicPercent"),
+    housingPercent: formData.get("housingPercent"),
+    transportPercent: formData.get("transportPercent"),
+    otherPercent: formData.get("otherPercent"),
+    pensionEnabled: formData.get("pensionEnabled") || "yes",
+    employeePensionRate: formData.get("employeePensionRate"),
+    employerPensionRate: formData.get("employerPensionRate"),
+    nsitfRate: formData.get("nsitfRate"),
+    itfRate: formData.get("itfRate"),
+    applyStructureToEveryone: formData.get("applyStructureToEveryone") ?? "",
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues.map((issue) => issue.message).join(" ") };
+  }
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const next: ReturnType<typeof parseOrgPayrollSettings> = {
+    payrollCountryCode: parsed.data.payrollCountryCode,
+    basicPercent: parsed.data.basicPercent,
+    housingPercent: parsed.data.housingPercent,
+    transportPercent: parsed.data.transportPercent,
+    otherPercent: parsed.data.otherPercent,
+    pensionEnabled: parsed.data.pensionEnabled !== "no",
+    employeePensionRate: parsed.data.employeePensionRate,
+    employerPensionRate: parsed.data.employerPensionRate,
+    nsitfRate: parsed.data.nsitfRate,
+    itfRate: parsed.data.itfRate,
+  };
+
+  const payrollSettings = orgPayrollSettingsPayload(next, tenant.settings?.payrollSettings) as Prisma.InputJsonValue;
+  if (tenant.settings) {
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { payrollCountryCode: next.payrollCountryCode, payrollSettings },
+    });
+  } else {
+    await prisma.tenantSettings.create({
+      data: {
+        tenantId: tenant.id,
+        payrollCountryCode: next.payrollCountryCode,
+        payrollSettings,
+      },
+    });
+  }
+
+  const defaultTemplate = await prisma.hrPayTemplate.findFirst({
+    where: { tenantId: tenant.id, isDefault: true },
+  });
+  if (defaultTemplate) {
+    await prisma.hrPayTemplate.update({
+      where: { id: defaultTemplate.id },
+      data: {
+        countryCode: next.payrollCountryCode,
+        basicPercent: next.basicPercent,
+        housingPercent: next.housingPercent,
+        transportPercent: next.transportPercent,
+        otherPercent: next.otherPercent,
+        pensionEnabled: next.pensionEnabled,
+        employeePensionRate: next.employeePensionRate,
+        employerPensionRate: next.employerPensionRate,
+      },
+    });
+  } else {
+    await prisma.hrPayTemplate.create({
+      data: {
+        tenantId: tenant.id,
+        name: "Organization default",
+        countryCode: next.payrollCountryCode,
+        basicPercent: next.basicPercent,
+        housingPercent: next.housingPercent,
+        transportPercent: next.transportPercent,
+        otherPercent: next.otherPercent,
+        pensionEnabled: next.pensionEnabled,
+        employeePensionRate: next.employeePensionRate,
+        employerPensionRate: next.employerPensionRate,
+        isDefault: true,
+      },
+    });
+  }
+
+  let appliedCount = 0;
+  if (parsed.data.applyStructureToEveryone === "on" || parsed.data.applyStructureToEveryone === "true") {
+    const updated = await prisma.employeeProfile.updateMany({
+      where: { tenantId: tenant.id },
+      data: {
+        payrollCountryCode: next.payrollCountryCode,
+        basicPercent: next.basicPercent,
+        housingPercent: next.housingPercent,
+        transportPercent: next.transportPercent,
+        otherPercent: next.otherPercent,
+        pensionEnabled: next.pensionEnabled,
+        employeePensionRate: next.employeePensionRate,
+        employerPensionRate: next.employerPensionRate,
+      },
+    });
+    appliedCount = updated.count;
+  }
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email,
+    module: "HR",
+    entityType: "TENANT_SETTINGS",
+    action: "UPDATE",
+    summary: "Updated organization People payroll settings.",
+    metadata: { payrollCountryCode: next.payrollCountryCode, appliedCount },
+  });
+  revalidateHr(tenantSlug);
+  revalidatePath(`/${tenantSlug}/settings`);
+  return { ok: true, appliedCount };
+}
+
+export async function applyCountryTaxLawToEveryone(
+  tenantSlug: string,
+): Promise<ActionResult & { clearedCount?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const country = tenant.settings?.payrollCountryCode || "NG";
+  const cleared = await prisma.employeeProfile.updateMany({
+    where: {
+      tenantId: tenant.id,
+      OR: [{ taxOverrideReason: null }, { taxOverrideReason: "" }],
+    },
+    data: {
+      payeeTaxMonthly: null,
+      taxOverrideReason: null,
+      payrollCountryCode: country,
+    },
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email,
+    module: "HR",
+    entityType: "EMPLOYEE_PROFILE",
+    action: "UPDATE",
+    summary: "Reset undocumented PAYE overrides to country tax law.",
+    metadata: { clearedCount: cleared.count, payrollCountryCode: country },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true, clearedCount: cleared.count };
+}
+
 function calculatedPayslipData(calc: ReturnType<typeof calculatePayroll>) {
   return {
     currency: calc.currency,
@@ -840,8 +1016,10 @@ async function calculateDraftProfilePayroll(input: {
     employerStatutoryContributions: employerContributionsFromSettings(
       input.tenantPayrollSettings,
     ),
-    taxOverrideMonthly:
-      profile.payeeTaxMonthly == null ? undefined : Number(profile.payeeTaxMonthly),
+    taxOverrideMonthly: resolveManualPayeOverride({
+      amount: profile.payeeTaxMonthly == null ? null : Number(profile.payeeTaxMonthly),
+      reason: profile.taxOverrideReason,
+    }),
     taxOverrideReason: profile.taxOverrideReason,
     priorYtd,
     variableEarnings: adjustments
@@ -976,10 +1154,10 @@ export async function generatePayslipRun(
   for (const profile of profiles) {
     const gross = Number(profile.grossMonthly);
     if (!gross || gross <= 0) continue;
-    const payeeOverride =
-      profile.payeeTaxMonthly != null && Number(profile.payeeTaxMonthly) >= 0
-        ? Number(profile.payeeTaxMonthly)
-        : undefined;
+    const payeeOverride = resolveManualPayeOverride({
+      amount: profile.payeeTaxMonthly == null ? null : Number(profile.payeeTaxMonthly),
+      reason: profile.taxOverrideReason,
+    });
     const history = priorByProfile.get(profile.id) ?? [];
     const adjustments = adjustmentsByProfile.get(profile.id) ?? [];
     const priorYtd = {

@@ -8,6 +8,7 @@ import {
   HrPayslipRunStatus,
 } from "../../src/generated/prisma";
 import { DEFAULT_APPRAISAL_CRITERIA } from "../../src/lib/appraisal-competencies";
+import { calculatePayroll } from "../../src/lib/payroll/engine";
 import { daysAgo, daysFromNow } from "./helpers";
 import type { DemoSeedContext } from "./types";
 
@@ -72,7 +73,6 @@ export async function seedPeople(ctx: DemoSeedContext) {
         dateOfJoining: daysAgo(200 + ei * 30),
         employmentType: "Full-time",
         grossMonthly: row.gross,
-        payeeTaxMonthly: String(Math.round(Number(row.gross) * 0.08)),
         phoneMobile: "+234 803 000 0000",
         addressCity: "Lagos",
         addressState: "Lagos",
@@ -254,21 +254,33 @@ export async function seedPeople(ctx: DemoSeedContext) {
 
     for (const profile of profiles.filter((p) => p.status === EmployeeProfileStatus.ACTIVE)) {
       const gross = Number(profile.grossMonthly ?? 0);
-      const tax = Number(profile.payeeTaxMonthly ?? 0);
-      const pension = Math.round(gross * 0.08);
-      const net = gross - tax - pension;
+      if (!gross) continue;
+      const calc = calculatePayroll({
+        countryCode: "NG",
+        year,
+        month,
+        grossMonthly: gross,
+      });
       await prisma.hrPayslip.upsert({
         where: { runId_employeeProfileId: { runId: run.id, employeeProfileId: profile.id } },
         create: {
           tenantId,
           runId: run.id,
           employeeProfileId: profile.id,
-          grossPay: String(gross),
-          payeeTax: String(tax),
-          pensionDeduction: String(pension),
-          netPay: String(net),
-          earningsBreakdown: { basic: gross * 0.3, housing: gross * 0.2, transport: gross * 0.15, other: gross * 0.35 },
-          deductionsBreakdown: { tax, pension },
+          currency: calc.currency,
+          jurisdictionCode: calc.jurisdictionCode,
+          taxRuleVersion: calc.ruleVersion,
+          grossPay: String(calc.grossPay),
+          payeeTax: String(calc.tax),
+          pensionDeduction: String(calc.employeePension),
+          otherDeductions: String(calc.otherDeductions),
+          chargeableIncome: String(calc.chargeableIncome),
+          employerCost: String(calc.employerCost),
+          netPay: String(calc.netPay),
+          earningsBreakdown: calc.earnings as object,
+          deductionsBreakdown: calc.deductions as object,
+          employerContributions: calc.employerContributions as object,
+          calculationBreakdown: calc.calculationBreakdown as object,
           paymentStatus: month < 5 ? HrPayslipPaymentStatus.PAID : HrPayslipPaymentStatus.PENDING,
           paidAt: month < 5 ? daysAgo(5) : null,
         },

@@ -8,6 +8,7 @@ import {
 import { parseFinanceControls } from "@/lib/finance-controls";
 import { loadClientDepositRows } from "@/lib/client-deposits";
 import { expensePnlAmount } from "@/lib/finance-vat";
+import { operatingNet } from "@/lib/finance-income";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { loadTenantRequest } from "@/lib/tenant-request";
 import { notFound } from "next/navigation";
@@ -72,13 +73,11 @@ export default async function FinanceQueuePage({
   const needsDeals = isOverview;
   const needsDealOptions =
     financeSurface === "invoices" || financeSurface === "receipts";
-  const needsDimensions = [
-    "reports",
-    "expenses",
-    "invoices",
-    "payments",
-    "receipts",
-  ].includes(financeSurface);
+  const needsDimensions =
+    isOverview ||
+    ["reports", "expenses", "invoices", "payments", "receipts", "remittances"].includes(
+      financeSurface,
+    );
   const needsReceipts =
     isOverview || ["reports", "receipts"].includes(financeSurface);
   const needsInvoices =
@@ -88,6 +87,9 @@ export default async function FinanceQueuePage({
     isOverview || ["reports", "payments", "banking"].includes(financeSurface);
   const needsExpenses =
     isOverview || ["reports", "expenses", "banking"].includes(financeSurface);
+  const needsRemittances =
+    isOverview || ["reports", "remittances", "banking"].includes(financeSurface);
+  const needsRemittanceClients = financeSurface === "remittances";
   const needsBills =
     isOverview || financeSurface === "reports" || financeSurface === "payables";
   const needsInvoiceEvents =
@@ -205,6 +207,8 @@ export default async function FinanceQueuePage({
     bankRows,
     bankImports,
     bankRowStats,
+    remittances,
+    remittanceClients,
   ] = await Promise.all([
     needsDeals
       ? prisma.deal.findMany({
@@ -428,6 +432,24 @@ export default async function FinanceQueuePage({
           _count: { _all: true },
         })
       : Promise.resolve([]),
+    needsRemittances
+      ? prisma.clientRemittance.findMany({
+          where: { tenantId: tenant.id, voidedAt: null },
+          orderBy: { remittedAt: "desc" },
+          include: {
+            propertyClient: { select: { id: true, fullName: true, email: true } },
+          },
+          take: 500,
+        })
+      : Promise.resolve([]),
+    needsRemittanceClients
+      ? prisma.propertyClient.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { fullName: "asc" },
+          select: { id: true, fullName: true, email: true },
+          take: 800,
+        })
+      : Promise.resolve([]),
   ]);
 
   const bankStatsMap = new Map<
@@ -489,6 +511,7 @@ export default async function FinanceQueuePage({
 
   const livePayments = payments.filter((payment) => !payment.voidedAt);
   const liveExpenses = expenses.filter((expense) => !expense.voidedAt);
+  const liveRemittances = remittances.filter((row) => !row.voidedAt);
   const liveReceipts = salesReceipts.filter(
     (receipt) => !receipt.voidedAt && receipt.status !== "VOID",
   );
@@ -737,21 +760,32 @@ export default async function FinanceQueuePage({
       (expenseCashByMonth.get(key) || 0) + Number(expense.amount),
     );
   }
+  const remittedByMonth = new Map<string, number>();
+  for (const remittance of liveRemittances) {
+    const key = monthKey(remittance.remittedAt);
+    remittedByMonth.set(
+      key,
+      (remittedByMonth.get(key) || 0) + Number(remittance.amount),
+    );
+  }
   const pnlBreakdown = recentMonthKeys.map((key) => {
     const invoiced = invoicedByMonth.get(key) || 0;
     const collected = collectedByMonth.get(key) || 0;
     const expenseTotal = expenseByMonth.get(key) || 0;
+    const remitted = remittedByMonth.get(key) || 0;
     return {
       month: monthLabel(key),
       invoiced,
       collected,
       expenses: expenseTotal,
-      net: invoiced - expenseTotal,
+      remitted,
+      net: operatingNet({ collected, expenses: expenseTotal, remitted }),
     };
   });
   const cashflowBreakdown = recentMonthKeys.map((key) => {
     const inflow = collectedByMonth.get(key) || 0;
-    const outflow = expenseCashByMonth.get(key) || 0;
+    const remitted = remittedByMonth.get(key) || 0;
+    const outflow = (expenseCashByMonth.get(key) || 0) + remitted;
     return {
       month: monthLabel(key),
       inflow,
@@ -936,6 +970,39 @@ export default async function FinanceQueuePage({
         voidReason: expense.voidReason || "",
         canVoid: !expense.voidedAt,
       }))}
+      remittances={liveRemittances.map((row) => ({
+        id: row.id,
+        clientName: row.propertyClient.fullName,
+        clientEmail: row.propertyClient.email || "",
+        amountLabel: `${row.currency} ${Number(row.amount).toLocaleString()}`,
+        amountValue: Number(row.amount),
+        currency: row.currency,
+        method: canManage ? row.method || "—" : "Restricted",
+        reference: canManage ? row.reference || "—" : "Restricted",
+        remittedAtLabel: new Intl.DateTimeFormat("en-NG", {
+          dateStyle: "medium",
+        }).format(row.remittedAt),
+        remittedAtValue: row.remittedAt.toISOString().slice(0, 10),
+        note: row.note || "",
+        recordedBy: canManage ? row.recordedByLabel || "Unknown" : "Restricted",
+        projectId: row.projectId || "",
+        projectLabel: row.projectId
+          ? projectMap.get(row.projectId) || "Unknown project"
+          : "Unassigned project",
+        unitId: row.unitId || "",
+        unitLabel: row.unitId
+          ? unitMap.get(row.unitId)?.label || "Unknown unit"
+          : "Unassigned unit",
+        voided: Boolean(row.voidedAt),
+        voidReason: row.voidReason || "",
+        canVoid: !row.voidedAt,
+      }))}
+      remittanceClients={remittanceClients.map((client) => ({
+        id: client.id,
+        label: client.email
+          ? `${client.fullName} · ${client.email}`
+          : client.fullName,
+      }))}
       salesReceipts={salesReceipts
         .filter((receipt) => !receipt.voidedAt && receipt.status !== "VOID")
         .map((receipt) => ({
@@ -1080,10 +1147,14 @@ export default async function FinanceQueuePage({
           receivables: outstanding,
           overdueReceivables: overdueOutstanding,
           cashIn: totalCollected,
-          cashOut: liveExpenses.reduce((sum, x) => sum + Number(x.amount), 0),
-          netCashflow:
-            totalCollected -
-            liveExpenses.reduce((sum, x) => sum + Number(x.amount), 0),
+          cashOut:
+            liveExpenses.reduce((sum, x) => sum + Number(x.amount), 0) +
+            liveRemittances.reduce((sum, x) => sum + Number(x.amount), 0),
+          netCashflow: operatingNet({
+            collected: totalCollected,
+            expenses: liveExpenses.reduce((sum, x) => sum + Number(x.amount), 0),
+            remitted: liveRemittances.reduce((sum, x) => sum + Number(x.amount), 0),
+          }),
         },
         clientBalances: clientDepositRows,
       }}

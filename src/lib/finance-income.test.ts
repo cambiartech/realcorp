@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, resolveUnitServiceFee, summarizeClientDeposits, agreedPriceFromCatchUp, allocateClientCash, isPropertyEarningIncomeType, isServiceFeeIncomeType } from "./finance-income";
+import { parseFinanceIncomeType, remainingClientBalance, resolveClientUnitSalePrice, resolveUnitServiceFee, summarizeClientDeposits, agreedPriceFromCatchUp, allocateClientCash, isPropertyEarningIncomeType, isServiceFeeIncomeType, operatingNet } from "./finance-income";
 
 test("parses known income types and falls back to other", () => {
   assert.equal(parseFinanceIncomeType("CLIENT_DEPOSIT"), "CLIENT_DEPOSIT");
@@ -127,4 +127,10 @@ test("service fee stays off the sale remaining", () => {
   assert.equal(totals.serviceFee, 150_000);
   assert.equal(totals.serviceFeePaid, 50_000);
   assert.equal(totals.serviceFeeRemaining, 100_000);
+});
+
+test("operating net is collected minus expenses minus remittance", () => {
+  assert.equal(operatingNet({ collected: 715_000, expenses: 206_717 }), 508_283);
+  assert.equal(operatingNet({ collected: 1_010_000, expenses: 212_006, remitted: 400_000 }), 397_994);
+  assert.equal(operatingNet({ collected: 0, expenses: 206_717 }), -206_717);
 });

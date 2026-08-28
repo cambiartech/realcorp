@@ -244,6 +244,30 @@ export const applyPayTemplateSchema = z.object({
   templateId: z.string().min(1),
 });
 
+export const savePeopleOrgSettingsSchema = z
+  .object({
+    payrollCountryCode: z.string().trim().toUpperCase().length(2),
+    basicPercent: z.coerce.number().min(0).max(100),
+    housingPercent: z.coerce.number().min(0).max(100),
+    transportPercent: z.coerce.number().min(0).max(100),
+    otherPercent: z.coerce.number().min(0).max(100),
+    pensionEnabled: z.enum(["yes", "no"]).optional(),
+    employeePensionRate: z.coerce.number().min(0).max(100),
+    employerPensionRate: z.coerce.number().min(0).max(100),
+    nsitfRate: z.coerce.number().min(0).max(100),
+    itfRate: z.coerce.number().min(0).max(100),
+    applyStructureToEveryone: z
+      .union([z.literal("on"), z.literal("true"), z.literal("1"), z.literal("")])
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    const total =
+      value.basicPercent + value.housingPercent + value.transportPercent + value.otherPercent;
+    if (Math.abs(total - 100) > 0.01) {
+      ctx.addIssue({ code: "custom", message: "Salary allocation percentages must total 100%." });
+    }
+  });
+
 export const savePayrollAdjustmentSchema = z.object({
   runId: z.string().min(1),
   employeeProfileId: z.string().min(1),

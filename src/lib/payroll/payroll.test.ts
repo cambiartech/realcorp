@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculatePayroll, PayrollConfigurationError } from "./engine";
 import { calculateNigeriaAnnualTax, explainNigeriaAnnualTax } from "./jurisdictions/ng/2026";
+import { resolveManualPayeOverride } from "./tax-override";
 
 test("Nigeria 2026 PAYE bands calculate exact boundary tax", () => {
   assert.equal(calculateNigeriaAnnualTax(800_000), 0);
@@ -21,6 +22,18 @@ test("first 800k is untaxed and a 3m chargeable income taxes only the remaining 
   assert.equal(explained.bands[1].incomeInBand, 2_200_000);
   assert.equal(explained.bands[1].taxInBand, 330_000);
   assert.equal(explained.tax, 330_000);
+});
+
+test("HR-verified ₦200,000 gross is PAYE 18,440, pension 10,400, net 171,160", () => {
+  const result = calculatePayroll({
+    countryCode: "NG",
+    year: 2026,
+    month: 8,
+    grossMonthly: 200_000,
+  });
+  assert.equal(result.employeePension, 10_400);
+  assert.equal(result.tax, 18_440);
+  assert.equal(result.netPay, 171_160);
 });
 
 test("Nigeria payroll applies pension, PAYE, employer pension, and NSITF", () => {
@@ -100,6 +113,14 @@ test("manual tax overrides remain explicit in the calculation snapshot", () => {
   assert.equal(result.tax, 50_000);
   assert.equal(result.taxOverrideApplied, true);
   assert.equal(result.taxOverrideReason, "Tax authority directive");
+});
+
+test("manual PAYE override requires a documented reason", () => {
+  assert.equal(resolveManualPayeOverride({ amount: 16_920, reason: "" }), undefined);
+  assert.equal(resolveManualPayeOverride({ amount: 16_920, reason: "   " }), undefined);
+  assert.equal(resolveManualPayeOverride({ amount: 16_920 }), undefined);
+  assert.equal(resolveManualPayeOverride({ amount: 16_920, reason: "Tax authority directive" }), 16_920);
+  assert.equal(resolveManualPayeOverride({ amount: 0, reason: "Exempt by directive" }), 0);
 });
 
 test("unsupported jurisdictions fail closed", () => {

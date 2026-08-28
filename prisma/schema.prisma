@@ -102,6 +102,7 @@ model Tenant {
   invoices                    Invoice[]
   salesReceipts               SalesReceipt[]
   payments                    PaymentRecord[]
+  clientRemittances           ClientRemittance[]
   auditLogs                   AuditLog[]
   goals                       TenantGoal[]
   dashboardPreferences        DashboardPreference[]
@@ -373,6 +374,7 @@ model Project {
   invoices      Invoice[]
   payments      PaymentRecord[]
   salesReceipts SalesReceipt[]
+  clientRemittances ClientRemittance[]
   pricingPlans  ProjectPricingPlan[]
   stakeholders         ProjectStakeholder[]
   inventoryLocations   InventoryLocation[]
@@ -527,6 +529,7 @@ model Unit {
   invoices      Invoice[]
   payments      PaymentRecord[]
   salesReceipts        SalesReceipt[]
+  clientRemittances    ClientRemittance[]
   inventoryMovements   InventoryMovement[]
   inventoryDamages     InventoryDamage[]
 
@@ -2181,6 +2184,7 @@ model PropertyClient {
   shortletLinks        ClientShortletLink[]
   documents            ClientDocument[]
   payments             PaymentRecord[]
+  remittances          ClientRemittance[]
   shortletReservations ShortletReservation[]
   shortletGuests       ShortletGuest[]
 
@@ -2188,6 +2192,38 @@ model PropertyClient {
   @@index([tenantId, fullName])
   @@index([tenantId, email])
   @@index([userId])
+}
+
+/// Money finance remits to a property client/owner. Clients see this on their dashboard — not collections or expenses.
+model ClientRemittance {
+  id               String    @id @default(cuid())
+  tenantId         String
+  propertyClientId String
+  projectId        String?
+  unitId           String?
+  amount           Decimal   @db.Decimal(18, 2)
+  currency         String    @default("NGN")
+  remittedAt       DateTime
+  method           String?
+  reference        String?
+  note             String?
+  recordedByUserId String?
+  recordedByLabel  String?
+  voidedAt         DateTime?
+  voidedByUserId   String?
+  voidedByLabel    String?
+  voidReason       String?
+  createdAt        DateTime  @default(now())
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyClient PropertyClient  @relation(fields: [propertyClientId], references: [id], onDelete: Cascade)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, remittedAt])
+  @@index([tenantId, propertyClientId])
+  @@index([tenantId, projectId, unitId])
+  @@index([tenantId, voidedAt])
 }
 
 model ClientUnitLink {

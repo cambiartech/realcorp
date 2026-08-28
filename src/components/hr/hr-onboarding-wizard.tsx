@@ -26,7 +26,7 @@ const STEPS: { id: OnboardingStepId; label: string }[] = [
   { id: "personal", label: "Personal & job" },
   { id: "bank", label: "Bank & emergency" },
   { id: "compliance", label: "Forms & documents" },
-  { id: "activate", label: "Go live" },
+  { id: "activate", label: "Activate employee" },
 ];
 
 export function HrOnboardingWizard({

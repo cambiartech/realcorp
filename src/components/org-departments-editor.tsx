@@ -2,23 +2,45 @@
 
 import { useState } from "react";
 import { Pencil, X } from "lucide-react";
-import { DEFAULT_ORG_DEPARTMENTS, normalizeOrgDepartmentName } from "@/lib/org-departments";
+import { syncCustomOrgDepartments } from "@/app/[tenantSlug]/settings/actions";
+import { useSnackbar } from "@/components/snackbar";
+import { DEFAULT_ORG_DEPARTMENTS, isDefaultOrgDepartment, normalizeOrgDepartmentName } from "@/lib/org-departments";
 
 type Props = {
+  tenantSlug?: string;
   customDepartments: string[];
   onCustomDepartmentsChange: (next: string[]) => void;
 };
 
-export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsChange }: Props) {
+export function OrgDepartmentsEditor({ tenantSlug, customDepartments, onCustomDepartmentsChange }: Props) {
+  const { showSnackbar } = useSnackbar();
   const [newDepartment, setNewDepartment] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [editError, setEditError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  function addDepartment() {
+  async function persist(next: string[], successMessage: string) {
+    if (!tenantSlug) {
+      onCustomDepartmentsChange(next);
+      return true;
+    }
+    setSaving(true);
+    const result = await syncCustomOrgDepartments(tenantSlug, next);
+    setSaving(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return false;
+    }
+    onCustomDepartmentsChange(next);
+    showSnackbar(successMessage, "success");
+    return true;
+  }
+
+  async function addDepartment() {
     const next = normalizeOrgDepartmentName(newDepartment);
     if (!next) return;
-    if (DEFAULT_ORG_DEPARTMENTS.includes(next as (typeof DEFAULT_ORG_DEPARTMENTS)[number])) {
+    if (isDefaultOrgDepartment(next)) {
       setNewDepartment("");
       return;
     }
@@ -26,8 +48,8 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
       setNewDepartment("");
       return;
     }
-    onCustomDepartmentsChange([...customDepartments, next]);
-    setNewDepartment("");
+    const ok = await persist([...customDepartments, next], `${next} added. It now shows on invite and People.`);
+    if (ok) setNewDepartment("");
   }
 
   function startEdit(department: string) {
@@ -42,14 +64,14 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
     setEditError("");
   }
 
-  function commitEdit() {
+  async function commitEdit() {
     if (!editing) return;
     const next = normalizeOrgDepartmentName(draft);
     if (!next) {
       setEditError("Enter a department name.");
       return;
     }
-    if (DEFAULT_ORG_DEPARTMENTS.some((d) => d.toLowerCase() === next.toLowerCase())) {
+    if (isDefaultOrgDepartment(next)) {
       setEditError("That name is already a default department.");
       return;
     }
@@ -57,19 +79,20 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
       setEditError("A department with that name already exists.");
       return;
     }
-    onCustomDepartmentsChange(customDepartments.map((d) => (d === editing ? next : d)));
-    cancelEdit();
+    const ok = await persist(
+      customDepartments.map((d) => (d === editing ? next : d)),
+      "Department renamed.",
+    );
+    if (ok) cancelEdit();
   }
 
   return (
     <div id="org-departments" className="scroll-mt-6">
       <h3 className="text-sm font-semibold text-foreground">Departments</h3>
       <p className="mt-1 text-xs text-muted">
-        One shared list for Finance, HR, reporting, and anywhere you tag work by department. Defaults match
-        your enabled modules; add custom names for Operations, Legal, and so on.
+        One shared list for Team invites, People, Finance, and reporting. Add a name and it is saved immediately —
+        you do not need a second save step.
       </p>
-
-      <input type="hidden" name="orgDepartmentsCsv" value={customDepartments.join("\n")} />
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {DEFAULT_ORG_DEPARTMENTS.map((department) => (
@@ -89,18 +112,20 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              addDepartment();
+              void addDepartment();
             }
           }}
           placeholder="Add custom department"
+          disabled={saving}
           className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
         />
         <button
           type="button"
-          onClick={addDepartment}
-          className="shrink-0 rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.06]"
+          onClick={() => void addDepartment()}
+          disabled={saving}
+          className="shrink-0 rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
         >
-          Add
+          {saving ? "Saving…" : "Add"}
         </button>
       </div>
 
@@ -124,7 +149,7 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      commitEdit();
+                      void commitEdit();
                     }
                     if (e.key === "Escape") {
                       e.preventDefault();
@@ -136,7 +161,7 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
                 />
                 <button
                   type="button"
-                  onClick={commitEdit}
+                  onClick={() => void commitEdit()}
                   className="rounded px-1.5 text-[10px] font-semibold text-foreground hover:bg-foreground/[0.08]"
                 >
                   Save
@@ -168,7 +193,12 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
                   type="button"
                   aria-label={`Remove ${department}`}
                   title="Remove"
-                  onClick={() => onCustomDepartmentsChange(customDepartments.filter((x) => x !== department))}
+                  onClick={() =>
+                    void persist(
+                      customDepartments.filter((x) => x !== department),
+                      `${department} removed.`,
+                    )
+                  }
                   className="rounded p-0.5 text-muted hover:bg-foreground/[0.08] hover:text-foreground"
                 >
                   <X className="h-3 w-3" />
@@ -179,10 +209,6 @@ export function OrgDepartmentsEditor({ customDepartments, onCustomDepartmentsCha
         )}
       </div>
       {editError ? <p className="mt-1 text-[11px] text-[var(--danger)]">{editError}</p> : null}
-      <p className="mt-1 text-[11px] text-muted">
-        Use the pencil to rename a custom department, then click Save departments. Default departments cannot
-        be removed or renamed.
-      </p>
     </div>
   );
 }

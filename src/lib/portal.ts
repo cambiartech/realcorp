@@ -6,10 +6,8 @@ import { formatEnumLabel } from "@/lib/ui-format";
 /**
  * Portfolio loader for the investor / listing-owner portal.
  *
- * Money flow: Project → Unit → Deal → Invoice → PaymentRecord, plus
- * SalesReceipts recorded directly against deals. A stakeholder's earnings are
- * their share of collections based on their allocation relative to all
- * allocations on that project (not a manually entered percentage).
+ * Money flow: finance records remittances to property clients. Clients see
+ * remittance on this dashboard — not collections or expenses.
  */
 
 export type PortfolioPayment = {
@@ -68,6 +66,50 @@ type PortalClientFilter = {
   tenantId: string;
   OR: Array<{ userId: string } | { email: { equals: string; mode: "insensitive" } }>;
 };
+
+async function loadClientRemittanceRows(tenantId: string, userId: string) {
+  const clientFilter = await buildPortalClientFilter(tenantId, userId);
+  return prisma.clientRemittance.findMany({
+    where: { tenantId, voidedAt: null, propertyClient: clientFilter },
+    select: {
+      id: true,
+      amount: true,
+      currency: true,
+      remittedAt: true,
+      reference: true,
+      note: true,
+      projectId: true,
+      unitId: true,
+      project: { select: { name: true } },
+    },
+    orderBy: { remittedAt: "desc" },
+  });
+}
+
+function remittancePaymentRows(
+  rows: Array<{
+    id: string;
+    amount: unknown;
+    currency: string;
+    remittedAt: Date;
+    reference: string | null;
+    note: string | null;
+    project: { name: string } | null;
+  }>,
+): PortfolioPayment[] {
+  return rows.map((row) => ({
+    id: row.id,
+    amount: Number(row.amount),
+    currency: row.currency,
+    paidAt: row.remittedAt.toISOString(),
+    label: row.reference
+      ? `Remittance · ${row.reference}`
+      : row.note
+        ? `Remittance · ${row.note}`
+        : "Remittance",
+    projectName: row.project?.name || "",
+  }));
+}
 
 async function buildPortalClientFilter(tenantId: string, userId: string): Promise<PortalClientFilter> {
   const user = await prisma.user.findUnique({
@@ -486,16 +528,28 @@ export async function loadStakeholderPortfolio(
     }
   }
 
+  const remittanceRows = await loadClientRemittanceRows(tenantId, userId);
+  const remittedByProject = new Map<string, number>();
+  for (const row of remittanceRows) {
+    if (!row.projectId) continue;
+    remittedByProject.set(row.projectId, (remittedByProject.get(row.projectId) ?? 0) + Number(row.amount));
+  }
+  const remittedTotal = remittanceRows.reduce((sum, row) => sum + Number(row.amount), 0);
+  const projectsWithRemittance = allProjects.map((project) => ({
+    ...project,
+    yourEarnings: remittedByProject.get(project.projectId) ?? 0,
+  }));
+
   return {
-    projects: allProjects,
+    projects: projectsWithRemittance,
     totals: {
-      currency: allProjects[0]?.currency ?? currency,
-      allocated: allProjects.reduce((sum, p) => sum + p.allocationAmount, 0),
-      collected: allProjects.reduce((sum, p) => sum + p.totalCollected, 0),
-      earnings: allProjects.reduce((sum, p) => sum + p.yourEarnings, 0),
-      projects: allProjects.length,
+      currency: projectsWithRemittance[0]?.currency ?? remittanceRows[0]?.currency ?? currency,
+      allocated: projectsWithRemittance.reduce((sum, p) => sum + p.allocationAmount, 0),
+      collected: remittedTotal,
+      earnings: remittedTotal,
+      projects: projectsWithRemittance.length,
     },
-    recentPayments: mergedRecentPayments,
+    recentPayments: remittancePaymentRows(remittanceRows).slice(0, 12),
   };
 }
 
@@ -648,32 +702,13 @@ export async function loadInvestorProjectDetail(
     receipts.reduce((sum, r) => sum + Number(r.amount), 0);
 
   const allocationAmount = stake?.investmentAmount != null ? Number(stake.investmentAmount) : 0;
-  const yourEarnings = stake
-    ? totalProjectAllocation > 0 && allocationAmount > 0
-      ? (totalCollected * allocationAmount) / totalProjectAllocation
-      : 0
-    : totalCollected;
 
   const unitsForCounts = stake ? p.units : linkedUnits;
 
-  const projectPayments: PortfolioPayment[] = [
-    ...payments.map((pay) => ({
-      id: pay.id,
-      amount: Number(pay.amount),
-      currency: pay.currency,
-      paidAt: pay.paidAt.toISOString(),
-      label: pay.invoice?.title || pay.payerName || "Payment",
-      projectName: p.name,
-    })),
-    ...receipts.map((receipt) => ({
-      id: receipt.id,
-      amount: Number(receipt.amount),
-      currency: receipt.currency,
-      paidAt: receipt.issuedAt.toISOString(),
-      label: receipt.title || receipt.customerName || "Sales receipt",
-      projectName: p.name,
-    })),
-  ].sort((a, b) => b.paidAt.localeCompare(a.paidAt));
+  const remittanceRows = (await loadClientRemittanceRows(tenantId, userId)).filter(
+    (row) => row.projectId === p.id,
+  );
+  const remitted = remittanceRows.reduce((sum, row) => sum + Number(row.amount), 0);
 
   return {
     projectId: p.id,
@@ -693,12 +728,12 @@ export async function loadInvestorProjectDetail(
     totalInvoiced,
     totalCollected,
     outstanding: Math.max(totalInvoiced - totalCollected, 0),
-    yourEarnings,
+    yourEarnings: remitted,
     description: p.listingDescription,
     locationAddress: p.locationAddress,
     galleryUrls: jsonStringArray(p.galleryUrls),
     amenities: jsonStringArray(p.amenities),
-    payments: projectPayments,
+    payments: remittancePaymentRows(remittanceRows),
   };
 }
 
@@ -815,6 +850,14 @@ export async function loadInvestorShortletPortfolio(
   userId: string,
 ): Promise<InvestorShortletPortfolio> {
   const clientFilter = await buildPortalClientFilter(tenantId, userId);
+  const remittanceRows = await loadClientRemittanceRows(tenantId, userId);
+  const remittedByUnit = new Map<string, number>();
+  const remittedTotal = remittanceRows.reduce((sum, row) => {
+    if (row.unitId) {
+      remittedByUnit.set(row.unitId, (remittedByUnit.get(row.unitId) ?? 0) + Number(row.amount));
+    }
+    return sum + Number(row.amount);
+  }, 0);
   const clientShortletLinks = await prisma.clientShortletLink.findMany({
     where: { tenantId, client: clientFilter },
     select: {
@@ -823,6 +866,7 @@ export async function loadInvestorShortletPortfolio(
           id: true,
           name: true,
           currency: true,
+          projectUnitId: true,
           property: { select: { name: true } },
         },
       },
@@ -861,7 +905,7 @@ export async function loadInvestorShortletPortfolio(
       allocationAmount: 0,
       totalProjectAllocation: 0,
       totalCollected,
-      yourEarnings: totalCollected,
+      yourEarnings: unit.projectUnitId ? remittedByUnit.get(unit.projectUnitId) ?? 0 : 0,
       currency: unit.currency,
       reservationCount: countByClientUnit.get(unit.id) ?? 0,
     };
@@ -882,8 +926,8 @@ export async function loadInvestorShortletPortfolio(
       units: clientUnits,
       totals: {
         currency,
-        collected: clientUnits.reduce((s, u) => s + u.totalCollected, 0),
-        earnings: clientUnits.reduce((s, u) => s + u.yourEarnings, 0),
+        collected: remittedTotal,
+        earnings: remittedTotal,
         units: clientUnits.length,
       },
     };
@@ -915,7 +959,7 @@ export async function loadInvestorShortletPortfolio(
       id: true,
       name: true,
       currency: true,
-      projectUnit: { select: { projectId: true } },
+      projectUnit: { select: { id: true, projectId: true } },
     },
   });
 
@@ -926,8 +970,8 @@ export async function loadInvestorShortletPortfolio(
       units: merged,
       totals: {
         currency,
-        collected: merged.reduce((s, u) => s + u.totalCollected, 0),
-        earnings: merged.reduce((s, u) => s + u.yourEarnings, 0),
+        collected: remittedTotal,
+        earnings: remittedTotal,
         units: merged.length,
       },
     };
@@ -957,10 +1001,9 @@ export async function loadInvestorShortletPortfolio(
     const allocationAmount = stake?.allocation ?? 0;
     const totalProjectAllocation = totalAllocationByProject.get(projectId) ?? 0;
     const totalCollected = collectedByUnit.get(unit.id) ?? 0;
-    const yourEarnings =
-      totalProjectAllocation > 0 && allocationAmount > 0
-        ? (totalCollected * allocationAmount) / totalProjectAllocation
-        : 0;
+    const yourEarnings = unit.projectUnit?.id
+      ? remittedByUnit.get(unit.projectUnit.id) ?? 0
+      : 0;
     return {
       unitId: unit.id,
       unitName: unit.name,
@@ -983,8 +1026,8 @@ export async function loadInvestorShortletPortfolio(
     units,
     totals: {
       currency,
-      collected: units.reduce((s, u) => s + u.totalCollected, 0),
-      earnings: units.reduce((s, u) => s + u.yourEarnings, 0),
+      collected: remittedTotal,
+      earnings: remittedTotal,
       units: units.length,
     },
   };

@@ -9,9 +9,10 @@ import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_MD } from "@/lib/modal-panel";
+import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { inviteDepartmentChoices } from "@/lib/org-department-access";
 import {
   INVITE_ACCESS_KIND_OPTIONS,
-  INVITE_DEPARTMENT_OPTIONS,
   INVITE_PORTAL_ROLE_OPTIONS,
   TEAM_MEMBERSHIP_ROLE_OPTIONS,
 } from "@/lib/team-membership-roles";
@@ -76,6 +77,7 @@ export function TeamWorkspace({
   tenantName,
   tenantSlug,
   canInvite,
+  orgDepartments,
   entitledModules,
   members,
   invites,
@@ -84,6 +86,7 @@ export function TeamWorkspace({
   tenantName: string;
   tenantSlug: string;
   canInvite: boolean;
+  orgDepartments: string[];
   entitledModules: AssignableMemberModule[];
   members: TeamMemberRow[];
   invites: PendingInviteRow[];
@@ -147,7 +150,11 @@ export function TeamWorkspace({
       )}
 
       {isInviteOpen && canInvite ? (
-        <InviteModal tenantSlug={tenantSlug} onClose={() => setIsInviteOpen(false)} />
+        <InviteModal
+          tenantSlug={tenantSlug}
+          orgDepartments={orgDepartments}
+          onClose={() => setIsInviteOpen(false)}
+        />
       ) : null}
     </div>
   );
@@ -469,7 +476,15 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
   );
 }
 
-function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () => void }) {
+function InviteModal({
+  tenantSlug,
+  orgDepartments,
+  onClose,
+}: {
+  tenantSlug: string;
+  orgDepartments: string[];
+  onClose: () => void;
+}) {
   const [state, formAction, pending] = useActionState(inviteTenantMember.bind(null, tenantSlug), initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<TeamInviteFieldName, string>>>({});
   const [accessKind, setAccessKind] = useState<"department" | "org_admin" | "portal">("department");
@@ -597,21 +612,18 @@ function InviteModal({ tenantSlug, onClose }: { tenantSlug: string; onClose: () 
           {accessKind === "department" ? (
             <>
               <div>
-                <label htmlFor="team-modal-department" className="mb-1 block text-sm text-muted">
-                  Department
-                </label>
-                <UiSelect
-                  id="team-modal-department"
+                <OrgDepartmentSelect
+                  tenantSlug={tenantSlug}
+                  departments={inviteDepartmentChoices(orgDepartments).map((row) => row.label)}
                   name="department"
-                  defaultValue="sales"
-                  invalid={Boolean(fieldErrors.department)}
-                >
-                  {INVITE_DEPARTMENT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </UiSelect>
+                  label="Department"
+                  required
+                  allowCreate
+                />
+                <p className="mt-1 text-[11px] text-muted">
+                  Same list as People → Settings. Use “Add a department not on this list” if you need a new
+                  team name.
+                </p>
                 {fieldErrors.department ? (
                   <FormFieldError>{fieldErrors.department}</FormFieldError>
                 ) : null}

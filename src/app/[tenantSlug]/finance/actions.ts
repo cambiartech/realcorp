@@ -34,6 +34,7 @@ import {
 import {
   createExpenseInputSchema,
   createInvoiceInputSchema,
+  createClientRemittanceInputSchema,
   createSalesReceiptInputSchema,
   createVendorBillInputSchema,
   financeControlsInputSchema,
@@ -1448,6 +1449,144 @@ export async function createExpenseRecord(
   }
 
   revalidatePath(`/${tenantSlug}/finance`);
+  return { ok: true };
+}
+
+export async function createClientRemittance(
+  tenantSlug: string,
+  input: {
+    propertyClientId: string;
+    projectId?: string;
+    unitId?: string;
+    amount: number;
+    currency: string;
+    remittedAt: string;
+    method?: string;
+    reference?: string;
+    note?: string;
+  },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = createClientRemittanceInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to record remittances." };
+  }
+
+  const client = await prisma.propertyClient.findFirst({
+    where: { id: parsed.data.propertyClientId, tenantId: tenant.id },
+    select: { id: true, fullName: true },
+  });
+  if (!client) return { ok: false, error: "Client not found." };
+
+  const allocation = await resolveExpenseAllocation({
+    tenantId: tenant.id,
+    projectId: parsed.data.projectId,
+    unitId: parsed.data.unitId,
+  });
+  if (!allocation.ok) return allocation;
+
+  const actorLabel = session.user.name || session.user.email || "Unknown user";
+  try {
+    const created = await prisma.clientRemittance.create({
+      data: {
+        tenantId: tenant.id,
+        propertyClientId: client.id,
+        projectId: allocation.projectId,
+        unitId: allocation.unitId,
+        amount: parsed.data.amount,
+        currency: parsed.data.currency,
+        remittedAt: new Date(parsed.data.remittedAt),
+        method: parsed.data.method || null,
+        reference: parsed.data.reference || null,
+        note: parsed.data.note || null,
+        recordedByUserId: session.user.id,
+        recordedByLabel: actorLabel,
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel,
+      module: "FINANCE",
+      entityType: "REMITTANCE",
+      entityId: created.id,
+      action: "CREATE",
+      summary: `Remitted ${parsed.data.currency} ${parsed.data.amount.toLocaleString()} to ${client.fullName}.`,
+    });
+  } catch {
+    return { ok: false, error: "Could not record this remittance right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  revalidatePath(`/${tenantSlug}/portal`);
+  revalidatePath(`/${tenantSlug}/clients`);
+  return { ok: true };
+}
+
+export async function voidClientRemittance(
+  tenantSlug: string,
+  remittanceId: string,
+  input: { reason: string },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const parsed = voidFinanceEntrySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManageFinance(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission to remove remittances." };
+  }
+
+  const remittance = await prisma.clientRemittance.findFirst({
+    where: { id: remittanceId, tenantId: tenant.id },
+    select: {
+      id: true,
+      voidedAt: true,
+      amount: true,
+      currency: true,
+      propertyClient: { select: { fullName: true } },
+    },
+  });
+  if (!remittance) return { ok: false, error: "Remittance not found." };
+  if (remittance.voidedAt) return { ok: false, error: "This remittance is already removed." };
+
+  const actorLabel = session.user.name || session.user.email || "Unknown user";
+  try {
+    await prisma.clientRemittance.update({
+      where: { id: remittance.id },
+      data: {
+        voidedAt: new Date(),
+        voidedByUserId: session.user.id,
+        voidedByLabel: actorLabel,
+        voidReason: parsed.data.reason,
+      },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel,
+      module: "FINANCE",
+      entityType: "REMITTANCE",
+      entityId: remittance.id,
+      action: "VOID",
+      summary: `Removed remittance of ${remittance.currency} ${Number(remittance.amount).toLocaleString()} to ${remittance.propertyClient.fullName}. ${parsed.data.reason}`,
+    });
+  } catch {
+    return { ok: false, error: "Could not remove this remittance right now." };
+  }
+
+  revalidatePath(`/${tenantSlug}/finance`);
+  revalidatePath(`/${tenantSlug}/portal`);
+  revalidatePath(`/${tenantSlug}/clients`);
   return { ok: true };
 }
 

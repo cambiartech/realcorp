@@ -24,7 +24,6 @@ import {
   saveOrganizationLogoUrl,
   updateOrganizationName,
   updateOrgModules,
-  saveOrgDepartments,
 } from "./actions";
 import { FormAlert } from "@/components/form-message";
 import { OrgDepartmentsEditor } from "@/components/org-departments-editor";
@@ -166,10 +165,6 @@ export function SettingsWorkspace({
     updateOrgModules.bind(null, tenantSlug),
     null as { ok: true } | { ok: false; error: string } | null,
   );
-  const [departmentsState, departmentsAction, departmentsPending] = useActionState(
-    saveOrgDepartments.bind(null, tenantSlug),
-    null as { ok: true } | { ok: false; error: string } | null,
-  );
   const [intState, intAction, intPending] = useActionState(
     saveIntegrationSettings.bind(null, tenantSlug),
     null as { ok: true } | { ok: false; error: string } | null,
@@ -197,13 +192,6 @@ export function SettingsWorkspace({
       router.refresh();
     }
   }, [orgNameState, router, showSnackbar]);
-
-  useEffect(() => {
-    if (departmentsState?.ok) {
-      showSnackbar("Departments saved. Available across Finance, HR, and reporting.", "success");
-      router.refresh();
-    }
-  }, [departmentsState, router, showSnackbar]);
 
   function reportLogoIssue(message: string) {
     setLogoUploadError(message);
@@ -450,29 +438,11 @@ export function SettingsWorkspace({
             </form>
 
             <div className="mt-8 border-t border-foreground/10 pt-6">
-              {departmentsState && !departmentsState.ok ? (
-                <div className="mb-2">
-                  <FormAlert>{departmentsState.error}</FormAlert>
-                </div>
-              ) : null}
-              {departmentsState?.ok ? (
-                <p className="mb-2 text-xs text-[var(--success)]">Departments saved.</p>
-              ) : null}
-              <form action={departmentsAction} className="space-y-4">
-                <OrgDepartmentsEditor
-                  customDepartments={customDepartments}
-                  onCustomDepartmentsChange={setCustomDepartments}
-                />
-                <button
-                  type="submit"
-                  disabled={departmentsPending}
-                  aria-busy={departmentsPending}
-                  className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
-                >
-                  {departmentsPending ? <ButtonSpinner /> : null}
-                  {departmentsPending ? "Saving…" : "Save departments"}
-                </button>
-              </form>
+              <OrgDepartmentsEditor
+                tenantSlug={tenantSlug}
+                customDepartments={customDepartments}
+                onCustomDepartmentsChange={setCustomDepartments}
+              />
             </div>
 
             <div className="mt-8 border-t border-foreground/10 pt-6">
