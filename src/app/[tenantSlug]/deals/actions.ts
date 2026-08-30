@@ -45,7 +45,7 @@ export async function createDeal(
 
   if (parsed.data.leadId) {
     const lead = await prisma.lead.findFirst({
-      where: { id: parsed.data.leadId, tenantId: tenant.id },
+      where: { id: parsed.data.leadId, tenantId: tenant.id, salesVisible: true },
       select: { id: true },
     });
     if (!lead) return { ok: false, error: "Selected lead is invalid." };

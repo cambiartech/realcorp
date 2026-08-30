@@ -75,7 +75,7 @@ export default async function DealsPage({
   const [totalDeals, leads, users, units, projects] = await Promise.all([
     prisma.deal.count({ where: dealWhere }),
     prisma.lead.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: tenant.id, salesVisible: true },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, email: true },
       take: 300,

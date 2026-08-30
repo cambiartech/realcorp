@@ -18,6 +18,7 @@ import {
   resolveLeadPhoneFromValues,
 } from "@/lib/capture-form-lead-map";
 import prisma from "@/lib/db";
+import { inboundLeadVisibilityData } from "@/lib/marketing-lead-routing";
 import { computeLeadScore, scoreToQuality } from "@/lib/lead-scoring";
 import { captureFormEventSchema, captureFormSubmitSchema } from "@/lib/validators/capture-form";
 import { headers } from "next/headers";
@@ -30,7 +31,9 @@ async function getTenantBySlug(tenantSlug: string) {
       id: true,
       slug: true,
       name: true,
-      settings: { select: { logoUrl: true, primaryColor: true, accentColor: true } },
+      settings: {
+        select: { logoUrl: true, primaryColor: true, accentColor: true, marketingLeadRouting: true },
+      },
     },
   });
 }
@@ -299,6 +302,7 @@ export async function submitCaptureForm(
           quality,
           score,
           lastActivityAt: new Date(),
+          ...inboundLeadVisibilityData(tenant.settings?.marketingLeadRouting),
         },
       });
 
@@ -334,6 +338,7 @@ export async function submitCaptureForm(
 
     revalidatePath(`/${tenantSlug}/leads`);
     revalidatePath(`/${tenantSlug}/marketing`);
+    revalidatePath(`/${tenantSlug}/marketing/entries`);
 
     const leadPhone = resolveLeadPhoneFromValues(fields, parsed.data.values);
     if (form.autoWhatsAppEnabled && leadPhone) {

@@ -7,6 +7,7 @@ import { paginate, parsePage } from "@/lib/pagination";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { SALES_VISIBLE_LEAD } from "@/lib/marketing-lead-routing";
 import { LeadsWorkspace } from "./leads-workspace";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function TenantLeadsPage({
 
   const leadWhere = {
     tenantId: tenant.id,
+    ...SALES_VISIBLE_LEAD,
     ...(owner ? { assignedUserId: owner } : {}),
     ...(source ? { source } : {}),
     ...(project ? { projectInterest: project } : {}),

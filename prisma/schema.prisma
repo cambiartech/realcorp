@@ -226,6 +226,9 @@ model TenantSettings {
   financeCurrencies   Json?
   /// e.g. { expenseApprovalThreshold, firstReminderAfterDays, secondReminderAfterDays }
   financeControls     Json?
+  /// SALES_IMMEDIATE = marketing inbound appears on Sales Leads now.
+  /// MARKETING_HOLD = marketing reviews entries, then pushes to Sales.
+  marketingLeadRouting MarketingLeadRouting @default(SALES_IMMEDIATE)
 
   // Short lets / PMS
   shortletCheckInTime        String  @default("14:00")
@@ -237,6 +240,11 @@ model TenantSettings {
   shortletServiceCharge      Decimal? @db.Decimal(18, 2)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+enum MarketingLeadRouting {
+  SALES_IMMEDIATE
+  MARKETING_HOLD
 }
 
 model TenantGoal {
@@ -615,6 +623,9 @@ model Lead {
   email            String?
   phone            String?
   notes            String?     @db.Text
+  /// False while Marketing is holding the entry; Sales Leads only shows true.
+  salesVisible     Boolean     @default(true)
+  salesReleasedAt  DateTime?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
@@ -631,6 +642,7 @@ model Lead {
   @@index([tenantId, score])
   @@index([tenantId, campaignId])
   @@index([tenantId, realtorPartnerId])
+  @@index([tenantId, salesVisible])
 }
 
 enum DealStage {

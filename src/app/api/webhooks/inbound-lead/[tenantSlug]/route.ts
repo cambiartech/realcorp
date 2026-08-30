@@ -27,6 +27,7 @@
  */
 
 import prisma from "@/lib/db";
+import { inboundLeadVisibilityData } from "@/lib/marketing-lead-routing";
 import { recalculateLeadScore } from "@/lib/lead-scoring";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ten
     where: { slug: tenantSlug },
     select: {
       id: true,
-      settings: { select: { metaVerifyToken: true, metaDefaultSource: true } },
+      settings: { select: { metaVerifyToken: true, metaDefaultSource: true, marketingLeadRouting: true } },
     },
   });
   if (!tenant) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ten
       utmMedium,
       utmCampaign,
       utmContent,
+      ...inboundLeadVisibilityData(tenant.settings?.marketingLeadRouting),
     },
   });
 

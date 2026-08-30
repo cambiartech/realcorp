@@ -11,6 +11,7 @@
  */
 
 import prisma from "@/lib/db";
+import { inboundLeadVisibilityData } from "@/lib/marketing-lead-routing";
 import { recalculateLeadScore } from "@/lib/lead-scoring";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ten
         select: {
           metaPageAccessToken: true,
           metaDefaultSource: true,
+          marketingLeadRouting: true,
         },
       },
     },
@@ -140,6 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ten
           utmSource: "meta",
           utmMedium: "lead_ads",
           utmCampaign: value.form_id,
+          ...inboundLeadVisibilityData(tenant.settings?.marketingLeadRouting),
         },
       });
       createdIds.push(lead.id);

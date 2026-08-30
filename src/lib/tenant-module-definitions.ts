@@ -52,7 +52,7 @@ export const TENANT_MODULE_DEFINITIONS: TenantModuleDefinition[] = [
     key: "moduleMarketing",
     label: "Marketing",
     description: "Campaigns, lead sources, and capture forms",
-    subpages: ["Marketing overview", "Lead forms", "Meta Lead Ads"],
+    subpages: ["Marketing overview", "Lead forms", "Entries", "Marketing settings", "Meta Lead Ads"],
     group: "core",
     defaultOn: true,
     platformOnly: true,

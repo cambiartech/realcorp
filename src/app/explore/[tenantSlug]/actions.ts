@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "@/lib/db";
+import { inboundLeadVisibilityData } from "@/lib/marketing-lead-routing";
 import { z } from "zod";
 
 const inquirySchema = z.object({
@@ -43,7 +44,7 @@ export async function submitExploreInquiry(
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true },
+    select: { id: true, settings: { select: { marketingLeadRouting: true } } },
   });
   if (!tenant) return { ok: false, error: "Organization not found." };
 
@@ -84,6 +85,7 @@ export async function submitExploreInquiry(
       utmContent: parsed.data.utmContent || null,
       utmTerm: parsed.data.utmTerm || null,
       lastActivityAt: new Date(),
+      ...inboundLeadVisibilityData(tenant.settings?.marketingLeadRouting),
     },
   });
 

@@ -69,7 +69,7 @@ export default async function LeadDetailPage({
       },
     },
   });
-  if (!lead) notFound();
+  if (!lead || !lead.salesVisible) notFound();
 
   const [users, projects, campaigns, rawActivities] = await Promise.all([
     prisma.membership.findMany({

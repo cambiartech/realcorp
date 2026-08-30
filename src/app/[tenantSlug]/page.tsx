@@ -177,7 +177,7 @@ export default async function TenantHomePage({
       take: 2000,
     }),
     prisma.lead.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: tenant.id, salesVisible: true },
       select: {
         id: true,
         assignedUserId: true,

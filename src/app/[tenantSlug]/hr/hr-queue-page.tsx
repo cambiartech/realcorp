@@ -374,7 +374,7 @@ export default async function HrQueuePage({
       : Promise.resolve([]),
     loadScores
       ? prisma.lead.findMany({
-          where: { tenantId: tenant.id, createdAt: { gte: scoreDataSince } },
+          where: { tenantId: tenant.id, salesVisible: true, createdAt: { gte: scoreDataSince } },
           select: { assignedUserId: true, createdAt: true },
         })
       : Promise.resolve([]),

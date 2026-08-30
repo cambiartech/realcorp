@@ -113,7 +113,12 @@ export function MarketingWorkspace({
           <h1 className="text-2xl font-bold text-foreground">Marketing</h1>
           <p className="mt-1 text-sm text-muted">
             Campaigns, capture forms, and lead attribution for{" "}
-            <span className="font-medium text-foreground">{tenantName}</span>.
+            <span className="font-medium text-foreground">{tenantName}</span>. Control whether new
+            submissions go to Sales immediately or wait in{" "}
+            <a href={`/${tenantSlug}/marketing/settings`} className="font-semibold underline">
+              Marketing settings
+            </a>
+            .
           </p>
         </div>
         {canEdit && tab === "campaigns" ? (

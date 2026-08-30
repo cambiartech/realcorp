@@ -343,6 +343,18 @@ export function TenantSidebar({
       href: marketingItem.href,
       icon: Megaphone,
     });
+    marketingSubItems.push({
+      id: "entries",
+      label: "Entries",
+      href: `${marketingItem.href}/entries`,
+      icon: ClipboardList,
+    });
+    marketingSubItems.push({
+      id: "settings",
+      label: "Settings",
+      href: `${marketingItem.href}/settings`,
+      icon: Settings,
+    });
   }
   if (activitiesItem && moduleWhatsApp !== false && (marketingItem || listingsItem)) {
     marketingSubItems.push({
@@ -441,7 +453,16 @@ export function TenantSidebar({
 
   function isMarketingSubActive(id: string) {
     if (id === "campaigns" && marketingItem) {
-      return pathname === marketingItem.href || pathname.startsWith(`${marketingItem.href}/`);
+      return (
+        pathname === marketingItem.href ||
+        pathname.startsWith(`${marketingItem.href}/forms`)
+      );
+    }
+    if (id === "entries" && marketingItem) {
+      return pathname.startsWith(`${marketingItem.href}/entries`);
+    }
+    if (id === "settings" && marketingItem) {
+      return pathname.startsWith(`${marketingItem.href}/settings`);
     }
     if (id === "whatsapp" && activitiesItem) {
       return (
