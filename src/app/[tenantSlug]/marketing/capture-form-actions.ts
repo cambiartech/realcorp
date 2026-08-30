@@ -2,15 +2,11 @@
 
 import { auth } from "@/auth";
 import { submitCaptureForm } from "@/app/f/[tenantSlug]/[formSlug]/actions";
-import {
-  LeadCaptureFormStatus,
-  MarketingLeadRouting,
-  MembershipRole,
-  MembershipStatus,
-} from "@/generated/prisma";
+import { LeadCaptureFormStatus, MarketingLeadRouting } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import { slugifyCaptureFormName } from "@/lib/capture-form-types";
 import { resolveCaptureFormTemplate } from "@/lib/capture-form-templates";
+import { canEditMarketing } from "@/lib/marketing-access";
 import { sanitizeRichTextHtml } from "@/lib/rich-text-sanitize";
 import prisma from "@/lib/db";
 import { parseCreateCaptureForm, parseCaptureFormFieldsJson } from "@/lib/validators/capture-form";
@@ -22,8 +18,22 @@ export type ManualFillResult =
   | { ok: true; leadId: string; heldForMarketing: boolean }
   | { ok: false; error: string };
 
-function canManageCaptureForms(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
+async function requireCaptureFormEditor(tenantSlug: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "You must be signed in." as const };
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, settings: { select: { marketingLeadRouting: true } } },
+  });
+  if (!tenant) return { error: "Organization not found." as const };
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  if (!canEditMarketing(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { error: "You do not have permission to manage capture forms." as const };
+  }
+  return { session, tenant };
 }
 
 export async function createLeadCaptureForm(
@@ -31,27 +41,14 @@ export async function createLeadCaptureForm(
   _prev: CaptureFormActionResult | null,
   formData: FormData,
 ): Promise<CaptureFormActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
   const parsed = parseCreateCaptureForm(formData);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
   }
 
-  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
-  if (!tenant) return { ok: false, error: "Organization not found." };
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
-  });
-  if (
-    membership?.status !== MembershipStatus.ACTIVE ||
-    !canManageCaptureForms(membership.role, Boolean(session.user.isPlatformAdmin))
-  ) {
-    return { ok: false, error: "You do not have permission to create capture forms." };
-  }
+  const access = await requireCaptureFormEditor(tenantSlug);
+  if ("error" in access) return { ok: false, error: access.error };
+  const { session, tenant } = access;
 
   const slug = parsed.data.slug ?? slugifyCaptureFormName(parsed.data.name);
   const existing = await prisma.leadCaptureForm.findUnique({
@@ -118,25 +115,11 @@ export async function updateLeadCaptureFormStatus(
   formId: string,
   status: LeadCaptureFormStatus,
 ): Promise<CaptureFormActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
-  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
-  if (!tenant) return { ok: false, error: "Organization not found." };
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
-  });
-  if (
-    membership?.status !== MembershipStatus.ACTIVE ||
-    !canManageCaptureForms(membership.role, Boolean(session.user.isPlatformAdmin))
-  ) {
-    return { ok: false, error: "You do not have permission." };
-  }
+  const access = await requireCaptureFormEditor(tenantSlug);
+  if ("error" in access) return { ok: false, error: access.error };
 
   await prisma.leadCaptureForm.updateMany({
-    where: { id: formId, tenantId: tenant.id },
+    where: { id: formId, tenantId: access.tenant.id },
     data: { status },
   });
   revalidatePath(`/${tenantSlug}/marketing`);
@@ -150,29 +133,15 @@ export async function updateLeadCaptureFormSettings(
   _prev: CaptureFormActionResult | null,
   formData: FormData,
 ): Promise<CaptureFormActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
-  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
-  if (!tenant) return { ok: false, error: "Organization not found." };
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
-  });
-  if (
-    membership?.status !== MembershipStatus.ACTIVE ||
-    !canManageCaptureForms(membership.role, Boolean(session.user.isPlatformAdmin))
-  ) {
-    return { ok: false, error: "You do not have permission." };
-  }
+  const access = await requireCaptureFormEditor(tenantSlug);
+  if ("error" in access) return { ok: false, error: access.error };
 
   const title = String(formData.get("title") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   if (!title || !name) return { ok: false, error: "Name and title are required." };
 
   await prisma.leadCaptureForm.updateMany({
-    where: { id: formId, tenantId: tenant.id },
+    where: { id: formId, tenantId: access.tenant.id },
     data: {
       name,
       title,
@@ -200,22 +169,8 @@ export async function updateLeadCaptureFormFields(
   formId: string,
   fields: CaptureFormField[],
 ): Promise<CaptureFormActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
-  const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug }, select: { id: true } });
-  if (!tenant) return { ok: false, error: "Organization not found." };
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
-  });
-  if (
-    membership?.status !== MembershipStatus.ACTIVE ||
-    !canManageCaptureForms(membership.role, Boolean(session.user.isPlatformAdmin))
-  ) {
-    return { ok: false, error: "You do not have permission." };
-  }
+  const access = await requireCaptureFormEditor(tenantSlug);
+  if ("error" in access) return { ok: false, error: access.error };
 
   const parsed = parseCaptureFormFieldsJson(JSON.stringify(fields));
   if (!parsed.success) {
@@ -223,7 +178,7 @@ export async function updateLeadCaptureFormFields(
   }
 
   await prisma.leadCaptureForm.updateMany({
-    where: { id: formId, tenantId: tenant.id },
+    where: { id: formId, tenantId: access.tenant.id },
     data: { fields: parsed.data },
   });
 
@@ -237,25 +192,9 @@ export async function submitManualCaptureForm(
   values: Record<string, string>,
   client?: { timezone?: string; localHour?: number },
 ): Promise<ManualFillResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
-
-  const tenant = await prisma.tenant.findUnique({
-    where: { slug: tenantSlug },
-    select: { id: true, settings: { select: { marketingLeadRouting: true } } },
-  });
-  if (!tenant) return { ok: false, error: "Organization not found." };
-
-  const membership = await prisma.membership.findUnique({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
-    select: { role: true, status: true },
-  });
-  if (
-    membership?.status !== MembershipStatus.ACTIVE ||
-    !canManageCaptureForms(membership.role, Boolean(session.user.isPlatformAdmin))
-  ) {
-    return { ok: false, error: "You do not have permission to fill forms for someone." };
-  }
+  const access = await requireCaptureFormEditor(tenantSlug);
+  if ("error" in access) return { ok: false, error: access.error };
+  const { session, tenant } = access;
 
   const form = await prisma.leadCaptureForm.findFirst({
     where: { tenantId: tenant.id, slug: formSlug },

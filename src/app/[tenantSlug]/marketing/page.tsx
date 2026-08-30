@@ -1,22 +1,14 @@
 import { auth } from "@/auth";
-import {
-  CampaignStatus,
-  LeadCaptureSessionStatus,
-  MembershipRole,
-  MembershipStatus,
-} from "@/generated/prisma";
+import { CampaignStatus, LeadCaptureSessionStatus } from "@/generated/prisma";
 import { parseCaptureFormFields } from "@/lib/capture-form-types";
 import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
+import { canEditMarketing } from "@/lib/marketing-access";
 import prisma from "@/lib/db";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { MarketingWorkspace } from "./marketing-workspace";
 
 export const dynamic = "force-dynamic";
-
-function canManageMarketing(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
-}
 
 export default async function MarketingPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
@@ -47,9 +39,7 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
     select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "marketing");
-  const canEdit =
-    membership?.status === MembershipStatus.ACTIVE &&
-    canManageMarketing(membership.role, Boolean(session.user.isPlatformAdmin));
+  const canEdit = canEditMarketing(Boolean(session.user.isPlatformAdmin), membership);
 
   const hdrs = await headers();
   const host = hdrs.get("x-forwarded-host") || hdrs.get("host") || "localhost:3000";

@@ -1,18 +1,14 @@
 import { auth } from "@/auth";
-import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { aggregateCaptureFormAnalytics } from "@/lib/capture-form-analytics";
 import { parseCaptureFormFields } from "@/lib/capture-form-types";
 import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
+import { canEditMarketing } from "@/lib/marketing-access";
 import prisma from "@/lib/db";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { CaptureFormDetailClient } from "@/components/capture-forms/capture-form-detail-client";
 
 export const dynamic = "force-dynamic";
-
-function canManageMarketing(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
-}
 
 export default async function CaptureFormDetailPage({
   params,
@@ -106,9 +102,7 @@ export default async function CaptureFormDetailPage({
     submitCount: form.submitCount,
   });
 
-  const canEdit =
-    membership?.status === MembershipStatus.ACTIVE &&
-    canManageMarketing(membership.role, Boolean(session.user.isPlatformAdmin));
+  const canEdit = canEditMarketing(Boolean(session.user.isPlatformAdmin), membership);
 
   return (
     <CaptureFormDetailClient

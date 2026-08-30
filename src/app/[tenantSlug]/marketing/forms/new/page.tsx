@@ -1,15 +1,11 @@
 import { auth } from "@/auth";
-import { MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { CaptureFormNewWorkspace } from "@/components/capture-forms/capture-form-new-workspace";
 import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
+import { canEditMarketing } from "@/lib/marketing-access";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-
-function canManageMarketing(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
-}
 
 export default async function CaptureFormNewPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
   const { tenantSlug } = await params;
@@ -38,10 +34,7 @@ export default async function CaptureFormNewPage({ params }: { params: Promise<{
     select: MEMBERSHIP_FOR_NAV_SELECT,
   });
   assertTenantNavAccess(session, membership, tenant.settings, "marketing");
-  if (
-    membership?.status !== MembershipStatus.ACTIVE ||
-    !canManageMarketing(membership.role, Boolean(session.user.isPlatformAdmin))
-  ) {
+  if (!canEditMarketing(Boolean(session.user.isPlatformAdmin), membership)) {
     notFound();
   }
 

@@ -1,15 +1,12 @@
 import { auth } from "@/auth";
-import { MarketingLeadRouting, MembershipRole, MembershipStatus } from "@/generated/prisma";
+import { MarketingLeadRouting } from "@/generated/prisma";
 import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
+import { canEditMarketing } from "@/lib/marketing-access";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { MarketingSettingsWorkspace } from "./settings-workspace";
 
 export const dynamic = "force-dynamic";
-
-function canManageMarketing(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
-}
 
 export default async function MarketingSettingsPage({
   params,
@@ -45,10 +42,7 @@ export default async function MarketingSettingsPage({
   });
   assertTenantNavAccess(session, membership, tenant.settings, "marketing");
 
-  const canEdit =
-    Boolean(session.user.isPlatformAdmin) ||
-    (membership?.status === MembershipStatus.ACTIVE &&
-      canManageMarketing(membership.role, false));
+  const canEdit = canEditMarketing(Boolean(session.user.isPlatformAdmin), membership);
 
   const pendingCount = await prisma.lead.count({
     where: { tenantId: tenant.id, salesVisible: false },

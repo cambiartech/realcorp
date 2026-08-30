@@ -1,17 +1,14 @@
 "use server";
 
 import { auth } from "@/auth";
-import { MarketingLeadRouting, MembershipRole, MembershipStatus } from "@/generated/prisma";
+import { MarketingLeadRouting, MembershipStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
+import { canEditMarketing } from "@/lib/marketing-access";
 import prisma from "@/lib/db";
 import { parseCreateCampaignForm } from "@/lib/validators/campaign";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
-
-function canManageMarketing(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
-}
 
 export async function createCampaign(
   tenantSlug: string,
@@ -36,11 +33,7 @@ export async function createCampaign(
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { status: true, role: true },
   });
-  if (
-    !membership ||
-    membership.status !== MembershipStatus.ACTIVE ||
-    !canManageMarketing(membership.role, Boolean(session.user.isPlatformAdmin))
-  ) {
+  if (!canEditMarketing(Boolean(session.user.isPlatformAdmin), membership)) {
     return { ok: false, error: "You do not have permission to manage campaigns." };
   }
 
@@ -91,12 +84,7 @@ async function requireMarketingEditor(tenantSlug: string, userId: string, isPlat
     where: { tenantId_userId: { tenantId: tenant.id, userId } },
     select: { status: true, role: true },
   });
-  if (
-    !isPlatformAdmin &&
-    (!membership ||
-      membership.status !== MembershipStatus.ACTIVE ||
-      !canManageMarketing(membership.role, false))
-  ) {
+  if (!canEditMarketing(isPlatformAdmin, membership)) {
     return { tenant: null, error: "You do not have permission to change marketing settings." };
   }
   return { tenant, error: null };

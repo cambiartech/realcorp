@@ -176,7 +176,12 @@ export function CaptureFormsPanel({
                 return (
                   <tr key={form.id} className="hover:bg-foreground/[0.02]">
                     <td className="px-4 py-3">
-                      <p className="font-medium">{form.name}</p>
+                      <Link
+                        href={`/${tenantSlug}/marketing/forms/${form.id}?tab=${canEdit ? "builder" : "analytics"}`}
+                        className="font-medium text-foreground underline-offset-2 hover:underline"
+                      >
+                        {form.name}
+                      </Link>
                       <p className="text-xs text-muted">{form.title}</p>
                       <code className="mt-1 block text-[11px] text-muted">
                         {captureFormPublicPath(tenantSlug, form.slug)}
