@@ -1,9 +1,15 @@
 "use server";
 
 import { auth } from "@/auth";
-import { LeadCaptureFormStatus, MembershipRole, MembershipStatus } from "@/generated/prisma";
+import { submitCaptureForm } from "@/app/f/[tenantSlug]/[formSlug]/actions";
+import {
+  LeadCaptureFormStatus,
+  MarketingLeadRouting,
+  MembershipRole,
+  MembershipStatus,
+} from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
-import { DEFAULT_LEAD_MAGNET_FIELDS, slugifyCaptureFormName } from "@/lib/capture-form-types";
+import { slugifyCaptureFormName } from "@/lib/capture-form-types";
 import { resolveCaptureFormTemplate } from "@/lib/capture-form-templates";
 import { sanitizeRichTextHtml } from "@/lib/rich-text-sanitize";
 import prisma from "@/lib/db";
@@ -12,6 +18,9 @@ import { revalidatePath } from "next/cache";
 import type { CaptureFormField } from "@/lib/capture-form-types";
 
 export type CaptureFormActionResult = { ok: true; id?: string } | { ok: false; error: string };
+export type ManualFillResult =
+  | { ok: true; leadId: string; heldForMarketing: boolean }
+  | { ok: false; error: string };
 
 function canManageCaptureForms(role: MembershipRole | undefined, isPlatformAdmin: boolean) {
   return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.MARKETING_MANAGER;
@@ -220,4 +229,73 @@ export async function updateLeadCaptureFormFields(
 
   revalidatePath(`/${tenantSlug}/marketing/forms/${formId}`);
   return { ok: true };
+}
+
+export async function submitManualCaptureForm(
+  tenantSlug: string,
+  formSlug: string,
+  values: Record<string, string>,
+  client?: { timezone?: string; localHour?: number },
+): Promise<ManualFillResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, settings: { select: { marketingLeadRouting: true } } },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true },
+  });
+  if (
+    membership?.status !== MembershipStatus.ACTIVE ||
+    !canManageCaptureForms(membership.role, Boolean(session.user.isPlatformAdmin))
+  ) {
+    return { ok: false, error: "You do not have permission to fill forms for someone." };
+  }
+
+  const form = await prisma.leadCaptureForm.findFirst({
+    where: { tenantId: tenant.id, slug: formSlug },
+    select: { id: true, name: true, status: true },
+  });
+  if (!form) return { ok: false, error: "Form not found." };
+  if (form.status !== LeadCaptureFormStatus.ACTIVE) {
+    return { ok: false, error: "Activate this form first, then you can fill it for someone." };
+  }
+
+  const result = await submitCaptureForm(tenantSlug, formSlug, {
+    sessionToken: `staff-${session.user.id}-${crypto.randomUUID()}`.slice(0, 128),
+    values,
+    attribution: {
+      utmSource: "staff",
+      utmMedium: "manual",
+      utmCampaign: formSlug,
+      sharerUserId: session.user.id,
+    },
+    client: {
+      timezone: client?.timezone,
+      localHour: client?.localHour,
+    },
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    module: "MARKETING",
+    entityType: "LEAD",
+    entityId: result.leadId,
+    action: "CREATE",
+    summary: `Filled capture form "${form.name}" for someone`,
+  });
+
+  return {
+    ok: true,
+    leadId: result.leadId,
+    heldForMarketing: tenant.settings?.marketingLeadRouting === MarketingLeadRouting.MARKETING_HOLD,
+  };
 }

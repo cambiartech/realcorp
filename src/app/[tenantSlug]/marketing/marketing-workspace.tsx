@@ -15,6 +15,7 @@ import { FormAlert } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
+import type { CaptureFormField } from "@/lib/capture-form-types";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createCampaign } from "./actions";
@@ -41,6 +42,7 @@ type CaptureFormRow = {
   campaignName: string | null;
   partnerName: string | null;
   createdAt: string;
+  fields: CaptureFormField[];
 };
 
 type AnalyticsRow = {
@@ -70,6 +72,7 @@ export function MarketingWorkspace({
   captureForms,
   captureFormAnalytics,
   partners,
+  projectOptions,
 }: {
   tenantSlug: string;
   tenantName: string;
@@ -88,6 +91,7 @@ export function MarketingWorkspace({
   captureForms: CaptureFormRow[];
   captureFormAnalytics: AnalyticsRow[];
   partners: Array<{ id: string; displayName: string }>;
+  projectOptions: string[];
 }) {
   const [tab, setTab] = useState<"campaigns" | "forms">("forms");
   const [open, setOpen] = useState(false);
@@ -165,6 +169,7 @@ export function MarketingWorkspace({
             campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, code: c.code }))}
             partners={partners}
             analytics={captureFormAnalytics}
+            projectOptions={projectOptions}
           />
         </div>
       ) : (

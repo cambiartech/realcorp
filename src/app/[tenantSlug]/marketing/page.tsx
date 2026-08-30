@@ -5,6 +5,7 @@ import {
   MembershipRole,
   MembershipStatus,
 } from "@/generated/prisma";
+import { parseCaptureFormFields } from "@/lib/capture-form-types";
 import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { headers } from "next/headers";
@@ -55,7 +56,7 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
   const proto = hdrs.get("x-forwarded-proto") || "http";
   const siteOrigin = `${proto}://${host}`;
 
-  const [campaigns, totalLeads, attributedLeads, realtorLeads, captureForms, partners, sessions] =
+  const [campaigns, totalLeads, attributedLeads, realtorLeads, captureForms, partners, sessions, projects] =
     await Promise.all([
       prisma.campaign.findMany({
         where: { tenantId: tenant.id },
@@ -89,6 +90,12 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
           utmSource: true,
           localHour: true,
         },
+      }),
+      prisma.project.findMany({
+        where: { tenantId: tenant.id },
+        select: { name: true },
+        orderBy: { name: "asc" },
+        take: 100,
       }),
     ]);
 
@@ -181,9 +188,11 @@ export default async function MarketingPage({ params }: { params: Promise<{ tena
         campaignName: f.campaign?.name ?? null,
         partnerName: f.realtorPartner?.displayName ?? null,
         createdAt: f.createdAt.toISOString().slice(0, 10),
+        fields: parseCaptureFormFields(f.fields),
       }))}
       captureFormAnalytics={captureFormAnalytics}
       partners={partners}
+      projectOptions={projects.map((p) => p.name)}
     />
   );
 }

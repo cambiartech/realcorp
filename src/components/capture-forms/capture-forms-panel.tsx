@@ -4,10 +4,18 @@ import Link from "next/link";
 import { LeadCaptureFormStatus } from "@/generated/prisma";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { ManualCaptureFormFill } from "@/components/capture-forms/manual-capture-form-fill";
 import { useSnackbar } from "@/components/snackbar";
-import { buildCaptureFormShareUrl, captureFormPublicPath } from "@/lib/capture-form-types";
+import {
+  buildCaptureFormShareUrl,
+  captureFormPublicPath,
+  type CaptureFormField,
+} from "@/lib/capture-form-types";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { updateLeadCaptureFormStatus } from "@/app/[tenantSlug]/marketing/capture-form-actions";
+
+const SHARE_BTN =
+  "inline-flex items-center rounded-md border border-foreground bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-foreground hover:text-background";
 
 type CaptureFormRow = {
   id: string;
@@ -21,6 +29,7 @@ type CaptureFormRow = {
   campaignName: string | null;
   partnerName: string | null;
   createdAt: string;
+  fields: CaptureFormField[];
 };
 
 type AnalyticsRow = {
@@ -48,6 +57,7 @@ export function CaptureFormsPanel({
   siteOrigin,
   forms,
   analytics,
+  projectOptions,
 }: {
   tenantSlug: string;
   canEdit: boolean;
@@ -57,6 +67,7 @@ export function CaptureFormsPanel({
   campaigns: Array<{ id: string; name: string; code: string }>;
   partners: Array<{ id: string; displayName: string }>;
   analytics: AnalyticsRow[];
+  projectOptions: string[];
 }) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const { showSnackbar } = useSnackbar();
@@ -96,8 +107,9 @@ export function CaptureFormsPanel({
         <div>
           <h2 className="text-lg font-semibold">Capture forms</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Lead magnets for social bios, WhatsApp status, and community partners. Track views, partial fills,
-            and submissions with UTM attribution, location, device, and time-of-day.
+            Lead magnets for social bios, WhatsApp status, and community partners. Fill a form for someone
+            who calls in or cannot use their phone. Track views, partial fills, and submissions with UTM
+            attribution.
           </p>
         </div>
         {canEdit ? (
@@ -136,7 +148,7 @@ export function CaptureFormsPanel({
               <th className="px-4 py-3">Attribution</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Actions</th>
-              <th className="px-4 py-3">Share</th>
+              <th className="px-4 py-3">Copy links</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-foreground/10">
@@ -203,6 +215,16 @@ export function CaptureFormsPanel({
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         {canEdit ? (
+                          <ManualCaptureFormFill
+                            tenantSlug={tenantSlug}
+                            formSlug={form.slug}
+                            formName={form.name}
+                            formTitle={form.title}
+                            fields={form.fields}
+                            projectOptions={projectOptions}
+                          />
+                        ) : null}
+                        {canEdit ? (
                           <Link
                             href={`/${tenantSlug}/marketing/forms/${form.id}?tab=builder`}
                             className="inline-flex w-fit rounded-md border border-foreground bg-foreground px-2.5 py-1 text-xs font-semibold text-background"
@@ -227,27 +249,30 @@ export function CaptureFormsPanel({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5">
                         <button
                           type="button"
+                          title="Copy your tracked sales link"
                           onClick={() => void copyLink(form, "personal")}
-                          className="rounded border border-foreground/15 px-2 py-1 text-xs"
+                          className={SHARE_BTN}
                         >
-                          {copiedId === `${form.id}-personal` ? "Copied" : "My link"}
+                          {copiedId === `${form.id}-personal` ? "Copied" : "Copy my link"}
                         </button>
                         <button
                           type="button"
+                          title="Copy Instagram bio link"
                           onClick={() => void copyLink(form, "instagram")}
-                          className="rounded border border-foreground/15 px-2 py-1 text-xs"
+                          className={SHARE_BTN}
                         >
-                          {copiedId === `${form.id}-instagram` ? "Copied" : "IG bio"}
+                          {copiedId === `${form.id}-instagram` ? "Copied" : "Copy IG bio"}
                         </button>
                         <button
                           type="button"
+                          title="Copy LinkedIn bio link"
                           onClick={() => void copyLink(form, "linkedin")}
-                          className="rounded border border-foreground/15 px-2 py-1 text-xs"
+                          className={SHARE_BTN}
                         >
-                          {copiedId === `${form.id}-linkedin` ? "Copied" : "LinkedIn"}
+                          {copiedId === `${form.id}-linkedin` ? "Copied" : "Copy LinkedIn"}
                         </button>
                       </div>
                     </td>

@@ -24,6 +24,7 @@ import {
   type CaptureFormField,
 } from "@/lib/capture-form-types";
 import { formatEnumLabel } from "@/lib/ui-format";
+import { ManualCaptureFormFill } from "@/components/capture-forms/manual-capture-form-fill";
 
 type TabId = "builder" | "analytics" | "settings" | "links" | "share";
 
@@ -66,6 +67,7 @@ export function CaptureFormDetailWorkspace({
   analytics,
   campaigns,
   partners,
+  projectOptions,
 }: {
   tenantSlug: string;
   canEdit: boolean;
@@ -113,6 +115,7 @@ export function CaptureFormDetailWorkspace({
   };
   campaigns: Array<{ id: string; name: string; code: string }>;
   partners: Array<{ id: string; displayName: string }>;
+  projectOptions: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -235,6 +238,17 @@ export function CaptureFormDetailWorkspace({
             >
               {form.status === LeadCaptureFormStatus.ACTIVE ? "Pause" : "Activate"}
             </button>
+          ) : null}
+          {canEdit ? (
+            <ManualCaptureFormFill
+              tenantSlug={tenantSlug}
+              formSlug={form.slug}
+              formName={form.name}
+              formTitle={form.title}
+              fields={form.fields}
+              projectOptions={projectOptions}
+              triggerClassName="rounded-md border border-foreground px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background"
+            />
           ) : null}
           <a
             href={previewUrl}
@@ -430,7 +444,7 @@ export function CaptureFormDetailWorkspace({
                   setUtmCampaign(form.slug);
                   setUtmContent(preset.content);
                 }}
-                className="rounded border border-foreground/15 px-2 py-1 text-xs"
+                className="rounded-md border border-foreground bg-background px-2.5 py-1.5 text-xs font-semibold text-foreground shadow-sm hover:bg-foreground hover:text-background"
               >
                 {preset.label}
               </button>

@@ -56,7 +56,7 @@ export default async function CaptureFormDetailPage({
   });
   if (!form) notFound();
 
-  const [sessions, campaigns, partners] = await Promise.all([
+  const [sessions, campaigns, partners, projects] = await Promise.all([
     prisma.leadCaptureFormSession.findMany({
       where: { formId: form.id },
       select: {
@@ -86,6 +86,12 @@ export default async function CaptureFormDetailPage({
       where: { tenantId: tenant.id, isActive: true },
       select: { id: true, displayName: true },
       orderBy: { displayName: "asc" },
+    }),
+    prisma.project.findMany({
+      where: { tenantId: tenant.id },
+      select: { name: true },
+      orderBy: { name: "asc" },
+      take: 100,
     }),
   ]);
 
@@ -131,6 +137,7 @@ export default async function CaptureFormDetailPage({
       analytics={analytics}
       campaigns={campaigns}
       partners={partners}
+      projectOptions={projects.map((p) => p.name)}
     />
   );
 }
