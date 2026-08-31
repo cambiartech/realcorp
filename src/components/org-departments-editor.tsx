@@ -10,9 +10,15 @@ type Props = {
   tenantSlug?: string;
   customDepartments: string[];
   onCustomDepartmentsChange: (next: string[]) => void;
+  compact?: boolean;
 };
 
-export function OrgDepartmentsEditor({ tenantSlug, customDepartments, onCustomDepartmentsChange }: Props) {
+export function OrgDepartmentsEditor({
+  tenantSlug,
+  customDepartments,
+  onCustomDepartmentsChange,
+  compact = false,
+}: Props) {
   const { showSnackbar } = useSnackbar();
   const [newDepartment, setNewDepartment] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -88,11 +94,15 @@ export function OrgDepartmentsEditor({ tenantSlug, customDepartments, onCustomDe
 
   return (
     <div id="org-departments" className="scroll-mt-6">
-      <h3 className="text-sm font-semibold text-foreground">Departments</h3>
-      <p className="mt-1 text-xs text-muted">
-        One shared list for Team invites, People, Finance, and reporting. Add a name and it is saved immediately —
-        you do not need a second save step.
-      </p>
+      {compact ? null : (
+        <>
+          <h3 className="text-sm font-semibold text-foreground">Departments</h3>
+          <p className="mt-1 text-xs text-muted">
+            One shared list for Team invites, People, Finance, and reporting. Add a name and it is saved immediately —
+            you do not need a second save step.
+          </p>
+        </>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {DEFAULT_ORG_DEPARTMENTS.map((department) => (

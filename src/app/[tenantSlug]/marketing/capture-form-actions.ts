@@ -18,22 +18,39 @@ export type ManualFillResult =
   | { ok: true; leadId: string; heldForMarketing: boolean }
   | { ok: false; error: string };
 
-async function requireCaptureFormEditor(tenantSlug: string) {
+type CaptureFormEditorAccess =
+  | {
+      ok: true;
+      userId: string;
+      actorLabel: string;
+      tenant: {
+        id: string;
+        settings: { marketingLeadRouting: MarketingLeadRouting } | null;
+      };
+    }
+  | { ok: false; error: string };
+
+async function requireCaptureFormEditor(tenantSlug: string): Promise<CaptureFormEditorAccess> {
   const session = await auth();
-  if (!session?.user?.id) return { error: "You must be signed in." as const };
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
     select: { id: true, settings: { select: { marketingLeadRouting: true } } },
   });
-  if (!tenant) return { error: "Organization not found." as const };
+  if (!tenant) return { ok: false, error: "Organization not found." };
   const membership = await prisma.membership.findUnique({
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { role: true, status: true },
   });
   if (!canEditMarketing(Boolean(session.user.isPlatformAdmin), membership)) {
-    return { error: "You do not have permission to manage capture forms." as const };
+    return { ok: false, error: "You do not have permission to manage capture forms." };
   }
-  return { session, tenant };
+  return {
+    ok: true,
+    userId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "Unknown",
+    tenant,
+  };
 }
 
 export async function createLeadCaptureForm(
@@ -47,8 +64,8 @@ export async function createLeadCaptureForm(
   }
 
   const access = await requireCaptureFormEditor(tenantSlug);
-  if ("error" in access) return { ok: false, error: access.error };
-  const { session, tenant } = access;
+  if (!access.ok) return { ok: false, error: access.error };
+  const { userId, actorLabel, tenant } = access;
 
   const slug = parsed.data.slug ?? slugifyCaptureFormName(parsed.data.name);
   const existing = await prisma.leadCaptureForm.findUnique({
@@ -88,14 +105,14 @@ export async function createLeadCaptureForm(
         realtorPartnerId: parsed.data.realtorPartnerId || null,
         thankYouMessage: parsed.data.thankYouMessage ?? "Thanks — we'll be in touch shortly.",
         redirectUrl: parsed.data.redirectUrl || null,
-        createdByUserId: session.user.id,
+        createdByUserId: userId,
       },
     });
 
     await writeAuditLog({
       tenantId: tenant.id,
-      actorUserId: session.user.id,
-      actorLabel: session.user.name || session.user.email || "Unknown",
+      actorUserId: userId,
+      actorLabel,
       module: "MARKETING",
       entityType: "LEAD_CAPTURE_FORM",
       entityId: form.id,
@@ -116,7 +133,7 @@ export async function updateLeadCaptureFormStatus(
   status: LeadCaptureFormStatus,
 ): Promise<CaptureFormActionResult> {
   const access = await requireCaptureFormEditor(tenantSlug);
-  if ("error" in access) return { ok: false, error: access.error };
+  if (!access.ok) return { ok: false, error: access.error };
 
   await prisma.leadCaptureForm.updateMany({
     where: { id: formId, tenantId: access.tenant.id },
@@ -134,7 +151,7 @@ export async function updateLeadCaptureFormSettings(
   formData: FormData,
 ): Promise<CaptureFormActionResult> {
   const access = await requireCaptureFormEditor(tenantSlug);
-  if ("error" in access) return { ok: false, error: access.error };
+  if (!access.ok) return { ok: false, error: access.error };
 
   const title = String(formData.get("title") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
@@ -170,7 +187,7 @@ export async function updateLeadCaptureFormFields(
   fields: CaptureFormField[],
 ): Promise<CaptureFormActionResult> {
   const access = await requireCaptureFormEditor(tenantSlug);
-  if ("error" in access) return { ok: false, error: access.error };
+  if (!access.ok) return { ok: false, error: access.error };
 
   const parsed = parseCaptureFormFieldsJson(JSON.stringify(fields));
   if (!parsed.success) {
@@ -193,8 +210,8 @@ export async function submitManualCaptureForm(
   client?: { timezone?: string; localHour?: number },
 ): Promise<ManualFillResult> {
   const access = await requireCaptureFormEditor(tenantSlug);
-  if ("error" in access) return { ok: false, error: access.error };
-  const { session, tenant } = access;
+  if (!access.ok) return { ok: false, error: access.error };
+  const { userId, actorLabel, tenant } = access;
 
   const form = await prisma.leadCaptureForm.findFirst({
     where: { tenantId: tenant.id, slug: formSlug },
@@ -206,13 +223,13 @@ export async function submitManualCaptureForm(
   }
 
   const result = await submitCaptureForm(tenantSlug, formSlug, {
-    sessionToken: `staff-${session.user.id}-${crypto.randomUUID()}`.slice(0, 128),
+    sessionToken: `staff-${userId}-${crypto.randomUUID()}`.slice(0, 128),
     values,
     attribution: {
       utmSource: "staff",
       utmMedium: "manual",
       utmCampaign: formSlug,
-      sharerUserId: session.user.id,
+      sharerUserId: userId,
     },
     client: {
       timezone: client?.timezone,
@@ -223,8 +240,8 @@ export async function submitManualCaptureForm(
 
   await writeAuditLog({
     tenantId: tenant.id,
-    actorUserId: session.user.id,
-    actorLabel: session.user.name || session.user.email || "Unknown",
+    actorUserId: userId,
+    actorLabel,
     module: "MARKETING",
     entityType: "LEAD",
     entityId: result.leadId,

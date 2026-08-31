@@ -13,9 +13,10 @@ type Props = {
   tenantSlug: string;
   administrators: string[];
   onChange: (next: string[]) => void;
+  compact?: boolean;
 };
 
-export function PensionAdministratorsEditor({ tenantSlug, administrators, onChange }: Props) {
+export function PensionAdministratorsEditor({ tenantSlug, administrators, onChange, compact = false }: Props) {
   const { showSnackbar } = useSnackbar();
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -89,11 +90,18 @@ export function PensionAdministratorsEditor({ tenantSlug, administrators, onChan
 
   return (
     <div id="org-pension-administrators" className="scroll-mt-6">
-      <h3 className="text-sm font-semibold text-foreground">Pension fund administrators</h3>
-      <p className="mt-1 text-xs text-muted">
-        Each organization keeps its own PFA list. Add the administrators this company remits to — they
-        appear on People records, onboarding, and My HR. Saved as soon as you add them.
-      </p>
+      {compact ? null : (
+        <>
+          <h3 className="text-sm font-semibold text-foreground">Pension fund administrators</h3>
+          <p className="mt-1 text-xs text-muted">
+            Each organization keeps its own PFA list. Add the administrators this company remits to — they
+            appear on People records, onboarding, and My HR. Saved as soon as you add them.
+          </p>
+        </>
+      )}
+      {compact ? (
+        <p className="text-xs font-medium text-foreground">Pension fund administrators (PFA)</p>
+      ) : null}
 
       {unusedSuggestions.length > 0 ? (
         <div className="mt-3">

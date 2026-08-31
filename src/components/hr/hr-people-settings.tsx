@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FormAlert } from "@/components/form-message";
@@ -18,6 +18,59 @@ import {
 
 const inputClass =
   "w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30";
+
+const SECTIONS = [
+  { id: "tax", label: "Tax & PAYE" },
+  { id: "split", label: "Salary split" },
+  { id: "pension", label: "Pension" },
+  { id: "statutory", label: "NSITF & ITF" },
+  { id: "departments", label: "Departments" },
+] as const;
+
+function PercentField({
+  label,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  defaultValue: number;
+}) {
+  return (
+    <label className="text-xs font-medium text-muted">
+      {label}
+      <input
+        name={name}
+        type="number"
+        min={0}
+        max={100}
+        step={0.01}
+        defaultValue={defaultValue}
+        className={`mt-1 ${inputClass}`}
+      />
+    </label>
+  );
+}
+
+function SettingsCard({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-24 rounded-xl border border-foreground/10 bg-background p-5 sm:p-6">
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
+      <p className="mt-1 text-sm text-muted">{description}</p>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
 
 export function HrPeopleSettingsWorkspace({
   tenantSlug,
@@ -40,7 +93,6 @@ export function HrPeopleSettingsWorkspace({
   const [customDepartments, setCustomDepartments] = useState(() =>
     orgDepartments.filter((name) => !isDefaultOrgDepartment(name)),
   );
-
   const [pfaList, setPfaList] = useState(pensionAdministrators);
 
   useEffect(() => {
@@ -82,141 +134,130 @@ export function HrPeopleSettingsWorkspace({
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">People</p>
       <h1 className="mt-1 text-2xl font-bold text-foreground">People settings</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        Set tax, pension, PFAs, and departments once for the whole organization. Open a person only when they
-        need an exception.
+        Defaults for this organization. Change a person only when they need an exception.
       </p>
 
-      <section className="mt-8 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
-        <h2 className="text-sm font-semibold text-foreground">PAYE and payroll country</h2>
-        <p className="mt-1 text-xs text-muted">
-          The first ₦800,000 untaxed is a yearly figure, not monthly. Each payslip annualizes this
-          month&apos;s earnings (×12, after pension), applies the yearly tax bands, then deducts one
-          month of that tax. Pension comes off before tax. You do not enter PAYE on each record.
-        </p>
-        <form action={saveAction} className="mt-4 space-y-4">
-          {saveState && !saveState.ok ? <FormAlert>{saveState.error}</FormAlert> : null}
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted">Tax law</label>
-            <UiSelect name="payrollCountryCode" defaultValue={payroll.payrollCountryCode}>
-              {PAYROLL_COUNTRY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </UiSelect>
+      <nav className="mt-6 flex flex-wrap gap-2" aria-label="Settings sections">
+        {SECTIONS.map((section) => (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            className="rounded-full border border-foreground/15 bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background"
+          >
+            {section.label}
+          </a>
+        ))}
+      </nav>
+
+      <form action={saveAction} className="mt-6 space-y-5">
+        {saveState && !saveState.ok ? <FormAlert>{saveState.error}</FormAlert> : null}
+
+        <SettingsCard
+          id="tax"
+          title="Tax & PAYE"
+          description="Which tax law to use. PAYE is calculated on payslips — you do not type it on each person."
+        >
+          <label className="mb-1 block text-xs font-medium text-muted">Tax law</label>
+          <UiSelect name="payrollCountryCode" defaultValue={payroll.payrollCountryCode}>
+            {PAYROLL_COUNTRY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </UiSelect>
+          <p className="mt-3 text-xs text-muted">
+            Nigeria: the first ₦800,000 of yearly chargeable income is untaxed. Payslips annualize this month
+            (after pension), apply the yearly bands, then deduct one month of that tax.
+          </p>
+          <div className="mt-4 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
+            <p className="text-xs text-muted">
+              Wrong PAYE on old slips? Use this once, then{" "}
+              <Link href={`/${tenantSlug}/hr/payslips`} className="font-semibold underline">
+                Generate / refresh
+              </Link>
+              . Documented manual exceptions stay.
+            </p>
+            <button
+              type="button"
+              disabled={taxPending}
+              onClick={() => void applyTaxLaw()}
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
+            >
+              {taxPending ? <ButtonSpinner /> : null}
+              {taxPending ? "Updating…" : "Use country tax law for everyone"}
+            </button>
           </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="split"
+          title="Salary split"
+          description="How monthly gross is broken into basic, housing, transport, and other earnings. These should add up to 100%."
+        >
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs font-medium text-muted">
-              Basic salary (%)
-              <input
-                name="basicPercent"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.basicPercent}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="text-xs font-medium text-muted">
-              Housing (%)
-              <input
-                name="housingPercent"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.housingPercent}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="text-xs font-medium text-muted">
-              Transport (%)
-              <input
-                name="transportPercent"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.transportPercent}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="text-xs font-medium text-muted">
-              Other earnings (%)
-              <input
-                name="otherPercent"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.otherPercent}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="text-xs font-medium text-muted">
-              Employee pension (%)
-              <input
-                name="employeePensionRate"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.employeePensionRate}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="text-xs font-medium text-muted">
-              Employer pension (%)
-              <input
-                name="employerPensionRate"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.employerPensionRate}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="text-xs font-medium text-muted">
-              NSITF / employee compensation (%)
-              <input
-                name="nsitfRate"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.nsitfRate}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
-            <label className="text-xs font-medium text-muted">
-              ITF (%)
-              <input
-                name="itfRate"
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                defaultValue={payroll.itfRate}
-                className={`mt-1 ${inputClass}`}
-              />
-            </label>
+            <PercentField label="Basic salary (%)" name="basicPercent" defaultValue={payroll.basicPercent} />
+            <PercentField label="Housing (%)" name="housingPercent" defaultValue={payroll.housingPercent} />
+            <PercentField label="Transport (%)" name="transportPercent" defaultValue={payroll.transportPercent} />
+            <PercentField label="Other earnings (%)" name="otherPercent" defaultValue={payroll.otherPercent} />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted">Pension on payslips</label>
+        </SettingsCard>
+
+        <SettingsCard
+          id="pension"
+          title="Pension"
+          description="Contribution rates for payslips. Add the PFAs this organization remits to — they show on People records."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <PercentField
+              label="Employee pension (%)"
+              name="employeePensionRate"
+              defaultValue={payroll.employeePensionRate}
+            />
+            <PercentField
+              label="Employer pension (%)"
+              name="employerPensionRate"
+              defaultValue={payroll.employerPensionRate}
+            />
+          </div>
+          <div className="mt-4">
+            <label className="mb-1 block text-xs font-medium text-muted">Deduct employee pension on payslips</label>
             <UiSelect name="pensionEnabled" defaultValue={payroll.pensionEnabled ? "yes" : "no"}>
-              <option value="yes">Yes — deduct employee pension (8% of basic + housing + transport)</option>
+              <option value="yes">Yes — 8% of basic + housing + transport (unless you change the rate)</option>
               <option value="no">No</option>
             </UiSelect>
           </div>
-          <label className="flex items-start gap-3 rounded-md border border-foreground/10 bg-field px-3 py-3 text-sm">
+          <div className="mt-6 border-t border-foreground/10 pt-5">
+            <PensionAdministratorsEditor
+              tenantSlug={tenantSlug}
+              administrators={pfaList}
+              onChange={setPfaList}
+              compact
+            />
+          </div>
+        </SettingsCard>
+
+        <SettingsCard
+          id="statutory"
+          title="NSITF & ITF"
+          description="Employer statutory rates used on payroll. Leave at 0 if this organization does not apply them."
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <PercentField
+              label="NSITF / employee compensation (%)"
+              name="nsitfRate"
+              defaultValue={payroll.nsitfRate}
+            />
+            <PercentField label="ITF (%)" name="itfRate" defaultValue={payroll.itfRate} />
+          </div>
+        </SettingsCard>
+
+        <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 sm:p-6">
+          <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="applyStructureToEveryone" value="on" className="mt-0.5 h-4 w-4" />
             <span>
               <span className="font-medium text-foreground">Also apply this split and pension to everyone now</span>
               <span className="mt-0.5 block text-xs text-muted">
-                Leave unchecked to only change defaults for new people. Existing records keep their current
-                split unless you tick this.
+                Leave unchecked to only change defaults for new people.
               </span>
             </span>
           </label>
@@ -224,48 +265,28 @@ export function HrPeopleSettingsWorkspace({
             type="submit"
             disabled={savePending}
             aria-busy={savePending}
-            className="inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            className="mt-4 inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
           >
             {savePending ? <ButtonSpinner /> : null}
             {savePending ? "Saving…" : "Save payroll defaults"}
           </button>
-        </form>
-
-        <div className="mt-6 border-t border-foreground/10 pt-4">
-          <p className="text-xs text-muted">
-            If old payslips still show the wrong PAYE, use this once, then{" "}
-            <Link href={`/${tenantSlug}/hr/payslips`} className="font-semibold underline">
-              Generate / refresh
-            </Link>{" "}
-            on Payslips. Documented manual exceptions are left alone.
-          </p>
-          <button
-            type="button"
-            disabled={taxPending}
-            onClick={() => void applyTaxLaw()}
-            className="mt-3 inline-flex items-center gap-2 rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
-          >
-            {taxPending ? <ButtonSpinner /> : null}
-            {taxPending ? "Updating…" : "Use country tax law for everyone"}
-          </button>
         </div>
-      </section>
+      </form>
 
-      <section className="mt-6 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
-        <PensionAdministratorsEditor
-          tenantSlug={tenantSlug}
-          administrators={pfaList}
-          onChange={setPfaList}
-        />
-      </section>
-
-      <section className="mt-6 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
-        <OrgDepartmentsEditor
-          tenantSlug={tenantSlug}
-          customDepartments={customDepartments}
-          onCustomDepartmentsChange={setCustomDepartments}
-        />
-      </section>
+      <div className="mt-5">
+        <SettingsCard
+          id="departments"
+          title="Departments"
+          description="Shared list for Team invites, People, Finance, and reporting."
+        >
+          <OrgDepartmentsEditor
+            tenantSlug={tenantSlug}
+            customDepartments={customDepartments}
+            onCustomDepartmentsChange={setCustomDepartments}
+            compact
+          />
+        </SettingsCard>
+      </div>
     </div>
   );
 }
