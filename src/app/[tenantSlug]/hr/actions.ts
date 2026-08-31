@@ -67,6 +67,7 @@ import {
   upsertPerformanceGoalSchema,
 } from "@/lib/validators/hr";
 import { revalidatePath } from "next/cache";
+import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
 import { z } from "zod";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -875,6 +876,53 @@ export async function savePeopleOrgSettings(
   revalidateHr(tenantSlug);
   revalidatePath(`/${tenantSlug}/settings`);
   return { ok: true, appliedCount };
+}
+
+export async function syncOrgPensionAdministrators(
+  tenantSlug: string,
+  names: string[],
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true, settings: { select: { id: true } } },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { status: true, role: true },
+  });
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const pensionAdministrators = parsePensionAdministrators(names);
+  if (tenant.settings) {
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { pensionAdministrators },
+    });
+  } else {
+    await prisma.tenantSettings.create({
+      data: { tenantId: tenant.id, pensionAdministrators },
+    });
+  }
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email,
+    module: "HR",
+    entityType: "TENANT_SETTINGS",
+    action: "UPDATE",
+    summary: "Updated organization pension fund administrators.",
+    metadata: { count: pensionAdministrators.length },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true };
 }
 
 export async function applyCountryTaxLawToEveryone(

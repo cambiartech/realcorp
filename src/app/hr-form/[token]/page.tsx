@@ -3,6 +3,7 @@ import { prefillValuesForForm } from "@/lib/hr-form-prefill";
 import { loadHrFormRequestByToken } from "@/lib/hr-form-request-loader";
 import { resolveBundleTokenForFormRequest } from "@/lib/hr-form-bundle-consolidate";
 import { hrOnboardingBundlePath } from "@/lib/hr-form-types";
+import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
 import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,7 @@ export default async function HrPublicFormPage({ params }: { params: Promise<{ t
       hrNote={loaded.hrNote}
       initialValues={initialValues}
       printPath={`/hr-form/${token}/print`}
+      pensionAdministrators={parsePensionAdministrators(loaded.tenant.settings?.pensionAdministrators)}
     />
   );
 }

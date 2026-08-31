@@ -12,6 +12,7 @@ import { OnboardingProfileHiddenFields } from "@/components/hr/onboarding-profil
 import { upsertEmployeeProfile } from "@/app/[tenantSlug]/hr/actions";
 import { UiSelect } from "@/components/ui-select";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { PensionAdministratorField } from "@/components/pension-administrator-field";
 import { useSnackbar } from "@/components/snackbar";
 import {
   notifyPrefillResult,
@@ -45,6 +46,7 @@ export function HrOnboardingWizard({
   onSendForm,
   onSendAllForms,
   departments,
+  pensionAdministrators,
 }: {
   tenantSlug: string;
   currency: string;
@@ -73,6 +75,7 @@ export function HrOnboardingWizard({
   onSendForm: (formType: "BIODATA" | "BANK_FORM" | "GUARANTOR" | "HEALTH") => void;
   onSendAllForms?: () => void;
   departments: string[];
+  pensionAdministrators: string[];
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -345,10 +348,12 @@ export function HrOnboardingWizard({
             <span className="mb-1 block text-xs font-medium">RSA PIN</span>
             <input name="rsaPin" defaultValue={draft.rsaPin} placeholder="PEN…" className={inputClass} />
           </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-medium">Pension administrator (PFA)</span>
-            <input name="pensionAdministrator" defaultValue={draft.pensionAdministrator} className={inputClass} />
-          </label>
+          <div className="sm:col-span-2">
+            <PensionAdministratorField
+              defaultValue={draft.pensionAdministrator}
+              options={pensionAdministrators}
+            />
+          </div>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">NHF membership number</span>
             <input name="nhfMembershipNumber" defaultValue={draft.nhfMembershipNumber} className={inputClass} />
@@ -418,14 +423,12 @@ export function HrOnboardingWizard({
                 <span className="mb-1 block text-xs font-medium">RSA PIN</span>
                 <input name="rsaPin" defaultValue={draft.rsaPin} placeholder="PEN…" className={inputClass} />
               </label>
-              <label className="block text-sm">
-                <span className="mb-1 block text-xs font-medium">Pension administrator (PFA)</span>
-                <input
-                  name="pensionAdministrator"
+              <div className="sm:col-span-2">
+                <PensionAdministratorField
                   defaultValue={draft.pensionAdministrator}
-                  className={inputClass}
+                  options={pensionAdministrators}
                 />
-              </label>
+              </div>
               <label className="block text-sm">
                 <span className="mb-1 block text-xs font-medium">NHF membership number</span>
                 <input

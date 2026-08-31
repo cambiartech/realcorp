@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FormAlert } from "@/components/form-message";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { OrgDepartmentsEditor } from "@/components/org-departments-editor";
+import { PensionAdministratorsEditor } from "@/components/pension-administrators-editor";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { isDefaultOrgDepartment } from "@/lib/org-departments";
@@ -22,10 +23,12 @@ export function HrPeopleSettingsWorkspace({
   tenantSlug,
   payroll,
   orgDepartments,
+  pensionAdministrators,
 }: {
   tenantSlug: string;
   payroll: OrgPayrollSettings;
   orgDepartments: string[];
+  pensionAdministrators: string[];
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -38,9 +41,15 @@ export function HrPeopleSettingsWorkspace({
     orgDepartments.filter((name) => !isDefaultOrgDepartment(name)),
   );
 
+  const [pfaList, setPfaList] = useState(pensionAdministrators);
+
   useEffect(() => {
     setCustomDepartments(orgDepartments.filter((name) => !isDefaultOrgDepartment(name)));
   }, [orgDepartments]);
+
+  useEffect(() => {
+    setPfaList(pensionAdministrators);
+  }, [pensionAdministrators]);
 
   useEffect(() => {
     if (!saveState) return;
@@ -73,7 +82,7 @@ export function HrPeopleSettingsWorkspace({
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">People</p>
       <h1 className="mt-1 text-2xl font-bold text-foreground">People settings</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        Set tax, pension, and departments once for the whole organization. Open a person only when they
+        Set tax, pension, PFAs, and departments once for the whole organization. Open a person only when they
         need an exception.
       </p>
 
@@ -240,6 +249,14 @@ export function HrPeopleSettingsWorkspace({
             {taxPending ? "Updating…" : "Use country tax law for everyone"}
           </button>
         </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
+        <PensionAdministratorsEditor
+          tenantSlug={tenantSlug}
+          administrators={pfaList}
+          onChange={setPfaList}
+        />
       </section>
 
       <section className="mt-6 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">

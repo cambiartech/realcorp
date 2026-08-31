@@ -37,6 +37,7 @@ export function HrPublicFormClient({
   dashboardHref,
   onSubmitted,
   onBackToForms,
+  pensionAdministrators = [],
 }: {
   token: string;
   formType: HrFormType;
@@ -54,6 +55,7 @@ export function HrPublicFormClient({
   dashboardHref?: string;
   onSubmitted?: () => void;
   onBackToForms?: () => void;
+  pensionAdministrators?: string[];
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -236,7 +238,9 @@ export function HrPublicFormClient({
 
       {mode === "online" && canFillOnline ? (
         <form onSubmit={handleOnlineSubmit} className="space-y-4">
-          {formType === "BIODATA" ? <BiodataFormFields v={initialValues} /> : null}
+          {formType === "BIODATA" ? (
+            <BiodataFormFields v={initialValues} pensionAdministrators={pensionAdministrators} />
+          ) : null}
           {formType === "BANK_FORM" ? <BankFields v={initialValues} /> : null}
           {formType === "GUARANTOR" ? <GuarantorFields v={initialValues} /> : null}
           {formType === "HEALTH" ? <HealthFields initialValues={initialValues} /> : null}

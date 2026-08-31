@@ -53,6 +53,7 @@ export function HrFormBundleClient({
     steps: BundleStep[];
     allExpired: boolean;
     allDone: boolean;
+    pensionAdministrators?: string[];
   };
   /** Org URL segment, e.g. bopropertiesng — required for My dashboard link. */
   tenantSlug?: string;
@@ -211,6 +212,7 @@ export function HrFormBundleClient({
           suppressBackNav
           dashboardHref={dashboardHref ?? undefined}
           onSubmitted={handleStepSubmitted}
+          pensionAdministrators={bundle.pensionAdministrators}
         />
       </main>
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { HrFormField, HrFormLockedField, HrFormSelect } from "@/components/hr/hr-form-field";
 import { HrLocationFields } from "@/components/hr/hr-location-fields";
+import { PensionAdministratorField } from "@/components/pension-administrator-field";
 
 type InitialValues = Record<string, string>;
 
@@ -10,7 +11,13 @@ function locked(value: string | undefined) {
   return Boolean(value?.trim());
 }
 
-export function BiodataFormFields({ v }: { v: InitialValues }) {
+export function BiodataFormFields({
+  v,
+  pensionAdministrators = [],
+}: {
+  v: InitialValues;
+  pensionAdministrators?: string[];
+}) {
   const nokSectionId = useId();
   const [sameAsEmergency, setSameAsEmergency] = useState(() => {
     if (!v.emergencyName?.trim()) return false;
@@ -95,10 +102,10 @@ export function BiodataFormFields({ v }: { v: InitialValues }) {
         defaultValue={v.taxId}
       />
       <HrFormField label="RSA PIN" name="rsaPin" defaultValue={v.rsaPin} />
-      <HrFormField
-        label="Pension administrator (PFA)"
-        name="pensionAdministrator"
+      <PensionAdministratorField
+        variant="public"
         defaultValue={v.pensionAdministrator}
+        options={pensionAdministrators}
       />
       <HrFormField
         label="NHF membership number"

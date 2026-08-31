@@ -3,6 +3,7 @@ import { canManageHr } from "@/lib/hr-access";
 import { assertTenantNavAccess, MEMBERSHIP_FOR_NAV_SELECT } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { mergeOrgDepartments } from "@/lib/org-departments";
+import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
 import { parseOrgPayrollSettings } from "@/lib/payroll/org-payroll-settings";
 import { notFound } from "next/navigation";
 import { HrPeopleSettingsWorkspace } from "@/components/hr/hr-people-settings";
@@ -28,6 +29,7 @@ export default async function HrPeopleSettingsPage({
           payrollCountryCode: true,
           payrollSettings: true,
           orgDepartments: true,
+          pensionAdministrators: true,
           moduleSales: true,
           moduleFinance: true,
           moduleMarketing: true,
@@ -62,6 +64,7 @@ export default async function HrPeopleSettingsPage({
         tenant.settings?.payrollSettings,
       )}
       orgDepartments={mergeOrgDepartments(tenant.settings?.orgDepartments as string[] | null | undefined)}
+      pensionAdministrators={parsePensionAdministrators(tenant.settings?.pensionAdministrators)}
     />
   );
 }

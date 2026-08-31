@@ -175,6 +175,7 @@ export function HrWorkspace(props: {
   performanceGoals: PerformanceGoalRow[];
   profileOptions: Array<{ id: string; label: string; department: string }>;
   departments: string[];
+  pensionAdministrators: string[];
   yearlyArchive: YearlyArchiveEntry[];
   staffPerformancePeriods: Array<{ year: number; month: number; label: string; start: string; end: string }>;
   staffPerformanceInput: {
@@ -349,6 +350,7 @@ export function HrWorkspace(props: {
     performanceGoals,
     profileOptions,
     departments,
+    pensionAdministrators,
     yearlyArchive,
     staffPerformancePeriods,
     staffPerformanceInput,
@@ -429,6 +431,7 @@ export function HrWorkspace(props: {
             offerByUserId={offerByUserId}
             aiEnabled={aiEnabled}
             departments={departments}
+            pensionAdministrators={pensionAdministrators}
           />
         ) : null}
 
@@ -529,6 +532,7 @@ export function HrWorkspace(props: {
             myView={myView}
             previewAs={myDashboardPreview}
             initialTab={initialMyTab}
+            pensionAdministrators={pensionAdministrators}
           />
         ) : null}
       </section>

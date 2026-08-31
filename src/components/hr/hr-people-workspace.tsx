@@ -39,6 +39,7 @@ import { GlobalLocationFields } from "@/components/global-location-fields";
 import { calculatePayroll } from "@/lib/payroll/engine";
 import { NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { PensionAdministratorField } from "@/components/pension-administrator-field";
 import { TableSearch, filterTableRows } from "@/components/table-search";
 import { SortTh, useTableSort } from "@/components/sort-th";
 import { sortTableRows } from "@/lib/table-sort";
@@ -234,6 +235,7 @@ export function HrPeopleWorkspace({
   offerByUserId,
   formRequests,
   departments,
+  pensionAdministrators,
 }: {
   tenantSlug: string;
   companyName: string;
@@ -297,6 +299,7 @@ export function HrPeopleWorkspace({
     reviewNote: string | null;
   }>;
   departments: string[];
+  pensionAdministrators: string[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -903,6 +906,7 @@ export function HrPeopleWorkspace({
           onSendForm={(ft) => openSendForm(ft)}
           onSendAllForms={openSendAllForms}
           departments={departments}
+          pensionAdministrators={pensionAdministrators}
         />
       ) : null}
 
@@ -1184,11 +1188,10 @@ export function HrPeopleWorkspace({
                       defaultValue={record.rsaPin}
                       hint="Pension Retirement Savings Account PIN. Also on the onboarding wizard and My HR → Tax & pension."
                     />
-                    <Field
-                      label="Pension administrator (PFA)"
-                      name="pensionAdministrator"
+                    <PensionAdministratorField
                       defaultValue={record.pensionAdministrator}
-                      hint="e.g. ARM Pension, Stanbic IBTC Pension. Type a name if it is not listed yet."
+                      options={pensionAdministrators}
+                      emptyHint="Add PFAs in People → Settings so they show as a list here."
                     />
                     <Field
                       label="NHF membership number"

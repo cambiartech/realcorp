@@ -28,6 +28,7 @@ import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
 import { brandingFromSettings } from "@/lib/tenant-branding";
 import { mergeOrgDepartments } from "@/lib/org-departments";
+import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
 import { loadTenantRequest } from "@/lib/tenant-request";
 import { redirect } from "next/navigation";
 import { formatEnumLabel } from "@/lib/ui-format";
@@ -601,6 +602,8 @@ export default async function HrQueuePage({
     ...profiles.map((p) => p.department?.trim() || ""),
   ]).sort((a, b) => a.localeCompare(b));
 
+  const pensionAdministrators = parsePensionAdministrators(tenant.settings?.pensionAdministrators);
+
   const performanceGoalRows: PerformanceGoalRow[] = goals.map((g) => ({
     id: g.id,
     employeeProfileId: g.employeeProfileId,
@@ -888,6 +891,7 @@ export default async function HrQueuePage({
       performanceGoals={performanceGoalRows}
       profileOptions={profileOptions}
       departments={departments}
+      pensionAdministrators={pensionAdministrators}
       yearlyArchive={yearlyArchive}
       staffPerformancePeriods={staffPerformancePeriods.map((p) => ({
         year: p.year,

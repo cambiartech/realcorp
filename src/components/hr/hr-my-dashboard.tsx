@@ -21,6 +21,7 @@ import {
 import { AppraisalRatingSelect } from "@/components/hr/appraisal-rating-select";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { ButtonSpinner } from "@/components/button-spinner";
+import { PensionAdministratorField } from "@/components/pension-administrator-field";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { RichTextDisplay, RichTextField } from "@/components/rich-text-field";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
@@ -108,6 +109,7 @@ export function HrMyDashboard({
   myYtd = null,
   previewAs = null,
   initialTab,
+  pensionAdministrators = [],
 }: {
   tenantSlug: string;
   companyName: string;
@@ -117,6 +119,7 @@ export function HrMyDashboard({
   myYtd?: PayslipYtdSummary | null;
   previewAs?: { userId: string; name: string; email: string } | null;
   initialTab?: string;
+  pensionAdministrators?: string[];
   myView: {
     profile: ProfileDetailRow | null;
     leaveBalances?: LeaveBalanceRow[];
@@ -959,16 +962,12 @@ export function HrMyDashboard({
                     <span className="mb-1 block text-xs font-medium text-muted">RSA PIN</span>
                     <input name="rsaPin" defaultValue={p.rsaPin} placeholder="PEN…" className={inputClass} />
                   </label>
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs font-medium text-muted">
-                      Pension administrator (PFA)
-                    </span>
-                    <input
-                      name="pensionAdministrator"
+                  <div className="sm:col-span-2">
+                    <PensionAdministratorField
                       defaultValue={p.pensionAdministrator}
-                      className={inputClass}
+                      options={pensionAdministrators}
                     />
-                  </label>
+                  </div>
                   <label className="text-sm">
                     <span className="mb-1 block text-xs font-medium text-muted">NHF membership number</span>
                     <input

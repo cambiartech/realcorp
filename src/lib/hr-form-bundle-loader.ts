@@ -2,6 +2,7 @@ import { HrFormRequestStatus, type HrFormType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { prefillValuesForForm } from "@/lib/hr-form-prefill";
 import { HR_FORM_TYPE_LABELS, sortFormTypes } from "@/lib/hr-form-types";
+import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
 import { brandingFromSettings } from "@/lib/tenant-branding";
 
 export async function loadHrFormBundleByToken(bundleToken: string) {
@@ -24,6 +25,7 @@ export async function loadHrFormBundleByToken(bundleToken: string) {
               orgCity: true,
               orgState: true,
               orgCountry: true,
+              pensionAdministrators: true,
             },
           },
         },
@@ -95,6 +97,7 @@ export async function loadHrFormBundleByToken(bundleToken: string) {
           orgCity: true,
           orgState: true,
           orgCountry: true,
+          pensionAdministrators: true,
         },
       },
     },
@@ -117,5 +120,6 @@ export async function loadHrFormBundleByToken(bundleToken: string) {
     steps,
     allExpired,
     allDone,
+    pensionAdministrators: parsePensionAdministrators(tenant.settings?.pensionAdministrators),
   };
 }
