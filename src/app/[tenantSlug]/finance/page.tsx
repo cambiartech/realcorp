@@ -11,6 +11,13 @@ import { expensePnlAmount } from "@/lib/finance-vat";
 import { operatingNet } from "@/lib/finance-income";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { loadTenantRequest } from "@/lib/tenant-request";
+import {
+  currentMonthKey,
+  monthBounds,
+  monthLongLabel,
+  resolveMonthKey,
+  shiftMonthKey,
+} from "@/lib/calendar-month";
 import { notFound } from "next/navigation";
 import { FinanceWorkspace } from "./finance-workspace";
 
@@ -48,6 +55,7 @@ export default async function FinanceQueuePage({
     logsTo?: string;
     logsEntityType?: string;
     logsEntityId?: string;
+    month?: string;
   }>;
 }) {
   const { tenantSlug } = await params;
@@ -691,6 +699,23 @@ export default async function FinanceQueuePage({
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const overviewMonthKey = resolveMonthKey(logsParams.month, now);
+  const overviewMonth = monthBounds(overviewMonthKey, now);
+  const priorOverviewMonth = monthBounds(shiftMonthKey(overviewMonth.key, -1), now);
+  const periodCash =
+    livePayments
+      .filter((p) => p.paidAt >= overviewMonth.start && p.paidAt < overviewMonth.end)
+      .reduce((sum, p) => sum + Number(p.amount), 0) +
+    liveReceipts
+      .filter((r) => r.issuedAt >= overviewMonth.start && r.issuedAt < overviewMonth.end)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
+  const priorPeriodCash =
+    livePayments
+      .filter((p) => p.paidAt >= priorOverviewMonth.start && p.paidAt < priorOverviewMonth.end)
+      .reduce((sum, p) => sum + Number(p.amount), 0) +
+    liveReceipts
+      .filter((r) => r.issuedAt >= priorOverviewMonth.start && r.issuedAt < priorOverviewMonth.end)
+      .reduce((sum, r) => sum + Number(r.amount), 0);
   const currentMonthCash =
     livePayments
       .filter((p) => p.paidAt >= monthStart)
@@ -824,8 +849,8 @@ export default async function FinanceQueuePage({
   const payablesOverdueCount = openVendorBills.filter(
     (b) => b.dueDate && b.dueDate.getTime() < startOfToday.getTime(),
   ).length;
-  const currentMonthExpenses = expenses
-    .filter((e) => e.expenseDate >= monthStart)
+  const periodExpenses = liveExpenses
+    .filter((e) => e.expenseDate >= overviewMonth.start && e.expenseDate < overviewMonth.end)
     .reduce((sum, e) => sum + Number(e.amount), 0);
   const bankingUnmatched = Array.from(bankStatsMap.values()).reduce(
     (sum, s) => sum + s.unmatched,
@@ -844,8 +869,13 @@ export default async function FinanceQueuePage({
         overdueInvoiceCount: overdueInvoices.length,
         openPayables: money(payablesOutstanding),
         payablesOverdueCount,
-        collectedThisMonth: money(currentMonthCash),
-        expensesThisMonth: money(currentMonthExpenses),
+        collectedThisMonth: money(periodCash),
+        expensesThisMonth: money(periodExpenses),
+        periodKey: overviewMonth.key,
+        periodLabel: monthLongLabel(overviewMonth.key),
+        isCurrentMonth: overviewMonth.key === currentMonthKey(now),
+        priorPeriodCollected: money(priorPeriodCash),
+        priorPeriodLabel: monthLongLabel(priorOverviewMonth.key),
         pendingFinanceChecks: deals.length,
         openInvoiceCount: openInvoices.length,
         openPayableCount: openVendorBills.length,

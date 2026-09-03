@@ -49,6 +49,16 @@ import {
   type DashboardRoleView,
 } from "@/lib/org-membership-profile";
 import { saveDashboardPreference, upsertTenantGoal } from "./actions";
+import { CalendarMonthPicker } from "@/components/calendar-month-picker";
+import {
+  currentMonthKey,
+  isInHalfOpenRange,
+  monthBounds,
+  monthLongLabel,
+  monthShortLabel,
+  parseMonthKey,
+  resolveMonthKey,
+} from "@/lib/calendar-month";
 
 type RoleView = DashboardRoleView;
 
@@ -229,10 +239,13 @@ type Goal = {
   pipelineTarget: number | null;
 } | null;
 
+type DashboardRange = "TODAY" | "WEEK" | "1M" | "6M" | "12M" | "YTD" | "MONTH";
+
 type FilterPreset = {
   id: string;
   label: string;
-  range: "TODAY" | "WEEK" | "1M" | "6M" | "12M" | "YTD";
+  range: DashboardRange;
+  calendarMonth?: string;
   module: "ALL" | "SALES" | "FINANCE" | "PROJECTS";
   owner: string;
   project: string;
@@ -322,12 +335,22 @@ const ALL_WIDGET_IDS = new Set(Object.values(ROLE_WIDGETS).flat());
 
 const DASHBOARD_UI_DRAFT_VERSION = 1;
 
+type PeriodStats = {
+  label: string;
+  shortLabel: string;
+  isCurrent: boolean;
+  collected: number;
+  expectedDue: number;
+  invoicesIssued: number;
+};
+
 type DashboardUiDraftV1 = {
   v: number;
   roleView: RoleView;
   widgetIds: string[];
   chartRange: "WEEK" | "1M" | "6M" | "12M" | "YTD";
-  globalRange: FilterPreset["range"];
+  globalRange: DashboardRange;
+  calendarMonth: string;
   module: FilterPreset["module"];
   owner: string;
   project: string;
@@ -336,6 +359,33 @@ type DashboardUiDraftV1 = {
 
 function dashboardDraftKey(tenantSlug: string) {
   return `dashboard-ui-draft:${tenantSlug}`;
+}
+
+function sanitizeDashboardRange(value: unknown): DashboardRange {
+  if (
+    value === "TODAY" ||
+    value === "WEEK" ||
+    value === "1M" ||
+    value === "6M" ||
+    value === "12M" ||
+    value === "YTD" ||
+    value === "MONTH"
+  ) {
+    return value;
+  }
+  return "MONTH";
+}
+
+function sanitizeCalendarMonth(value: unknown): string {
+  return parseMonthKey(typeof value === "string" ? value : null) ? (value as string) : currentMonthKey();
+}
+
+function dashboardRangeLabel(range: DashboardRange, calendarMonth: string): string {
+  if (range === "MONTH") return monthShortLabel(calendarMonth);
+  if (range === "WEEK") return "This week";
+  if (range === "TODAY") return "Today";
+  if (range === "YTD") return "YTD";
+  return range;
 }
 
 function sanitizeWidgetIds(ids: unknown): string[] {
@@ -364,6 +414,8 @@ function readDashboardDraft(tenantSlug: string): DashboardUiDraftV1 | null {
     ];
     if (!allowedRole.includes(normalizedView)) return null;
     const widgetIds = sanitizeWidgetIds(d.widgetIds);
+    const hasCalendarMonthField = Object.prototype.hasOwnProperty.call(d, "calendarMonth");
+    const storedRange = sanitizeDashboardRange(d.globalRange);
     return {
       v: DASHBOARD_UI_DRAFT_VERSION,
       roleView: normalizedView,
@@ -376,15 +428,8 @@ function readDashboardDraft(tenantSlug: string): DashboardUiDraftV1 | null {
         d.chartRange === "YTD"
           ? d.chartRange
           : "1M",
-      globalRange:
-        d.globalRange === "TODAY" ||
-        d.globalRange === "WEEK" ||
-        d.globalRange === "1M" ||
-        d.globalRange === "6M" ||
-        d.globalRange === "12M" ||
-        d.globalRange === "YTD"
-          ? d.globalRange
-          : "1M",
+      globalRange: hasCalendarMonthField ? storedRange : storedRange === "1M" ? "MONTH" : storedRange,
+      calendarMonth: sanitizeCalendarMonth(d.calendarMonth),
       module:
         d.module === "ALL" || d.module === "SALES" || d.module === "FINANCE" || d.module === "PROJECTS"
           ? d.module
@@ -411,7 +456,8 @@ type DashboardBootstrapUi = {
   roleView: RoleView;
   selectedWidgets: string[];
   chartRange: "WEEK" | "1M" | "6M" | "12M" | "YTD";
-  globalRange: FilterPreset["range"];
+  globalRange: DashboardRange;
+  calendarMonth: string;
   module: FilterPreset["module"];
   owner: string;
   project: string;
@@ -442,7 +488,8 @@ function getServerAlignedDashboardUi(
     roleView: initialRoleView,
     selectedWidgets,
     chartRange: "1M",
-    globalRange: "1M",
+    globalRange: "MONTH",
+    calendarMonth: currentMonthKey(),
     module: "ALL",
     owner: "",
     project: "",
@@ -471,6 +518,7 @@ function mergeDashboardDraftFromStorage(
     selectedWidgets: nextIds,
     chartRange: d.chartRange,
     globalRange: d.globalRange,
+    calendarMonth: d.calendarMonth,
     module: d.module,
     owner: d.owner,
     project: d.project,
@@ -526,9 +574,8 @@ export function DashboardWorkspace({
   const [openGoal, setOpenGoal] = useState(false);
   const [pending, setPending] = useState(false);
   const [chartRange, setChartRange] = useState<"WEEK" | "1M" | "6M" | "12M" | "YTD">(initialUi.chartRange);
-  const [globalRange, setGlobalRange] = useState<"TODAY" | "WEEK" | "1M" | "6M" | "12M" | "YTD">(
-    initialUi.globalRange,
-  );
+  const [globalRange, setGlobalRange] = useState<DashboardRange>(initialUi.globalRange);
+  const [calendarMonth, setCalendarMonth] = useState(initialUi.calendarMonth);
   const [moduleFilter, setModuleFilter] = useState<"ALL" | "SALES" | "FINANCE" | "PROJECTS">(
     initialUi.module,
   );
@@ -554,6 +601,7 @@ export function DashboardWorkspace({
     setSelectedWidgets(fromDraft.selectedWidgets);
     setChartRange(fromDraft.chartRange);
     setGlobalRange(fromDraft.globalRange);
+    setCalendarMonth(fromDraft.calendarMonth);
     setModuleFilter(fromDraft.module);
     setOwnerFilter(fromDraft.owner);
     setProjectFilter(fromDraft.project);
@@ -626,6 +674,7 @@ export function DashboardWorkspace({
         widgetIds: selectedWidgets,
         chartRange,
         globalRange,
+        calendarMonth,
         module: moduleFilter,
         owner: ownerFilter,
         project: projectFilter,
@@ -641,6 +690,7 @@ export function DashboardWorkspace({
     selectedWidgets,
     chartRange,
     globalRange,
+    calendarMonth,
     moduleFilter,
     ownerFilter,
     projectFilter,
@@ -650,51 +700,112 @@ export function DashboardWorkspace({
   const now = new Date();
   const currentYear = now.getFullYear();
   const seriesRevenue = useMemo(() => {
-    if (chartRange === "WEEK") return values.revenueWeekly.slice(-8);
-    if (chartRange === "1M") return values.revenueWeekly.slice(-4);
-    if (chartRange === "12M") return values.revenueMonthly;
-    if (chartRange === "YTD") return values.revenueMonthly.filter((x) => x.year === currentYear);
-    return values.revenueMonthly.slice(-6);
-  }, [chartRange, values.revenueMonthly, values.revenueWeekly, currentYear]);
+    const monthly = values.revenueMonthly;
+    const weekly = values.revenueWeekly;
+    if (globalRange === "MONTH") {
+      const parsed = parseMonthKey(calendarMonth);
+      if (parsed) {
+        if (chartRange === "12M") {
+          const endIdx = monthly.findIndex((x) => x.year === parsed.year && x.month === parsed.month);
+          if (endIdx >= 0) return monthly.slice(Math.max(0, endIdx - 11), endIdx + 1);
+        }
+        if (chartRange === "YTD") {
+          return monthly.filter((x) => x.year === parsed.year && x.month <= parsed.month);
+        }
+        if (chartRange === "6M") {
+          const endIdx = monthly.findIndex((x) => x.year === parsed.year && x.month === parsed.month);
+          if (endIdx >= 0) return monthly.slice(Math.max(0, endIdx - 5), endIdx + 1);
+        }
+        const monthRow = monthly.find((x) => x.year === parsed.year && x.month === parsed.month);
+        if (monthRow) return [monthRow];
+      }
+    }
+    if (chartRange === "WEEK") return weekly.slice(-8);
+    if (chartRange === "1M") return weekly.slice(-4);
+    if (chartRange === "12M") return monthly;
+    if (chartRange === "YTD") return monthly.filter((x) => x.year === currentYear);
+    return monthly.slice(-6);
+  }, [chartRange, values.revenueMonthly, values.revenueWeekly, currentYear, globalRange, calendarMonth]);
   const seriesPipeline = useMemo(() => {
-    if (chartRange === "WEEK") return values.pipelineVsTargetWeekly.slice(-8);
-    if (chartRange === "1M") return values.pipelineVsTargetWeekly.slice(-4);
-    if (chartRange === "12M") return values.pipelineVsTargetMonthly;
-    if (chartRange === "YTD") return values.pipelineVsTargetMonthly.filter((x) => x.year === currentYear);
-    return values.pipelineVsTargetMonthly.slice(-6);
-  }, [chartRange, values.pipelineVsTargetMonthly, values.pipelineVsTargetWeekly, currentYear]);
+    const monthly = values.pipelineVsTargetMonthly;
+    const weekly = values.pipelineVsTargetWeekly;
+    if (globalRange === "MONTH") {
+      const parsed = parseMonthKey(calendarMonth);
+      if (parsed) {
+        if (chartRange === "12M") {
+          const endIdx = monthly.findIndex((x) => x.year === parsed.year && x.month === parsed.month);
+          if (endIdx >= 0) return monthly.slice(Math.max(0, endIdx - 11), endIdx + 1);
+        }
+        if (chartRange === "YTD") {
+          return monthly.filter((x) => x.year === parsed.year && x.month <= parsed.month);
+        }
+        if (chartRange === "6M") {
+          const endIdx = monthly.findIndex((x) => x.year === parsed.year && x.month === parsed.month);
+          if (endIdx >= 0) return monthly.slice(Math.max(0, endIdx - 5), endIdx + 1);
+        }
+        const monthRow = monthly.find((x) => x.year === parsed.year && x.month === parsed.month);
+        if (monthRow) return [monthRow];
+      }
+    }
+    if (chartRange === "WEEK") return weekly.slice(-8);
+    if (chartRange === "1M") return weekly.slice(-4);
+    if (chartRange === "12M") return monthly;
+    if (chartRange === "YTD") return monthly.filter((x) => x.year === currentYear);
+    return monthly.slice(-6);
+  }, [
+    chartRange,
+    values.pipelineVsTargetMonthly,
+    values.pipelineVsTargetWeekly,
+    currentYear,
+    globalRange,
+    calendarMonth,
+  ]);
 
-  const rangeStart = useMemo(() => {
+  const rangeBounds = useMemo(() => {
     const nowDate = new Date();
-    const start = new Date(nowDate);
-    start.setHours(0, 0, 0, 0);
-    if (globalRange === "TODAY") return start;
+    const todayStart = new Date(nowDate);
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(todayStart);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (globalRange === "MONTH") {
+      return monthBounds(calendarMonth, nowDate);
+    }
+    if (globalRange === "TODAY") {
+      return { start: todayStart, end: tomorrow };
+    }
     if (globalRange === "WEEK") {
+      const start = new Date(todayStart);
       const day = start.getDay();
       const diff = day === 0 ? -6 : 1 - day;
       start.setDate(start.getDate() + diff);
-      return start;
+      return { start, end: tomorrow };
     }
     if (globalRange === "1M") {
+      const start = new Date(todayStart);
       start.setMonth(start.getMonth() - 1);
-      return start;
+      return { start, end: tomorrow };
     }
     if (globalRange === "6M") {
+      const start = new Date(todayStart);
       start.setMonth(start.getMonth() - 6);
-      return start;
+      return { start, end: tomorrow };
     }
     if (globalRange === "12M") {
+      const start = new Date(todayStart);
       start.setMonth(start.getMonth() - 12);
-      return start;
+      return { start, end: tomorrow };
     }
-    start.setMonth(0, 1);
-    return start;
-  }, [globalRange]);
+    const ytd = new Date(nowDate.getFullYear(), 0, 1);
+    return { start: ytd, end: tomorrow };
+  }, [globalRange, calendarMonth]);
+  const rangeStart = rangeBounds.start;
+  const rangeEnd = rangeBounds.end;
 
   const filteredLeads = useMemo(() => {
     return values.kpiLeadRows.filter((row) => {
       const created = new Date(row.createdAt);
-      if (created < rangeStart) return false;
+      if (!isInHalfOpenRange(created, rangeStart, rangeEnd)) return false;
       if (ownerFilter && row.ownerId !== ownerFilter) return false;
       if (sourceFilter && row.source !== sourceFilter) return false;
       if (
@@ -709,6 +820,7 @@ export function DashboardWorkspace({
     values.kpiLeadRows,
     values.filterOptions.projects,
     rangeStart,
+    rangeEnd,
     ownerFilter,
     sourceFilter,
     projectFilter,
@@ -718,62 +830,69 @@ export function DashboardWorkspace({
   const filteredDeals = useMemo(() => {
     return values.kpiDealRows.filter((row) => {
       const created = new Date(row.createdAt);
-      if (created < rangeStart) return false;
+      if (!isInHalfOpenRange(created, rangeStart, rangeEnd)) return false;
       if (ownerFilter && row.ownerId !== ownerFilter) return false;
       if (projectFilter && row.projectId !== projectFilter) return false;
       if (moduleFilter !== "ALL" && moduleFilter !== "SALES" && moduleFilter !== "FINANCE") return false;
       return true;
     });
-  }, [values.kpiDealRows, rangeStart, ownerFilter, projectFilter, moduleFilter]);
+  }, [values.kpiDealRows, rangeStart, rangeEnd, ownerFilter, projectFilter, moduleFilter]);
 
   const filteredProjects = useMemo(() => {
     return values.kpiProjectRows.filter((row) => {
       const created = new Date(row.createdAt);
-      if (created < rangeStart) return false;
+      if (!isInHalfOpenRange(created, rangeStart, rangeEnd)) return false;
       if (projectFilter && row.id !== projectFilter) return false;
       if (moduleFilter !== "ALL" && moduleFilter !== "PROJECTS") return false;
       return true;
     });
-  }, [values.kpiProjectRows, rangeStart, projectFilter, moduleFilter]);
+  }, [values.kpiProjectRows, rangeStart, rangeEnd, projectFilter, moduleFilter]);
+
+  const financeDimensionMatch = (row: { ownerId: string | null; projectId: string | null }) => {
+    if (ownerFilter && row.ownerId !== ownerFilter) return false;
+    if (projectFilter && row.projectId !== projectFilter) return false;
+    if (moduleFilter !== "ALL" && moduleFilter !== "FINANCE") return false;
+    return true;
+  };
+
+  const scopedFinanceInvoices = useMemo(() => {
+    return values.kpiInvoiceRows.filter((row) => financeDimensionMatch(row));
+  }, [values.kpiInvoiceRows, ownerFilter, projectFilter, moduleFilter]);
+
+  const scopedFinancePayments = useMemo(() => {
+    return values.kpiPaymentRows.filter((row) => financeDimensionMatch(row));
+  }, [values.kpiPaymentRows, ownerFilter, projectFilter, moduleFilter]);
 
   const filteredFinanceInvoices = useMemo(() => {
-    return values.kpiInvoiceRows.filter((row) => {
-      const created = new Date(row.createdAt);
-      if (created < rangeStart) return false;
-      if (ownerFilter && row.ownerId !== ownerFilter) return false;
-      if (projectFilter && row.projectId !== projectFilter) return false;
-      if (moduleFilter !== "ALL" && moduleFilter !== "FINANCE") return false;
-      return true;
+    return scopedFinanceInvoices.filter((row) => {
+      const created = new Date(row.issuedAt || row.createdAt);
+      return isInHalfOpenRange(created, rangeStart, rangeEnd);
     });
-  }, [values.kpiInvoiceRows, rangeStart, ownerFilter, projectFilter, moduleFilter]);
+  }, [scopedFinanceInvoices, rangeStart, rangeEnd]);
 
   const filteredFinancePayments = useMemo(() => {
-    return values.kpiPaymentRows.filter((row) => {
+    return scopedFinancePayments.filter((row) => {
       const paid = new Date(row.paidAt);
-      if (paid < rangeStart) return false;
-      if (ownerFilter && row.ownerId !== ownerFilter) return false;
-      if (projectFilter && row.projectId !== projectFilter) return false;
-      if (moduleFilter !== "ALL" && moduleFilter !== "FINANCE") return false;
-      return true;
+      return isInHalfOpenRange(paid, rangeStart, rangeEnd);
     });
-  }, [values.kpiPaymentRows, rangeStart, ownerFilter, projectFilter, moduleFilter]);
+  }, [scopedFinancePayments, rangeStart, rangeEnd]);
 
   const collectionsTrend = useMemo(() => {
     const out: Array<{ label: string; invoiced: number; collected: number; outstanding: number }> = [];
+    const anchor =
+      globalRange === "MONTH" ? monthBounds(calendarMonth).end : new Date();
     for (let i = 5; i >= 0; i -= 1) {
-      const start = new Date();
-      start.setDate(1);
+      const start = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
       start.setHours(0, 0, 0, 0);
-      start.setMonth(start.getMonth() - i);
       const end = new Date(start);
       end.setMonth(end.getMonth() + 1);
-      const invoiced = filteredFinanceInvoices
-        .filter((x) => new Date(x.issuedAt) >= start && new Date(x.issuedAt) < end && x.status !== "VOID")
+      const invoiced = scopedFinanceInvoices
+        .filter((x) => isInHalfOpenRange(new Date(x.issuedAt), start, end) && x.status !== "VOID")
         .reduce((sum, x) => sum + x.amount, 0);
-      const collected = filteredFinancePayments
-        .filter((x) => new Date(x.paidAt) >= start && new Date(x.paidAt) < end)
+      const collected = scopedFinancePayments
+        .filter((x) => isInHalfOpenRange(new Date(x.paidAt), start, end))
         .reduce((sum, x) => sum + x.amount, 0);
-      const outstanding = filteredFinanceInvoices
+      const outstanding = scopedFinanceInvoices
         .filter((x) => x.status !== "VOID" && x.status !== "PAID")
         .reduce((sum, x) => sum + x.balanceDue, 0);
       out.push({
@@ -784,12 +903,12 @@ export function DashboardWorkspace({
       });
     }
     return out;
-  }, [filteredFinanceInvoices, filteredFinancePayments]);
+  }, [scopedFinanceInvoices, scopedFinancePayments, globalRange, calendarMonth]);
 
   const overdueAging = useMemo(() => {
     const now = new Date();
     const buckets = { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90p: 0, noDueDate: 0 };
-    for (const invoice of filteredFinanceInvoices) {
+    for (const invoice of scopedFinanceInvoices) {
       if (invoice.status === "VOID" || invoice.status === "PAID" || invoice.balanceDue <= 0) continue;
       if (!invoice.dueDate) {
         buckets.noDueDate += invoice.balanceDue;
@@ -804,7 +923,7 @@ export function DashboardWorkspace({
       else buckets.d90p += invoice.balanceDue;
     }
     return buckets;
-  }, [filteredFinanceInvoices]);
+  }, [scopedFinanceInvoices]);
 
   const financeHealthRows = useMemo(() => {
     const byProject = new Map<
@@ -864,7 +983,7 @@ export function DashboardWorkspace({
       const periodStart = new Date(start.getFullYear(), start.getMonth() + i, 1);
       const periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 1);
-      const actual = filteredFinancePayments
+      const actual = scopedFinancePayments
         .filter((x) => new Date(x.paidAt) >= periodStart && new Date(x.paidAt) < periodEnd)
         .reduce((sum, x) => sum + x.amount, 0);
       const attainmentPct = periodTarget > 0 ? (actual / periodTarget) * 100 : 0;
@@ -876,7 +995,7 @@ export function DashboardWorkspace({
       });
     }
     return { periods };
-  }, [goal, filteredFinancePayments]);
+  }, [goal, scopedFinancePayments]);
 
   const leadsTodayCount = useMemo(() => {
     const today = new Date();
@@ -901,6 +1020,35 @@ export function DashboardWorkspace({
       );
     }).length;
   }, [filteredDeals]);
+
+  const periodStats = useMemo(() => {
+    const collected = filteredFinancePayments.reduce((sum, x) => sum + x.amount, 0);
+    const expectedDue = scopedFinanceInvoices
+      .filter((inv) => {
+        if (!inv.dueDate) return false;
+        return isInHalfOpenRange(new Date(inv.dueDate), rangeStart, rangeEnd);
+      })
+      .reduce((sum, inv) => sum + inv.balanceDue, 0);
+    const invoicesIssued = filteredFinanceInvoices.filter((inv) => inv.status !== "VOID").length;
+    const isCurrent = globalRange === "MONTH" && calendarMonth === currentMonthKey();
+    return {
+      label: globalRange === "MONTH" ? monthLongLabel(calendarMonth) : dashboardRangeLabel(globalRange, calendarMonth),
+      shortLabel:
+        globalRange === "MONTH" ? monthShortLabel(calendarMonth) : dashboardRangeLabel(globalRange, calendarMonth),
+      isCurrent,
+      collected,
+      expectedDue,
+      invoicesIssued,
+    };
+  }, [
+    filteredFinancePayments,
+    filteredFinanceInvoices,
+    scopedFinanceInvoices,
+    rangeStart,
+    rangeEnd,
+    globalRange,
+    calendarMonth,
+  ]);
 
   const topProjects = useMemo(() => {
     const map = new Map<
@@ -1009,6 +1157,7 @@ export function DashboardWorkspace({
       id: String(Date.now()),
       label,
       range: globalRange,
+      calendarMonth,
       module: moduleFilter,
       owner: ownerFilter,
       project: projectFilter,
@@ -1027,6 +1176,7 @@ export function DashboardWorkspace({
     const preset = filterPresets.find((x) => x.id === id);
     if (!preset) return;
     setGlobalRange(preset.range);
+    if (preset.calendarMonth) setCalendarMonth(resolveMonthKey(preset.calendarMonth));
     setModuleFilter(preset.module);
     setOwnerFilter(preset.owner);
     setProjectFilter(preset.project);
@@ -1043,11 +1193,17 @@ export function DashboardWorkspace({
   }
 
   function clearGlobalFilters() {
-    setGlobalRange("1M");
+    setGlobalRange("MONTH");
+    setCalendarMonth(currentMonthKey());
     setModuleFilter("ALL");
     setOwnerFilter("");
     setProjectFilter("");
     setSourceFilter("");
+  }
+
+  function selectCalendarMonth(next: string) {
+    setCalendarMonth(resolveMonthKey(next));
+    setGlobalRange("MONTH");
   }
 
   const ownerLabel = ownerFilter
@@ -1056,6 +1212,7 @@ export function DashboardWorkspace({
   const projectLabel = projectFilter
     ? values.filterOptions.projects.find((x) => x.id === projectFilter)?.label || projectFilter
     : "";
+  const isDefaultScope = globalRange === "MONTH" && calendarMonth === currentMonthKey();
 
   async function submitGoal(formData: FormData) {
     setPending(true);
@@ -1100,7 +1257,13 @@ export function DashboardWorkspace({
             <span className="text-muted"> · or Quick actions (bottom-right)</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarMonthPicker
+            id="dashboard-calendar-month"
+            value={calendarMonth}
+            onChange={selectCalendarMonth}
+            monthsBack={12}
+          />
           <button
             type="button"
             onClick={() => setOpenBuilder(true)}
@@ -1256,6 +1419,7 @@ export function DashboardWorkspace({
               kind={overviewKind}
               tenantSlug={tenantSlug}
               values={values}
+              periodStats={periodStats}
               canManageOrgSetup={canManageOrgSetup}
               orgSetupSteps={orgSetupSteps}
               onOpenSetupGuide={() => setOpenOnboardingGuide(true)}
@@ -1264,15 +1428,18 @@ export function DashboardWorkspace({
         </div>
       ) : null}
 
-      {globalRange !== "1M" || moduleFilter !== "ALL" || ownerFilter || projectFilter || sourceFilter ? (
+      {!isDefaultScope || moduleFilter !== "ALL" || ownerFilter || projectFilter || sourceFilter ? (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
-          {globalRange !== "1M" ? (
+          {!isDefaultScope ? (
             <button
               type="button"
-              onClick={() => setGlobalRange("1M")}
+              onClick={() => {
+                setGlobalRange("MONTH");
+                setCalendarMonth(currentMonthKey());
+              }}
               className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
             >
-              <span>Range: {globalRange === "WEEK" ? "This Week" : globalRange}</span>
+              <span>Range: {dashboardRangeLabel(globalRange, calendarMonth)}</span>
               <span aria-hidden>×</span>
             </button>
           ) : null}
@@ -1430,16 +1597,34 @@ export function DashboardWorkspace({
                   </label>
                   <UiSelect
                     value={globalRange}
-                    onChange={(e) => setGlobalRange(e.target.value as typeof globalRange)}
+                    onChange={(e) => setGlobalRange(e.target.value as DashboardRange)}
                   >
+                    <option value="MONTH">Calendar month</option>
                     <option value="TODAY">Today</option>
                     <option value="WEEK">This Week</option>
-                    <option value="1M">1 Month</option>
-                    <option value="6M">6M</option>
-                    <option value="12M">12M</option>
+                    <option value="1M">Last 1 month</option>
+                    <option value="6M">Last 6 months</option>
+                    <option value="12M">Last 12 months</option>
                     <option value="YTD">YTD</option>
                   </UiSelect>
                 </div>
+                {globalRange === "MONTH" ? (
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                      Month
+                    </label>
+                    <CalendarMonthPicker
+                      id="dashboard-filter-month"
+                      value={calendarMonth}
+                      onChange={selectCalendarMonth}
+                      monthsBack={12}
+                    />
+                  </div>
+                ) : (
+                  <p className="sm:col-span-2 text-[11px] text-muted">
+                    Use the month picker at the top of the dashboard to jump to a specific previous month.
+                  </p>
+                )}
                 <div className="sm:col-span-2">
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
                     Module
@@ -1494,19 +1679,22 @@ export function DashboardWorkspace({
                   </UiSelect>
                 </div>
               </div>
-              {globalRange !== "1M" ||
+              {!isDefaultScope ||
               moduleFilter !== "ALL" ||
               ownerFilter ||
               projectFilter ||
               sourceFilter ? (
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-foreground/10 pt-4">
-                  {globalRange !== "1M" ? (
+                  {!isDefaultScope ? (
                     <button
                       type="button"
-                      onClick={() => setGlobalRange("1M")}
+                      onClick={() => {
+                        setGlobalRange("MONTH");
+                        setCalendarMonth(currentMonthKey());
+                      }}
                       className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
                     >
-                      <span>Range: {globalRange === "WEEK" ? "This Week" : globalRange}</span>
+                      <span>Range: {dashboardRangeLabel(globalRange, calendarMonth)}</span>
                       <span aria-hidden>×</span>
                     </button>
                   ) : null}
@@ -1686,9 +1874,18 @@ export function DashboardWorkspace({
             onClick={() => setOpenKpiDetail("LEADS_TODAY")}
             className="rc-card-interactive p-4"
           >
-            <p className="rc-metric-label">Leads today</p>
-            <p className="rc-metric-value" data-zero={leadsTodayCount === 0}>
-              {leadsTodayCount}
+            <p className="rc-metric-label">
+              {periodStats.isCurrent || globalRange === "TODAY"
+                ? "Leads today"
+                : `Leads · ${periodStats.shortLabel}`}
+            </p>
+            <p
+              className="rc-metric-value"
+              data-zero={
+                (periodStats.isCurrent || globalRange === "TODAY" ? leadsTodayCount : filteredLeads.length) === 0
+              }
+            >
+              {periodStats.isCurrent || globalRange === "TODAY" ? leadsTodayCount : filteredLeads.length}
             </p>
             <MiniBars values={leadsMiniSeries} tone="accent" />
             <p className="rc-metric-hint">Lead-level breakdown</p>
@@ -1698,9 +1895,18 @@ export function DashboardWorkspace({
             onClick={() => setOpenKpiDetail("DEALS_TODAY")}
             className="rc-card-interactive p-4"
           >
-            <p className="rc-metric-label">Deals today</p>
-            <p className="rc-metric-value" data-zero={dealsTodayCount === 0}>
-              {dealsTodayCount}
+            <p className="rc-metric-label">
+              {periodStats.isCurrent || globalRange === "TODAY"
+                ? "Deals today"
+                : `Deals · ${periodStats.shortLabel}`}
+            </p>
+            <p
+              className="rc-metric-value"
+              data-zero={
+                (periodStats.isCurrent || globalRange === "TODAY" ? dealsTodayCount : filteredDeals.length) === 0
+              }
+            >
+              {periodStats.isCurrent || globalRange === "TODAY" ? dealsTodayCount : filteredDeals.length}
             </p>
             <MiniBars values={dealsMiniSeries} tone="info" />
             <p className="rc-metric-hint">Deal-level breakdown</p>
@@ -1750,7 +1956,8 @@ export function DashboardWorkspace({
           >
             <p className="text-xs uppercase tracking-wide text-muted">Collections trend</p>
             <p className="mt-1 text-sm text-foreground">
-              {formatMoney(collectionsTrend.reduce((s, x) => s + x.collected, 0))} collected / last 6 months
+              {formatMoney(collectionsTrend.reduce((s, x) => s + x.collected, 0))} collected / 6 months
+              {globalRange === "MONTH" ? ` to ${monthShortLabel(calendarMonth)}` : ""}
             </p>
           </button>
           <button
@@ -1793,6 +2000,7 @@ export function DashboardWorkspace({
             id={id}
             values={values}
             goal={goal}
+            periodStats={periodStats}
             revenueSeries={seriesRevenue}
             pipelineSeries={seriesPipeline}
           />
@@ -1816,9 +2024,13 @@ export function DashboardWorkspace({
             <div>
               <h3 className="text-lg font-semibold text-foreground">
                 {openKpiDetail === "LEADS_TODAY"
-                  ? "Leads Today Breakdown"
+                  ? periodStats.isCurrent || globalRange === "TODAY"
+                    ? "Leads Today Breakdown"
+                    : `Leads · ${periodStats.shortLabel}`
                   : openKpiDetail === "DEALS_TODAY"
-                    ? "Deals Today Breakdown"
+                    ? periodStats.isCurrent || globalRange === "TODAY"
+                      ? "Deals Today Breakdown"
+                      : `Deals · ${periodStats.shortLabel}`
                     : openKpiDetail === "PROJECTS"
                       ? "Project Breakdown"
                       : "Top Projects Breakdown"}
@@ -2530,12 +2742,14 @@ function WidgetCard({
   id,
   values,
   goal,
+  periodStats,
   revenueSeries,
   pipelineSeries,
 }: {
   id: string;
   values: WidgetValue;
   goal: Goal;
+  periodStats: PeriodStats;
   revenueSeries: Array<{ label: string; value: number }>;
   pipelineSeries: Array<{ label: string; pipeline: number; target: number }>;
 }) {
@@ -2555,7 +2769,7 @@ function WidgetCard({
   const inventoryTotal = Math.max(1, values.availableUnits + values.reservedUnits + values.soldUnits);
   const revenuePct =
     goal?.revenueTarget && goal.revenueTarget > 0
-      ? Math.min(100, (values.revenueMtd / goal.revenueTarget) * 100)
+      ? Math.min(100, (periodStats.collected / goal.revenueTarget) * 100)
       : null;
   const pipelinePct =
     goal?.pipelineTarget && goal.pipelineTarget > 0
@@ -2569,13 +2783,15 @@ function WidgetCard({
   let body: React.ReactNode = <p className="mt-2 text-sm text-muted">No data.</p>;
 
   if (id === "revenue_target_progress") {
-    title = "Collections vs target (MTD)";
+    title = periodStats.isCurrent
+      ? "Collections vs target (MTD)"
+      : `Collections vs target (${periodStats.shortLabel})`;
     body = (
       <>
-        <p className="mt-2 text-2xl font-bold text-foreground">{money(values.revenueMtd)}</p>
+        <p className="mt-2 text-2xl font-bold text-foreground">{money(periodStats.collected)}</p>
         <p className="text-xs text-muted">
-          Cash collected this month vs fiscal revenue target:{" "}
-          {goal?.revenueTarget != null ? money(goal.revenueTarget) : "No target set"}
+          Cash collected {periodStats.isCurrent ? "this month" : `in ${periodStats.label}`} vs fiscal
+          revenue target: {goal?.revenueTarget != null ? money(goal.revenueTarget) : "No target set"}
         </p>
         <div className="mt-3 h-2.5 rounded-full bg-foreground/10">
           <div
@@ -3021,8 +3237,8 @@ function WidgetCard({
         tone: "bg-[var(--danger-wash)] border-[var(--danger-line)] text-[var(--danger)]",
       },
       expected_month: {
-        title: "Expected This Month",
-        value: money(values.expectedThisMonth),
+        title: periodStats.isCurrent ? "Expected This Month" : `Expected · ${periodStats.shortLabel}`,
+        value: money(periodStats.expectedDue),
         tone: "bg-[var(--success-wash)] border-[var(--success-line)] text-[var(--success)]",
       },
       overdue_installments: {
@@ -3036,8 +3252,8 @@ function WidgetCard({
         tone: "bg-[var(--accent-wash)] border-[var(--accent-line)] text-[var(--accent)]",
       },
       recent_payments: {
-        title: "Invoices This Month",
-        value: `${values.invoicesMtdCount} invoice(s)`,
+        title: periodStats.isCurrent ? "Invoices This Month" : `Invoices · ${periodStats.shortLabel}`,
+        value: `${periodStats.invoicesIssued} invoice(s)`,
         tone: "bg-[var(--info-wash)] border-[var(--info-line)] text-[var(--info)]",
       },
       team_pipeline: {
@@ -3114,6 +3330,7 @@ function DepartmentOverviewPanel({
   kind,
   tenantSlug,
   values,
+  periodStats,
   canManageOrgSetup,
   orgSetupSteps,
   onOpenSetupGuide,
@@ -3121,6 +3338,7 @@ function DepartmentOverviewPanel({
   kind: DepartmentOverviewKind;
   tenantSlug: string;
   values: WidgetValue;
+  periodStats: PeriodStats;
   canManageOrgSetup: boolean;
   orgSetupSteps: OrgSetupStep[];
   onOpenSetupGuide: () => void;
@@ -3228,8 +3446,16 @@ function DepartmentOverviewPanel({
         <section className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Collections</p>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <HrStat label="Expected this month" value={values.expectedThisMonth} money />
-            <HrStat label="Revenue MTD" value={values.revenueMtd} money />
+            <HrStat
+              label={periodStats.isCurrent ? "Expected this month" : `Expected · ${periodStats.shortLabel}`}
+              value={periodStats.expectedDue}
+              money
+            />
+            <HrStat
+              label={periodStats.isCurrent ? "Revenue MTD" : `Collected · ${periodStats.shortLabel}`}
+              value={periodStats.collected}
+              money
+            />
           </div>
           <Link
             href={`/${tenantSlug}/finance`}
@@ -3274,9 +3500,9 @@ function DepartmentOverviewPanel({
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Your workload</p>
           <ul className="mt-2 space-y-1.5 text-sm">
             <ChecklistRow
-              label="Invoices this month"
-              done={values.invoicesMtdCount > 0}
-              detail={`${values.invoicesMtdCount} issued`}
+              label={periodStats.isCurrent ? "Invoices this month" : `Invoices · ${periodStats.shortLabel}`}
+              done={periodStats.invoicesIssued > 0}
+              detail={`${periodStats.invoicesIssued} issued`}
             />
             <ChecklistRow
               label="Open tasks"

@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { Download, FileSpreadsheet, Send, UserPlus, Users } from "lucide-react";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { UiTabs } from "@/components/ui-tabs";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { PdfDownloadButton } from "@/components/pdf-download-button";
@@ -708,23 +709,7 @@ export function HrPeopleWorkspace({
         record to edit details, or send them a form link to their work email.
       </p>
 
-      <div className="flex flex-wrap gap-1 border-b border-foreground/10 pb-1">
-        {peopleTabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setPeopleTab(t.id)}
-            className={[
-              "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              peopleTab === t.id
-                ? "bg-foreground text-background"
-                : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
-            ].join(" ")}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <UiTabs tabs={peopleTabs} value={peopleTab} onChange={setPeopleTab} aria-label="People" />
 
       {peopleTab === "directory" && submittedRequests.length > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3">

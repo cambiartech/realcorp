@@ -73,6 +73,8 @@ import {
   normalizeFinanceExpenseCategory,
 } from "@/lib/finance-expense-category";
 import { UiSelect } from "@/components/ui-select";
+import { CalendarMonthPicker } from "@/components/calendar-month-picker";
+import { currentMonthKey } from "@/lib/calendar-month";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   recurrenceFrequencyLabel,
@@ -446,6 +448,11 @@ type FinanceOverviewStats = {
   payablesOverdueCount: number;
   collectedThisMonth: string;
   expensesThisMonth: string;
+  periodKey: string;
+  periodLabel: string;
+  isCurrentMonth: boolean;
+  priorPeriodCollected: string;
+  priorPeriodLabel: string;
   pendingFinanceChecks: number;
   openInvoiceCount: number;
   openPayableCount: number;
@@ -1029,12 +1036,25 @@ export function FinanceWorkspace({
   const pageHeading = isFinanceOverviewSurface
     ? {
         title: "Finance overview",
-        subtitle:
-          "Key numbers at a glance, plus pending finance checks from sales deals.",
+        subtitle: overviewStats.isCurrentMonth
+          ? "Key numbers at a glance, plus pending finance checks from sales deals."
+          : `Activity for ${overviewStats.periodLabel}. Outstanding balances are as of today.`,
       }
     : dedicatedSlug
       ? dedicatedHeading[dedicatedSlug]
       : { title: "Finance", subtitle: "" };
+
+  function setOverviewMonth(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("activeTab");
+    if (next === currentMonthKey()) {
+      params.delete("month");
+    } else {
+      params.set("month", next);
+    }
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
+  }
 
   function exportLogsCsv() {
     if (masterLogs.length === 0) {
@@ -3379,24 +3399,31 @@ export function FinanceWorkspace({
           <p className="mt-1 text-sm text-muted">{pageHeading.subtitle}</p>
         </div>
         {isFinanceOverviewSurface ? (
-          <button
-            type="button"
-            onClick={() => setShowFinanceOverviewHelp((x) => !x)}
-            className={[
-              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors",
-              showFinanceOverviewHelp
-                ? "border-foreground bg-foreground text-background"
-                : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground",
-            ].join(" ")}
-            aria-label={
-              showFinanceOverviewHelp
-                ? "Hide workflow help"
-                : "Show workflow help"
-            }
-            title="How this workflow works"
-          >
-            i
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <CalendarMonthPicker
+              id="finance-overview-month"
+              value={overviewStats.periodKey}
+              onChange={setOverviewMonth}
+            />
+            <button
+              type="button"
+              onClick={() => setShowFinanceOverviewHelp((x) => !x)}
+              className={[
+                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors",
+                showFinanceOverviewHelp
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-foreground/15 text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+              ].join(" ")}
+              aria-label={
+                showFinanceOverviewHelp
+                  ? "Hide workflow help"
+                  : "Show workflow help"
+              }
+              title="How this workflow works"
+            >
+              i
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -3490,13 +3517,18 @@ export function FinanceWorkspace({
             className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4 transition-colors hover:bg-[var(--success-wash)] dark:hover:bg-[var(--success-wash)]"
           >
             <p className="text-xs uppercase tracking-wide text-[var(--success)]">
-              Collected this month
+              {overviewStats.isCurrentMonth
+                ? "Collected this month"
+                : `Collected · ${overviewStats.periodLabel}`}
             </p>
             <p className="mt-1 text-2xl font-bold text-[var(--success)]">
               {overviewStats.collectedThisMonth}
             </p>
             <p className="mt-1 text-xs text-[var(--success)]">
               Invoice & direct payments
+              {overviewStats.isCurrentMonth
+                ? ""
+                : ` · vs ${overviewStats.priorPeriodLabel}: ${overviewStats.priorPeriodCollected}`}
             </p>
           </Link>
           <Link
@@ -3504,7 +3536,9 @@ export function FinanceWorkspace({
             className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
           >
             <p className="text-xs uppercase tracking-wide text-muted">
-              Expenses this month
+              {overviewStats.isCurrentMonth
+                ? "Expenses this month"
+                : `Expenses · ${overviewStats.periodLabel}`}
             </p>
             <p className="mt-1 text-2xl font-bold text-foreground">
               {overviewStats.expensesThisMonth}
