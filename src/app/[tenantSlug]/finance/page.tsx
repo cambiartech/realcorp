@@ -17,13 +17,7 @@ import { expensePnlAmount } from "@/lib/finance-vat";
 import { operatingNet } from "@/lib/finance-income";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { loadTenantRequest } from "@/lib/tenant-request";
-import {
-  currentMonthKey,
-  monthBounds,
-  monthLongLabel,
-  resolveMonthKey,
-  shiftMonthKey,
-} from "@/lib/calendar-month";
+import { resolveFinancePeriod } from "@/lib/finance-period";
 import { notFound } from "next/navigation";
 import { FinanceWorkspace } from "./finance-workspace";
 
@@ -175,6 +169,10 @@ export default async function FinanceQueuePage({
     logsEntityType?: string;
     logsEntityId?: string;
     month?: string;
+    period?: string;
+    year?: string;
+    from?: string;
+    to?: string;
   }>;
 }) {
   const { tenantSlug } = await params;
@@ -236,12 +234,7 @@ export default async function FinanceQueuePage({
     nowForPeriod.getMonth(),
     nowForPeriod.getDate(),
   );
-  const overviewMonthKey = resolveMonthKey(logsParams.month, nowForPeriod);
-  const overviewMonth = monthBounds(overviewMonthKey, nowForPeriod);
-  const priorOverviewMonth = monthBounds(
-    shiftMonthKey(overviewMonth.key, -1),
-    nowForPeriod,
-  );
+  const overviewPeriod = resolveFinancePeriod(logsParams, nowForPeriod);
 
   const [activeFiscalGoal, financeVendors, financeExpenseCategories] =
     await Promise.all([
@@ -600,8 +593,8 @@ export default async function FinanceQueuePage({
     isOverview
       ? loadFinanceOverviewKpis(
           tenant.id,
-          overviewMonth,
-          priorOverviewMonth,
+          overviewPeriod,
+          { start: overviewPeriod.priorStart, end: overviewPeriod.priorEnd },
           startOfTodayForKpis,
         )
       : Promise.resolve(null),
@@ -845,24 +838,24 @@ export default async function FinanceQueuePage({
   const periodCash = overviewKpis
     ? overviewKpis.periodCash
     : livePayments
-        .filter((p) => p.paidAt >= overviewMonth.start && p.paidAt < overviewMonth.end)
+        .filter((p) => p.paidAt >= overviewPeriod.start && p.paidAt < overviewPeriod.end)
         .reduce((sum, p) => sum + Number(p.amount), 0) +
       liveReceipts
-        .filter((r) => r.issuedAt >= overviewMonth.start && r.issuedAt < overviewMonth.end)
+        .filter((r) => r.issuedAt >= overviewPeriod.start && r.issuedAt < overviewPeriod.end)
         .reduce((sum, r) => sum + Number(r.amount), 0);
   const priorPeriodCash = overviewKpis
     ? overviewKpis.priorPeriodCash
     : livePayments
         .filter(
           (p) =>
-            p.paidAt >= priorOverviewMonth.start && p.paidAt < priorOverviewMonth.end,
+            p.paidAt >= overviewPeriod.priorStart && p.paidAt < overviewPeriod.priorEnd,
         )
         .reduce((sum, p) => sum + Number(p.amount), 0) +
       liveReceipts
         .filter(
           (r) =>
-            r.issuedAt >= priorOverviewMonth.start &&
-            r.issuedAt < priorOverviewMonth.end,
+            r.issuedAt >= overviewPeriod.priorStart &&
+            r.issuedAt < overviewPeriod.priorEnd,
         )
         .reduce((sum, r) => sum + Number(r.amount), 0);
   const currentMonthCash =
@@ -1003,8 +996,8 @@ export default async function FinanceQueuePage({
     : liveExpenses
         .filter(
           (e) =>
-            e.expenseDate >= overviewMonth.start &&
-            e.expenseDate < overviewMonth.end,
+            e.expenseDate >= overviewPeriod.start &&
+            e.expenseDate < overviewPeriod.end,
         )
         .reduce((sum, e) => sum + Number(e.amount), 0);
   const bankingUnmatched = overviewKpis
@@ -1038,11 +1031,17 @@ export default async function FinanceQueuePage({
           : payablesOverdueCount,
         collectedThisMonth: money(periodCash),
         expensesThisMonth: money(periodExpenses),
-        periodKey: overviewMonth.key,
-        periodLabel: monthLongLabel(overviewMonth.key),
-        isCurrentMonth: overviewMonth.key === currentMonthKey(now),
+        periodPreset: overviewPeriod.preset,
+        periodKey: overviewPeriod.monthKey,
+        periodYear: overviewPeriod.year,
+        periodFrom: overviewPeriod.fromKey,
+        periodTo: overviewPeriod.toKey,
+        periodLabel: overviewPeriod.label,
+        collectedLabel: overviewPeriod.collectedLabel,
+        expensesLabel: overviewPeriod.expensesLabel,
+        isCurrentMonth: overviewPeriod.isDefault,
         priorPeriodCollected: money(priorPeriodCash),
-        priorPeriodLabel: monthLongLabel(priorOverviewMonth.key),
+        priorPeriodLabel: overviewPeriod.priorLabel,
         pendingFinanceChecks: deals.length,
         openInvoiceCount: overviewKpis
           ? overviewKpis.openInvoiceCount

@@ -74,8 +74,11 @@ import {
   normalizeFinanceExpenseCategory,
 } from "@/lib/finance-expense-category";
 import { UiSelect } from "@/components/ui-select";
-import { CalendarMonthPicker } from "@/components/calendar-month-picker";
-import { currentMonthKey, monthLongLabel } from "@/lib/calendar-month";
+import { FinancePeriodPicker } from "@/components/finance-period-picker";
+import {
+  financePeriodHrefParams,
+  type FinancePeriodPreset,
+} from "@/lib/finance-period";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   recurrenceFrequencyLabel,
@@ -449,8 +452,14 @@ type FinanceOverviewStats = {
   payablesOverdueCount: number;
   collectedThisMonth: string;
   expensesThisMonth: string;
+  periodPreset: FinancePeriodPreset;
   periodKey: string;
+  periodYear: number;
+  periodFrom: string;
+  periodTo: string;
   periodLabel: string;
+  collectedLabel: string;
+  expensesLabel: string;
   isCurrentMonth: boolean;
   priorPeriodCollected: string;
   priorPeriodLabel: string;
@@ -1047,17 +1056,41 @@ export function FinanceWorkspace({
       ? dedicatedHeading[dedicatedSlug]
       : { title: "Finance", subtitle: "" };
 
-  function setOverviewMonth(next: string) {
-    if (next === overviewStats.periodKey) return;
+  function setOverviewPeriod(next: {
+    preset: FinancePeriodPreset;
+    monthKey: string;
+    year: number;
+    fromKey: string;
+    toKey: string;
+  }) {
+    const nextParams = financePeriodHrefParams(next);
+    const currentParams = financePeriodHrefParams({
+      preset: overviewStats.periodPreset,
+      monthKey: overviewStats.periodKey,
+      year: overviewStats.periodYear,
+      fromKey: overviewStats.periodFrom,
+      toKey: overviewStats.periodTo,
+    });
+    if (JSON.stringify(nextParams) === JSON.stringify(currentParams)) return;
+
     const params = new URLSearchParams(searchParams.toString());
     params.delete("activeTab");
-    if (next === currentMonthKey()) {
-      params.delete("month");
-    } else {
-      params.set("month", next);
+    params.delete("period");
+    params.delete("month");
+    params.delete("year");
+    params.delete("from");
+    params.delete("to");
+    for (const [key, value] of Object.entries(nextParams)) {
+      params.set(key, value);
     }
     const query = params.toString();
-    setPendingMonthLabel(monthLongLabel(next));
+    const pendingLabel =
+      next.preset === "year"
+        ? String(next.year)
+        : next.preset === "custom"
+          ? `${next.fromKey} to ${next.toKey}`
+          : next.monthKey;
+    setPendingMonthLabel(pendingLabel);
     startMonthTransition(() => {
       router.push(query ? `${pathname}?${query}` : pathname);
     });
@@ -3419,10 +3452,15 @@ export function FinanceWorkspace({
         </div>
         {isFinanceOverviewSurface ? (
           <div className="flex flex-wrap items-center gap-2">
-            <CalendarMonthPicker
-              id="finance-overview-month"
-              value={overviewStats.periodKey}
-              onChange={setOverviewMonth}
+            <FinancePeriodPicker
+              value={{
+                preset: overviewStats.periodPreset,
+                monthKey: overviewStats.periodKey,
+                year: overviewStats.periodYear,
+                fromKey: overviewStats.periodFrom,
+                toKey: overviewStats.periodTo,
+              }}
+              onChange={setOverviewPeriod}
               disabled={monthPending}
             />
             <button
@@ -3537,18 +3575,14 @@ export function FinanceWorkspace({
             className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4 transition-colors hover:bg-[var(--success-wash)] dark:hover:bg-[var(--success-wash)]"
           >
             <p className="text-xs uppercase tracking-wide text-[var(--success)]">
-              {overviewStats.isCurrentMonth
-                ? "Collected this month"
-                : `Collected · ${overviewStats.periodLabel}`}
+              {overviewStats.collectedLabel}
             </p>
             <p className="mt-1 text-2xl font-bold text-[var(--success)]">
               {overviewStats.collectedThisMonth}
             </p>
             <p className="mt-1 text-xs text-[var(--success)]">
-              Invoice & direct payments
-              {overviewStats.isCurrentMonth
-                ? ""
-                : ` · vs ${overviewStats.priorPeriodLabel}: ${overviewStats.priorPeriodCollected}`}
+              Invoice & direct payments · vs {overviewStats.priorPeriodLabel}:{" "}
+              {overviewStats.priorPeriodCollected}
             </p>
           </Link>
           <Link
@@ -3556,9 +3590,7 @@ export function FinanceWorkspace({
             className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 transition-colors hover:bg-foreground/[0.04]"
           >
             <p className="text-xs uppercase tracking-wide text-muted">
-              {overviewStats.isCurrentMonth
-                ? "Expenses this month"
-                : `Expenses · ${overviewStats.periodLabel}`}
+              {overviewStats.expensesLabel}
             </p>
             <p className="mt-1 text-2xl font-bold text-foreground">
               {overviewStats.expensesThisMonth}
