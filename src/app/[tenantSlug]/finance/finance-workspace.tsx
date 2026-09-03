@@ -10,7 +10,8 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { ButtonSpinner } from "@/components/button-spinner";
 import type { FinanceControls } from "@/lib/finance-controls";
 import { useSnackbar } from "@/components/snackbar";
 import {
@@ -74,7 +75,7 @@ import {
 } from "@/lib/finance-expense-category";
 import { UiSelect } from "@/components/ui-select";
 import { CalendarMonthPicker } from "@/components/calendar-month-picker";
-import { currentMonthKey } from "@/lib/calendar-month";
+import { currentMonthKey, monthLongLabel } from "@/lib/calendar-month";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   recurrenceFrequencyLabel,
@@ -849,6 +850,8 @@ export function FinanceWorkspace({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [monthPending, startMonthTransition] = useTransition();
+  const [pendingMonthLabel, setPendingMonthLabel] = useState<string | null>(null);
 
   const financeBasePath = `/${tenantSlug}/finance`;
   useEffect(() => {
@@ -1045,6 +1048,7 @@ export function FinanceWorkspace({
       : { title: "Finance", subtitle: "" };
 
   function setOverviewMonth(next: string) {
+    if (next === overviewStats.periodKey) return;
     const params = new URLSearchParams(searchParams.toString());
     params.delete("activeTab");
     if (next === currentMonthKey()) {
@@ -1053,7 +1057,10 @@ export function FinanceWorkspace({
       params.set("month", next);
     }
     const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname);
+    setPendingMonthLabel(monthLongLabel(next));
+    startMonthTransition(() => {
+      router.push(query ? `${pathname}?${query}` : pathname);
+    });
   }
 
   function exportLogsCsv() {
@@ -3390,7 +3397,19 @@ export function FinanceWorkspace({
   }
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+    <div className="relative w-full px-4 py-6 sm:px-6 sm:py-8">
+      {isFinanceOverviewSurface && monthPending ? (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-start bg-background/70 pt-28 backdrop-blur-[1px]"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <div className="inline-flex items-center gap-2 rounded-full border border-foreground/15 bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm">
+            <ButtonSpinner />
+            Loading {pendingMonthLabel || "selected month"}…
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
@@ -3404,6 +3423,7 @@ export function FinanceWorkspace({
               id="finance-overview-month"
               value={overviewStats.periodKey}
               onChange={setOverviewMonth}
+              disabled={monthPending}
             />
             <button
               type="button"

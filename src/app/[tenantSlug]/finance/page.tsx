@@ -1,4 +1,10 @@
-import { MembershipRole, MembershipStatus } from "@/generated/prisma";
+import {
+  BankMatchStatus,
+  InvoiceStatus,
+  MembershipRole,
+  MembershipStatus,
+  VendorBillStatus,
+} from "@/generated/prisma";
 import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import {
@@ -24,6 +30,119 @@ import { FinanceWorkspace } from "./finance-workspace";
 export const dynamic = "force-dynamic";
 const DEFAULT_PAYMENT_MODES = ["Bank Transfer", "Cash", "Cheque", "POS"];
 import { mergeOrgDepartments } from "@/lib/org-departments";
+
+function num(value: { toString(): string } | number | null | undefined) {
+  if (value == null) return 0;
+  return Number(value);
+}
+
+async function loadFinanceOverviewKpis(
+  tenantId: string,
+  period: { start: Date; end: Date },
+  prior: { start: Date; end: Date },
+  startOfToday: Date,
+) {
+  const openInvoiceWhere = {
+    tenantId,
+    status: { notIn: [InvoiceStatus.VOID, InvoiceStatus.PAID] },
+    balanceDue: { gt: 0 },
+  };
+  const openBillWhere = {
+    tenantId,
+    status: { notIn: [VendorBillStatus.VOID, VendorBillStatus.PAID] },
+    balanceDue: { gt: 0 },
+  };
+  const [
+    openInvoices,
+    overdueInvoices,
+    openBills,
+    overdueBillCount,
+    periodPayments,
+    priorPayments,
+    periodReceipts,
+    priorReceipts,
+    periodExpenses,
+    unmatchedBankCount,
+  ] = await Promise.all([
+    prisma.invoice.aggregate({
+      where: openInvoiceWhere,
+      _sum: { balanceDue: true },
+      _count: true,
+    }),
+    prisma.invoice.aggregate({
+      where: { ...openInvoiceWhere, dueDate: { lt: startOfToday } },
+      _sum: { balanceDue: true },
+      _count: true,
+    }),
+    prisma.vendorBill.aggregate({
+      where: openBillWhere,
+      _sum: { balanceDue: true },
+      _count: true,
+    }),
+    prisma.vendorBill.count({
+      where: { ...openBillWhere, dueDate: { lt: startOfToday } },
+    }),
+    prisma.paymentRecord.aggregate({
+      where: {
+        tenantId,
+        voidedAt: null,
+        paidAt: { gte: period.start, lt: period.end },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.paymentRecord.aggregate({
+      where: {
+        tenantId,
+        voidedAt: null,
+        paidAt: { gte: prior.start, lt: prior.end },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.salesReceipt.aggregate({
+      where: {
+        tenantId,
+        voidedAt: null,
+        status: { not: "VOID" },
+        issuedAt: { gte: period.start, lt: period.end },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.salesReceipt.aggregate({
+      where: {
+        tenantId,
+        voidedAt: null,
+        status: { not: "VOID" },
+        issuedAt: { gte: prior.start, lt: prior.end },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.expense.aggregate({
+      where: {
+        tenantId,
+        voidedAt: null,
+        expenseDate: { gte: period.start, lt: period.end },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.bankStatementRow.count({
+      where: { tenantId, matchStatus: BankMatchStatus.UNMATCHED },
+    }),
+  ]);
+
+  return {
+    outstanding: num(openInvoices._sum.balanceDue),
+    openInvoiceCount: openInvoices._count,
+    overdueOutstanding: num(overdueInvoices._sum.balanceDue),
+    overdueInvoiceCount: overdueInvoices._count,
+    payablesOutstanding: num(openBills._sum.balanceDue),
+    openPayableCount: openBills._count,
+    payablesOverdueCount: overdueBillCount,
+    periodCash: num(periodPayments._sum.amount) + num(periodReceipts._sum.amount),
+    priorPeriodCash: num(priorPayments._sum.amount) + num(priorReceipts._sum.amount),
+    periodExpenses: num(periodExpenses._sum.amount),
+    bankingUnmatched: unmatchedBankCount,
+  };
+}
 
 function canManageFinance(
   isPlatformAdmin: boolean,
@@ -81,29 +200,48 @@ export default async function FinanceQueuePage({
   const needsDeals = isOverview;
   const needsDealOptions =
     financeSurface === "invoices" || financeSurface === "receipts";
-  const needsDimensions =
-    isOverview ||
-    ["reports", "expenses", "invoices", "payments", "receipts", "remittances"].includes(
-      financeSurface,
-    );
-  const needsReceipts =
-    isOverview || ["reports", "receipts"].includes(financeSurface);
-  const needsInvoices =
-    isOverview ||
-    ["reports", "invoices", "ar", "payments"].includes(financeSurface);
-  const needsPayments =
-    isOverview || ["reports", "payments", "banking"].includes(financeSurface);
-  const needsExpenses =
-    isOverview || ["reports", "expenses", "banking"].includes(financeSurface);
-  const needsRemittances =
-    isOverview || ["reports", "remittances", "banking"].includes(financeSurface);
+  const needsDimensions = [
+    "reports",
+    "expenses",
+    "invoices",
+    "payments",
+    "receipts",
+    "remittances",
+  ].includes(financeSurface);
+  const needsReceipts = ["reports", "receipts"].includes(financeSurface);
+  const needsInvoices = ["reports", "invoices", "ar", "payments"].includes(
+    financeSurface,
+  );
+  const needsPayments = ["reports", "payments", "banking"].includes(
+    financeSurface,
+  );
+  const needsExpenses = ["reports", "expenses", "banking"].includes(
+    financeSurface,
+  );
+  const needsRemittances = ["reports", "remittances", "banking"].includes(
+    financeSurface,
+  );
   const needsRemittanceClients = financeSurface === "remittances";
   const needsBills =
-    isOverview || financeSurface === "reports" || financeSurface === "payables";
-  const needsInvoiceEvents =
-    isOverview || ["reports", "invoices", "ar"].includes(financeSurface);
-  const needsBanking = isOverview || financeSurface === "banking";
+    financeSurface === "reports" || financeSurface === "payables";
+  const needsInvoiceEvents = ["reports", "invoices", "ar"].includes(
+    financeSurface,
+  );
+  const needsBanking = financeSurface === "banking";
   const needsLogs = financeSurface === "logs";
+
+  const nowForPeriod = new Date();
+  const startOfTodayForKpis = new Date(
+    nowForPeriod.getFullYear(),
+    nowForPeriod.getMonth(),
+    nowForPeriod.getDate(),
+  );
+  const overviewMonthKey = resolveMonthKey(logsParams.month, nowForPeriod);
+  const overviewMonth = monthBounds(overviewMonthKey, nowForPeriod);
+  const priorOverviewMonth = monthBounds(
+    shiftMonthKey(overviewMonth.key, -1),
+    nowForPeriod,
+  );
 
   const [activeFiscalGoal, financeVendors, financeExpenseCategories] =
     await Promise.all([
@@ -217,6 +355,7 @@ export default async function FinanceQueuePage({
     bankRowStats,
     remittances,
     remittanceClients,
+    overviewKpis,
   ] = await Promise.all([
     needsDeals
       ? prisma.deal.findMany({
@@ -458,6 +597,14 @@ export default async function FinanceQueuePage({
           take: 800,
         })
       : Promise.resolve([]),
+    isOverview
+      ? loadFinanceOverviewKpis(
+          tenant.id,
+          overviewMonth,
+          priorOverviewMonth,
+          startOfTodayForKpis,
+        )
+      : Promise.resolve(null),
   ]);
 
   const bankStatsMap = new Map<
@@ -555,12 +702,8 @@ export default async function FinanceQueuePage({
     invoiceEventMap.set(event.entityId, existing);
   }
 
-  const now = new Date();
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
+  const now = nowForPeriod;
+  const startOfToday = startOfTodayForKpis;
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
   const invoiceRows = invoices.map((invoice) => {
@@ -699,23 +842,29 @@ export default async function FinanceQueuePage({
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const overviewMonthKey = resolveMonthKey(logsParams.month, now);
-  const overviewMonth = monthBounds(overviewMonthKey, now);
-  const priorOverviewMonth = monthBounds(shiftMonthKey(overviewMonth.key, -1), now);
-  const periodCash =
-    livePayments
-      .filter((p) => p.paidAt >= overviewMonth.start && p.paidAt < overviewMonth.end)
-      .reduce((sum, p) => sum + Number(p.amount), 0) +
-    liveReceipts
-      .filter((r) => r.issuedAt >= overviewMonth.start && r.issuedAt < overviewMonth.end)
-      .reduce((sum, r) => sum + Number(r.amount), 0);
-  const priorPeriodCash =
-    livePayments
-      .filter((p) => p.paidAt >= priorOverviewMonth.start && p.paidAt < priorOverviewMonth.end)
-      .reduce((sum, p) => sum + Number(p.amount), 0) +
-    liveReceipts
-      .filter((r) => r.issuedAt >= priorOverviewMonth.start && r.issuedAt < priorOverviewMonth.end)
-      .reduce((sum, r) => sum + Number(r.amount), 0);
+  const periodCash = overviewKpis
+    ? overviewKpis.periodCash
+    : livePayments
+        .filter((p) => p.paidAt >= overviewMonth.start && p.paidAt < overviewMonth.end)
+        .reduce((sum, p) => sum + Number(p.amount), 0) +
+      liveReceipts
+        .filter((r) => r.issuedAt >= overviewMonth.start && r.issuedAt < overviewMonth.end)
+        .reduce((sum, r) => sum + Number(r.amount), 0);
+  const priorPeriodCash = overviewKpis
+    ? overviewKpis.priorPeriodCash
+    : livePayments
+        .filter(
+          (p) =>
+            p.paidAt >= priorOverviewMonth.start && p.paidAt < priorOverviewMonth.end,
+        )
+        .reduce((sum, p) => sum + Number(p.amount), 0) +
+      liveReceipts
+        .filter(
+          (r) =>
+            r.issuedAt >= priorOverviewMonth.start &&
+            r.issuedAt < priorOverviewMonth.end,
+        )
+        .reduce((sum, r) => sum + Number(r.amount), 0);
   const currentMonthCash =
     livePayments
       .filter((p) => p.paidAt >= monthStart)
@@ -849,13 +998,21 @@ export default async function FinanceQueuePage({
   const payablesOverdueCount = openVendorBills.filter(
     (b) => b.dueDate && b.dueDate.getTime() < startOfToday.getTime(),
   ).length;
-  const periodExpenses = liveExpenses
-    .filter((e) => e.expenseDate >= overviewMonth.start && e.expenseDate < overviewMonth.end)
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-  const bankingUnmatched = Array.from(bankStatsMap.values()).reduce(
-    (sum, s) => sum + s.unmatched,
-    0,
-  );
+  const periodExpenses = overviewKpis
+    ? overviewKpis.periodExpenses
+    : liveExpenses
+        .filter(
+          (e) =>
+            e.expenseDate >= overviewMonth.start &&
+            e.expenseDate < overviewMonth.end,
+        )
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+  const bankingUnmatched = overviewKpis
+    ? overviewKpis.bankingUnmatched
+    : Array.from(bankStatsMap.values()).reduce(
+        (sum, s) => sum + s.unmatched,
+        0,
+      );
   const currency = tenant.defaultCurrency || "NGN";
   const money = (n: number) => `${currency} ${n.toLocaleString()}`;
 
@@ -864,11 +1021,21 @@ export default async function FinanceQueuePage({
       tenantSlug={tenant.slug}
       canManageFinance={canManage}
       overviewStats={{
-        outstandingReceivables: money(outstanding),
-        overdueReceivables: money(overdueOutstanding),
-        overdueInvoiceCount: overdueInvoices.length,
-        openPayables: money(payablesOutstanding),
-        payablesOverdueCount,
+        outstandingReceivables: money(
+          overviewKpis ? overviewKpis.outstanding : outstanding,
+        ),
+        overdueReceivables: money(
+          overviewKpis ? overviewKpis.overdueOutstanding : overdueOutstanding,
+        ),
+        overdueInvoiceCount: overviewKpis
+          ? overviewKpis.overdueInvoiceCount
+          : overdueInvoices.length,
+        openPayables: money(
+          overviewKpis ? overviewKpis.payablesOutstanding : payablesOutstanding,
+        ),
+        payablesOverdueCount: overviewKpis
+          ? overviewKpis.payablesOverdueCount
+          : payablesOverdueCount,
         collectedThisMonth: money(periodCash),
         expensesThisMonth: money(periodExpenses),
         periodKey: overviewMonth.key,
@@ -877,8 +1044,12 @@ export default async function FinanceQueuePage({
         priorPeriodCollected: money(priorPeriodCash),
         priorPeriodLabel: monthLongLabel(priorOverviewMonth.key),
         pendingFinanceChecks: deals.length,
-        openInvoiceCount: openInvoices.length,
-        openPayableCount: openVendorBills.length,
+        openInvoiceCount: overviewKpis
+          ? overviewKpis.openInvoiceCount
+          : openInvoices.length,
+        openPayableCount: overviewKpis
+          ? overviewKpis.openPayableCount
+          : openVendorBills.length,
         bankingUnmatched,
       }}
       deals={deals.map((deal) => ({
