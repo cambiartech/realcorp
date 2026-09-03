@@ -1,6 +1,6 @@
 "use client";
 
-type TabItem<T extends string> = { id: T; label: string };
+type TabItem<T extends string> = { readonly id: T; readonly label: string };
 
 export function UiTabs<T extends string>({
   tabs,
@@ -8,7 +8,7 @@ export function UiTabs<T extends string>({
   onChange,
   "aria-label": ariaLabel,
 }: {
-  tabs: TabItem<T>[];
+  tabs: ReadonlyArray<TabItem<T>>;
   value: T;
   onChange: (id: T) => void;
   "aria-label"?: string;
