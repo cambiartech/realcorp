@@ -549,12 +549,12 @@ export function HrPeopleWorkspace({
 
   function openSendAllForms() {
     const uid = selectedUserId;
-    setSelectedFormTypes(["BIODATA", "BANK_FORM", "GUARANTOR", "HEALTH"]);
+    setSelectedFormTypes(["BIODATA", "BANK_FORM", "GUARANTOR"]);
     setPeopleTab("send");
     setSendMode("team");
     const qs = new URLSearchParams();
     qs.set("send", "1");
-    qs.set("forms", "BIODATA,BANK_FORM,GUARANTOR,HEALTH");
+    qs.set("forms", "BIODATA,BANK_FORM,GUARANTOR");
     if (uid) qs.set("forUser", uid);
     router.replace(`/${tenantSlug}/hr/people?${qs.toString()}`, { scroll: false });
   }
@@ -577,13 +577,13 @@ export function HrPeopleWorkspace({
     if (formsParam) {
       for (const part of formsParam.split(",")) {
         const t = part.trim();
-        if (t === "BIODATA" || t === "BANK_FORM" || t === "GUARANTOR" || t === "HEALTH") types.push(t);
+        if (t === "BIODATA" || t === "BANK_FORM" || t === "GUARANTOR") types.push(t);
       }
-    } else if (form === "BIODATA" || form === "BANK_FORM" || form === "GUARANTOR" || form === "HEALTH") {
+    } else if (form === "BIODATA" || form === "BANK_FORM" || form === "GUARANTOR") {
       types.push(form);
     }
     if (types.length > 0) setSelectedFormTypes(types);
-    else if (form === "BIODATA" || form === "BANK_FORM" || form === "GUARANTOR" || form === "HEALTH") {
+    else if (form === "BIODATA" || form === "BANK_FORM" || form === "GUARANTOR") {
       setSelectedFormTypes([form]);
     }
   }, [searchParams]);

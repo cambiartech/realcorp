@@ -73,6 +73,8 @@ export type PayslipRunView = {
     paygroup: string;
     employeeId: string;
     department: string;
+    location: string;
+    hireDate: string;
     taxId: string;
     rsaPin: string;
     pensionAdministrator: string;
@@ -961,6 +963,8 @@ export function HrPayslipsWorkspace({
               companyName={companyName}
               brand={tenantBrand}
               periodLabel={selectedRun.label}
+              year={selectedRun.year}
+              month={selectedRun.month}
               employeeName={viewPayslip.employeeName}
               jobRole={viewPayslip.jobRole}
               paygroup={viewPayslip.paygroup}
@@ -970,6 +974,9 @@ export function HrPayslipsWorkspace({
               taxId={viewPayslip.taxId}
               rsaPin={viewPayslip.rsaPin}
               pensionAdministrator={viewPayslip.pensionAdministrator}
+              nhfMembershipNumber={viewPayslip.nhfMembershipNumber}
+              location={viewPayslip.location}
+              hireDate={viewPayslip.hireDate}
               currency={currency}
               calc={viewPayslip.calc}
             />

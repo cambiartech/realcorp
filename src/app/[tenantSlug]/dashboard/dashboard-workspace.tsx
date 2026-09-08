@@ -49,16 +49,20 @@ import {
   type DashboardRoleView,
 } from "@/lib/org-membership-profile";
 import { saveDashboardPreference, upsertTenantGoal } from "./actions";
-import { CalendarMonthPicker } from "@/components/calendar-month-picker";
+import { FinancePeriodPicker, type FinancePeriodPickerValue } from "@/components/finance-period-picker";
 import {
   currentMonthKey,
   isInHalfOpenRange,
   monthBounds,
-  monthLongLabel,
   monthShortLabel,
   parseMonthKey,
   resolveMonthKey,
 } from "@/lib/calendar-month";
+import {
+  dateKey,
+  parseDateKey,
+  resolveFinancePeriod,
+} from "@/lib/finance-period";
 
 type RoleView = DashboardRoleView;
 
@@ -239,13 +243,16 @@ type Goal = {
   pipelineTarget: number | null;
 } | null;
 
-type DashboardRange = "TODAY" | "WEEK" | "1M" | "6M" | "12M" | "YTD" | "MONTH";
+type DashboardRange = "TODAY" | "WEEK" | "1M" | "6M" | "12M" | "YTD" | "MONTH" | "YEAR" | "CUSTOM";
 
 type FilterPreset = {
   id: string;
   label: string;
   range: DashboardRange;
   calendarMonth?: string;
+  calendarYear?: number;
+  periodFrom?: string;
+  periodTo?: string;
   module: "ALL" | "SALES" | "FINANCE" | "PROJECTS";
   owner: string;
   project: string;
@@ -351,6 +358,9 @@ type DashboardUiDraftV1 = {
   chartRange: "WEEK" | "1M" | "6M" | "12M" | "YTD";
   globalRange: DashboardRange;
   calendarMonth: string;
+  calendarYear: number;
+  periodFrom: string;
+  periodTo: string;
   module: FilterPreset["module"];
   owner: string;
   project: string;
@@ -369,7 +379,9 @@ function sanitizeDashboardRange(value: unknown): DashboardRange {
     value === "6M" ||
     value === "12M" ||
     value === "YTD" ||
-    value === "MONTH"
+    value === "MONTH" ||
+    value === "YEAR" ||
+    value === "CUSTOM"
   ) {
     return value;
   }
@@ -380,8 +392,35 @@ function sanitizeCalendarMonth(value: unknown): string {
   return parseMonthKey(typeof value === "string" ? value : null) ? (value as string) : currentMonthKey();
 }
 
-function dashboardRangeLabel(range: DashboardRange, calendarMonth: string): string {
+function sanitizeCalendarYear(value: unknown): number {
+  const year = typeof value === "number" ? value : Number(value);
+  const max = new Date().getFullYear();
+  if (!Number.isFinite(year)) return max;
+  return Math.min(max, Math.max(max - 5, Math.trunc(year)));
+}
+
+function sanitizePeriodDate(value: unknown, fallback: string): string {
+  return parseDateKey(typeof value === "string" ? value : null) ? (value as string) : fallback;
+}
+
+function currentMonthDateKeys(at = new Date()) {
+  const bounds = monthBounds(currentMonthKey(at), at);
+  return {
+    from: dateKey(bounds.start),
+    to: dateKey(new Date(bounds.end.getTime() - 1)),
+  };
+}
+
+function dashboardRangeLabel(
+  range: DashboardRange,
+  calendarMonth: string,
+  calendarYear: number,
+  periodFrom: string,
+  periodTo: string,
+): string {
   if (range === "MONTH") return monthShortLabel(calendarMonth);
+  if (range === "YEAR") return String(calendarYear);
+  if (range === "CUSTOM") return `${periodFrom} – ${periodTo}`;
   if (range === "WEEK") return "This week";
   if (range === "TODAY") return "Today";
   if (range === "YTD") return "YTD";
@@ -416,6 +455,7 @@ function readDashboardDraft(tenantSlug: string): DashboardUiDraftV1 | null {
     const widgetIds = sanitizeWidgetIds(d.widgetIds);
     const hasCalendarMonthField = Object.prototype.hasOwnProperty.call(d, "calendarMonth");
     const storedRange = sanitizeDashboardRange(d.globalRange);
+    const monthKeys = currentMonthDateKeys();
     return {
       v: DASHBOARD_UI_DRAFT_VERSION,
       roleView: normalizedView,
@@ -430,6 +470,9 @@ function readDashboardDraft(tenantSlug: string): DashboardUiDraftV1 | null {
           : "1M",
       globalRange: hasCalendarMonthField ? storedRange : storedRange === "1M" ? "MONTH" : storedRange,
       calendarMonth: sanitizeCalendarMonth(d.calendarMonth),
+      calendarYear: sanitizeCalendarYear(d.calendarYear),
+      periodFrom: sanitizePeriodDate(d.periodFrom, monthKeys.from),
+      periodTo: sanitizePeriodDate(d.periodTo, monthKeys.to),
       module:
         d.module === "ALL" || d.module === "SALES" || d.module === "FINANCE" || d.module === "PROJECTS"
           ? d.module
@@ -458,6 +501,9 @@ type DashboardBootstrapUi = {
   chartRange: "WEEK" | "1M" | "6M" | "12M" | "YTD";
   globalRange: DashboardRange;
   calendarMonth: string;
+  calendarYear: number;
+  periodFrom: string;
+  periodTo: string;
   module: FilterPreset["module"];
   owner: string;
   project: string;
@@ -484,12 +530,16 @@ function getServerAlignedDashboardUi(
   }
 
   const selectedWidgets = mergedInitial.length > 0 ? mergedInitial : [...pool];
+  const monthKeys = currentMonthDateKeys();
   return {
     roleView: initialRoleView,
     selectedWidgets,
     chartRange: "1M",
     globalRange: "MONTH",
     calendarMonth: currentMonthKey(),
+    calendarYear: new Date().getFullYear(),
+    periodFrom: monthKeys.from,
+    periodTo: monthKeys.to,
     module: "ALL",
     owner: "",
     project: "",
@@ -519,6 +569,9 @@ function mergeDashboardDraftFromStorage(
     chartRange: d.chartRange,
     globalRange: d.globalRange,
     calendarMonth: d.calendarMonth,
+    calendarYear: d.calendarYear,
+    periodFrom: d.periodFrom,
+    periodTo: d.periodTo,
     module: d.module,
     owner: d.owner,
     project: d.project,
@@ -576,6 +629,9 @@ export function DashboardWorkspace({
   const [chartRange, setChartRange] = useState<"WEEK" | "1M" | "6M" | "12M" | "YTD">(initialUi.chartRange);
   const [globalRange, setGlobalRange] = useState<DashboardRange>(initialUi.globalRange);
   const [calendarMonth, setCalendarMonth] = useState(initialUi.calendarMonth);
+  const [calendarYear, setCalendarYear] = useState(initialUi.calendarYear);
+  const [periodFrom, setPeriodFrom] = useState(initialUi.periodFrom);
+  const [periodTo, setPeriodTo] = useState(initialUi.periodTo);
   const [moduleFilter, setModuleFilter] = useState<"ALL" | "SALES" | "FINANCE" | "PROJECTS">(
     initialUi.module,
   );
@@ -602,6 +658,9 @@ export function DashboardWorkspace({
     setChartRange(fromDraft.chartRange);
     setGlobalRange(fromDraft.globalRange);
     setCalendarMonth(fromDraft.calendarMonth);
+    setCalendarYear(fromDraft.calendarYear);
+    setPeriodFrom(fromDraft.periodFrom);
+    setPeriodTo(fromDraft.periodTo);
     setModuleFilter(fromDraft.module);
     setOwnerFilter(fromDraft.owner);
     setProjectFilter(fromDraft.project);
@@ -675,6 +734,9 @@ export function DashboardWorkspace({
         chartRange,
         globalRange,
         calendarMonth,
+        calendarYear,
+        periodFrom,
+        periodTo,
         module: moduleFilter,
         owner: ownerFilter,
         project: projectFilter,
@@ -691,6 +753,9 @@ export function DashboardWorkspace({
     chartRange,
     globalRange,
     calendarMonth,
+    calendarYear,
+    periodFrom,
+    periodTo,
     moduleFilter,
     ownerFilter,
     projectFilter,
@@ -699,9 +764,32 @@ export function DashboardWorkspace({
 
   const now = new Date();
   const currentYear = now.getFullYear();
+  const resolvedCalendarPeriod = useMemo(() => {
+    if (globalRange === "YEAR") {
+      return resolveFinancePeriod({ period: "year", year: String(calendarYear) });
+    }
+    if (globalRange === "CUSTOM") {
+      return resolveFinancePeriod({ period: "custom", from: periodFrom, to: periodTo });
+    }
+    if (globalRange === "MONTH") {
+      return resolveFinancePeriod({ period: "month", month: calendarMonth });
+    }
+    return null;
+  }, [globalRange, calendarYear, periodFrom, periodTo, calendarMonth]);
+
   const seriesRevenue = useMemo(() => {
     const monthly = values.revenueMonthly;
     const weekly = values.revenueWeekly;
+    if (resolvedCalendarPeriod?.preset === "year") {
+      return monthly.filter((x) => x.year === resolvedCalendarPeriod.year);
+    }
+    if (resolvedCalendarPeriod?.preset === "custom") {
+      return monthly.filter((x) => {
+        const start = new Date(x.year, x.month - 1, 1);
+        const end = new Date(x.year, x.month, 1);
+        return start < resolvedCalendarPeriod.end && end > resolvedCalendarPeriod.start;
+      });
+    }
     if (globalRange === "MONTH") {
       const parsed = parseMonthKey(calendarMonth);
       if (parsed) {
@@ -725,10 +813,28 @@ export function DashboardWorkspace({
     if (chartRange === "12M") return monthly;
     if (chartRange === "YTD") return monthly.filter((x) => x.year === currentYear);
     return monthly.slice(-6);
-  }, [chartRange, values.revenueMonthly, values.revenueWeekly, currentYear, globalRange, calendarMonth]);
+  }, [
+    chartRange,
+    values.revenueMonthly,
+    values.revenueWeekly,
+    currentYear,
+    globalRange,
+    calendarMonth,
+    resolvedCalendarPeriod,
+  ]);
   const seriesPipeline = useMemo(() => {
     const monthly = values.pipelineVsTargetMonthly;
     const weekly = values.pipelineVsTargetWeekly;
+    if (resolvedCalendarPeriod?.preset === "year") {
+      return monthly.filter((x) => x.year === resolvedCalendarPeriod.year);
+    }
+    if (resolvedCalendarPeriod?.preset === "custom") {
+      return monthly.filter((x) => {
+        const start = new Date(x.year, x.month - 1, 1);
+        const end = new Date(x.year, x.month, 1);
+        return start < resolvedCalendarPeriod.end && end > resolvedCalendarPeriod.start;
+      });
+    }
     if (globalRange === "MONTH") {
       const parsed = parseMonthKey(calendarMonth);
       if (parsed) {
@@ -759,18 +865,19 @@ export function DashboardWorkspace({
     currentYear,
     globalRange,
     calendarMonth,
+    resolvedCalendarPeriod,
   ]);
 
   const rangeBounds = useMemo(() => {
+    if (resolvedCalendarPeriod) {
+      return { start: resolvedCalendarPeriod.start, end: resolvedCalendarPeriod.end };
+    }
     const nowDate = new Date();
     const todayStart = new Date(nowDate);
     todayStart.setHours(0, 0, 0, 0);
     const tomorrow = new Date(todayStart);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (globalRange === "MONTH") {
-      return monthBounds(calendarMonth, nowDate);
-    }
     if (globalRange === "TODAY") {
       return { start: todayStart, end: tomorrow };
     }
@@ -798,7 +905,7 @@ export function DashboardWorkspace({
     }
     const ytd = new Date(nowDate.getFullYear(), 0, 1);
     return { start: ytd, end: tomorrow };
-  }, [globalRange, calendarMonth]);
+  }, [globalRange, resolvedCalendarPeriod]);
   const rangeStart = rangeBounds.start;
   const rangeEnd = rangeBounds.end;
 
@@ -879,8 +986,7 @@ export function DashboardWorkspace({
 
   const collectionsTrend = useMemo(() => {
     const out: Array<{ label: string; invoiced: number; collected: number; outstanding: number }> = [];
-    const anchor =
-      globalRange === "MONTH" ? monthBounds(calendarMonth).end : new Date();
+    const anchor = resolvedCalendarPeriod?.end ?? new Date();
     for (let i = 5; i >= 0; i -= 1) {
       const start = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
       start.setHours(0, 0, 0, 0);
@@ -903,7 +1009,7 @@ export function DashboardWorkspace({
       });
     }
     return out;
-  }, [scopedFinanceInvoices, scopedFinancePayments, globalRange, calendarMonth]);
+  }, [scopedFinanceInvoices, scopedFinancePayments, resolvedCalendarPeriod]);
 
   const overdueAging = useMemo(() => {
     const now = new Date();
@@ -1030,11 +1136,20 @@ export function DashboardWorkspace({
       })
       .reduce((sum, inv) => sum + inv.balanceDue, 0);
     const invoicesIssued = filteredFinanceInvoices.filter((inv) => inv.status !== "VOID").length;
-    const isCurrent = globalRange === "MONTH" && calendarMonth === currentMonthKey();
+    const isCurrent = Boolean(resolvedCalendarPeriod?.isDefault);
+    const rangeLabel = dashboardRangeLabel(
+      globalRange,
+      calendarMonth,
+      calendarYear,
+      periodFrom,
+      periodTo,
+    );
     return {
-      label: globalRange === "MONTH" ? monthLongLabel(calendarMonth) : dashboardRangeLabel(globalRange, calendarMonth),
+      label: resolvedCalendarPeriod?.label ?? rangeLabel,
       shortLabel:
-        globalRange === "MONTH" ? monthShortLabel(calendarMonth) : dashboardRangeLabel(globalRange, calendarMonth),
+        resolvedCalendarPeriod?.preset === "month"
+          ? monthShortLabel(calendarMonth)
+          : resolvedCalendarPeriod?.label ?? rangeLabel,
       isCurrent,
       collected,
       expectedDue,
@@ -1048,6 +1163,10 @@ export function DashboardWorkspace({
     rangeEnd,
     globalRange,
     calendarMonth,
+    calendarYear,
+    periodFrom,
+    periodTo,
+    resolvedCalendarPeriod,
   ]);
 
   const topProjects = useMemo(() => {
@@ -1158,6 +1277,9 @@ export function DashboardWorkspace({
       label,
       range: globalRange,
       calendarMonth,
+      calendarYear,
+      periodFrom,
+      periodTo,
       module: moduleFilter,
       owner: ownerFilter,
       project: projectFilter,
@@ -1177,6 +1299,9 @@ export function DashboardWorkspace({
     if (!preset) return;
     setGlobalRange(preset.range);
     if (preset.calendarMonth) setCalendarMonth(resolveMonthKey(preset.calendarMonth));
+    if (preset.calendarYear) setCalendarYear(preset.calendarYear);
+    if (preset.periodFrom) setPeriodFrom(preset.periodFrom);
+    if (preset.periodTo) setPeriodTo(preset.periodTo);
     setModuleFilter(preset.module);
     setOwnerFilter(preset.owner);
     setProjectFilter(preset.project);
@@ -1193,18 +1318,34 @@ export function DashboardWorkspace({
   }
 
   function clearGlobalFilters() {
+    const monthKeys = currentMonthDateKeys();
     setGlobalRange("MONTH");
     setCalendarMonth(currentMonthKey());
+    setCalendarYear(new Date().getFullYear());
+    setPeriodFrom(monthKeys.from);
+    setPeriodTo(monthKeys.to);
     setModuleFilter("ALL");
     setOwnerFilter("");
     setProjectFilter("");
     setSourceFilter("");
   }
 
-  function selectCalendarMonth(next: string) {
-    setCalendarMonth(resolveMonthKey(next));
-    setGlobalRange("MONTH");
+  function applyPeriodPicker(next: FinancePeriodPickerValue) {
+    setCalendarMonth(next.monthKey);
+    setCalendarYear(next.year);
+    setPeriodFrom(next.fromKey);
+    setPeriodTo(next.toKey);
+    setGlobalRange(next.preset === "year" ? "YEAR" : next.preset === "custom" ? "CUSTOM" : "MONTH");
   }
+
+  const periodPickerValue: FinancePeriodPickerValue = {
+    preset:
+      globalRange === "YEAR" ? "year" : globalRange === "CUSTOM" ? "custom" : "month",
+    monthKey: calendarMonth,
+    year: calendarYear,
+    fromKey: periodFrom,
+    toKey: periodTo,
+  };
 
   const ownerLabel = ownerFilter
     ? values.filterOptions.owners.find((x) => x.id === ownerFilter)?.label || ownerFilter
@@ -1213,6 +1354,13 @@ export function DashboardWorkspace({
     ? values.filterOptions.projects.find((x) => x.id === projectFilter)?.label || projectFilter
     : "";
   const isDefaultScope = globalRange === "MONTH" && calendarMonth === currentMonthKey();
+  const rangeChipLabel = dashboardRangeLabel(
+    globalRange,
+    calendarMonth,
+    calendarYear,
+    periodFrom,
+    periodTo,
+  );
 
   async function submitGoal(formData: FormData) {
     setPending(true);
@@ -1258,11 +1406,10 @@ export function DashboardWorkspace({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CalendarMonthPicker
-            id="dashboard-calendar-month"
-            value={calendarMonth}
-            onChange={selectCalendarMonth}
-            monthsBack={12}
+          <FinancePeriodPicker
+            idPrefix="dashboard"
+            value={periodPickerValue}
+            onChange={applyPeriodPicker}
           />
           <button
             type="button"
@@ -1439,7 +1586,7 @@ export function DashboardWorkspace({
               }}
               className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
             >
-              <span>Range: {dashboardRangeLabel(globalRange, calendarMonth)}</span>
+              <span>Range: {rangeChipLabel}</span>
               <span aria-hidden>×</span>
             </button>
           ) : null}
@@ -1600,6 +1747,8 @@ export function DashboardWorkspace({
                     onChange={(e) => setGlobalRange(e.target.value as DashboardRange)}
                   >
                     <option value="MONTH">Calendar month</option>
+                    <option value="YEAR">Calendar year</option>
+                    <option value="CUSTOM">Custom range</option>
                     <option value="TODAY">Today</option>
                     <option value="WEEK">This Week</option>
                     <option value="1M">Last 1 month</option>
@@ -1608,21 +1757,20 @@ export function DashboardWorkspace({
                     <option value="YTD">YTD</option>
                   </UiSelect>
                 </div>
-                {globalRange === "MONTH" ? (
+                {globalRange === "MONTH" || globalRange === "YEAR" || globalRange === "CUSTOM" ? (
                   <div className="sm:col-span-2">
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
-                      Month
+                      Period
                     </label>
-                    <CalendarMonthPicker
-                      id="dashboard-filter-month"
-                      value={calendarMonth}
-                      onChange={selectCalendarMonth}
-                      monthsBack={12}
+                    <FinancePeriodPicker
+                      idPrefix="dashboard-filter"
+                      value={periodPickerValue}
+                      onChange={applyPeriodPicker}
                     />
                   </div>
                 ) : (
                   <p className="sm:col-span-2 text-[11px] text-muted">
-                    Use the month picker at the top of the dashboard to jump to a specific previous month.
+                    Use Month / Year / Custom range at the top of the dashboard for a specific period.
                   </p>
                 )}
                 <div className="sm:col-span-2">
@@ -1694,7 +1842,7 @@ export function DashboardWorkspace({
                       }}
                       className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
                     >
-                      <span>Range: {dashboardRangeLabel(globalRange, calendarMonth)}</span>
+                      <span>Range: {rangeChipLabel}</span>
                       <span aria-hidden>×</span>
                     </button>
                   ) : null}
@@ -1957,7 +2105,13 @@ export function DashboardWorkspace({
             <p className="text-xs uppercase tracking-wide text-muted">Collections trend</p>
             <p className="mt-1 text-sm text-foreground">
               {formatMoney(collectionsTrend.reduce((s, x) => s + x.collected, 0))} collected / 6 months
-              {globalRange === "MONTH" ? ` to ${monthShortLabel(calendarMonth)}` : ""}
+              {globalRange === "MONTH"
+                ? ` to ${monthShortLabel(calendarMonth)}`
+                : globalRange === "YEAR"
+                  ? ` to ${calendarYear}`
+                  : globalRange === "CUSTOM"
+                    ? ` to ${periodTo}`
+                    : ""}
             </p>
           </button>
           <button

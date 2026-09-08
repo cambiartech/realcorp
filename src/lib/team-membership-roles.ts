@@ -23,6 +23,7 @@ export const TEAM_MEMBERSHIP_ROLE_OPTIONS: { value: MembershipRole; label: strin
   { value: MembershipRole.SALES_MANAGER, label: "Sales · Lead" },
   { value: MembershipRole.SALES_EXECUTIVE, label: "Sales" },
   { value: MembershipRole.MARKETING_MANAGER, label: "Marketing · Lead" },
+  { value: MembershipRole.MARKETING_EXECUTIVE, label: "Marketing" },
   { value: MembershipRole.COMMUNITY_MANAGER, label: "Community · Lead" },
   { value: MembershipRole.HOUSEKEEPING_MANAGER, label: "Operations · Lead" },
   { value: MembershipRole.FNB_STAFF, label: "Operations" },

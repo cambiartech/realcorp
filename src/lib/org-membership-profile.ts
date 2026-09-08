@@ -71,7 +71,7 @@ export function resolveMembershipRole(input: MembershipProfileInput): Membership
     case "finance":
       return MembershipRole.FINANCE_MANAGER;
     case "marketing":
-      return MembershipRole.MARKETING_MANAGER;
+      return isDepartmentLead ? MembershipRole.MARKETING_MANAGER : MembershipRole.MARKETING_EXECUTIVE;
     case "community":
       return MembershipRole.COMMUNITY_MANAGER;
     case "hr":
@@ -100,6 +100,8 @@ export function profileFromMembershipRole(role: MembershipRole): {
       return { department: "finance", isDepartmentLead: true };
     case MembershipRole.MARKETING_MANAGER:
       return { department: "marketing", isDepartmentLead: true };
+    case MembershipRole.MARKETING_EXECUTIVE:
+      return { department: "marketing", isDepartmentLead: false };
     case MembershipRole.COMMUNITY_MANAGER:
       return { department: "community", isDepartmentLead: true };
     case MembershipRole.HR_MANAGER:
@@ -163,7 +165,13 @@ export function dashboardRoleViewForMembership(
 
   if (dept === "finance" || role === MembershipRole.FINANCE_MANAGER) return "FINANCE";
   if (dept === "hr" || role === MembershipRole.HR_MANAGER) return "HR";
-  if (dept === "marketing" || role === MembershipRole.MARKETING_MANAGER) return "MARKETING";
+  if (
+    dept === "marketing" ||
+    role === MembershipRole.MARKETING_MANAGER ||
+    role === MembershipRole.MARKETING_EXECUTIVE
+  ) {
+    return "MARKETING";
+  }
   if (dept === "community" || role === MembershipRole.COMMUNITY_MANAGER) return "COMMUNITY";
   if (
     dept === "operations" ||

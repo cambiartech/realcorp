@@ -4,10 +4,105 @@ import { BrandedDocumentShell } from "@/components/hr/branded-document-shell";
 import type { PayslipCalculation } from "@/lib/hr-payslip";
 import type { TenantBranding } from "@/lib/tenant-branding";
 
+const MONTH_FULL = [
+  "JANUARY",
+  "FEBRUARY",
+  "MARCH",
+  "APRIL",
+  "MAY",
+  "JUNE",
+  "JULY",
+  "AUGUST",
+  "SEPTEMBER",
+  "OCTOBER",
+  "NOVEMBER",
+  "DECEMBER",
+];
+
+const PENSIONABLE_EARNING_CODES = new Set(["B", "H", "T", "BASIC", "HOUSING", "TRANSPORT"]);
+
+function payslipDocumentTitle(periodLabel: string, year?: number, month?: number) {
+  if (year && month && month >= 1 && month <= 12) {
+    return `${MONTH_FULL[month - 1]} ${year} PAY SLIP`;
+  }
+  const trimmed = periodLabel.trim();
+  if (/pay\s*slip/i.test(trimmed)) return trimmed.toUpperCase();
+  return `${trimmed.toUpperCase()} PAY SLIP`;
+}
+
+function formatSlipDate(value?: string | null) {
+  if (!value?.trim()) return "";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!iso) return value.trim();
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${iso[3]}-${months[Number(iso[2]) - 1]}-${iso[1]}`;
+}
+
+function formatSlipAmount(n: number) {
+  return n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function earningLabel(code: string, label: string) {
+  const cleaned = label.replace(/\s*\(\d+%\)/, "").trim();
+  if (code === "B" || code === "BASIC") return "Basic Allowance";
+  if (code === "H" || code === "HOUSING") return "Housing Allowance";
+  if (code === "T" || code === "TRANSPORT") return "Transportation Allowance";
+  return cleaned || label;
+}
+
+function deductionLabel(code: string, label: string) {
+  if (code === "PAYE") return "P.A.Y.E";
+  if (code === "PENSION_EMPLOYEE" || code === "PEN") return "PENSION";
+  if (code === "NHF") return "NHF";
+  return label;
+}
+
+function DetailCell({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="grid grid-cols-[8.75rem_minmax(0,1fr)] items-baseline gap-x-2 py-[3px] text-[13px] leading-snug">
+      <span className="font-semibold text-slate-800">{label}:</span>
+      <span className="min-h-[1.1em] text-slate-900">{value?.trim() ? value : "\u00a0"}</span>
+    </div>
+  );
+}
+
+function AmountRow({
+  label,
+  amount,
+  variant = "plain",
+}: {
+  label: string;
+  amount: number;
+  variant?: "plain" | "gross" | "deduction" | "totalDeduction" | "net";
+}) {
+  const isDeduction = variant === "deduction" || variant === "totalDeduction";
+  const formatted = isDeduction ? `(${formatSlipAmount(amount)})` : formatSlipAmount(amount);
+  return (
+    <div
+      className={[
+        "grid grid-cols-[minmax(0,1fr)_9rem] items-baseline gap-4 py-[3px] text-[13px]",
+        variant === "gross" || variant === "net" || variant === "totalDeduction" ? "font-bold" : "",
+      ].join(" ")}
+    >
+      <span className="text-slate-800">{label}</span>
+      <span
+        className={[
+          "text-right tabular-nums",
+          isDeduction ? "text-red-600 print:text-red-700" : "text-slate-900",
+        ].join(" ")}
+      >
+        {formatted}
+      </span>
+    </div>
+  );
+}
+
 export function PayslipPrintView({
   companyName,
   brand,
   periodLabel,
+  year,
+  month,
   employeeName,
   jobRole,
   paygroup,
@@ -17,12 +112,17 @@ export function PayslipPrintView({
   taxId,
   rsaPin,
   pensionAdministrator,
+  nhfMembershipNumber,
+  location,
+  hireDate,
   currency,
   calc,
 }: {
   companyName: string;
   brand?: TenantBranding | null;
   periodLabel: string;
+  year?: number;
+  month?: number;
   employeeName: string;
   jobRole: string;
   paygroup: string;
@@ -32,6 +132,9 @@ export function PayslipPrintView({
   taxId?: string;
   rsaPin?: string;
   pensionAdministrator?: string;
+  nhfMembershipNumber?: string;
+  location?: string;
+  hireDate?: string;
   currency: string;
   calc: PayslipCalculation;
 }) {
@@ -39,185 +142,103 @@ export function PayslipPrintView({
     `${currency} ${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const earningsRows = Array.isArray(calc.earnings) ? calc.earnings : [];
   const deductionRows = Array.isArray(calc.deductions) ? calc.deductions : [];
+  const title = payslipDocumentTitle(periodLabel, year, month);
+  const grade = jobRole.trim() || paygroup.trim();
+  const totalDeductions = deductionRows.reduce((sum, row) => sum + row.amount, 0);
 
   const bht = earningsRows
-    .filter((e) => ["B", "H", "T"].includes(e.code))
+    .filter((e) => PENSIONABLE_EARNING_CODES.has(e.code))
     .reduce((sum, e) => sum + e.amount, 0);
 
-  const body = (
-    <>
-      <div className="mb-5 rounded-lg border-2 border-slate-800 bg-slate-50 px-4 py-3 text-center print:border-slate-900">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Net pay this period</p>
-        <p className="mt-1 text-2xl font-bold text-slate-900">{money(calc.netPay)}</p>
+  const details = (
+    <div className="mb-6 grid gap-x-10 sm:grid-cols-2">
+      <div>
+        <DetailCell label="Employee ID" value={employeeId} />
+        <DetailCell label="Name" value={employeeName} />
+        <DetailCell label="Grade" value={grade} />
+        <DetailCell label="Bank Name" value={bankName} />
+        <DetailCell label="Pension Provider" value={pensionAdministrator} />
+        <DetailCell label="Location" value={location} />
+        <DetailCell label="Hire Date" value={formatSlipDate(hireDate)} />
       </div>
-
-      <div className="mb-5 grid gap-3 rounded-md border border-slate-200 bg-slate-50/80 p-3 text-sm sm:grid-cols-2">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Employee</p>
-          <p className="font-semibold text-slate-900">{employeeName}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Job role</p>
-          <p className="font-semibold text-slate-900">{jobRole || "—"}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Pay group</p>
-          <p>{paygroup || "—"}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Employee ID</p>
-          <p>{employeeId || "—"}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Bank</p>
-          <p>{bankName || "—"}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Account number</p>
-          <p className="font-mono text-xs">{accountNumber || "—"}</p>
-        </div>
-        {taxId ? (
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">TIN</p>
-            <p className="font-mono text-xs">{taxId}</p>
-          </div>
-        ) : null}
-        {rsaPin ? (
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">RSA PIN</p>
-            <p className="font-mono text-xs">{rsaPin}</p>
-            {pensionAdministrator ? <p className="text-xs text-slate-600">{pensionAdministrator}</p> : null}
-          </div>
-        ) : null}
+      <div>
+        <DetailCell label="Tax Id" value={taxId} />
+        <DetailCell label="NHF Number" value={nhfMembershipNumber} />
+        <DetailCell label="Account Number" value={accountNumber} />
+        <DetailCell label="Pension No" value={rsaPin} />
       </div>
+    </div>
+  );
 
-      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Earnings</p>
-      <table className="mb-4 w-full border-collapse border border-slate-300 text-sm">
-        <thead>
-          <tr className="bg-slate-800 text-left text-white">
-            <th className="border border-slate-300 px-3 py-2">Description</th>
-            <th className="border border-slate-300 px-3 py-2 text-right">%</th>
-            <th className="border border-slate-300 px-3 py-2 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {earningsRows.map((row) => (
-            <tr key={row.code}>
-              <td className="border border-slate-200 px-3 py-2">{row.label.replace(/\s*\(\d+%\)/, "")}</td>
-              <td className="border border-slate-200 px-3 py-2 text-right text-slate-600">
-                {row.percent == null ? "One-time" : `${row.percent}%`}
-              </td>
-              <td className="border border-slate-200 px-3 py-2 text-right font-medium">
-                {money(row.amount)}
-              </td>
-            </tr>
-          ))}
-          <tr className="bg-slate-100 font-semibold">
-            <td className="border border-slate-200 px-3 py-2" colSpan={2}>
-              Total gross pay
-            </td>
-            <td className="border border-slate-200 px-3 py-2 text-right">{money(calc.grossPay)}</td>
-          </tr>
-        </tbody>
-      </table>
+  const amounts = (
+    <div className="grid grid-cols-[6.75rem_minmax(0,1fr)] gap-x-4">
+      <p className="pt-1 text-[13px] font-semibold text-slate-800">Allowances</p>
+      <div>
+        {earningsRows.map((row) => (
+          <AmountRow key={row.code} label={earningLabel(row.code, row.label)} amount={row.amount} />
+        ))}
+        <AmountRow label="Gross Earnings" amount={calc.grossPay} variant="gross" />
+      </div>
+      <p className="pt-5 text-[13px] font-semibold text-slate-800">Deductions</p>
+      <div className="pt-5">
+        {deductionRows.map((row) => (
+          <AmountRow
+            key={row.code}
+            label={deductionLabel(row.code, row.label)}
+            amount={row.amount}
+            variant="deduction"
+          />
+        ))}
+        <AmountRow label="Total Deduction" amount={totalDeductions} variant="totalDeduction" />
+        <div className="mt-4">
+          <AmountRow label="NET PAY" amount={calc.netPay} variant="net" />
+        </div>
+      </div>
+    </div>
+  );
 
-      <p className="mb-2 text-xs text-slate-600">
+  const notes = (
+    <div className="mt-8 border-t border-slate-300/70 pt-4 text-[11px] text-slate-600">
+      <p>
         Pension is calculated on Basic + Housing + Transport (BHT): {money(bht)}
       </p>
-
-      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Deductions</p>
-      <table className="w-full border-collapse border border-slate-300 text-sm">
-        <thead>
-          <tr className="bg-slate-800 text-left text-white">
-            <th className="border border-slate-300 px-3 py-2">Description</th>
-            <th className="border border-slate-300 px-3 py-2 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {deductionRows.map((row) => (
-            <tr key={row.code}>
-              <td className="border border-slate-200 px-3 py-2">{row.label}</td>
-              <td className="border border-slate-200 px-3 py-2 text-right font-medium">
-                {money(row.amount)}
-              </td>
-            </tr>
-          ))}
-          <tr className="bg-slate-800 font-bold text-white">
-            <td className="border border-slate-300 px-3 py-2">Net pay</td>
-            <td className="border border-slate-300 px-3 py-2 text-right">{money(calc.netPay)}</td>
-          </tr>
-        </tbody>
-      </table>
-
       {calc.employerContributions?.length ? (
-        <>
-          <p className="mb-2 mt-4 text-xs font-bold uppercase tracking-wide text-slate-600">
+        <div className="mt-3">
+          <p className="mb-1 font-semibold uppercase tracking-wide text-slate-500">
             Employer contributions (not deducted from net)
           </p>
-          <table className="w-full border-collapse border border-slate-300 text-sm">
-            <thead>
-              <tr className="bg-slate-100 text-left">
-                <th className="border border-slate-300 px-3 py-2">Description</th>
-                <th className="border border-slate-300 px-3 py-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {calc.employerContributions.map((row) => (
-                <tr key={row.code}>
-                  <td className="border border-slate-200 px-3 py-2">{row.label}</td>
-                  <td className="border border-slate-200 px-3 py-2 text-right font-medium">
-                    {money(row.amount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
+          {calc.employerContributions.map((row) => (
+            <p key={row.code}>
+              {row.label}: {money(row.amount)}
+            </p>
+          ))}
+        </div>
       ) : null}
-
       {calc.appliedTaxBands?.length ? (
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">
-            PAYE tax by band
-          </p>
-          <p className="mb-2 text-[11px] text-slate-600">
-            The first ₦800,000 of annual chargeable income is untaxed. Only the amount above that
-            is taxed, band by band.
+        <div className="mt-3">
+          <p className="mb-1 font-semibold uppercase tracking-wide text-slate-500">PAYE tax by band</p>
+          <p className="mb-1">
+            The first ₦800,000 of annual chargeable income is untaxed.
             {calc.projectedAnnualChargeableIncome
               ? ` Annual chargeable: ${money(calc.projectedAnnualChargeableIncome)}.`
               : ""}
             {calc.projectedAnnualTax != null ? ` Annual PAYE: ${money(calc.projectedAnnualTax)}.` : ""}
           </p>
-          <table className="w-full border-collapse border border-slate-300 text-sm">
-            <thead>
-              <tr className="bg-slate-100 text-left">
-                <th className="border border-slate-300 px-3 py-2">Band</th>
-                <th className="border border-slate-300 px-3 py-2 text-right">Income in band</th>
-                <th className="border border-slate-300 px-3 py-2 text-right">Tax</th>
-              </tr>
-            </thead>
-            <tbody>
-              {calc.appliedTaxBands.map((band) => (
-                <tr key={band.label}>
-                  <td className="border border-slate-200 px-3 py-2">
-                    {band.label} ({Math.round(band.rate * 100)}%)
-                  </td>
-                  <td className="border border-slate-200 px-3 py-2 text-right">
-                    {money(band.incomeInBand)}
-                  </td>
-                  <td className="border border-slate-200 px-3 py-2 text-right font-medium">
-                    {money(band.taxInBand)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {calc.appliedTaxBands.map((band) => (
+            <p key={band.label}>
+              {band.label} ({Math.round(band.rate * 100)}%): {money(band.taxInBand)}
+            </p>
+          ))}
         </div>
       ) : null}
+    </div>
+  );
 
-      <p className="mt-4 text-center text-[10px] text-slate-500">
-        This payslip is computer-generated. Please report discrepancies to HR within 5 working days.
-      </p>
+  const body = (
+    <>
+      {details}
+      {amounts}
+      {notes}
     </>
   );
 
@@ -225,9 +246,9 @@ export function PayslipPrintView({
     return (
       <BrandedDocumentShell
         brand={brand}
-        title="Salary payslip"
-        subtitle={periodLabel}
-        footerNote="Confidential — employee copy only"
+        title={title}
+        variant="letterhead"
+        footerNote="This payslip is computer-generated. Please report discrepancies to HR within 5 working days."
       >
         {body}
       </BrandedDocumentShell>
@@ -235,14 +256,16 @@ export function PayslipPrintView({
   }
 
   return (
-    <div className="rounded-lg border border-foreground/15 bg-white p-6 text-black print:border-0 print:shadow-none">
-      <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
-        <div>
-          <p className="text-lg font-bold text-slate-900">{companyName}</p>
-          <p className="text-sm text-slate-600">Salary payslip — {periodLabel}</p>
-        </div>
-        <p className="text-xs text-slate-500">Employee copy</p>
+    <div
+      data-pdf-document="true"
+      className="rounded-none border border-slate-200 bg-[#ececec] p-8 text-black print:border-0 print:bg-[#ececec] print:shadow-none"
+    >
+      <div className="mb-2">
+        <p className="text-lg font-bold uppercase tracking-wide text-slate-900">{companyName}</p>
       </div>
+      <h1 className="mb-6 text-center text-[15px] font-bold uppercase tracking-wide text-slate-900 underline decoration-slate-800 decoration-1 underline-offset-[6px]">
+        {title}
+      </h1>
       {body}
     </div>
   );

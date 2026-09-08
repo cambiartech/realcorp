@@ -1018,6 +1018,8 @@ const ROLE_GRANT_ROW_HINT: Partial<Record<MembershipRole, string>> = {
   [MembershipRole.HR_MANAGER]: "Default: People (HR), Team, Settings.",
   [MembershipRole.MARKETING_MANAGER]:
     "Default: projects, leads, Marketing, Settings. Tick Sales to add Deals (full CRM strip).",
+  [MembershipRole.MARKETING_EXECUTIVE]:
+    "Default: Marketing workspace (campaigns, entries, settings). Not a department lead.",
   [MembershipRole.COMMUNITY_MANAGER]: "Default: Community, Settings.",
   [MembershipRole.FACILITY_MANAGER]: "Default: Facility, Projects, Tasks, Settings.",
   [MembershipRole.FACILITY_STAFF]: "Default: Facility, Tasks, Settings.",

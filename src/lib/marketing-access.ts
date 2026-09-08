@@ -8,6 +8,8 @@ export function canEditMarketing(
   if (isPlatformAdmin) return true;
   return (
     membership?.status === MembershipStatus.ACTIVE &&
-    (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.MARKETING_MANAGER)
+    (membership.role === MembershipRole.ORG_ADMIN ||
+      membership.role === MembershipRole.MARKETING_MANAGER ||
+      membership.role === MembershipRole.MARKETING_EXECUTIVE)
   );
 }

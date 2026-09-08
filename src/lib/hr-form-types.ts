@@ -7,11 +7,11 @@ export const HR_FORM_TYPE_LABELS: Record<HrFormType, string> = {
   HEALTH: "Health & additional information",
 };
 
+/** Health & certifications stay on biodata — do not offer a separate form that leaves profiles looking incomplete. */
 export const HR_FORM_OPTIONS: { value: HrFormType; label: string }[] = [
   { value: "BIODATA", label: "Biodata" },
   { value: "BANK_FORM", label: "Bank account" },
   { value: "GUARANTOR", label: "Guarantor" },
-  { value: "HEALTH", label: "Health & additional" },
 ];
 
 export const HR_FORM_DELIVERY_LABELS: Record<HrFormDeliveryMode, string> = {
@@ -37,7 +37,7 @@ export function hrOnboardingBundlePath(bundleToken: string, query?: { form?: str
 }
 
 /** Stable order for multi-form onboarding wizard. */
-export const HR_FORM_TYPE_ORDER: HrFormType[] = ["BIODATA", "BANK_FORM", "GUARANTOR", "HEALTH"];
+export const HR_FORM_TYPE_ORDER: HrFormType[] = ["BIODATA", "BANK_FORM", "GUARANTOR"];
 
 export function sortFormTypes(types: HrFormType[]): HrFormType[] {
   const set = new Set(types);

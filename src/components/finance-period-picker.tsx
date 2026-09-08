@@ -15,6 +15,7 @@ type FinancePeriodPickerProps = {
   value: FinancePeriodPickerValue;
   onChange: (next: FinancePeriodPickerValue) => void;
   disabled?: boolean;
+  idPrefix?: string;
 };
 
 const PRESETS: Array<{ id: FinancePeriodPreset; label: string }> = [
@@ -23,7 +24,12 @@ const PRESETS: Array<{ id: FinancePeriodPreset; label: string }> = [
   { id: "custom", label: "Custom range" },
 ];
 
-export function FinancePeriodPicker({ value, onChange, disabled }: FinancePeriodPickerProps) {
+export function FinancePeriodPicker({
+  value,
+  onChange,
+  disabled,
+  idPrefix = "finance-overview",
+}: FinancePeriodPickerProps) {
   const thisYear = new Date().getFullYear();
   const minYear = thisYear - 5;
   const year = clampFinanceYear(value.year);
@@ -58,7 +64,7 @@ export function FinancePeriodPicker({ value, onChange, disabled }: FinancePeriod
 
       {value.preset === "month" ? (
         <CalendarMonthPicker
-          id="finance-overview-month"
+          id={`${idPrefix}-month`}
           value={value.monthKey}
           disabled={disabled}
           onChange={(monthKey) => onChange({ ...value, preset: "month", monthKey })}
@@ -76,11 +82,11 @@ export function FinancePeriodPicker({ value, onChange, disabled }: FinancePeriod
           >
             ‹
           </button>
-          <label className="sr-only" htmlFor="finance-overview-year">
+          <label className="sr-only" htmlFor={`${idPrefix}-year`}>
             Year
           </label>
           <input
-            id="finance-overview-year"
+            id={`${idPrefix}-year`}
             type="number"
             min={minYear}
             max={thisYear}

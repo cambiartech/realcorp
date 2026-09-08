@@ -78,7 +78,7 @@ export function ProfileComplianceChecklist({
                 onClick={onSendAllForms}
                 className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-left text-xs font-semibold text-background"
               >
-                Send all forms at once (biodata, bank, guarantor, health)
+                Send all forms at once (biodata, bank, guarantor)
               </button>
             ) : null}
             <button

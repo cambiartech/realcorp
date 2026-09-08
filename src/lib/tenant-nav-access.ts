@@ -123,6 +123,8 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
       return ["dashboard", "tasks", "hr", "team", "settings"];
     case MembershipRole.MARKETING_MANAGER:
       return ["dashboard", "projects", "leads", "tasks", "marketing", "listings", "activities", "settings"];
+    case MembershipRole.MARKETING_EXECUTIVE:
+      return ["dashboard", "projects", "leads", "tasks", "marketing", "settings"];
     case MembershipRole.COMMUNITY_MANAGER:
       return ["dashboard", "tasks", "community", "settings"];
     case MembershipRole.HOUSEKEEPING_MANAGER:

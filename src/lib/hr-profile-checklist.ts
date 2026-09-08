@@ -22,8 +22,6 @@ export type ProfileChecklistProfile = Pick<
   | "rsaPin"
   | "emergencyContact"
   | "nextOfKin"
-  | "healthInfo"
-  | "additionalInfo"
   | "guarantorInfo"
 >;
 
@@ -36,8 +34,6 @@ export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
   rsaPin: null,
   emergencyContact: null,
   nextOfKin: null,
-  healthInfo: null,
-  additionalInfo: null,
   guarantorInfo: null,
 };
 
@@ -78,11 +74,6 @@ export function buildProfileChecklist(
       id: "nextOfKin",
       label: "Next of kin",
       done: hasJson(profile.nextOfKin),
-    },
-    {
-      id: "health",
-      label: "Health & certifications",
-      done: hasJson(profile.healthInfo) || hasJson(profile.additionalInfo),
     },
     {
       id: "guarantor",

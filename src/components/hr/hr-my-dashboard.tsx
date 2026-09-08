@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
 import { PdfDownloadButton } from "@/components/pdf-download-button";
 import { PayslipYtdCard } from "@/components/hr/payslip-ytd-card";
+import { UiSelect } from "@/components/ui-select";
 import type { PayslipYtdSummary } from "@/lib/hr-payslip-ytd";
 import { useSnackbar } from "@/components/snackbar";
 import type { PayslipCalculation } from "@/lib/hr-payslip";
@@ -90,6 +91,21 @@ function leaveStatusClass(status: string) {
 const inputClass =
   "w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20";
 
+const ARCHIVE_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 function ReadRow({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="border-b border-foreground/10 py-2.5 last:border-0">
@@ -127,6 +143,8 @@ export function HrMyDashboard({
     payslips: Array<{
       id: string;
       periodLabel: string;
+      year: number;
+      month: number;
       calc: PayslipCalculation;
       employeeName: string;
       jobRole: string;
@@ -208,6 +226,10 @@ export function HrMyDashboard({
   const [tab, setTab] = useState<MyTab>(resolvedInitial.tab);
   const [recordSection, setRecordSection] = useState<RecordSection>(resolvedInitial.recordSection ?? "personal");
   const [viewPayslipId, setViewPayslipId] = useState<string | null>(null);
+  const [archiveYear, setArchiveYear] = useState(
+    () => myView.payslips[0]?.year ?? new Date().getFullYear(),
+  );
+  const [archiveMonth, setArchiveMonth] = useState(() => myView.payslips[0]?.month ?? 1);
   const [pending, setPending] = useState(false);
   const [showLeaveRequest, setShowLeaveRequest] = useState(false);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
@@ -222,6 +244,27 @@ export function HrMyDashboard({
   }, [viewParam]);
 
   const viewPayslip = viewPayslipId ? myView.payslips.find((p) => p.id === viewPayslipId) : null;
+
+  const payslipYears = useMemo(
+    () => Array.from(new Set(myView.payslips.map((s) => s.year))).sort((a, b) => b - a),
+    [myView.payslips],
+  );
+
+  const monthsForYear = useMemo(
+    () =>
+      Array.from(new Set(myView.payslips.filter((s) => s.year === archiveYear).map((s) => s.month))).sort(
+        (a, b) => a - b,
+      ),
+    [myView.payslips, archiveYear],
+  );
+
+  useEffect(() => {
+    if (monthsForYear.length && !monthsForYear.includes(archiveMonth)) {
+      setArchiveMonth(monthsForYear[monthsForYear.length - 1]);
+    }
+  }, [monthsForYear, archiveMonth]);
+
+  const profile = myView.profile;
 
   const openAppraisals = myView.appraisals.filter(
     (a) => a.cycleStatus === "OPEN" && a.statusValue !== "REVIEWED",
@@ -810,36 +853,94 @@ export function HrMyDashboard({
         ) : (
           <div className="space-y-4">
             {myYtd ? <PayslipYtdCard ytd={myYtd} currency={currency} /> : null}
-            <div className="space-y-2">
-              {myView.payslips.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-foreground/10 px-4 py-3"
-                >
-                  <div>
-                    <p className="font-medium text-foreground">{s.periodLabel}</p>
-                    <p className="text-xs text-muted">
-                      Net pay: {currency}{" "}
-                      {s.calc.netPay.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="mt-1 text-[10px] font-medium">
-                      {s.paymentStatusValue === "PAID" ? (
-                        <span className="text-[var(--success)]">Salary paid · {s.paidAtLabel}</span>
-                      ) : (
-                        <span className="text-[var(--warn)]">Payment processing</span>
-                      )}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setViewPayslipId(s.id)}
-                    className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold hover:bg-foreground/[0.06]"
-                  >
-                    View & download
-                  </button>
+            <div className="overflow-hidden rounded-xl border border-foreground/10">
+              <div className="flex flex-wrap items-start justify-between gap-3 bg-foreground px-4 py-3 text-background">
+                <div>
+                  <p className="text-sm font-semibold">Payslip archive</p>
+                  <p className="mt-0.5 text-xs text-background/75">Open any payslip you have been issued.</p>
                 </div>
-              ))}
+                <p className="max-w-xs text-[11px] leading-relaxed text-background/80">
+                  Pick the year, then the period. Opens as a printable PDF. Only your own records are shown.
+                </p>
+              </div>
+              <div className="grid gap-3 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs font-medium text-muted">Year</span>
+                  <UiSelect
+                    value={String(archiveYear)}
+                    onChange={(e) => setArchiveYear(Number(e.target.value))}
+                  >
+                    {payslipYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </UiSelect>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-xs font-medium text-muted">Period</span>
+                  <UiSelect
+                    value={String(archiveMonth)}
+                    onChange={(e) => setArchiveMonth(Number(e.target.value))}
+                  >
+                    {monthsForYear.map((month) => (
+                      <option key={month} value={month}>
+                        {ARCHIVE_MONTHS[month - 1]}
+                      </option>
+                    ))}
+                  </UiSelect>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const slip = myView.payslips.find(
+                      (s) => s.year === archiveYear && s.month === archiveMonth,
+                    );
+                    if (!slip) {
+                      showSnackbar("No payslip for that period.", "error");
+                      return;
+                    }
+                    setViewPayslipId(slip.id);
+                  }}
+                  className="rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background"
+                >
+                  View
+                </button>
+              </div>
             </div>
+            {viewPayslip ? (
+              <div className="space-y-3">
+                <PayslipPrintView
+                  companyName={companyName}
+                  brand={tenantBrand}
+                  periodLabel={viewPayslip.periodLabel}
+                  year={viewPayslip.year}
+                  month={viewPayslip.month}
+                  employeeName={viewPayslip.employeeName}
+                  jobRole={viewPayslip.jobRole}
+                  paygroup={viewPayslip.paygroup}
+                  accountNumber={viewPayslip.accountNumber}
+                  bankName={viewPayslip.bankName}
+                  employeeId={viewPayslip.employeeId}
+                  taxId={profile?.taxId}
+                  rsaPin={profile?.rsaPin}
+                  pensionAdministrator={profile?.pensionAdministrator}
+                  nhfMembershipNumber={profile?.nhfMembershipNumber}
+                  location={profile?.addressState || profile?.department}
+                  hireDate={profile?.dateOfJoining}
+                  currency={currency}
+                  calc={viewPayslip.calc}
+                />
+                <PdfDownloadButton
+                  filename={`payslip-${viewPayslip.periodLabel}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-60"
+                >
+                  Download PDF
+                </PdfDownloadButton>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Pick a year and period, then View to open your payslip.</p>
+            )}
           </div>
         )
       ) : null}
@@ -1241,38 +1342,6 @@ export function HrMyDashboard({
             </div>
           </form>
         </ModalOverlay>
-      ) : null}
-
-      {viewPayslip ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
-          <div className="mx-auto max-w-3xl rounded-xl bg-white p-4 shadow-xl dark:bg-zinc-900">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="font-semibold text-foreground">{viewPayslip.periodLabel}</p>
-              <button type="button" onClick={() => setViewPayslipId(null)} className="text-sm underline">
-                Close
-              </button>
-            </div>
-            <PayslipPrintView
-              companyName={companyName}
-              brand={tenantBrand}
-              periodLabel={viewPayslip.periodLabel}
-              employeeName={viewPayslip.employeeName}
-              jobRole={viewPayslip.jobRole}
-              paygroup={viewPayslip.paygroup}
-              accountNumber={viewPayslip.accountNumber}
-              bankName={viewPayslip.bankName}
-              employeeId={viewPayslip.employeeId}
-              currency={currency}
-              calc={viewPayslip.calc}
-            />
-            <PdfDownloadButton
-              filename={`payslip-${viewPayslip.periodLabel}`}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-foreground bg-foreground py-2.5 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-60"
-            >
-              Download PDF
-            </PdfDownloadButton>
-          </div>
-        </div>
       ) : null}
     </div>
   );

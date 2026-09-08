@@ -253,6 +253,8 @@ export function HrWorkspace(props: {
     payslips: Array<{
       id: string;
       periodLabel: string;
+      year: number;
+      month: number;
       calc: PayslipCalculation;
       employeeName: string;
       jobRole: string;
