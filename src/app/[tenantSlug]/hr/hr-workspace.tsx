@@ -129,6 +129,8 @@ export function HrWorkspace(props: {
       paygroup: string;
       employeeId: string;
       department: string;
+      location: string;
+      hireDate: string;
       taxId: string;
       rsaPin: string;
       pensionAdministrator: string;
