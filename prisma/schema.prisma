@@ -1600,6 +1600,8 @@ model EmployeeProfile {
   bankAccount            Json?
   guarantorInfo          Json?
   hrNotes                String?
+  /// Self-service edits waiting for HR approval. Applied only after review.
+  pendingProfileUpdate   Json?
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
 

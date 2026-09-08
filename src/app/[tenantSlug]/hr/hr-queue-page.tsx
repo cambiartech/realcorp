@@ -7,6 +7,7 @@ import { absoluteAppUrl } from "@/lib/app-url";
 import { HR_FORM_DELIVERY_LABELS, HR_FORM_TYPE_LABELS } from "@/lib/hr-form-types";
 import { hrOfferSignPath } from "@/lib/hr-offer-path";
 import { profileToDetailRow } from "@/lib/hr-profile-form";
+import { parsePendingProfileUpdate, pendingProfileChangeLines } from "@/lib/hr-profile-self-update";
 import {
   buildProfileChecklist,
   checklistProgress,
@@ -923,6 +924,7 @@ export default async function HrQueuePage({
       }
       myView={{
         profile: myProfile ? profileToDetailRow(myProfile) : null,
+        pendingProfileUpdate: myProfile ? parsePendingProfileUpdate(myProfile.pendingProfileUpdate) : null,
         leaveBalances: myLeaveBalances,
         leaveRequests: myLeaveRequests,
         payslips: myPayslips.map((s) => {
@@ -1061,6 +1063,21 @@ export default async function HrQueuePage({
             : null,
         reviewNote: r.hrNote,
       }))}
+      pendingProfileUpdates={profiles.flatMap((p) => {
+        const pending = parsePendingProfileUpdate(p.pendingProfileUpdate);
+        if (!pending) return [];
+        return [
+          {
+            profileId: p.id,
+            employeeName: p.fullName || "Unnamed",
+            submittedAtLabel: new Intl.DateTimeFormat("en-NG", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(new Date(pending.submittedAt)),
+            lines: pendingProfileChangeLines(pending),
+          },
+        ];
+      })}
       profileDetails={profiles.map((p) => profileToDetailRow(p))}
       profileOnboarding={profileOnboarding}
       peopleOnboardUserId={tab === "people" ? sp.onboard?.trim() || undefined : undefined}

@@ -174,6 +174,12 @@ export function HrWorkspace(props: {
     submittedPayload: Record<string, unknown> | null;
     reviewNote: string | null;
   }>;
+  pendingProfileUpdates: Array<{
+    profileId: string;
+    employeeName: string;
+    submittedAtLabel: string;
+    lines: string[];
+  }>;
   performanceGoals: PerformanceGoalRow[];
   profileOptions: Array<{ id: string; label: string; department: string }>;
   departments: string[];
@@ -228,6 +234,7 @@ export function HrWorkspace(props: {
   myDashboardPreview?: { userId: string; name: string; email: string } | null;
   myView: {
     profile: ProfileDetailRow | null;
+    pendingProfileUpdate: import("@/lib/hr-profile-self-update").PendingProfileUpdate | null;
     leaveBalances: Array<{
       leaveTypeId: string;
       name: string;
@@ -351,6 +358,7 @@ export function HrWorkspace(props: {
     myYtd,
     documents,
     formRequests,
+    pendingProfileUpdates,
     performanceGoals,
     profileOptions,
     departments,
@@ -431,6 +439,7 @@ export function HrWorkspace(props: {
             profileOnboarding={profileOnboarding}
             ytdByUserId={ytdByUserId}
             formRequests={formRequests}
+            pendingProfileUpdates={pendingProfileUpdates}
             initialOnboardUserId={peopleOnboardUserId}
             offerByUserId={offerByUserId}
             aiEnabled={aiEnabled}

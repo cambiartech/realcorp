@@ -15,6 +15,7 @@ import {
   HrPayrollAdjustmentType,
   HrPayslipPaymentStatus,
   HrPayslipRunStatus,
+  MembershipRole,
   MembershipStatus,
   Prisma,
 } from "@/generated/prisma";
@@ -37,7 +38,11 @@ import {
   parseActionScores,
   type AppraisalActionScores,
 } from "@/lib/appraisal-scores";
-import { writeAuditLog } from "@/lib/audit-log";
+import { sendHrProfileUpdateEmail } from "@/lib/email";
+import {
+  pendingProfileChangeLines,
+  type PendingProfileUpdate,
+} from "@/lib/hr-profile-self-update";
 import {
   createTenantUploadSignature,
   type CloudinaryUploadError,
@@ -2405,4 +2410,288 @@ export async function updateMyStatutoryIds(
   });
   revalidateHr(tenantSlug);
   return { ok: true };
+}
+
+const myRecordUpdateSchema = z.object({
+  phoneMobile: z.string().trim().max(40).optional(),
+  dateOfJoining: z.string().trim().max(20).optional(),
+  addressStreet: z.string().trim().max(200).optional(),
+  addressCity: z.string().trim().max(80).optional(),
+  addressState: z.string().trim().max(80).optional(),
+  addressCountry: z.string().trim().max(80).optional(),
+  emergencyName: z.string().trim().max(120).optional(),
+  emergencyRelationship: z.string().trim().max(80).optional(),
+  emergencyPhone: z.string().trim().max(40).optional(),
+  emergencyEmail: z.string().trim().max(160).optional(),
+  nextOfKinName: z.string().trim().max(120).optional(),
+  nextOfKinRelationship: z.string().trim().max(80).optional(),
+  nextOfKinPhone: z.string().trim().max(40).optional(),
+  nextOfKinEmail: z.string().trim().max(160).optional(),
+  nextOfKinOccupation: z.string().trim().max(80).optional(),
+  nextOfKinStreet: z.string().trim().max(200).optional(),
+  nextOfKinCity: z.string().trim().max(80).optional(),
+  nextOfKinState: z.string().trim().max(80).optional(),
+  nextOfKinCountry: z.string().trim().max(80).optional(),
+});
+
+function norm(value?: string | null) {
+  return (value || "").trim();
+}
+
+/** Employee submits personal-record edits. HR must approve before they replace the file. */
+export async function submitMyHrRecordUpdate(
+  tenantSlug: string,
+  input: z.infer<typeof myRecordUpdateSchema>,
+): Promise<ActionResult & { emailed?: boolean }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const parsed = myRecordUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Check the fields and try again." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const profile = await prisma.employeeProfile.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+  });
+  if (!profile) return { ok: false, error: "Your HR record is not set up yet." };
+
+  const currentKin =
+    profile.nextOfKin && typeof profile.nextOfKin === "object" && !Array.isArray(profile.nextOfKin)
+      ? (profile.nextOfKin as Record<string, string>)
+      : {};
+  const currentEmergency =
+    profile.emergencyContact && typeof profile.emergencyContact === "object" && !Array.isArray(profile.emergencyContact)
+      ? (profile.emergencyContact as Record<string, string>)
+      : {};
+  const joining = profile.dateOfJoining ? profile.dateOfJoining.toISOString().slice(0, 10) : "";
+
+  const proposed = parsed.data;
+  const changes: PendingProfileUpdate = {
+    submittedAt: new Date().toISOString(),
+    submittedByLabel: session.user.name || session.user.email || "Employee",
+  };
+  const assignIfChanged = (
+    key: keyof Omit<PendingProfileUpdate, "submittedAt" | "submittedByLabel">,
+    next: string | undefined,
+    current: string,
+  ) => {
+    const value = norm(next);
+    if (value && value !== norm(current)) changes[key] = value;
+  };
+
+  assignIfChanged("phoneMobile", proposed.phoneMobile, profile.phoneMobile || "");
+  assignIfChanged("dateOfJoining", proposed.dateOfJoining, joining);
+  assignIfChanged("addressStreet", proposed.addressStreet, profile.addressStreet || "");
+  assignIfChanged("addressCity", proposed.addressCity, profile.addressCity || "");
+  assignIfChanged("addressState", proposed.addressState, profile.addressState || "");
+  assignIfChanged("addressCountry", proposed.addressCountry, profile.addressCountry || "");
+  assignIfChanged("emergencyName", proposed.emergencyName, currentEmergency.name || "");
+  assignIfChanged("emergencyRelationship", proposed.emergencyRelationship, currentEmergency.relationship || "");
+  assignIfChanged("emergencyPhone", proposed.emergencyPhone, currentEmergency.phone || "");
+  assignIfChanged("emergencyEmail", proposed.emergencyEmail, currentEmergency.email || "");
+  assignIfChanged("nextOfKinName", proposed.nextOfKinName, currentKin.name || "");
+  assignIfChanged("nextOfKinRelationship", proposed.nextOfKinRelationship, currentKin.relationship || "");
+  assignIfChanged("nextOfKinPhone", proposed.nextOfKinPhone, currentKin.phone || "");
+  assignIfChanged("nextOfKinEmail", proposed.nextOfKinEmail, currentKin.email || "");
+  assignIfChanged("nextOfKinOccupation", proposed.nextOfKinOccupation, currentKin.occupation || "");
+  assignIfChanged("nextOfKinStreet", proposed.nextOfKinStreet, currentKin.street || "");
+  assignIfChanged("nextOfKinCity", proposed.nextOfKinCity, currentKin.city || "");
+  assignIfChanged("nextOfKinState", proposed.nextOfKinState, currentKin.state || "");
+  assignIfChanged("nextOfKinCountry", proposed.nextOfKinCountry, currentKin.country || "");
+
+  const lines = pendingProfileChangeLines(changes);
+  if (lines.length === 0) return { ok: false, error: "No changes to send. Gross pay and job title stay with HR." };
+
+  await prisma.employeeProfile.update({
+    where: { id: profile.id },
+    data: { pendingProfileUpdate: changes },
+  });
+
+  const [hrManagers, orgAdmins, settings] = await Promise.all([
+    prisma.membership.findMany({
+      where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE, role: MembershipRole.HR_MANAGER },
+      select: { user: { select: { email: true } } },
+    }),
+    prisma.membership.findMany({
+      where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE, role: MembershipRole.ORG_ADMIN },
+      select: { user: { select: { email: true } } },
+    }),
+    prisma.tenantSettings.findUnique({
+      where: { tenantId: tenant.id },
+      select: { orgEmail: true },
+    }),
+  ]);
+  const hrEmails = hrManagers
+    .map((row) => row.user.email)
+    .filter((email): email is string => Boolean(email?.includes("@")));
+  const adminEmails = orgAdmins
+    .map((row) => row.user.email)
+    .filter((email): email is string => Boolean(email?.includes("@")));
+  const recipients =
+    hrEmails.length > 0
+      ? hrEmails
+      : [settings?.orgEmail, ...adminEmails].filter((email): email is string => Boolean(email?.includes("@")));
+  const unique = [...new Set(recipients.map((email) => email.trim().toLowerCase()))];
+
+  const tenantRow = await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { name: true } });
+  const reviewUrl = absoluteAppUrl(`/${tenantSlug}/hr/people?approvals=1`);
+  let emailed = false;
+  for (const to of unique) {
+    const result = await sendHrProfileUpdateEmail({
+      to,
+      tenantName: tenantRow?.name || tenantSlug,
+      employeeName: profile.fullName || changes.submittedByLabel,
+      changeLines: lines,
+      reviewUrl,
+    });
+    if (result.ok) emailed = true;
+  }
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: changes.submittedByLabel,
+    module: "HR",
+    entityType: "EMPLOYEE_PROFILE",
+    action: "UPDATE",
+    summary: `${changes.submittedByLabel} submitted personal record changes for HR review.`,
+    metadata: { profileId: profile.id, fields: lines },
+  });
+
+  revalidateHr(tenantSlug);
+  return { ok: true, emailed };
+}
+
+async function applyPendingProfileUpdate(
+  profile: {
+    id: string;
+    fullName: string | null;
+    emergencyContact: unknown;
+    nextOfKin: unknown;
+    pendingProfileUpdate: unknown;
+  },
+  actor: { userId: string; label: string },
+  tenantId: string,
+) {
+  const pending = profile.pendingProfileUpdate as PendingProfileUpdate;
+  const emergency = {
+    ...(profile.emergencyContact && typeof profile.emergencyContact === "object" && !Array.isArray(profile.emergencyContact)
+      ? (profile.emergencyContact as Record<string, string>)
+      : {}),
+  };
+  const kin = {
+    ...(profile.nextOfKin && typeof profile.nextOfKin === "object" && !Array.isArray(profile.nextOfKin)
+      ? (profile.nextOfKin as Record<string, string>)
+      : {}),
+  };
+  if (pending.emergencyName) emergency.name = pending.emergencyName;
+  if (pending.emergencyRelationship) emergency.relationship = pending.emergencyRelationship;
+  if (pending.emergencyPhone) emergency.phone = pending.emergencyPhone;
+  if (pending.emergencyEmail) emergency.email = pending.emergencyEmail;
+  if (pending.nextOfKinName) kin.name = pending.nextOfKinName;
+  if (pending.nextOfKinRelationship) kin.relationship = pending.nextOfKinRelationship;
+  if (pending.nextOfKinPhone) kin.phone = pending.nextOfKinPhone;
+  if (pending.nextOfKinEmail) kin.email = pending.nextOfKinEmail;
+  if (pending.nextOfKinOccupation) kin.occupation = pending.nextOfKinOccupation;
+  if (pending.nextOfKinStreet) kin.street = pending.nextOfKinStreet;
+  if (pending.nextOfKinCity) kin.city = pending.nextOfKinCity;
+  if (pending.nextOfKinState) kin.state = pending.nextOfKinState;
+  if (pending.nextOfKinCountry) kin.country = pending.nextOfKinCountry;
+
+  await prisma.employeeProfile.update({
+    where: { id: profile.id },
+    data: {
+      ...(pending.phoneMobile ? { phoneMobile: pending.phoneMobile } : {}),
+      ...(pending.dateOfJoining ? { dateOfJoining: new Date(pending.dateOfJoining) } : {}),
+      ...(pending.addressStreet ? { addressStreet: pending.addressStreet } : {}),
+      ...(pending.addressCity ? { addressCity: pending.addressCity } : {}),
+      ...(pending.addressState ? { addressState: pending.addressState } : {}),
+      ...(pending.addressCountry ? { addressCountry: pending.addressCountry } : {}),
+      emergencyContact: emergency,
+      nextOfKin: kin,
+      pendingProfileUpdate: Prisma.DbNull,
+    },
+  });
+
+  await writeAuditLog({
+    tenantId,
+    actorUserId: actor.userId,
+    actorLabel: actor.label,
+    module: "HR",
+    entityType: "EMPLOYEE_PROFILE",
+    action: "UPDATE",
+    summary: `Approved personal record updates for ${profile.fullName || "an employee"}.`,
+    metadata: { profileId: profile.id },
+  });
+}
+
+export async function reviewEmployeeProfileUpdate(
+  tenantSlug: string,
+  input: { profileId: string; decision: "approve" | "reject" },
+): Promise<ActionResult> {
+  const result = await reviewEmployeeProfileUpdates(tenantSlug, {
+    profileIds: [input.profileId],
+    decision: input.decision,
+  });
+  if (!result.ok) return result;
+  if (result.processed === 0) return { ok: false, error: "There is no pending update for this employee." };
+  return { ok: true };
+}
+
+export async function reviewEmployeeProfileUpdates(
+  tenantSlug: string,
+  input: { profileIds: string[]; decision: "approve" | "reject" },
+): Promise<ActionResult & { processed?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "Only HR can review these updates." };
+  }
+
+  const uniqueIds = [...new Set(input.profileIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return { ok: false, error: "Select at least one update." };
+
+  const profiles = (
+    await prisma.employeeProfile.findMany({
+      where: { id: { in: uniqueIds }, tenantId: tenant.id },
+    })
+  ).filter((profile) => profile.pendingProfileUpdate != null);
+  if (profiles.length === 0) return { ok: false, error: "Those updates are no longer waiting for review." };
+
+  const actor = {
+    userId: session.user.id,
+    label: session.user.name || session.user.email || "HR",
+  };
+
+  if (input.decision === "reject") {
+    await prisma.employeeProfile.updateMany({
+      where: { id: { in: profiles.map((profile) => profile.id) }, tenantId: tenant.id },
+      data: { pendingProfileUpdate: Prisma.DbNull },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: actor.userId,
+      actorLabel: actor.label,
+      module: "HR",
+      entityType: "EMPLOYEE_PROFILE",
+      action: "UPDATE",
+      summary: `Rejected ${profiles.length} personal record update${profiles.length === 1 ? "" : "s"}.`,
+      metadata: { profileIds: profiles.map((profile) => profile.id) },
+    });
+    revalidateHr(tenantSlug);
+    return { ok: true, processed: profiles.length };
+  }
+
+  for (const profile of profiles) {
+    await applyPendingProfileUpdate(profile, actor, tenant.id);
+  }
+
+  revalidateHr(tenantSlug);
+  return { ok: true, processed: profiles.length };
 }

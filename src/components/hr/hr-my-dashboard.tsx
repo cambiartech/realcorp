@@ -13,7 +13,10 @@ import { useSnackbar } from "@/components/snackbar";
 import type { PayslipCalculation } from "@/lib/hr-payslip";
 import type { ProfileDetailRow } from "@/lib/hr-profile-form";
 import type { TenantBranding } from "@/lib/tenant-branding";
-import { saveSelfAppraisal, updateMyStatutoryIds } from "@/app/[tenantSlug]/hr/actions";
+import { saveSelfAppraisal, submitMyHrRecordUpdate, updateMyStatutoryIds } from "@/app/[tenantSlug]/hr/actions";
+import { GlobalLocationFields } from "@/components/global-location-fields";
+import type { PendingProfileUpdate } from "@/lib/hr-profile-self-update";
+import { pendingProfileChangeLines } from "@/lib/hr-profile-self-update";
 import {
   cancelLeaveRequest,
   getLeaveUploadSignature,
@@ -138,6 +141,7 @@ export function HrMyDashboard({
   pensionAdministrators?: string[];
   myView: {
     profile: ProfileDetailRow | null;
+    pendingProfileUpdate?: PendingProfileUpdate | null;
     leaveBalances?: LeaveBalanceRow[];
     leaveRequests?: LeaveRequestRow[];
     payslips: Array<{
@@ -348,6 +352,44 @@ export function HrMyDashboard({
       return;
     }
     showSnackbar("Tax and pension IDs saved.", "success");
+    router.refresh();
+  }
+
+  async function saveRecordUpdate(form: HTMLFormElement) {
+    const fd = new FormData(form);
+    setPending(true);
+    const result = await submitMyHrRecordUpdate(tenantSlug, {
+      phoneMobile: String(fd.get("phoneMobile") ?? ""),
+      dateOfJoining: String(fd.get("dateOfJoining") ?? ""),
+      addressStreet: String(fd.get("addressStreet") ?? ""),
+      addressCity: String(fd.get("addressCity") ?? ""),
+      addressState: String(fd.get("addressState") ?? ""),
+      addressCountry: String(fd.get("addressCountry") ?? ""),
+      emergencyName: String(fd.get("emergencyName") ?? ""),
+      emergencyRelationship: String(fd.get("emergencyRelationship") ?? ""),
+      emergencyPhone: String(fd.get("emergencyPhone") ?? ""),
+      emergencyEmail: String(fd.get("emergencyEmail") ?? ""),
+      nextOfKinName: String(fd.get("nextOfKinName") ?? ""),
+      nextOfKinRelationship: String(fd.get("nextOfKinRelationship") ?? ""),
+      nextOfKinPhone: String(fd.get("nextOfKinPhone") ?? ""),
+      nextOfKinEmail: String(fd.get("nextOfKinEmail") ?? ""),
+      nextOfKinOccupation: String(fd.get("nextOfKinOccupation") ?? ""),
+      nextOfKinStreet: String(fd.get("nextOfKinStreet") ?? ""),
+      nextOfKinCity: String(fd.get("nextOfKinCity") ?? ""),
+      nextOfKinState: String(fd.get("nextOfKinState") ?? ""),
+      nextOfKinCountry: String(fd.get("nextOfKinCountry") ?? ""),
+    });
+    setPending(false);
+    if (!result.ok) {
+      showSnackbar(result.error, "error");
+      return;
+    }
+    showSnackbar(
+      result.emailed
+        ? "Sent to HR for review. Your file stays as it is until they approve."
+        : "Sent to HR for review. Email could not be sent, but the request is waiting in People.",
+      "success",
+    );
     router.refresh();
   }
 
@@ -945,12 +987,22 @@ export function HrMyDashboard({
         )
       ) : null}
 
-      {tab === "record" ? (
+      {tab === "record" && p ? (
         <div>
           <p className="mb-3 text-xs text-muted">
-            Review the personal, job, salary bank, and emergency details HR has on file. You can add or update
-            your TIN and RSA PIN here for PAYE and pension remittances.
+            Update your phone, address, date of joining, emergency contact, and next of kin. Gross pay and job
+            title stay with HR. Changes are sent for review before they replace what is on file.
           </p>
+          {myView.pendingProfileUpdate ? (
+            <div className="mb-3 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3 text-sm">
+              <p className="font-semibold text-foreground">Waiting for HR review</p>
+              <ul className="mt-1 list-disc pl-4 text-xs text-muted">
+                {pendingProfileChangeLines(myView.pendingProfileUpdate).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {missingBanner ? <div className="mb-3">{missingBanner}</div> : null}
           <div className="mb-3 flex flex-wrap gap-1">
             {(
@@ -976,30 +1028,81 @@ export function HrMyDashboard({
               </button>
             ))}
           </div>
-          <div className="rounded-lg border border-foreground/10 px-4">
+          <form
+            className="rounded-lg border border-foreground/10 px-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (previewAs) return;
+              void saveRecordUpdate(event.currentTarget);
+            }}
+          >
             {recordSection === "personal" ? (
-              <>
-                <ReadRow label="Full name" value={p.fullName} />
-                <ReadRow label="Mobile" value={p.phoneMobile} />
-                <ReadRow label="Work email" value={p.workEmail} />
-                <ReadRow
-                  label="Address"
-                  value={[p.addressStreet, p.addressCity, p.addressState, p.addressCountry]
-                    .filter(Boolean)
-                    .join(", ")}
-                />
-              </>
+              previewAs ? (
+                <>
+                  <ReadRow label="Full name" value={p.fullName} />
+                  <ReadRow label="Mobile" value={p.phoneMobile} />
+                  <ReadRow label="Work email" value={p.workEmail} />
+                  <ReadRow
+                    label="Address"
+                    value={[p.addressStreet, p.addressCity, p.addressState, p.addressCountry]
+                      .filter(Boolean)
+                      .join(", ")}
+                  />
+                </>
+              ) : (
+                <div className="grid gap-3 py-3">
+                  <ReadRow label="Full name" value={p.fullName} />
+                  <ReadRow label="Work email" value={p.workEmail} />
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Mobile phone</span>
+                    <input name="phoneMobile" defaultValue={p.phoneMobile} className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Street address</span>
+                    <input name="addressStreet" defaultValue={p.addressStreet} className={inputClass} />
+                  </label>
+                  <GlobalLocationFields
+                    countryName="addressCountry"
+                    stateName="addressState"
+                    cityName="addressCity"
+                    defaultCountry={p.addressCountry || "Nigeria"}
+                    defaultState={p.addressState}
+                    defaultCity={p.addressCity}
+                  />
+                </div>
+              )
             ) : null}
             {recordSection === "job" ? (
-              <>
-                <ReadRow label="Job title" value={p.position} />
-                <ReadRow label="Department" value={p.department} />
-                <ReadRow label="Date of joining" value={p.dateOfJoining} />
-                <ReadRow
-                  label="Monthly gross pay"
-                  value={p.grossMonthly ? `${currency} ${Number(p.grossMonthly).toLocaleString()}` : null}
-                />
-              </>
+              previewAs ? (
+                <>
+                  <ReadRow label="Job title" value={p.position} />
+                  <ReadRow label="Department" value={p.department} />
+                  <ReadRow label="Date of joining" value={p.dateOfJoining} />
+                  <ReadRow
+                    label="Monthly gross pay"
+                    value={p.grossMonthly ? `${currency} ${Number(p.grossMonthly).toLocaleString()}` : null}
+                  />
+                </>
+              ) : (
+                <div className="grid gap-3 py-3">
+                  <ReadRow label="Job title" value={p.position} />
+                  <ReadRow label="Department" value={p.department} />
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Date of joining</span>
+                    <input
+                      type="date"
+                      name="dateOfJoining"
+                      defaultValue={p.dateOfJoining}
+                      className={inputClass}
+                    />
+                  </label>
+                  <ReadRow
+                    label="Monthly gross pay"
+                    value={p.grossMonthly ? `${currency} ${Number(p.grossMonthly).toLocaleString()}` : null}
+                  />
+                  <p className="text-[11px] text-muted">Ask HR if your salary is wrong. You cannot change it here.</p>
+                </div>
+              )
             ) : null}
             {recordSection === "bank" ? (
               <>
@@ -1015,27 +1118,99 @@ export function HrMyDashboard({
               </>
             ) : null}
             {recordSection === "emergency" ? (
-              <>
-                <ReadRow label="Emergency contact" value={p.emergencyName} />
-                <ReadRow label="Relationship" value={p.emergencyRelationship} />
-                <ReadRow label="Phone" value={p.emergencyPhone} />
-                <ReadRow label="Email" value={p.emergencyEmail} />
-              </>
+              previewAs ? (
+                <>
+                  <ReadRow label="Emergency contact" value={p.emergencyName} />
+                  <ReadRow label="Relationship" value={p.emergencyRelationship} />
+                  <ReadRow label="Phone" value={p.emergencyPhone} />
+                  <ReadRow label="Email" value={p.emergencyEmail} />
+                </>
+              ) : (
+                <div className="grid gap-3 py-3 sm:grid-cols-2">
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Emergency contact</span>
+                    <input name="emergencyName" defaultValue={p.emergencyName} className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Relationship</span>
+                    <input
+                      name="emergencyRelationship"
+                      defaultValue={p.emergencyRelationship}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Phone</span>
+                    <input name="emergencyPhone" defaultValue={p.emergencyPhone} className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Email</span>
+                    <input name="emergencyEmail" type="email" defaultValue={p.emergencyEmail} className={inputClass} />
+                  </label>
+                </div>
+              )
             ) : null}
             {recordSection === "kin" ? (
-              <>
-                <ReadRow label="Next of kin" value={p.nextOfKinName} />
-                <ReadRow label="Relationship" value={p.nextOfKinRelationship} />
-                <ReadRow label="Phone" value={p.nextOfKinPhone} />
-                <ReadRow label="Email" value={p.nextOfKinEmail} />
-                <ReadRow label="Occupation" value={p.nextOfKinOccupation} />
-                <ReadRow
-                  label="Address"
-                  value={[p.nextOfKinStreet, p.nextOfKinCity, p.nextOfKinState, p.nextOfKinCountry]
-                    .filter(Boolean)
-                    .join(", ")}
-                />
-              </>
+              previewAs ? (
+                <>
+                  <ReadRow label="Next of kin" value={p.nextOfKinName} />
+                  <ReadRow label="Relationship" value={p.nextOfKinRelationship} />
+                  <ReadRow label="Phone" value={p.nextOfKinPhone} />
+                  <ReadRow label="Email" value={p.nextOfKinEmail} />
+                  <ReadRow label="Occupation" value={p.nextOfKinOccupation} />
+                  <ReadRow
+                    label="Address"
+                    value={[p.nextOfKinStreet, p.nextOfKinCity, p.nextOfKinState, p.nextOfKinCountry]
+                      .filter(Boolean)
+                      .join(", ")}
+                  />
+                </>
+              ) : (
+                <div className="grid gap-3 py-3 sm:grid-cols-2">
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Next of kin</span>
+                    <input name="nextOfKinName" defaultValue={p.nextOfKinName} className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Relationship</span>
+                    <input
+                      name="nextOfKinRelationship"
+                      defaultValue={p.nextOfKinRelationship}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Phone</span>
+                    <input name="nextOfKinPhone" defaultValue={p.nextOfKinPhone} className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Email</span>
+                    <input name="nextOfKinEmail" type="email" defaultValue={p.nextOfKinEmail} className={inputClass} />
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-xs font-medium text-muted">Occupation</span>
+                    <input
+                      name="nextOfKinOccupation"
+                      defaultValue={p.nextOfKinOccupation}
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="text-sm sm:col-span-2">
+                    <span className="mb-1 block text-xs font-medium text-muted">Street</span>
+                    <input name="nextOfKinStreet" defaultValue={p.nextOfKinStreet} className={inputClass} />
+                  </label>
+                  <div className="sm:col-span-2">
+                    <GlobalLocationFields
+                      countryName="nextOfKinCountry"
+                      stateName="nextOfKinState"
+                      cityName="nextOfKinCity"
+                      defaultCountry={p.nextOfKinCountry || "Nigeria"}
+                      defaultState={p.nextOfKinState}
+                      defaultCity={p.nextOfKinCity}
+                    />
+                  </div>
+                </div>
+              )
             ) : null}
             {recordSection === "ids" ? (
               previewAs ? (
@@ -1046,50 +1221,68 @@ export function HrMyDashboard({
                   <ReadRow label="NHF membership number" value={p.nhfMembershipNumber} />
                 </>
               ) : (
-                <form
-                  className="grid gap-3 py-3 sm:grid-cols-2"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void saveStatutoryIds(event.currentTarget);
-                  }}
-                >
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs font-medium text-muted">
-                      Tax identification number (TIN)
-                    </span>
-                    <input name="taxId" defaultValue={p.taxId} className={inputClass} />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs font-medium text-muted">RSA PIN</span>
-                    <input name="rsaPin" defaultValue={p.rsaPin} placeholder="PEN…" className={inputClass} />
-                  </label>
-                  <div className="sm:col-span-2">
-                    <PensionAdministratorField
-                      defaultValue={p.pensionAdministrator}
-                      options={pensionAdministrators}
-                    />
-                  </div>
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs font-medium text-muted">NHF membership number</span>
-                    <input
-                      name="nhfMembershipNumber"
-                      defaultValue={p.nhfMembershipNumber}
-                      className={inputClass}
-                    />
-                  </label>
-                  <div className="sm:col-span-2">
-                    <button
-                      type="submit"
-                      disabled={pending}
-                      className="rounded-md border border-foreground bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50"
-                    >
-                      {pending ? "Saving…" : "Save tax & pension IDs"}
-                    </button>
-                  </div>
-                </form>
+                <p className="py-3 text-xs text-muted">
+                  Tax and pension IDs are saved separately below this form.
+                </p>
               )
             ) : null}
-          </div>
+            {!previewAs &&
+            (recordSection === "personal" ||
+              recordSection === "job" ||
+              recordSection === "emergency" ||
+              recordSection === "kin") ? (
+              <div className="border-t border-foreground/10 py-3">
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                >
+                  {pending ? "Sending…" : "Send changes to HR for review"}
+                </button>
+              </div>
+            ) : null}
+          </form>
+          {!previewAs && recordSection === "ids" ? (
+            <form
+              className="mt-3 grid gap-3 rounded-lg border border-foreground/10 px-4 py-3 sm:grid-cols-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveStatutoryIds(event.currentTarget);
+              }}
+            >
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-muted">Tax identification number (TIN)</span>
+                <input name="taxId" defaultValue={p.taxId} className={inputClass} />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-muted">RSA PIN</span>
+                <input name="rsaPin" defaultValue={p.rsaPin} placeholder="PEN…" className={inputClass} />
+              </label>
+              <div className="sm:col-span-2">
+                <PensionAdministratorField
+                  defaultValue={p.pensionAdministrator}
+                  options={pensionAdministrators}
+                />
+              </div>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium text-muted">NHF membership number</span>
+                <input
+                  name="nhfMembershipNumber"
+                  defaultValue={p.nhfMembershipNumber}
+                  className={inputClass}
+                />
+              </label>
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-md border border-foreground bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                >
+                  {pending ? "Saving…" : "Save tax & pension IDs"}
+                </button>
+              </div>
+            </form>
+          ) : null}
         </div>
       ) : null}
 

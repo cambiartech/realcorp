@@ -275,6 +275,48 @@ export async function sendInvoiceEmail(input: {
   }
 }
 
+export async function sendHrProfileUpdateEmail(input: {
+  to: string;
+  tenantName: string;
+  employeeName: string;
+  changeLines: string[];
+  reviewUrl: string;
+}) {
+  const resend = getResendClient();
+  if (!resend) {
+    return { ok: false as const, error: "Email is not configured (RESEND_API_KEY)." };
+  }
+  const from = `${getFromName()} <${getFromAddress()}>`;
+  const replyTo = getReplyToAddress();
+  const items = input.changeLines.map((line) => `<li>${line}</li>`).join("");
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111">
+      <h2 style="margin:0 0 12px;">Employee record update needs review</h2>
+      <p style="margin:0 0 12px;"><strong>${input.employeeName}</strong> updated personal details on My HR for ${input.tenantName}. Nothing is applied until you approve it.</p>
+      <ul style="margin:0 0 16px;padding-left:18px;">${items}</ul>
+      <p style="margin:0 0 16px;">
+        <a href="${input.reviewUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600;">
+          Review in People
+        </a>
+      </p>
+      <p style="margin:0;font-size:12px;color:#666;">Gross pay and job title were not included in this request.</p>
+    </div>
+  `;
+  try {
+    const result = await resend.emails.send({
+      from,
+      to: input.to,
+      subject: `${input.employeeName} updated their HR record — review needed`,
+      html,
+      ...(replyTo ? { replyTo } : {}),
+    });
+    return parseResendSendResult(result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to send email.";
+    return { ok: false as const, error: msg };
+  }
+}
+
 export async function sendCelebrationEmail(input: {
   to: string;
   subject: string;

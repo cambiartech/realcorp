@@ -28,6 +28,7 @@ import {
   cancelHrFormRequest,
   createPayTemplate,
   createHrFormRequestsBatch,
+  reviewEmployeeProfileUpdates,
   upsertEmployeeProfile,
 } from "@/app/[tenantSlug]/hr/actions";
 import { createHrOnlyEmployee } from "@/app/[tenantSlug]/hr/document-intake-actions";
@@ -46,7 +47,7 @@ import { SortTh, useTableSort } from "@/components/sort-th";
 import { sortTableRows } from "@/lib/table-sort";
 import { notifyPrefillResult, runPrefillFromUploadedDocs } from "@/lib/hr-prefill-client";
 
-type PeopleTab = "directory" | "onboard" | "record" | "send" | "requests";
+type PeopleTab = "directory" | "onboard" | "record" | "send" | "requests" | "approvals";
 type RecordTab = "personal" | "job" | "bank" | "emergency" | "family";
 type InviteMode = "single" | "bulk" | "excel";
 type InviteRow = {
@@ -235,6 +236,7 @@ export function HrPeopleWorkspace({
   initialOnboardUserId,
   offerByUserId,
   formRequests,
+  pendingProfileUpdates,
   departments,
   pensionAdministrators,
 }: {
@@ -299,6 +301,12 @@ export function HrPeopleWorkspace({
     submittedPayload: Record<string, unknown> | null;
     reviewNote: string | null;
   }>;
+  pendingProfileUpdates: Array<{
+    profileId: string;
+    employeeName: string;
+    submittedAtLabel: string;
+    lines: string[];
+  }>;
   departments: string[];
   pensionAdministrators: string[];
 }) {
@@ -307,8 +315,13 @@ export function HrPeopleWorkspace({
   const { showSnackbar } = useSnackbar();
   const [onboardInitialStep, setOnboardInitialStep] = useState<OnboardingStepId>("personal");
   const [peopleTab, setPeopleTab] = useState<PeopleTab>(() =>
-    searchParams.get("reviewForms") === "1" ? "requests" : "directory",
+    searchParams.get("approvals") === "1"
+      ? "approvals"
+      : searchParams.get("reviewForms") === "1"
+        ? "requests"
+        : "directory",
   );
+  const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
   const [peopleQuery, setPeopleQuery] = useState("");
   const { sortKey, sortDir, onSort } = useTableSort();
   const [recordTab, setRecordTab] = useState<RecordTab>("personal");
@@ -385,6 +398,21 @@ export function HrPeopleWorkspace({
     } finally {
       setPending(false);
     }
+  }
+
+  async function reviewApprovals(profileIds: string[], decision: "approve" | "reject") {
+    const ids = [...new Set(profileIds)];
+    if (ids.length === 0) {
+      showSnackbar("Select at least one update.", "error");
+      return;
+    }
+    const ok = await runAction(
+      () => reviewEmployeeProfileUpdates(tenantSlug, { profileIds: ids, decision }),
+      decision === "approve"
+        ? `Approved ${ids.length} update${ids.length === 1 ? "" : "s"}.`
+        : `Rejected ${ids.length} update${ids.length === 1 ? "" : "s"}. The current records are unchanged.`,
+    );
+    if (ok) setSelectedApprovalIds((current) => current.filter((id) => !ids.includes(id)));
   }
 
   function closeInviteModal() {
@@ -682,6 +710,10 @@ export function HrPeopleWorkspace({
 
   const peopleTabs: { id: PeopleTab; label: string }[] = [
     { id: "directory", label: "Team directory" },
+    {
+      id: "approvals",
+      label: `Approvals${pendingProfileUpdates.length ? ` (${pendingProfileUpdates.length})` : ""}`,
+    },
     { id: "record", label: "Employee record" },
     { id: "send", label: "Send forms" },
     {
@@ -693,6 +725,16 @@ export function HrPeopleWorkspace({
       }`,
     },
   ];
+
+  const selectedApprovals = pendingProfileUpdates.filter((item) => selectedApprovalIds.includes(item.profileId));
+  const allApprovalsSelected =
+    pendingProfileUpdates.length > 0 && selectedApprovals.length === pendingProfileUpdates.length;
+
+  function toggleApproval(profileId: string) {
+    setSelectedApprovalIds((current) =>
+      current.includes(profileId) ? current.filter((id) => id !== profileId) : [...current, profileId],
+    );
+  }
 
   const recordTabs: { id: RecordTab; label: string }[] = [
     { id: "personal", label: "Personal" },
@@ -728,6 +770,28 @@ export function HrPeopleWorkspace({
             className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background"
           >
             Review pending work →
+          </button>
+        </div>
+      ) : null}
+
+      {peopleTab === "directory" && pendingProfileUpdates.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {pendingProfileUpdates.length} My HR update{pendingProfileUpdates.length === 1 ? "" : "s"} waiting for
+              approval
+            </p>
+            <p className="text-xs text-muted">
+              Personal details only — phone, address, date of joining, emergency contact, and next of kin. Gross pay
+              is not included.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPeopleTab("approvals")}
+            className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background"
+          >
+            Open Approvals →
           </button>
         </div>
       ) : null}
@@ -1712,6 +1776,116 @@ export function HrPeopleWorkspace({
             </div>
           ) : null}
         </form>
+      ) : null}
+
+      {peopleTab === "approvals" ? (
+        pendingProfileUpdates.length === 0 ? (
+          <p className="text-sm text-muted">No personal record updates are waiting. When someone submits My HR changes, they show up here.</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {pendingProfileUpdates.length} personal update{pendingProfileUpdates.length === 1 ? "" : "s"} waiting
+                </p>
+                <p className="text-xs text-muted">
+                  Select a few, or approve the whole queue. Nothing is written to the employee file until you approve.
+                  Gross pay is never included.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={pending || selectedApprovals.length === 0}
+                  onClick={() => void reviewApprovals(selectedApprovals.map((item) => item.profileId), "reject")}
+                  className="rounded-md border border-foreground/15 bg-background px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                >
+                  Reject selected{selectedApprovals.length ? ` (${selectedApprovals.length})` : ""}
+                </button>
+                <button
+                  type="button"
+                  disabled={pending || selectedApprovals.length === 0}
+                  onClick={() => void reviewApprovals(selectedApprovals.map((item) => item.profileId), "approve")}
+                  className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                >
+                  {pending ? "Working…" : `Approve selected${selectedApprovals.length ? ` (${selectedApprovals.length})` : ""}`}
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => void reviewApprovals(pendingProfileUpdates.map((item) => item.profileId), "approve")}
+                  className="rounded-md border border-foreground/15 bg-background px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                >
+                  Approve all
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-foreground/10">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-foreground/[0.03] text-xs uppercase text-muted">
+                  <tr>
+                    <th className="w-10 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all updates"
+                        checked={allApprovalsSelected}
+                        onChange={() =>
+                          setSelectedApprovalIds(allApprovalsSelected ? [] : pendingProfileUpdates.map((item) => item.profileId))
+                        }
+                      />
+                    </th>
+                    <th className="px-3 py-2">Person</th>
+                    <th className="px-3 py-2">Submitted</th>
+                    <th className="px-3 py-2">Changes</th>
+                    <th className="px-3 py-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-foreground/10">
+                  {pendingProfileUpdates.map((item) => (
+                    <tr key={item.profileId}>
+                      <td className="px-3 py-3 align-top">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${item.employeeName}`}
+                          checked={selectedApprovalIds.includes(item.profileId)}
+                          onChange={() => toggleApproval(item.profileId)}
+                        />
+                      </td>
+                      <td className="px-3 py-3 align-top font-medium text-foreground">{item.employeeName}</td>
+                      <td className="px-3 py-3 align-top text-xs text-muted">{item.submittedAtLabel}</td>
+                      <td className="px-3 py-3 align-top">
+                        <ul className="list-disc space-y-0.5 pl-4 text-xs text-foreground">
+                          {item.lines.map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      </td>
+                      <td className="px-3 py-3 align-top whitespace-nowrap">
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => void reviewApprovals([item.profileId], "approve")}
+                          className="text-xs font-semibold text-[var(--success)] underline disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => void reviewApprovals([item.profileId], "reject")}
+                          className="ml-3 text-xs text-muted underline disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       ) : null}
 
       {peopleTab === "requests" ? (
