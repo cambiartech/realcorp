@@ -17,6 +17,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { SlidersHorizontal, Target } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -1405,28 +1406,34 @@ export function DashboardWorkspace({
             <span className="text-muted"> · or Quick actions (bottom-right)</span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-start gap-2">
           <FinancePeriodPicker
             idPrefix="dashboard"
             value={periodPickerValue}
             onChange={applyPeriodPicker}
           />
-          <button
-            type="button"
-            onClick={() => setOpenBuilder(true)}
-            className="rounded-md border border-foreground/20 px-3 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.06]"
-          >
-            Customize dashboard
-          </button>
-          {canManageGoals ? (
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setOpenGoal(true)}
-              className="rounded-md border border-foreground bg-foreground px-3 py-2 text-sm font-semibold text-background hover:opacity-90"
+              onClick={() => setOpenBuilder(true)}
+              title="Customize dashboard"
+              aria-label="Customize dashboard"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/20 text-foreground hover:bg-foreground/[0.06]"
             >
-              Set fiscal goals
+              <SlidersHorizontal className="h-4 w-4" />
             </button>
-          ) : null}
+            {canManageGoals ? (
+              <button
+                type="button"
+                onClick={() => setOpenGoal(true)}
+                title="Set fiscal goals"
+                aria-label="Set fiscal goals"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground bg-foreground text-background hover:opacity-90"
+              >
+                <Target className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
