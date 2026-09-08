@@ -25,7 +25,12 @@ export function OnboardingProfileHiddenFields({
       <input type="hidden" name="phoneMobile" value={draft.phoneMobile} />
       <input type="hidden" name="workEmail" value={draft.workEmail} />
       <input type="hidden" name="grossMonthly" value={draft.grossMonthly} />
-      <input type="hidden" name="payeeTaxMonthly" value={draft.payeeTaxMonthly} />
+      {draft.payeeTaxMonthly && draft.taxOverrideReason ? (
+        <>
+          <input type="hidden" name="payeeTaxMonthly" value={draft.payeeTaxMonthly} />
+          <input type="hidden" name="taxOverrideReason" value={draft.taxOverrideReason} />
+        </>
+      ) : null}
       <input type="hidden" name="taxId" value={draft.taxId} />
       <input type="hidden" name="rsaPin" value={draft.rsaPin} />
       <input type="hidden" name="pensionAdministrator" value={draft.pensionAdministrator} />

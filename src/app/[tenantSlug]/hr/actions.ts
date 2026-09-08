@@ -165,17 +165,24 @@ export async function upsertEmployeeProfile(
     tenant.settings?.payrollCountryCode,
     tenant.settings?.payrollSettings,
   );
-  const resultingTaxOverride = has("payeeTaxMonthly")
-    ? parsed.data.payeeTaxMonthly
-    : existingRow?.payeeTaxMonthly != null
-      ? Number(existingRow.payeeTaxMonthly)
-      : undefined;
-  const resultingOverrideReason = has("taxOverrideReason")
-    ? parsed.data.taxOverrideReason
-    : existingRow?.taxOverrideReason || undefined;
-  if (resultingTaxOverride !== undefined && !resultingOverrideReason?.trim()) {
-    return { ok: false, error: "Add a reason for the manual PAYE tax override, or leave the override blank." };
+  const incomingPayeAmount = has("payeeTaxMonthly") ? parsed.data.payeeTaxMonthly : undefined;
+  const incomingOverrideReason = has("taxOverrideReason") ? parsed.data.taxOverrideReason : undefined;
+  // Only block when this save is explicitly setting a manual amount without a reason.
+  // A leftover amount with no reason is not an override — country tax law applies.
+  if (
+    has("payeeTaxMonthly") &&
+    has("taxOverrideReason") &&
+    incomingPayeAmount != null &&
+    !incomingOverrideReason?.trim()
+  ) {
+    return { ok: false, error: "Add a reason for the manual PAYE, or switch back to country tax law." };
   }
+  const clearOrphanPaye =
+    incomingPayeAmount != null &&
+    !resolveManualPayeOverride({
+      amount: incomingPayeAmount,
+      reason: has("taxOverrideReason") ? incomingOverrideReason : existingRow?.taxOverrideReason,
+    });
 
   const strOrNull = (v: string | undefined) => (v && v !== "" ? v : null);
   const pickStr = (key: string, v: string | undefined) => {
@@ -256,13 +263,17 @@ export async function upsertEmployeeProfile(
     ...(pickMoney("grossMonthly", parsed.data.grossMonthly) !== undefined
       ? { grossMonthly: pickMoney("grossMonthly", parsed.data.grossMonthly) }
       : {}),
-    ...(pickMoney("payeeTaxMonthly", parsed.data.payeeTaxMonthly) !== undefined
-      ? { payeeTaxMonthly: pickMoney("payeeTaxMonthly", parsed.data.payeeTaxMonthly) }
-      : {}),
+    ...(clearOrphanPaye
+      ? { payeeTaxMonthly: null, taxOverrideReason: null }
+      : {
+          ...(pickMoney("payeeTaxMonthly", parsed.data.payeeTaxMonthly) !== undefined
+            ? { payeeTaxMonthly: pickMoney("payeeTaxMonthly", parsed.data.payeeTaxMonthly) }
+            : {}),
+          ...(has("taxOverrideReason") ? { taxOverrideReason: strOrNull(parsed.data.taxOverrideReason) } : {}),
+        }),
     ...(has("payrollCountryCode") ? { payrollCountryCode: parsed.data.payrollCountryCode || "NG" } : {}),
     ...(has("payrollRegionCode") ? { payrollRegionCode: strOrNull(parsed.data.payrollRegionCode) } : {}),
     ...(has("taxId") ? { taxId: strOrNull(parsed.data.taxId) } : {}),
-    ...(has("taxOverrideReason") ? { taxOverrideReason: strOrNull(parsed.data.taxOverrideReason) } : {}),
     ...(has("rsaPin") ? { rsaPin: strOrNull(parsed.data.rsaPin) } : {}),
     ...(has("pensionAdministrator") ? { pensionAdministrator: strOrNull(parsed.data.pensionAdministrator) } : {}),
     ...(has("nhfMembershipNumber") ? { nhfMembershipNumber: strOrNull(parsed.data.nhfMembershipNumber) } : {}),
