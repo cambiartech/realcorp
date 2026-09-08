@@ -20,6 +20,7 @@ import {
   Prisma,
 } from "@/generated/prisma";
 import { absoluteAppUrl } from "@/lib/app-url";
+import { writeAuditLog } from "@/lib/audit-log";
 import { mergeHrFormIntoProfile } from "@/lib/hr-form-merge";
 import {
   hrFormFillPath,
