@@ -13,20 +13,21 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 function canManageOrgModules(isPlatformAdmin: boolean, role: MembershipRole | undefined) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN;
+  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN;
 }
 
 function canAddOrgDepartment(isPlatformAdmin: boolean, role: MembershipRole | undefined) {
   return (
     isPlatformAdmin ||
     role === MembershipRole.ORG_ADMIN ||
+    role === MembershipRole.SUB_ADMIN ||
     role === MembershipRole.HR_MANAGER ||
     role === MembershipRole.FINANCE_MANAGER
   );
 }
 
 function canRenameOrg(isPlatformAdmin: boolean, role: MembershipRole | undefined) {
-  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN;
+  return isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN;
 }
 
 function parseLinesList(value: FormDataEntryValue | null): string[] {

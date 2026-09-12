@@ -77,6 +77,7 @@ export function TeamWorkspace({
   tenantName,
   tenantSlug,
   canInvite,
+  canGrantOrgAdmin = false,
   orgDepartments,
   entitledModules,
   members,
@@ -86,6 +87,7 @@ export function TeamWorkspace({
   tenantName: string;
   tenantSlug: string;
   canInvite: boolean;
+  canGrantOrgAdmin?: boolean;
   orgDepartments: string[];
   entitledModules: AssignableMemberModule[];
   members: TeamMemberRow[];
@@ -97,6 +99,9 @@ export function TeamWorkspace({
 
   const inviteCount = invites.length;
   const memberCount = members.length;
+  const roleOptions = canGrantOrgAdmin
+    ? TEAM_MEMBERSHIP_ROLE_OPTIONS
+    : TEAM_MEMBERSHIP_ROLE_OPTIONS.filter((opt) => opt.value !== MembershipRole.ORG_ADMIN);
 
   return (
     <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
@@ -118,7 +123,7 @@ export function TeamWorkspace({
 
       {!canInvite ? (
         <p className="mt-4 rounded-lg border border-foreground/10 bg-field px-3 py-2 text-sm text-muted">
-          Only org admins can create invites.
+          Only organization admins and subadmins can create invites.
         </p>
       ) : null}
 
@@ -142,6 +147,8 @@ export function TeamWorkspace({
           members={members}
           tenantSlug={tenantSlug}
           canManageRoles={canInvite}
+          canGrantOrgAdmin={canGrantOrgAdmin}
+          roleOptions={roleOptions}
           currentUserId={currentUserId}
           entitledModules={entitledModules}
         />
@@ -153,6 +160,7 @@ export function TeamWorkspace({
         <InviteModal
           tenantSlug={tenantSlug}
           orgDepartments={orgDepartments}
+          canGrantOrgAdmin={canGrantOrgAdmin}
           onClose={() => setIsInviteOpen(false)}
         />
       ) : null}
@@ -185,12 +193,16 @@ function MembersTable({
   members,
   tenantSlug,
   canManageRoles,
+  canGrantOrgAdmin,
+  roleOptions,
   currentUserId,
   entitledModules,
 }: {
   members: TeamMemberRow[];
   tenantSlug: string;
   canManageRoles: boolean;
+  canGrantOrgAdmin: boolean;
+  roleOptions: typeof TEAM_MEMBERSHIP_ROLE_OPTIONS;
   currentUserId: string;
   entitledModules: AssignableMemberModule[];
 }) {
@@ -294,11 +306,14 @@ function MembersTable({
                     onChange={(e) => void handleRoleChange(member.id, member.roleValue, e.target.value)}
                     className="text-sm"
                   >
-                    {TEAM_MEMBERSHIP_ROLE_OPTIONS.map((opt) => (
+                    {roleOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
+                    {!canGrantOrgAdmin && member.roleValue === MembershipRole.ORG_ADMIN ? (
+                      <option value={MembershipRole.ORG_ADMIN}>Organization admin</option>
+                    ) : null}
                   </UiSelect>
                 ) : (
                   <span className="text-foreground/90">{member.role}</span>
@@ -479,17 +494,22 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
 function InviteModal({
   tenantSlug,
   orgDepartments,
+  canGrantOrgAdmin,
   onClose,
 }: {
   tenantSlug: string;
   orgDepartments: string[];
+  canGrantOrgAdmin: boolean;
   onClose: () => void;
 }) {
   const [state, formAction, pending] = useActionState(inviteTenantMember.bind(null, tenantSlug), initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<TeamInviteFieldName, string>>>({});
-  const [accessKind, setAccessKind] = useState<"department" | "org_admin" | "portal">("department");
+  const [accessKind, setAccessKind] = useState<"department" | "sub_admin" | "org_admin" | "portal">("department");
   const { showSnackbar } = useSnackbar();
   const seenStateRef = useRef<string>("");
+  const accessKindOptions = canGrantOrgAdmin
+    ? INVITE_ACCESS_KIND_OPTIONS
+    : INVITE_ACCESS_KIND_OPTIONS.filter((opt) => opt.value !== "org_admin");
 
   const hasSuccess = Boolean(state?.ok);
   const successUrl = useMemo(() => (state?.ok ? state.inviteUrl : ""), [state]);
@@ -601,7 +621,7 @@ function InviteModal({
               value={accessKind}
               onChange={(e) => setAccessKind(e.target.value as typeof accessKind)}
             >
-              {INVITE_ACCESS_KIND_OPTIONS.map((opt) => (
+              {accessKindOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>

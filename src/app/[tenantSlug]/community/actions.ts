@@ -17,6 +17,7 @@ function canManageCommunity(role: MembershipRole | undefined, isPlatformAdmin: b
   return (
     isPlatformAdmin ||
     role === MembershipRole.ORG_ADMIN ||
+    role === MembershipRole.SUB_ADMIN ||
     role === MembershipRole.COMMUNITY_MANAGER ||
     role === MembershipRole.SALES_MANAGER
   );

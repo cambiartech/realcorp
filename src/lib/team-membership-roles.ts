@@ -4,7 +4,8 @@ import { ORG_DEPARTMENT_OPTIONS } from "@/lib/org-membership-profile";
 /** Simplified invite UI — department + lead toggle (legacy enum kept under the hood). */
 export const INVITE_ACCESS_KIND_OPTIONS = [
   { value: "department", label: "Team member (department)" },
-  { value: "org_admin", label: "Organization admin" },
+  { value: "sub_admin", label: "Subadmin (no People / payroll)" },
+  { value: "org_admin", label: "Organization admin (full access)" },
   { value: "portal", label: "Investor / listing owner (portal only)" },
 ] as const;
 
@@ -18,6 +19,7 @@ export const INVITE_PORTAL_ROLE_OPTIONS = [
 /** Member role dropdown — still maps to enum until member edit UI is migrated. */
 export const TEAM_MEMBERSHIP_ROLE_OPTIONS: { value: MembershipRole; label: string }[] = [
   { value: MembershipRole.ORG_ADMIN, label: "Organization admin" },
+  { value: MembershipRole.SUB_ADMIN, label: "Subadmin" },
   { value: MembershipRole.FINANCE_MANAGER, label: "Finance · Lead" },
   { value: MembershipRole.HR_MANAGER, label: "People (HR) · Lead" },
   { value: MembershipRole.SALES_MANAGER, label: "Sales · Lead" },

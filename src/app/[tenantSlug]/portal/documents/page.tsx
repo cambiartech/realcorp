@@ -40,7 +40,7 @@ export default async function InvestorDocumentsPage({ params }: { params: Promis
     select: { role: true, status: true, modulePermissions: true },
   });
 
-  const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";
+  const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN" || membership?.role === "SUB_ADMIN";
   if (!isAdminViewer) {
     assertTenantNavAccess(session, membership, tenant.settings, "portalDocuments");
   }

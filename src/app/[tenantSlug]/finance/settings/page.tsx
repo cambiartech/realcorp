@@ -16,7 +16,7 @@ function canManageFinance(
 ) {
   if (isPlatformAdmin) return true;
   if (!membership || membership.status !== MembershipStatus.ACTIVE) return false;
-  return membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.FINANCE_MANAGER;
+  return membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SUB_ADMIN || membership.role === MembershipRole.FINANCE_MANAGER;
 }
 
 export default async function FinanceSettingsPage({ params }: { params: Promise<{ tenantSlug: string }> }) {

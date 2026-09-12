@@ -43,7 +43,9 @@ export default async function ListingsPage({ params }: { params: Promise<{ tenan
   const canManage =
     session.user.isPlatformAdmin ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SALES_MANAGER));
+      (membership.role === MembershipRole.ORG_ADMIN ||
+        membership.role === MembershipRole.SUB_ADMIN ||
+        membership.role === MembershipRole.SALES_MANAGER));
 
   const projects = await prisma.project.findMany({
     where: { tenantId: tenant.id },

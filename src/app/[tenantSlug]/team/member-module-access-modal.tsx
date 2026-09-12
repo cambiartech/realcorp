@@ -45,12 +45,14 @@ export function MemberModuleAccessModal({
     return init;
   });
 
-  if (memberRole === MembershipRole.ORG_ADMIN) {
+  if (memberRole === MembershipRole.ORG_ADMIN || memberRole === MembershipRole.SUB_ADMIN) {
     return (
       <ModalOverlay open onClose={onClose} panelClassName={MODAL_PANEL_LG}>
         <h2 className="text-lg font-semibold text-foreground">Module access</h2>
         <p className="mt-2 text-sm text-muted">
-          Organization admins always have full access to every module on your plan.
+          {memberRole === MembershipRole.ORG_ADMIN
+            ? "Organization admins always have full access to every module on your plan, including People."
+            : "Subadmins have full access to operational modules, but cannot open People records, payslips, or other personal HR data."}
         </p>
         <div className="mt-4 flex justify-end">
           <button

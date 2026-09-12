@@ -43,7 +43,7 @@ async function getTenantAndAccess(tenantSlug: string, userId: string, isPlatform
   const canManage =
     Boolean(isPlatformAdmin) ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN ||
+      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SUB_ADMIN ||
         membership.role === MembershipRole.SALES_MANAGER ||
         projectAccess === "full"));
 

@@ -122,7 +122,7 @@ export default async function TenantSettingsPage({
     ? "Platform Admin"
     : membershipRoleLabel(membership?.role ?? MembershipRole.SALES_EXECUTIVE);
 
-  const canManageOrg = Boolean(session.user.isPlatformAdmin) || membership?.role === MembershipRole.ORG_ADMIN;
+  const canManageOrg = Boolean(session.user.isPlatformAdmin) || membership?.role === MembershipRole.ORG_ADMIN || membership?.role === MembershipRole.SUB_ADMIN;
 
   const workspaceMeta = {
     slug: tenant.slug,

@@ -54,11 +54,13 @@ export type DashboardRoleView =
 
 export type MembershipProfileInput =
   | { kind: "org_admin" }
+  | { kind: "sub_admin" }
   | { kind: "department"; department: OrgDepartment; isDepartmentLead: boolean }
   | { kind: "portal"; portalRole: "investor" | "listing_owner" };
 
 export function resolveMembershipRole(input: MembershipProfileInput): MembershipRole {
   if (input.kind === "org_admin") return MembershipRole.ORG_ADMIN;
+  if (input.kind === "sub_admin") return MembershipRole.SUB_ADMIN;
   if (input.kind === "portal") {
     return input.portalRole === "listing_owner"
       ? MembershipRole.LISTING_OWNER
@@ -92,6 +94,8 @@ export function profileFromMembershipRole(role: MembershipRole): {
   switch (role) {
     case MembershipRole.ORG_ADMIN:
       return { department: null, isDepartmentLead: true };
+    case MembershipRole.SUB_ADMIN:
+      return { department: null, isDepartmentLead: true };
     case MembershipRole.SALES_MANAGER:
       return { department: "sales", isDepartmentLead: true };
     case MembershipRole.SALES_EXECUTIVE:
@@ -121,6 +125,7 @@ export function profileFromMembershipRole(role: MembershipRole): {
 
 export function membershipRoleLabel(role: MembershipRole, department?: string | null, isDepartmentLead?: boolean) {
   if (role === MembershipRole.ORG_ADMIN) return "Organization admin";
+  if (role === MembershipRole.SUB_ADMIN) return "Subadmin";
   if (role === MembershipRole.INVESTOR) return "Investor (portal)";
   if (role === MembershipRole.LISTING_OWNER) return "Listing owner (portal)";
   if (role === MembershipRole.FACILITY_MANAGER) return "Facility Manager";
@@ -157,7 +162,9 @@ export function dashboardRoleViewForMembership(
   role: MembershipRole,
   opts?: { isPlatformAdmin?: boolean; department?: string | null; isDepartmentLead?: boolean },
 ): DashboardRoleView {
-  if (opts?.isPlatformAdmin || role === MembershipRole.ORG_ADMIN) return "ORG_ADMIN";
+  if (opts?.isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN) {
+    return "ORG_ADMIN";
+  }
 
   const mapped = opts?.department ? mapOrgDepartmentToAccess(opts.department) : null;
   const dept = mapped ?? profileFromMembershipRole(role).department;

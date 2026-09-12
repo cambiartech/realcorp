@@ -102,7 +102,7 @@ export async function upsertTenantGoal(
   const canManageGoals =
     Boolean(session.user.isPlatformAdmin) ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.FINANCE_MANAGER));
+      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SUB_ADMIN || membership.role === MembershipRole.FINANCE_MANAGER));
   if (!canManageGoals) return { ok: false, error: "Only org admin or finance manager can set fiscal goals." };
 
   const start = new Date(parsed.data.fiscalYearStart);

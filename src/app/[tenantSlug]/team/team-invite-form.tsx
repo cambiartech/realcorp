@@ -35,13 +35,18 @@ function fieldClass(invalid: boolean) {
 export function TeamInviteForm({
   tenantSlug,
   orgDepartments = [],
+  canGrantOrgAdmin = true,
 }: {
   tenantSlug: string;
   orgDepartments?: string[];
+  canGrantOrgAdmin?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(inviteTenantMember.bind(null, tenantSlug), initial);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<TeamInviteFieldName, string>>>({});
-  const [accessKind, setAccessKind] = useState<"department" | "org_admin" | "portal">("department");
+  const [accessKind, setAccessKind] = useState<"department" | "sub_admin" | "org_admin" | "portal">("department");
+  const accessKindOptions = canGrantOrgAdmin
+    ? INVITE_ACCESS_KIND_OPTIONS
+    : INVITE_ACCESS_KIND_OPTIONS.filter((opt) => opt.value !== "org_admin");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,7 +111,7 @@ export function TeamInviteForm({
           value={accessKind}
           onChange={(e) => setAccessKind(e.target.value as typeof accessKind)}
         >
-          {INVITE_ACCESS_KIND_OPTIONS.map((opt) => (
+          {accessKindOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>

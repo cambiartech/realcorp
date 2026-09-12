@@ -8,7 +8,7 @@ export const EXTRA_MODULE_GRANT_TOKENS = ["SALES", "MARKETING", "COMMUNITY", "FI
 export type ExtraModuleGrantToken = (typeof EXTRA_MODULE_GRANT_TOKENS)[number];
 
 export const MEMBERSHIP_ROLES_FOR_GRANT_MATRIX = (Object.values(MembershipRole) as MembershipRole[]).filter(
-  (r) => r !== MembershipRole.ORG_ADMIN,
+  (r) => r !== MembershipRole.ORG_ADMIN && r !== MembershipRole.SUB_ADMIN,
 );
 
 export function grantFormFieldName(role: MembershipRole, token: ExtraModuleGrantToken) {

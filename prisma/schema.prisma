@@ -285,6 +285,8 @@ model DashboardPreference {
 
 enum MembershipRole {
   ORG_ADMIN
+  /// Broad org operator — same modules as org admin except People / payroll / personal HR records.
+  SUB_ADMIN
   FINANCE_MANAGER
   HR_MANAGER
   SALES_MANAGER

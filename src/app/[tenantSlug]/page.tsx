@@ -105,7 +105,7 @@ export default async function TenantHomePage({
   ];
 
   const roleOptions: DashboardRoleView[] =
-    session.user.isPlatformAdmin || role === MembershipRole.ORG_ADMIN
+    session.user.isPlatformAdmin || role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN
       ? allRoleViews
       : [userDashboardView];
 
@@ -123,7 +123,7 @@ export default async function TenantHomePage({
 
   const moduleTasksEnabled = tenant.settings?.moduleTasks ?? true;
   const moduleHrEnabled = tenant.settings?.moduleHr ?? false;
-  const canManageOrgSetup = Boolean(session.user.isPlatformAdmin) || role === MembershipRole.ORG_ADMIN;
+  const canManageOrgSetup = Boolean(session.user.isPlatformAdmin) || role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN;
 
   const [
     goal,
@@ -612,7 +612,7 @@ export default async function TenantHomePage({
       }
       canManageGoals={
         Boolean(session.user.isPlatformAdmin) ||
-        (isActive && (role === MembershipRole.ORG_ADMIN || role === MembershipRole.FINANCE_MANAGER))
+        (isActive && (role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN || role === MembershipRole.FINANCE_MANAGER))
       }
       canManageOrgSetup={canManageOrgSetup}
       orgSetupSteps={orgSetup.steps}

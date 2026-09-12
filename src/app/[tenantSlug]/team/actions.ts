@@ -8,6 +8,12 @@ import prisma from "@/lib/db";
 import { sendInviteEmail } from "@/lib/email";
 import { buildInviteUrl, inviteExpiresAt, newInviteToken } from "@/lib/invitation-utils";
 import {
+  canGrantTopOrgAdmin,
+  isActiveOrgAdminOrSubAdmin,
+  isOrgAdminOrSubAdmin,
+  isTopOrgAdmin,
+} from "@/lib/org-admin-access";
+import {
   parseTeamInviteForm,
   inviteProfileFromForm,
   resolveRoleFromTeamInviteForm,
@@ -58,17 +64,22 @@ export async function inviteTenantMember(
     select: { role: true, status: true },
   });
 
-  const isOrgAdmin =
-    membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN;
+  const isOrgAdmin = isActiveOrgAdminOrSubAdmin(membership);
   const isHrManager =
     membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.HR_MANAGER;
   const canInvite = session.user.isPlatformAdmin || isOrgAdmin || isHrManager;
 
   if (!canInvite) {
-    return { ok: false, error: "Only organization admins and HR managers can invite team members." };
+    return { ok: false, error: "Only organization admins, subadmins, and HR managers can invite team members." };
   }
   if (isHrManager && parsed.data.accessKind !== "department") {
     return { ok: false, error: "HR managers can invite employees, but cannot grant administrator or portal access." };
+  }
+  if (
+    parsed.data.accessKind === "org_admin" &&
+    !canGrantTopOrgAdmin(Boolean(session.user.isPlatformAdmin), membership)
+  ) {
+    return { ok: false, error: "Only organization admins can grant full Organization admin access." };
   }
 
   const email = parsed.data.email.toLowerCase();
@@ -275,11 +286,9 @@ export async function updateMembershipRole(
   });
 
   const canManage =
-    session.user.isPlatformAdmin ||
-    (actorMembership?.status === MembershipStatus.ACTIVE &&
-      actorMembership.role === MembershipRole.ORG_ADMIN);
+    session.user.isPlatformAdmin || isActiveOrgAdminOrSubAdmin(actorMembership);
   if (!canManage) {
-    return { ok: false, error: "Only organization admins can change roles." };
+    return { ok: false, error: "Only organization admins and subadmins can change roles." };
   }
 
   const target = await prisma.membership.findFirst({
@@ -288,6 +297,21 @@ export async function updateMembershipRole(
   });
   if (!target) {
     return { ok: false, error: "Member not found." };
+  }
+
+  if (
+    parsed.data.role === MembershipRole.ORG_ADMIN &&
+    !canGrantTopOrgAdmin(Boolean(session.user.isPlatformAdmin), actorMembership)
+  ) {
+    return { ok: false, error: "Only organization admins can grant full Organization admin access." };
+  }
+
+  if (
+    isTopOrgAdmin(target.role) &&
+    parsed.data.role !== MembershipRole.ORG_ADMIN &&
+    !canGrantTopOrgAdmin(Boolean(session.user.isPlatformAdmin), actorMembership)
+  ) {
+    return { ok: false, error: "Only organization admins can change another organization admin’s role." };
   }
 
   if (target.role === MembershipRole.ORG_ADMIN && parsed.data.role !== MembershipRole.ORG_ADMIN) {
@@ -344,10 +368,8 @@ export async function resendInvitation(tenantSlug: string, invitationId: string)
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { role: true, status: true },
   });
-  const canManage =
-    session.user.isPlatformAdmin ||
-    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
-  if (!canManage) return { ok: false, error: "Only organization admins can manage invites." };
+  const canManage = session.user.isPlatformAdmin || isActiveOrgAdminOrSubAdmin(membership);
+  if (!canManage) return { ok: false, error: "Only organization admins and subadmins can manage invites." };
 
   const invite = await prisma.invitation.findFirst({
     where: { id: invitationId, tenantId: tenant.id, acceptedAt: null },
@@ -413,10 +435,8 @@ export async function refreshInvitationToken(
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { role: true, status: true },
   });
-  const canManage =
-    session.user.isPlatformAdmin ||
-    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
-  if (!canManage) return { ok: false, error: "Only organization admins can manage invites." };
+  const canManage = session.user.isPlatformAdmin || isActiveOrgAdminOrSubAdmin(membership);
+  if (!canManage) return { ok: false, error: "Only organization admins and subadmins can manage invites." };
 
   const invite = await prisma.invitation.findFirst({
     where: { id: invitationId, tenantId: tenant.id, acceptedAt: null },
@@ -471,10 +491,8 @@ export async function deleteInvitation(tenantSlug: string, invitationId: string)
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { role: true, status: true },
   });
-  const canManage =
-    session.user.isPlatformAdmin ||
-    (membership?.status === MembershipStatus.ACTIVE && membership.role === MembershipRole.ORG_ADMIN);
-  if (!canManage) return { ok: false, error: "Only organization admins can manage invites." };
+  const canManage = session.user.isPlatformAdmin || isActiveOrgAdminOrSubAdmin(membership);
+  if (!canManage) return { ok: false, error: "Only organization admins and subadmins can manage invites." };
 
   const invite = await prisma.invitation.findFirst({
     where: { id: invitationId, tenantId: tenant.id, acceptedAt: null },
@@ -514,11 +532,8 @@ export async function setMembershipStatus(
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { role: true, status: true },
   });
-  const canManage =
-    session.user.isPlatformAdmin ||
-    (actorMembership?.status === MembershipStatus.ACTIVE &&
-      actorMembership.role === MembershipRole.ORG_ADMIN);
-  if (!canManage) return { ok: false, error: "Only organization admins can manage members." };
+  const canManage = session.user.isPlatformAdmin || isActiveOrgAdminOrSubAdmin(actorMembership);
+  if (!canManage) return { ok: false, error: "Only organization admins and subadmins can manage members." };
 
   const target = await prisma.membership.findFirst({
     where: { id: membershipId, tenantId: tenant.id },
@@ -527,6 +542,13 @@ export async function setMembershipStatus(
   if (!target) return { ok: false, error: "Member not found." };
   if (!session.user.isPlatformAdmin && target.userId === session.user.id) {
     return { ok: false, error: "You cannot disable your own account." };
+  }
+
+  if (
+    isTopOrgAdmin(target.role) &&
+    !canGrantTopOrgAdmin(Boolean(session.user.isPlatformAdmin), actorMembership)
+  ) {
+    return { ok: false, error: "Only organization admins can disable another organization admin." };
   }
 
   if (target.role === MembershipRole.ORG_ADMIN && status === "SUSPENDED") {
@@ -572,19 +594,16 @@ export async function saveMembershipModulePermissions(
     where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
     select: { role: true, status: true },
   });
-  const canManage =
-    session.user.isPlatformAdmin ||
-    (actorMembership?.status === MembershipStatus.ACTIVE &&
-      actorMembership.role === MembershipRole.ORG_ADMIN);
-  if (!canManage) return { ok: false, error: "Only organization admins can change module access." };
+  const canManage = session.user.isPlatformAdmin || isActiveOrgAdminOrSubAdmin(actorMembership);
+  if (!canManage) return { ok: false, error: "Only organization admins and subadmins can change module access." };
 
   const target = await prisma.membership.findFirst({
     where: { id: membershipId, tenantId: tenant.id },
     select: { id: true, userId: true, role: true },
   });
   if (!target) return { ok: false, error: "Member not found." };
-  if (target.role === MembershipRole.ORG_ADMIN) {
-    return { ok: false, error: "Organization admins always have full module access." };
+  if (isOrgAdminOrSubAdmin(target.role)) {
+    return { ok: false, error: "Organization admins and subadmins always have full module access (except People for subadmins)." };
   }
 
   const parsed = parseMembershipModulePermissionsFromForm(formData);

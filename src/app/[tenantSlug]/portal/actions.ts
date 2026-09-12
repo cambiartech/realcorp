@@ -44,7 +44,9 @@ export async function submitInvestorInterest(
   const allowed =
     Boolean(session.user.isPlatformAdmin) ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN || isPortalOnlyRole(membership.role)));
+      (membership.role === MembershipRole.ORG_ADMIN ||
+        membership.role === MembershipRole.SUB_ADMIN ||
+        isPortalOnlyRole(membership.role)));
   if (!allowed) {
     return { ok: false, error: "You do not have access to express interest from the investor portal." };
   }

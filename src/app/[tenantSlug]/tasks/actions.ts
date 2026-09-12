@@ -186,7 +186,10 @@ export async function updateWorkTask(
 
   const isOwner =
     existing.createdByUserId === ctx.session.user.id || existing.assigneeUserId === ctx.session.user.id;
-  const isAdmin = Boolean(ctx.session.user.isPlatformAdmin) || ctx.membership?.role === "ORG_ADMIN";
+  const isAdmin =
+    Boolean(ctx.session.user.isPlatformAdmin) ||
+    ctx.membership?.role === "ORG_ADMIN" ||
+    ctx.membership?.role === "SUB_ADMIN";
   if (!isOwner && !isAdmin && !canManageTasks(Boolean(ctx.session.user.isPlatformAdmin), ctx.membership)) {
     return { ok: false, error: "You cannot edit this task." };
   }
@@ -225,7 +228,10 @@ export async function deleteWorkTask(tenantSlug: string, taskId: string): Promis
 
   const isOwner =
     existing.createdByUserId === ctx.session.user.id || existing.assigneeUserId === ctx.session.user.id;
-  const isAdmin = Boolean(ctx.session.user.isPlatformAdmin) || ctx.membership?.role === "ORG_ADMIN";
+  const isAdmin =
+    Boolean(ctx.session.user.isPlatformAdmin) ||
+    ctx.membership?.role === "ORG_ADMIN" ||
+    ctx.membership?.role === "SUB_ADMIN";
   if (!isOwner && !isAdmin) return { ok: false, error: "You cannot delete this task." };
 
   await prisma.workTask.delete({ where: { id: taskId } });

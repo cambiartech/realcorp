@@ -72,7 +72,7 @@ export function canAssignTasksAcrossDepartments(
 ): boolean {
   if (isPlatformAdmin) return true;
   if (!role) return false;
-  return role === MembershipRole.ORG_ADMIN || role === MembershipRole.HR_MANAGER;
+  return role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN || role === MembershipRole.HR_MANAGER;
 }
 
 /** @deprecated use departmentFromStored */

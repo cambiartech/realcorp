@@ -48,7 +48,7 @@ export default async function StakeholderPortalPage({ params }: { params: Promis
     select: MEMBERSHIP_FOR_NAV_SELECT,
   });
 
-  const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN";
+  const isAdminViewer = Boolean(session.user.isPlatformAdmin) || membership?.role === "ORG_ADMIN" || membership?.role === "SUB_ADMIN";
   if (!isAdminViewer) {
     assertTenantNavAccess(session, membership, tenant.settings, "portal");
   }

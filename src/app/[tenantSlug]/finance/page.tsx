@@ -147,6 +147,7 @@ function canManageFinance(
     return false;
   return (
     membership.role === MembershipRole.ORG_ADMIN ||
+    membership.role === MembershipRole.SUB_ADMIN ||
     membership.role === MembershipRole.FINANCE_MANAGER
   );
 }

@@ -53,7 +53,7 @@ export default async function TenantProjectsPage({
   const canManage =
     session.user.isPlatformAdmin ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN ||
+      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SUB_ADMIN ||
         membership.role === MembershipRole.SALES_MANAGER ||
         projectAccess === "full"));
 

@@ -18,6 +18,7 @@ export type FacilityAccessContext = {
 
 const FACILITY_DEFAULT_ROLES = new Set<MembershipRole>([
   MembershipRole.ORG_ADMIN,
+  MembershipRole.SUB_ADMIN,
   MembershipRole.FACILITY_MANAGER,
   MembershipRole.FACILITY_STAFF,
 ]);
@@ -50,7 +51,11 @@ export function canManageFacility(ctx: FacilityAccessContext) {
   if (level === "full" || level === "edit") return true;
   if (level === "read" || level === "none") return false;
   const role = ctx.membership?.role;
-  return role === MembershipRole.ORG_ADMIN || role === MembershipRole.FACILITY_MANAGER;
+  return (
+    role === MembershipRole.ORG_ADMIN ||
+    role === MembershipRole.SUB_ADMIN ||
+    role === MembershipRole.FACILITY_MANAGER
+  );
 }
 
 export function canRecordFacility(ctx: FacilityAccessContext) {

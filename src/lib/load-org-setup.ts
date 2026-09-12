@@ -37,7 +37,7 @@ export const loadOrgSetupForUser = cache(async function loadOrgSetupForUser(
 
   const canManageOrgSetup =
     isPlatformAdmin ||
-    (resolved?.status === MembershipStatus.ACTIVE && resolved.role === MembershipRole.ORG_ADMIN);
+    (resolved?.status === MembershipStatus.ACTIVE && (resolved.role === MembershipRole.ORG_ADMIN || resolved.role === MembershipRole.SUB_ADMIN));
 
   if (!canManageOrgSetup) {
     return { canManageOrgSetup: false as const };

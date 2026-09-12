@@ -17,6 +17,7 @@ export function canManageClients(isPlatformAdmin: boolean, membership: Membershi
   if (!membership || membership.status !== MembershipStatus.ACTIVE) return false;
   return (
     membership.role === MembershipRole.ORG_ADMIN ||
+    membership.role === MembershipRole.SUB_ADMIN ||
     membership.role === MembershipRole.SALES_MANAGER ||
     membership.role === MembershipRole.FINANCE_MANAGER
   );

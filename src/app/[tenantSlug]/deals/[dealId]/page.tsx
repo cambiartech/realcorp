@@ -57,7 +57,7 @@ export default async function DealDetailPage({
   const canEdit =
     Boolean(session.user.isPlatformAdmin) ||
     (membership?.status === MembershipStatus.ACTIVE &&
-      (membership.role === MembershipRole.ORG_ADMIN ||
+      (membership.role === MembershipRole.ORG_ADMIN || membership.role === MembershipRole.SUB_ADMIN ||
         membership.role === MembershipRole.SALES_MANAGER ||
         membership.role === MembershipRole.SALES_EXECUTIVE));
 

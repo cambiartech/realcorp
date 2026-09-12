@@ -143,6 +143,7 @@ export async function deleteActivity(tenantSlug: string, activityId: string): Pr
   const isManager =
     session.user.isPlatformAdmin ||
     membership?.role === MembershipRole.ORG_ADMIN ||
+    membership?.role === MembershipRole.SUB_ADMIN ||
     membership?.role === MembershipRole.SALES_MANAGER;
   if (!isOwner && !isManager) {
     return { ok: false, error: "You can only delete your own activities." };

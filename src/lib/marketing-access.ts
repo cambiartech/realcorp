@@ -9,6 +9,7 @@ export function canEditMarketing(
   return (
     membership?.status === MembershipStatus.ACTIVE &&
     (membership.role === MembershipRole.ORG_ADMIN ||
+      membership.role === MembershipRole.SUB_ADMIN ||
       membership.role === MembershipRole.MARKETING_MANAGER ||
       membership.role === MembershipRole.MARKETING_EXECUTIVE)
   );

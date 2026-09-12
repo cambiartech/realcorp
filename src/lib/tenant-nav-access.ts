@@ -116,6 +116,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.LISTING_OWNER:
       return ["portal", "portalShortlets", "portalDocuments", "settings"];
     case MembershipRole.ORG_ADMIN:
+    case MembershipRole.SUB_ADMIN:
       return withoutInvestorPortalNav(NAV_ORDER);
     case MembershipRole.FINANCE_MANAGER:
       return ["dashboard", "clients", "tasks", "finance", "settings"];
@@ -239,7 +240,7 @@ export function getVisibleNavKeys(opts: {
     set.add("tasks");
     keys = NAV_ORDER.filter((k) => set.has(k));
   }
-  if (!isPlatformAdmin && r !== MembershipRole.ORG_ADMIN && !portalOnly) {
+  if (!isPlatformAdmin && r !== MembershipRole.ORG_ADMIN && r !== MembershipRole.SUB_ADMIN && !portalOnly) {
     keys = applyUserModulePermissionsToNavKeys(
       keys,
       userModulePermissions,

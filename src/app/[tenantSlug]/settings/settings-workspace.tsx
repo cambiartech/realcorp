@@ -661,10 +661,12 @@ export function SettingsWorkspace({
             <form action={modulesAction} className="mt-6 space-y-6">
               <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">
-                  {formatEnumLabel(MembershipRole.ORG_ADMIN)}
+                  {formatEnumLabel(MembershipRole.ORG_ADMIN)} &amp; {formatEnumLabel(MembershipRole.SUB_ADMIN)}
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  Always has the full sidebar for every module enabled on your plan. No checkboxes needed.
+                  Both get the full operational sidebar for every module on your plan. Organization admins can
+                  also open People / payroll; Subadmins cannot — that stays with Organization admin and People
+                  (HR) leads.
                 </p>
               </div>
 

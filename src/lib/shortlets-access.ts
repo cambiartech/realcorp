@@ -18,6 +18,7 @@ export type ShortletsAccessContext = {
 /** Roles that get Short lets by default (ops + org admin). Sales/finance need explicit module assignment. */
 const SHORTLETS_DEFAULT_ROLES = new Set<MembershipRole>([
   MembershipRole.ORG_ADMIN,
+  MembershipRole.SUB_ADMIN,
   MembershipRole.HOUSEKEEPING_MANAGER,
   MembershipRole.FNB_STAFF,
 ]);
@@ -61,7 +62,7 @@ export function canManageShortLets(ctx: ShortletsAccessContext): boolean {
   if (level === "full" || level === "edit") return true;
   if (level === "none" || level === "read") return false;
   const r = role(ctx.membership)!;
-  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
+  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.SUB_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
 }
 
 export function canManageHousekeeping(ctx: ShortletsAccessContext): boolean {
@@ -69,7 +70,7 @@ export function canManageHousekeeping(ctx: ShortletsAccessContext): boolean {
   if (!isActiveMember(ctx.membership)) return false;
   if (shortletsPermissionLevel(ctx) === "full") return true;
   const r = role(ctx.membership)!;
-  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
+  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.SUB_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
 }
 
 export function canPostFolio(ctx: ShortletsAccessContext): boolean {
@@ -81,6 +82,7 @@ export function canPostFolio(ctx: ShortletsAccessContext): boolean {
   const r = role(ctx.membership)!;
   return (
     r === MembershipRole.ORG_ADMIN ||
+    r === MembershipRole.SUB_ADMIN ||
     r === MembershipRole.FNB_STAFF ||
     r === MembershipRole.HOUSEKEEPING_MANAGER
   );
@@ -91,13 +93,13 @@ export function canViewShortletReports(ctx: ShortletsAccessContext): boolean {
   if (!isActiveMember(ctx.membership)) return false;
   if (hasExplicitShortletsGrant(ctx)) return shortletsPermissionLevel(ctx) !== "none";
   const r = role(ctx.membership)!;
-  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
+  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.SUB_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
 }
 
 export function canManageShortletSettings(ctx: ShortletsAccessContext): boolean {
   if (ctx.isPlatformAdmin) return true;
   if (!isActiveMember(ctx.membership)) return false;
-  return ctx.membership!.role === MembershipRole.ORG_ADMIN;
+  return ctx.membership!.role === MembershipRole.ORG_ADMIN || ctx.membership!.role === MembershipRole.SUB_ADMIN;
 }
 
 export function resolveShortletsAccess(ctx: ShortletsAccessContext) {
