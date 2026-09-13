@@ -2,7 +2,9 @@
 
 import { auth } from "@/auth";
 import { WorkTaskStatus } from "@/generated/prisma";
+import { absoluteAppUrl } from "@/lib/app-url";
 import prisma from "@/lib/db";
+import { sendTaskAssignedEmail } from "@/lib/email";
 import { canManageTasks, canViewTasksModule } from "@/lib/tasks-access";
 import {
   isTaskAssigneeAllowed,
@@ -24,7 +26,7 @@ async function getTenantContext(tenantSlug: string) {
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true, settings: { select: { moduleTasks: true } } },
+    select: { id: true, name: true, settings: { select: { moduleTasks: true } } },
   });
   if (!tenant) return null;
 
@@ -78,6 +80,52 @@ async function assertAssigneeAllowed(
   return null;
 }
 
+function formatTaskDueLabel(dueDate?: string | Date | null) {
+  if (!dueDate) return null;
+  const date = dueDate instanceof Date ? dueDate : new Date(dueDate);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(date);
+}
+
+function formatTaskPriority(priority?: string | null) {
+  if (!priority) return null;
+  return priority.charAt(0) + priority.slice(1).toLowerCase();
+}
+
+async function notifyTaskAssignee(input: {
+  tenantSlug: string;
+  tenantName: string;
+  assignerLabel: string;
+  assignerUserId: string;
+  assigneeUserId: string | null | undefined;
+  taskTitle: string;
+  taskDescription?: string | null;
+  dueDate?: string | Date | null;
+  priority?: string | null;
+}) {
+  try {
+    if (!input.assigneeUserId || input.assigneeUserId === input.assignerUserId) return;
+    const assignee = await prisma.user.findUnique({
+      where: { id: input.assigneeUserId },
+      select: { email: true, name: true },
+    });
+    if (!assignee?.email) return;
+    await sendTaskAssignedEmail({
+      to: assignee.email,
+      tenantName: input.tenantName,
+      assigneeName: assignee.name || assignee.email,
+      assignerLabel: input.assignerLabel,
+      taskTitle: input.taskTitle,
+      taskDescription: input.taskDescription,
+      dueDateLabel: formatTaskDueLabel(input.dueDate),
+      priority: formatTaskPriority(input.priority),
+      taskUrl: absoluteAppUrl(`/${input.tenantSlug}/tasks`),
+    });
+  } catch {
+    // Task create/update should still succeed if email delivery fails.
+  }
+}
+
 export async function createWorkTask(
   tenantSlug: string,
   input: {
@@ -119,6 +167,18 @@ export async function createWorkTask(
       completedAt,
       createdByUserId: ctx.session.user.id,
     },
+  });
+
+  await notifyTaskAssignee({
+    tenantSlug,
+    tenantName: ctx.tenant.name,
+    assignerLabel: ctx.session.user.name || ctx.session.user.email || "A teammate",
+    assignerUserId: ctx.session.user.id,
+    assigneeUserId: parsed.data.assigneeUserId,
+    taskTitle: parsed.data.title,
+    taskDescription: parsed.data.description,
+    dueDate: parsed.data.dueDate,
+    priority: parsed.data.priority ?? "MEDIUM",
   });
 
   revalidatePath(`/${tenantSlug}/tasks`);
@@ -195,6 +255,8 @@ export async function updateWorkTask(
   }
 
   const nextStatus = parsed.data.status ?? existing.status;
+  const nextAssigneeUserId = parsed.data.assigneeUserId || null;
+  const assigneeChanged = nextAssigneeUserId !== existing.assigneeUserId;
 
   await prisma.workTask.update({
     where: { id: parsed.data.taskId },
@@ -205,12 +267,26 @@ export async function updateWorkTask(
       priority: parsed.data.priority ?? "MEDIUM",
       spaceId: parsed.data.spaceId || null,
       projectId: parsed.data.projectId || null,
-      assigneeUserId: parsed.data.assigneeUserId || null,
+      assigneeUserId: nextAssigneeUserId,
       dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
       sprintLabel: parsed.data.sprintLabel || null,
       completedAt: nextStatus === WorkTaskStatus.DONE ? new Date() : null,
     },
   });
+
+  if (assigneeChanged) {
+    await notifyTaskAssignee({
+      tenantSlug,
+      tenantName: ctx.tenant.name,
+      assignerLabel: ctx.session.user.name || ctx.session.user.email || "A teammate",
+      assignerUserId: ctx.session.user.id,
+      assigneeUserId: nextAssigneeUserId,
+      taskTitle: parsed.data.title,
+      taskDescription: parsed.data.description,
+      dueDate: parsed.data.dueDate,
+      priority: parsed.data.priority ?? "MEDIUM",
+    });
+  }
 
   revalidatePath(`/${tenantSlug}/tasks`);
   return { ok: true };

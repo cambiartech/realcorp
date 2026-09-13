@@ -317,6 +317,60 @@ export async function sendHrProfileUpdateEmail(input: {
   }
 }
 
+export async function sendTaskAssignedEmail(input: {
+  to: string;
+  tenantName: string;
+  assigneeName: string;
+  assignerLabel: string;
+  taskTitle: string;
+  taskDescription?: string | null;
+  dueDateLabel?: string | null;
+  priority?: string | null;
+  taskUrl: string;
+}) {
+  const resend = getResendClient();
+  if (!resend) {
+    return { ok: false as const, error: "Email is not configured (RESEND_API_KEY)." };
+  }
+  const from = `${getFromName()} <${getFromAddress()}>`;
+  const replyTo = getReplyToAddress();
+  const details: string[] = [];
+  if (input.priority) details.push(`<li><strong>Priority:</strong> ${input.priority}</li>`);
+  if (input.dueDateLabel) details.push(`<li><strong>Due:</strong> ${input.dueDateLabel}</li>`);
+  const descriptionBlock = input.taskDescription
+    ? `<p style="margin:0 0 16px;padding:12px;background:#f6f6f6;border-radius:8px;white-space:pre-wrap;">${input.taskDescription}</p>`
+    : "";
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111">
+      <h2 style="margin:0 0 12px;">New task assigned to you</h2>
+      <p style="margin:0 0 12px;">Hi ${input.assigneeName},</p>
+      <p style="margin:0 0 12px;"><strong>${input.assignerLabel}</strong> assigned you a task in ${input.tenantName}:</p>
+      <p style="margin:0 0 12px;font-size:16px;font-weight:600;">${input.taskTitle}</p>
+      ${descriptionBlock}
+      ${details.length ? `<ul style="margin:0 0 16px;padding-left:18px;">${details.join("")}</ul>` : ""}
+      <p style="margin:0 0 16px;">
+        <a href="${input.taskUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600;">
+          Open task
+        </a>
+      </p>
+      <p style="margin:0;font-size:12px;color:#666;">You can review and update this task in Realcorp.</p>
+    </div>
+  `;
+  try {
+    const result = await resend.emails.send({
+      from,
+      to: input.to,
+      subject: `New task: ${input.taskTitle}`,
+      html,
+      ...(replyTo ? { replyTo } : {}),
+    });
+    return parseResendSendResult(result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to send email.";
+    return { ok: false as const, error: msg };
+  }
+}
+
 export async function sendCelebrationEmail(input: {
   to: string;
   subject: string;

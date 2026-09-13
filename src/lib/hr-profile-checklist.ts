@@ -23,6 +23,7 @@ export type ProfileChecklistProfile = Pick<
   | "emergencyContact"
   | "nextOfKin"
   | "guarantorInfo"
+  | "employmentType"
 >;
 
 export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
@@ -35,7 +36,22 @@ export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
   emergencyContact: null,
   nextOfKin: null,
   guarantorInfo: null,
+  employmentType: null,
 };
+
+/** Contract / adhoc / temporary staff — paid via HR, no portal login or full statutory pack. */
+export function isContingentEmployment(employmentType?: string | null): boolean {
+  const value = (employmentType || "").trim().toLowerCase();
+  if (!value) return false;
+  return (
+    value.includes("contract") ||
+    value.includes("adhoc") ||
+    value.includes("ad-hoc") ||
+    value.includes("temporary") ||
+    value.includes("casual") ||
+    value.includes("consultant")
+  );
+}
 
 export function checklistProgress(items: ProfileChecklistItem[]) {
   const done = items.filter((i) => i.done).length;
@@ -47,6 +63,28 @@ export function buildProfileChecklist(
   profile: ProfileChecklistProfile,
   documents: Array<{ category: HrDocumentCategory }>,
 ): ProfileChecklistItem[] {
+  const contingent = isContingentEmployment(profile.employmentType);
+  if (contingent) {
+    return [
+      {
+        id: "basics",
+        label: "Basic details (name & role)",
+        done: Boolean(profile.fullName && profile.position),
+      },
+      {
+        id: "bank",
+        label: "Bank account for payment",
+        done: hasJson(profile.bankAccount),
+        hint: "Needed so HR can pay this person",
+      },
+      {
+        id: "phone",
+        label: "Phone contact",
+        done: Boolean(profile.phoneMobile),
+      },
+    ];
+  }
+
   const docCats = new Set(documents.map((d) => d.category));
   return [
     {

@@ -818,7 +818,7 @@ export function HrPeopleWorkspace({
                 className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 bg-background px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.05]"
               >
                 <UserPlus className="h-3.5 w-3.5" />
-                Add HR/payroll member
+                Add contract / adhoc staff
               </button>
               <button
                 type="button"
@@ -1112,9 +1112,16 @@ export function HrPeopleWorkspace({
                     <Field
                       label="Employment type"
                       name="employmentType"
-                      defaultValue={record.employmentType}
-                      hint="e.g. Full-Time, Contract"
-                    />
+                      hint="Contract / Adhoc skip full onboarding (TIN, RSA, guarantor)."
+                    >
+                      <UiSelect name="employmentType" defaultValue={record.employmentType || "Full-Time"}>
+                        <option value="Full-Time">Full-Time</option>
+                        <option value="Contract">Contract</option>
+                        <option value="Adhoc">Adhoc</option>
+                        <option value="Temporary">Temporary</option>
+                        <option value="Consultant">Consultant</option>
+                      </UiSelect>
+                    </Field>
                     <Field label="Work schedule" name="workSchedule" defaultValue={record.workSchedule} />
                     <Field
                       label="Pay group"
@@ -2129,10 +2136,10 @@ export function HrPeopleWorkspace({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="add-hr-member-title" className="text-xl font-semibold text-foreground">
-              Add HR/payroll member
+              Add contract / adhoc staff
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Create an employee record for payroll, headcount and documents without giving software access.
+              For people who need payroll and HR tracking, but not a Realcorp login, pension, or tax IDs.
             </p>
           </div>
           <button
@@ -2150,7 +2157,10 @@ export function HrPeopleWorkspace({
             event.preventDefault();
             const form = event.currentTarget;
             const data = Object.fromEntries(new FormData(form));
-            void runAction(() => createHrOnlyEmployee(tenantSlug, data), "HR/payroll member added.").then((ok) => {
+            void runAction(
+              () => createHrOnlyEmployee(tenantSlug, data),
+              "Contract / adhoc staff added.",
+            ).then((ok) => {
               if (ok) {
                 form.reset();
                 setShowHrOnlyForm(false);
@@ -2160,9 +2170,15 @@ export function HrPeopleWorkspace({
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Full name" name="fullName" required />
-            <Field label="Work email (optional)" name="workEmail" type="email" />
+            <Field label="Staff type" name="employmentType" required>
+              <UiSelect name="employmentType" defaultValue="Contract">
+                <option value="Contract">Contract</option>
+                <option value="Adhoc">Adhoc</option>
+              </UiSelect>
+            </Field>
             <Field label="Phone" name="phoneMobile" />
-            <Field label="Job title" name="position" />
+            <Field label="Email (optional)" name="workEmail" type="email" />
+            <Field label="Role / title" name="position" />
             <Field label="Department" name="department">
               <OrgDepartmentSelect
                 tenantSlug={tenantSlug}
@@ -2173,11 +2189,23 @@ export function HrPeopleWorkspace({
                 allowCreate
               />
             </Field>
-            <Field label="Pay group" name="paygroupName" />
+            <Field label="Pay group" name="paygroupName" hint="Optional — use to batch them on payslips" />
             <Field label={`Gross monthly pay (${currency})`} name="grossMonthly" type="number" />
           </div>
+
+          <div className="mt-5">
+            <p className="text-sm font-semibold text-foreground">Bank details for payment</p>
+            <p className="mt-0.5 text-xs text-muted">Optional now — add later on the employee record if needed.</p>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <Field label="Account name" name="bankAccountHolderName" />
+              <Field label="Bank name" name="bankName" />
+              <Field label="Account number" name="bankAccountNumber" />
+            </div>
+          </div>
+
           <div className="mt-5 rounded-lg border border-[var(--info-line)] bg-[var(--info-wash)] px-4 py-3 text-xs text-foreground">
-            This person will not receive an invitation and cannot sign in. You can invite them separately later.
+            No invitation is sent and they cannot sign in. Pension stays off. TIN / RSA PIN are not required.
+            Once gross pay is set, they appear in Payslips like other ACTIVE staff.
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <button
@@ -2194,7 +2222,7 @@ export function HrPeopleWorkspace({
               className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
             >
               {pending ? <ButtonSpinner /> : <UserPlus className="h-4 w-4" />}
-              {pending ? "Adding member…" : "Add HR/payroll member"}
+              {pending ? "Adding…" : "Add staff"}
             </button>
           </div>
         </form>

@@ -36,11 +36,15 @@ const createHrOnlySchema = z.object({
   phoneMobile: z.string().trim().max(40).optional(),
   position: z.string().trim().max(120).optional(),
   department: z.string().trim().max(80).optional(),
+  employmentType: z.enum(["Contract", "Adhoc"]).default("Contract"),
   paygroupName: z.string().trim().max(80).optional(),
   grossMonthly: z.preprocess(
     (value) => (value === "" || value == null ? undefined : value),
     z.coerce.number().positive().optional(),
   ),
+  bankAccountHolderName: z.string().trim().max(120).optional().or(z.literal("")),
+  bankName: z.string().trim().max(120).optional().or(z.literal("")),
+  bankAccountNumber: z.string().trim().max(40).optional().or(z.literal("")),
 });
 
 async function hrContext(tenantSlug: string, options?: { requireAi?: boolean }) {
@@ -373,6 +377,17 @@ export async function createHrOnlyEmployee(
   const parsed = createHrOnlySchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || "Invalid employee." };
   const email = parsed.data.workEmail?.trim().toLowerCase() || null;
+  const employmentType = parsed.data.employmentType;
+  const bankAccount =
+    parsed.data.bankAccountHolderName || parsed.data.bankName || parsed.data.bankAccountNumber
+      ? {
+          accountHolderName: parsed.data.bankAccountHolderName || parsed.data.fullName,
+          bankName: parsed.data.bankName || "",
+          accountNumber: parsed.data.bankAccountNumber || "",
+          accountType: "Checking",
+        }
+      : undefined;
+  const hrNotes = `${employmentType} staff · payroll/HR record only; no portal login. Pension and statutory IDs not required.`;
   try {
     const user = email
       ? await prisma.user.upsert({
@@ -396,11 +411,16 @@ export async function createHrOnlyEmployee(
         phoneMobile: parsed.data.phoneMobile || null,
         position: parsed.data.position || null,
         department: parsed.data.department || null,
+        employmentType,
         paygroupName: parsed.data.paygroupName || null,
         grossMonthly: parsed.data.grossMonthly,
         payrollCountryCode: ctx.tenant.settings?.payrollCountryCode || "NG",
+        pensionEnabled: false,
+        employeePensionRate: 0,
+        employerPensionRate: 0,
         status: EmployeeProfileStatus.ACTIVE,
-        hrNotes: membership?.status === MembershipStatus.ACTIVE ? null : "HR/payroll record only; no login access.",
+        bankAccount,
+        hrNotes: membership?.status === MembershipStatus.ACTIVE ? null : hrNotes,
       },
       update: {
         fullName: parsed.data.fullName,
@@ -408,8 +428,14 @@ export async function createHrOnlyEmployee(
         phoneMobile: parsed.data.phoneMobile || null,
         position: parsed.data.position || null,
         department: parsed.data.department || null,
+        employmentType,
         paygroupName: parsed.data.paygroupName || null,
         grossMonthly: parsed.data.grossMonthly,
+        pensionEnabled: false,
+        employeePensionRate: 0,
+        employerPensionRate: 0,
+        ...(bankAccount ? { bankAccount } : {}),
+        ...(membership?.status === MembershipStatus.ACTIVE ? {} : { hrNotes }),
       },
     });
     await ensureEmployeeNumber(profile.id);
@@ -421,7 +447,7 @@ export async function createHrOnlyEmployee(
       entityType: "EmployeeProfile",
       entityId: profile.id,
       action: "HR_ONLY_EMPLOYEE_CREATED",
-      summary: `${parsed.data.fullName} added without software access`,
+      summary: `${parsed.data.fullName} added as ${employmentType} staff without software access`,
     });
     revalidatePath(`/${tenantSlug}/hr`);
     revalidatePath(`/${tenantSlug}/hr/people`);

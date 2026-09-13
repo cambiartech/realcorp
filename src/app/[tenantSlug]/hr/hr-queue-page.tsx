@@ -12,6 +12,7 @@ import {
   buildProfileChecklist,
   checklistProgress,
   EMPTY_PROFILE_CHECKLIST_PROFILE,
+  isContingentEmployment,
 } from "@/lib/hr-profile-checklist";
 import { buildHrAnalytics } from "@/lib/hr-analytics";
 import {
@@ -423,11 +424,14 @@ export default async function HrQueuePage({
     })),
     ...hrOnlyProfiles.map((profile) => {
       const user = hrOnlyUserById.get(profile.userId);
+      const contingent = isContingentEmployment(profile.employmentType);
       return {
         userId: profile.userId,
         name: profile.fullName || user?.name || user?.email || "Employee",
         email: profile.workEmail || user?.email || "",
-        role: "HR/payroll only · No login",
+        role: contingent
+          ? `${profile.employmentType || "Contract"} · No login`
+          : "HR/payroll only · No login",
       };
     }),
   ];
