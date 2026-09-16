@@ -43,6 +43,7 @@ import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-p
 import { calculatePayroll } from "@/lib/payroll/engine";
 import { NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { OrgJobRoleSelect } from "@/components/org-job-role-select";
 import { PensionAdministratorField } from "@/components/pension-administrator-field";
 import { TableSearch, filterTableRows } from "@/components/table-search";
 import { SortTh, useTableSort } from "@/components/sort-th";
@@ -240,6 +241,7 @@ export function HrPeopleWorkspace({
   formRequests,
   pendingProfileUpdates,
   departments,
+  jobRoles,
   pensionAdministrators,
 }: {
   tenantSlug: string;
@@ -310,6 +312,7 @@ export function HrPeopleWorkspace({
     lines: string[];
   }>;
   departments: string[];
+  jobRoles: string[];
   pensionAdministrators: string[];
 }) {
   const router = useRouter();
@@ -985,6 +988,7 @@ export function HrPeopleWorkspace({
           onSendForm={(ft) => openSendForm(ft)}
           onSendAllForms={openSendAllForms}
           departments={departments}
+          jobRoles={jobRoles}
           pensionAdministrators={pensionAdministrators}
         />
       ) : null}
@@ -1126,7 +1130,17 @@ export function HrPeopleWorkspace({
               {recordTab === "job" ? (
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Job title" name="position" defaultValue={record.position} />
+                    <Field label="Job title" name="position">
+                      <OrgJobRoleSelect
+                        tenantSlug={tenantSlug}
+                        jobRoles={jobRoles}
+                        name="position"
+                        label="Job title"
+                        defaultValue={record.position}
+                        hideLabel
+                        allowCreate
+                      />
+                    </Field>
                     <Field label="Department" name="department">
                       <OrgDepartmentSelect
                         tenantSlug={tenantSlug}
@@ -1278,12 +1292,17 @@ export function HrPeopleWorkspace({
                         ))}
                       </UiSelect>
                     </Field>
-                    <Field label="Tax identification number (TIN)" name="taxId" defaultValue={record.taxId} hint="Also on the onboarding wizard (Personal & job / Forms & documents)." />
+                    <Field
+                      label="Tax identification number (TIN)"
+                      name="taxId"
+                      defaultValue={record.taxId}
+                      hint="Optional for payslip generation — add when available for remittances."
+                    />
                     <Field
                       label="RSA PIN"
                       name="rsaPin"
                       defaultValue={record.rsaPin}
-                      hint="Pension Retirement Savings Account PIN. Also on the onboarding wizard and My HR → Tax & pension."
+                      hint="Optional — leave blank if the employee is not interested in pension. Set Pension participation to Not applicable below."
                     />
                     <PensionAdministratorField
                       defaultValue={record.pensionAdministrator}
@@ -1305,7 +1324,12 @@ export function HrPeopleWorkspace({
                       the calculation snapshot.
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <Field label="Pension participation" name="pensionEnabled" defaultValue={record.pensionEnabled}>
+                      <Field
+                        label="Pension participation"
+                        name="pensionEnabled"
+                        defaultValue={record.pensionEnabled}
+                        hint="Choose Not applicable if they opted out of pension — payroll still runs."
+                      >
                         <UiSelect name="pensionEnabled" defaultValue={record.pensionEnabled}>
                           <option value="yes">Enabled</option>
                           <option value="no">Not applicable</option>

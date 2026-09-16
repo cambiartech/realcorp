@@ -64,6 +64,9 @@ export function ProfileComplianceChecklist({
             )}
             <span className={item.done ? "text-foreground" : "text-muted"}>
               {item.label}
+              {item.optional ? (
+                <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-muted">(optional)</span>
+              ) : null}
               {item.hint && !item.done ? <span className="block text-[10px]">{item.hint}</span> : null}
             </span>
           </li>

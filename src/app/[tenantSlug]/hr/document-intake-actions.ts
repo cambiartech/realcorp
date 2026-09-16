@@ -87,6 +87,87 @@ function nameScore(a: string, b: string) {
   return (2 * overlap) / (aa.size + bb.size);
 }
 
+/** Invite / team display name is a weak placeholder (email, empty, or generic). */
+function isWeakEmployeeName(name: string | null | undefined, email?: string | null) {
+  const n = (name || "").trim();
+  if (!n) return true;
+  if (n.includes("@")) return true;
+  if (email && n.toLowerCase() === email.trim().toLowerCase()) return true;
+  return false;
+}
+
+function extractedPersonName(extracted: {
+  employeeName?: string;
+  payload?: Record<string, unknown>;
+}): string {
+  const fromTop = (extracted.employeeName || "").trim();
+  if (fromTop) return fromTop;
+  const payload = extracted.payload;
+  if (!payload || typeof payload !== "object") return "";
+  for (const key of ["fullName", "employeeFullName", "accountHolderName"] as const) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function namesLookLikeSamePerson(a: string, b: string) {
+  return nameScore(a, b) >= 0.4;
+}
+
+/**
+ * Prefer the Team invite name when the profile name was already overwritten by a wrong AI prefill.
+ */
+function identityAnchors(input: {
+  profileFullName: string | null | undefined;
+  memberName: string | null | undefined;
+  memberEmail: string | null | undefined;
+}): string[] {
+  const anchors: string[] = [];
+  const member = (input.memberName || "").trim();
+  const profile = (input.profileFullName || "").trim();
+  if (!isWeakEmployeeName(member, input.memberEmail)) anchors.push(member);
+  if (!isWeakEmployeeName(profile, input.memberEmail)) {
+    if (!anchors.length || namesLookLikeSamePerson(profile, anchors[0])) anchors.push(profile);
+  }
+  return anchors;
+}
+
+function documentMatchesEmployee(detectedName: string, anchors: string[]): boolean {
+  const name = detectedName.trim();
+  if (!name) return true;
+  if (!anchors.length) return true;
+  return anchors.some((anchor) => namesLookLikeSamePerson(anchor, name));
+}
+
+function omitMismatchedFullName(
+  data: ReturnType<typeof mergeHrFormIntoProfile>,
+  anchors: string[],
+  existingFullName: string | null | undefined,
+  memberEmail: string | null | undefined,
+): ReturnType<typeof mergeHrFormIntoProfile> {
+  if (!("fullName" in data) || data.fullName == null) return data;
+  const incoming = String(data.fullName).trim();
+  if (!incoming) {
+    const rest = { ...data };
+    delete (rest as { fullName?: unknown }).fullName;
+    return rest;
+  }
+  // Wrong person on the form — never rename the employee.
+  if (anchors.length && !documentMatchesEmployee(incoming, anchors)) {
+    const rest = { ...data };
+    delete (rest as { fullName?: unknown }).fullName;
+    return rest;
+  }
+  // Keep an existing real name; AI may still fill other biodata fields.
+  if (!isWeakEmployeeName(existingFullName, memberEmail)) {
+    const rest = { ...data };
+    delete (rest as { fullName?: unknown }).fullName;
+    return rest;
+  }
+  return data;
+}
+
 type IntakeProfile = {
   id: string;
   userId: string;
@@ -502,6 +583,30 @@ export async function prefillEmployeeFromUploadedDocs(
   });
   if (!profile) return { ok: false, error: "Create this employee record first, then prefill from their documents." };
 
+  const memberUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  });
+  // If AI previously wrote another person's name onto this record, restore the Team invite name.
+  if (
+    memberUser?.name &&
+    !isWeakEmployeeName(memberUser.name, memberUser.email) &&
+    profile.fullName &&
+    !isWeakEmployeeName(profile.fullName, memberUser.email || profile.workEmail) &&
+    !namesLookLikeSamePerson(profile.fullName, memberUser.name)
+  ) {
+    await prisma.employeeProfile.update({
+      where: { id: profile.id },
+      data: { fullName: memberUser.name },
+    });
+    profile.fullName = memberUser.name;
+  }
+  const anchors = identityAnchors({
+    profileFullName: profile.fullName,
+    memberName: memberUser?.name,
+    memberEmail: memberUser?.email || profile.workEmail,
+  });
+
   const [documents, pendingRequests, alreadyRead] = await Promise.all([
     prisma.hrDocument.findMany({
       where: { tenantId: ctx.tenant.id, employeeProfileId: profile.id, deletedAt: null },
@@ -549,9 +654,26 @@ export async function prefillEmployeeFromUploadedDocs(
       skipped += 1;
       continue;
     }
+    const payload =
+      request.submittedPayload && typeof request.submittedPayload === "object"
+        ? (request.submittedPayload as Record<string, unknown>)
+        : {};
+    const detectedName = extractedPersonName({ payload });
+    if (detectedName && !documentMatchesEmployee(detectedName, anchors)) {
+      failed.push({
+        fileName: PREFILL_FORM_LABELS[request.formType] || request.formType,
+        error: `Name on form (${detectedName}) does not match this employee (${anchors[0] || profile.fullName || "selected person"}). Skipped.`,
+      });
+      continue;
+    }
     await prisma.employeeProfile.update({
       where: { id: profile.id },
-      data: mergeHrFormIntoProfile(request.formType, request.submittedPayload),
+      data: omitMismatchedFullName(
+        mergeHrFormIntoProfile(request.formType, request.submittedPayload),
+        anchors,
+        profile.fullName,
+        memberUser?.email || profile.workEmail,
+      ),
     });
     await prisma.hrFormRequest.update({
       where: { id: request.id },
@@ -613,15 +735,33 @@ export async function prefillEmployeeFromUploadedDocs(
         skipped += 1;
         continue;
       }
+      const detectedName = extractedPersonName({
+        employeeName: extracted.employeeName,
+        payload: extracted.payload as Record<string, unknown>,
+      });
+      if (detectedName && !documentMatchesEmployee(detectedName, anchors)) {
+        failed.push({
+          fileName,
+          error: `Name in file (${detectedName}) does not match this employee (${
+            anchors[0] || profile.fullName || "selected person"
+          }). Wrong person's document? Nothing from this file was applied.`,
+        });
+        continue;
+      }
       await prisma.employeeProfile.update({
         where: { id: profile.id },
-        data: mergeHrFormIntoProfile(extracted.formType, extracted.payload),
+        data: omitMismatchedFullName(
+          mergeHrFormIntoProfile(extracted.formType, extracted.payload),
+          anchors,
+          profile.fullName,
+          memberUser?.email || profile.workEmail,
+        ),
       });
       await prisma.hrFormRequest.create({
         data: {
           tenantId: ctx.tenant.id,
           employeeProfileId: profile.id,
-          recipientName: profile.fullName || extracted.employeeName || "Employee",
+          recipientName: anchors[0] || profile.fullName || extracted.employeeName || "Employee",
           recipientEmail: profile.workEmail || extracted.employeeEmail || null,
           formType: extracted.formType,
           deliveryMode: HrFormDeliveryMode.PRINT_UPLOAD,
@@ -671,7 +811,7 @@ export async function prefillEmployeeFromUploadedDocs(
     entityType: "EmployeeProfile",
     entityId: profile.id,
     action: "PREFILL_FROM_DOCUMENTS",
-    summary: `Prefill from uploaded docs for ${profile.fullName || "employee"}: ${applied} applied, ${skipped} skipped, ${failed.length} failed.`,
+    summary: `Prefill from uploaded docs for ${anchors[0] || profile.fullName || "employee"}: ${applied} applied, ${skipped} skipped, ${failed.length} failed.`,
     metadata: { applied, skipped, failed: failed.length, filled: Array.from(filled) },
   });
   revalidatePath(`/${tenantSlug}/hr`);

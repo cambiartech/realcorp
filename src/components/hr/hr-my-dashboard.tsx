@@ -533,8 +533,6 @@ export function HrMyDashboard({
   if (!p.nextOfKinName?.trim() || !p.nextOfKinPhone?.trim()) {
     missingOnFile.push({ label: "Next of kin", section: "kin" });
   }
-  if (!p.taxId?.trim()) missingOnFile.push({ label: "Tax identification number (TIN)", section: "ids", canSelfUpdate: true });
-  if (!p.rsaPin?.trim()) missingOnFile.push({ label: "RSA PIN", section: "ids", canSelfUpdate: true });
 
   const missingBanner = missingOnFile.length > 0 ? (
     <div className="rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] p-4">
@@ -1269,10 +1267,14 @@ export function HrMyDashboard({
               <label className="text-sm">
                 <span className="mb-1 block text-xs font-medium text-muted">Tax identification number (TIN)</span>
                 <input name="taxId" defaultValue={p.taxId} className={inputClass} />
+                <span className="mt-1 block text-[11px] text-muted">Optional — not required for payslips.</span>
               </label>
               <label className="text-sm">
                 <span className="mb-1 block text-xs font-medium text-muted">RSA PIN</span>
                 <input name="rsaPin" defaultValue={p.rsaPin} placeholder="PEN…" className={inputClass} />
+                <span className="mt-1 block text-[11px] text-muted">
+                  Optional — leave blank if you are not interested in pension.
+                </span>
               </label>
               <div className="sm:col-span-2">
                 <PensionAdministratorField

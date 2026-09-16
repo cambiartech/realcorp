@@ -95,7 +95,10 @@ export function BiodataFormFields({
       />
 
       <hr className="border-slate-200" />
-      <p className="text-xs font-semibold uppercase text-slate-500">Tax and pension IDs</p>
+      <p className="text-xs font-semibold uppercase text-slate-500">Tax and pension IDs (optional)</p>
+      <p className="text-xs text-slate-500">
+        Not required for payslips. Leave blank if you do not have a TIN yet or are not interested in pension.
+      </p>
       <HrFormField
         label="Tax identification number (TIN)"
         name="taxId"

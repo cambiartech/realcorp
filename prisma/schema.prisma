@@ -199,6 +199,8 @@ model TenantSettings {
   /// Extra nav modules per role beyond defaults, e.g. { "SALES_EXECUTIVE": ["MARKETING","FINANCE"] }
   roleModuleGrants     Json?
   orgDepartments       Json?
+  /// Reusable job titles for People records (e.g. Digital Marketer, Graphics Designer).
+  orgJobRoles          Json?
   /// Org-specific pension fund administrators (PFA names) for People records.
   pensionAdministrators Json?
 

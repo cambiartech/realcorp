@@ -10,6 +10,8 @@ export type ProfileChecklistItem = {
   label: string;
   done: boolean;
   hint?: string;
+  /** Soft items (e.g. TIN / RSA) — shown but excluded from % complete / payroll gate. */
+  optional?: boolean;
 };
 
 export type ProfileChecklistProfile = Pick<
@@ -61,8 +63,9 @@ export function isContingentEmployment(employmentType?: string | null): boolean 
 }
 
 export function checklistProgress(items: ProfileChecklistItem[]) {
-  const done = items.filter((i) => i.done).length;
-  const total = items.length;
+  const required = items.filter((i) => !i.optional);
+  const done = required.filter((i) => i.done).length;
+  const total = required.length;
   return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
 }
 
@@ -117,7 +120,8 @@ export function buildProfileChecklist(
       id: "statutory",
       label: "Statutory IDs (TIN / RSA PIN)",
       done: Boolean(profile.taxId && profile.rsaPin),
-      hint: "Type TIN and RSA PIN in this wizard, on My HR, or Prefill with AI from an uploaded form",
+      optional: true,
+      hint: "Optional for payroll — skip if the employee opts out of pension or TIN is not on file yet",
     },
     {
       id: "emergency",

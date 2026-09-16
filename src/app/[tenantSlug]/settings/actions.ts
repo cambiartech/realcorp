@@ -7,6 +7,7 @@ import prisma from "@/lib/db";
 import { parseRoleModuleGrantsFromFormData } from "@/lib/role-module-grants-form";
 import { parseMembershipModulePermissions } from "@/lib/membership-module-permissions";
 import { mergeOrgDepartments, normalizeOrgDepartmentName } from "@/lib/org-departments";
+import { mergeOrgJobRoles, normalizeOrgJobRoleName } from "@/lib/org-job-roles";
 import { canAccessNavKey, normalizeSettingsNavSlice } from "@/lib/tenant-nav-access";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
@@ -415,6 +416,84 @@ export async function addOrgDepartment(
   revalidatePath(`/${tenantSlug}`);
   revalidatePath(`/${tenantSlug}/settings`);
   revalidatePath(`/${tenantSlug}/finance`);
+  revalidatePath(`/${tenantSlug}/hr`);
+  revalidatePath(`/${tenantSlug}/hr/settings`);
+  revalidatePath(`/${tenantSlug}/team`);
+  return { ok: true, name: next };
+}
+
+export async function addOrgJobRole(
+  tenantSlug: string,
+  rawName: string,
+): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const next = normalizeOrgJobRoleName(rawName);
+  if (!next) return { ok: false, error: "Enter a job title." };
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: {
+      id: true,
+      settings: {
+        select: {
+          id: true,
+          orgJobRoles: true,
+          moduleSales: true,
+          moduleFinance: true,
+          moduleMarketing: true,
+          moduleCommunity: true,
+          moduleShortLets: true,
+          moduleHr: true,
+          moduleTasks: true,
+          moduleClients: true,
+          moduleListings: true,
+          moduleInvestorPortal: true,
+          roleModuleGrants: true,
+        },
+      },
+    },
+  });
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const membership = await prisma.membership.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: session.user.id } },
+    select: { role: true, status: true, modulePermissions: true },
+  });
+  const canAdd =
+    canAddOrgDepartment(Boolean(session.user.isPlatformAdmin), membership?.role) ||
+    canAccessNavKey("finance", {
+      role: membership?.role,
+      isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+      settings: normalizeSettingsNavSlice(tenant.settings),
+      userModulePermissions: parseMembershipModulePermissions(membership?.modulePermissions),
+    });
+  if (!canAdd) {
+    return { ok: false, error: "You do not have permission to add a job title." };
+  }
+  if (!session.user.isPlatformAdmin && membership?.status !== MembershipStatus.ACTIVE) {
+    return { ok: false, error: "No access." };
+  }
+
+  const existing = mergeOrgJobRoles(tenant.settings?.orgJobRoles as string[] | null | undefined);
+  const already = existing.find((role) => role.toLowerCase() === next.toLowerCase());
+  if (already) return { ok: true, name: already };
+
+  const orgJobRoles = mergeOrgJobRoles([...existing, next]).slice(0, 80);
+  if (!tenant.settings) {
+    await prisma.tenantSettings.create({
+      data: { tenantId: tenant.id, orgJobRoles: orgJobRoles as Prisma.InputJsonValue },
+    });
+  } else {
+    await prisma.tenantSettings.update({
+      where: { tenantId: tenant.id },
+      data: { orgJobRoles: orgJobRoles as Prisma.InputJsonValue },
+    });
+  }
+
+  revalidatePath(`/${tenantSlug}`);
+  revalidatePath(`/${tenantSlug}/settings`);
   revalidatePath(`/${tenantSlug}/hr`);
   revalidatePath(`/${tenantSlug}/hr/settings`);
   revalidatePath(`/${tenantSlug}/team`);

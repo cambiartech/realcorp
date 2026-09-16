@@ -183,6 +183,7 @@ export function HrWorkspace(props: {
   performanceGoals: PerformanceGoalRow[];
   profileOptions: Array<{ id: string; label: string; department: string }>;
   departments: string[];
+  jobRoles: string[];
   pensionAdministrators: string[];
   yearlyArchive: YearlyArchiveEntry[];
   staffPerformancePeriods: Array<{ year: number; month: number; label: string; start: string; end: string }>;
@@ -362,6 +363,7 @@ export function HrWorkspace(props: {
     performanceGoals,
     profileOptions,
     departments,
+    jobRoles,
     pensionAdministrators,
     yearlyArchive,
     staffPerformancePeriods,
@@ -444,6 +446,7 @@ export function HrWorkspace(props: {
             offerByUserId={offerByUserId}
             aiEnabled={aiEnabled}
             departments={departments}
+            jobRoles={jobRoles}
             pensionAdministrators={pensionAdministrators}
           />
         ) : null}

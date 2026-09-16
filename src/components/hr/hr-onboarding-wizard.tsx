@@ -12,6 +12,7 @@ import { OnboardingProfileHiddenFields } from "@/components/hr/onboarding-profil
 import { upsertEmployeeProfile } from "@/app/[tenantSlug]/hr/actions";
 import { UiSelect } from "@/components/ui-select";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
+import { OrgJobRoleSelect } from "@/components/org-job-role-select";
 import { PensionAdministratorField } from "@/components/pension-administrator-field";
 import { useSnackbar } from "@/components/snackbar";
 import {
@@ -46,6 +47,7 @@ export function HrOnboardingWizard({
   onSendForm,
   onSendAllForms,
   departments,
+  jobRoles,
   pensionAdministrators,
 }: {
   tenantSlug: string;
@@ -75,6 +77,7 @@ export function HrOnboardingWizard({
   onSendForm: (formType: "BIODATA" | "BANK_FORM" | "GUARANTOR" | "HEALTH") => void;
   onSendAllForms?: () => void;
   departments: string[];
+  jobRoles: string[];
   pensionAdministrators: string[];
 }) {
   const router = useRouter();
@@ -264,7 +267,7 @@ export function HrOnboardingWizard({
               Choose this before entering the remaining onboarding details.
             </span>
           </label>
-          <label className="block text-sm sm:col-span-2">
+          <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Full name *</span>
             <input
               name="fullName"
@@ -273,18 +276,16 @@ export function HrOnboardingWizard({
               className={inputClass}
             />
           </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-xs font-medium">Job title</span>
-            <input
+          <div className="block text-sm">
+            <OrgJobRoleSelect
+              tenantSlug={tenantSlug}
+              jobRoles={jobRoles}
               name="position"
+              label="Job title"
               defaultValue={draft.position}
-              placeholder="e.g. Sales Manager"
-              className={inputClass}
+              allowCreate
             />
-            <span className="mt-1 block text-[11px] text-muted">
-              Payroll title — separate from their Team app role.
-            </span>
-          </label>
+          </div>
           <div className="block text-sm">
             <OrgDepartmentSelect
               tenantSlug={tenantSlug}
@@ -338,7 +339,10 @@ export function HrOnboardingWizard({
             />
           </label>
           <p className="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            Statutory IDs
+            Statutory IDs (optional)
+          </p>
+          <p className="sm:col-span-2 text-xs text-muted">
+            Not required to generate payslips. Skip TIN / RSA if not on file, or if the employee declined pension.
           </p>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Tax identification number (TIN)</span>
@@ -410,10 +414,10 @@ export function HrOnboardingWizard({
               className="grid gap-3 sm:grid-cols-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4"
               onSubmit={(e) => e.preventDefault()}
             >
-              <p className="sm:col-span-2 text-sm font-semibold text-foreground">Statutory IDs</p>
+              <p className="sm:col-span-2 text-sm font-semibold text-foreground">Statutory IDs (optional)</p>
               <p className="sm:col-span-2 text-xs text-muted">
-                TIN and RSA PIN are needed for PAYE and pension remittances. Type them here, use Prefill with
-                AI if a form was uploaded, or send the biodata form so the employee can add them on My HR.
+                Optional for payroll. Add TIN / RSA when available for remittances, or leave blank if the employee
+                opted out of pension. Prefill with AI or the biodata form still works when you have them later.
               </p>
               <label className="block text-sm">
                 <span className="mb-1 block text-xs font-medium">Tax identification number (TIN)</span>
