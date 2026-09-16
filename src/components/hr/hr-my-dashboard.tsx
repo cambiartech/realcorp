@@ -15,6 +15,7 @@ import type { ProfileDetailRow } from "@/lib/hr-profile-form";
 import type { TenantBranding } from "@/lib/tenant-branding";
 import { saveSelfAppraisal, submitMyHrRecordUpdate, updateMyStatutoryIds } from "@/app/[tenantSlug]/hr/actions";
 import { GlobalLocationFields } from "@/components/global-location-fields";
+import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-photo-upload";
 import type { PendingProfileUpdate } from "@/lib/hr-profile-self-update";
 import { pendingProfileChangeLines } from "@/lib/hr-profile-self-update";
 import {
@@ -1039,6 +1040,15 @@ export function HrMyDashboard({
             {recordSection === "personal" ? (
               previewAs ? (
                 <>
+                  <div className="py-3">
+                    <EmployeePassportPhotoUpload
+                      tenantSlug={tenantSlug}
+                      userId={previewAs.userId}
+                      fullName={p.fullName}
+                      photoUrl={p.photoUrl}
+                      readOnly
+                    />
+                  </div>
                   <ReadRow label="Full name" value={p.fullName} />
                   <ReadRow label="Mobile" value={p.phoneMobile} />
                   <ReadRow label="Work email" value={p.workEmail} />
@@ -1051,6 +1061,12 @@ export function HrMyDashboard({
                 </>
               ) : (
                 <div className="grid gap-3 py-3">
+                  <EmployeePassportPhotoUpload
+                    tenantSlug={tenantSlug}
+                    userId={p.userId}
+                    fullName={p.fullName}
+                    photoUrl={p.photoUrl}
+                  />
                   <ReadRow label="Full name" value={p.fullName} />
                   <ReadRow label="Work email" value={p.workEmail} />
                   <label className="text-sm">

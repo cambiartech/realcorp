@@ -156,6 +156,7 @@ export type ProfileDetailRow = {
   nationality: string;
   phoneMobile: string;
   workEmail: string;
+  photoUrl: string;
   addressStreet: string;
   addressCity: string;
   addressState: string;
@@ -228,6 +229,7 @@ export function profileToDetailRow(p: {
   nationality: string | null;
   phoneMobile: string | null;
   workEmail: string | null;
+  photoUrl?: string | null;
   addressStreet: string | null;
   addressCity: string | null;
   addressState: string | null;
@@ -287,6 +289,7 @@ export function profileToDetailRow(p: {
     nationality: p.nationality || "",
     phoneMobile: p.phoneMobile || "",
     workEmail: p.workEmail || "",
+    photoUrl: p.photoUrl || "",
     addressStreet: p.addressStreet || "",
     addressCity: p.addressCity || "",
     addressState: p.addressState || "",

@@ -19,6 +19,7 @@ import { inferOnboardingStep, resolveOnboardingStep, type OnboardingStepId } fro
 import { ProfileComplianceChecklist } from "@/components/hr/profile-compliance-checklist";
 import { PayslipYtdCard } from "@/components/hr/payslip-ytd-card";
 import type { ProfileChecklistItem } from "@/lib/hr-profile-checklist";
+import { isContingentEmployment } from "@/lib/hr-profile-checklist";
 import type { PayslipYtdSummary } from "@/lib/hr-payslip-ytd";
 import type { TenantBranding } from "@/lib/tenant-branding";
 import {
@@ -38,6 +39,7 @@ import { inviteDepartmentChoices } from "@/lib/org-department-access";
 import { downloadExcel } from "@/lib/table-export";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { GlobalLocationFields } from "@/components/global-location-fields";
+import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-photo-upload";
 import { calculatePayroll } from "@/lib/payroll/engine";
 import { NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
@@ -631,6 +633,7 @@ export function HrPeopleWorkspace({
       nationality: "",
       phoneMobile: "",
       workEmail: member.email,
+      photoUrl: "",
       addressStreet: "",
       addressCity: "",
       addressState: "",
@@ -707,6 +710,7 @@ export function HrPeopleWorkspace({
   }
 
   const record = selectedMember ? buildDraftFromTeam(selectedMember) : null;
+  const recordIsServiceStaff = isContingentEmployment(record?.employmentType);
 
   const peopleTabs: { id: PeopleTab; label: string }[] = [
     { id: "directory", label: "Team directory" },
@@ -818,7 +822,7 @@ export function HrPeopleWorkspace({
                 className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 bg-background px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.05]"
               >
                 <UserPlus className="h-3.5 w-3.5" />
-                Add contract / adhoc staff
+                Add contract / service staff
               </button>
               <button
                 type="button"
@@ -863,10 +867,30 @@ export function HrPeopleWorkspace({
               ) : (
                 visibleTeamMembers.map((m) => {
                   const prof = profiles.find((p) => p.userId === m.userId);
+                  const detail = profileByUserId.get(m.userId);
                   const onboard = onboardingByUserId.get(m.userId);
                   return (
                     <tr key={m.userId}>
-                      <td className="px-3 py-2 font-medium">{m.name}</td>
+                      <td className="px-3 py-2 font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-foreground/10 bg-foreground/[0.04]">
+                            {detail?.photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={detail.photoUrl} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold text-muted">
+                                {m.name
+                                  .split(/\s+/)
+                                  .filter(Boolean)
+                                  .slice(0, 2)
+                                  .map((part) => part[0]?.toUpperCase() || "")
+                                  .join("")}
+                              </div>
+                            )}
+                          </div>
+                          <span>{m.name}</span>
+                        </div>
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted">{m.email || "—"}</td>
                       <td className="px-3 py-2 text-xs">{m.role}</td>
                       <td className="px-3 py-2">
@@ -881,22 +905,28 @@ export function HrPeopleWorkspace({
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-foreground/10">
-                            <div
-                              className="h-full bg-[var(--success)]"
-                              style={{ width: `${onboard?.percent ?? 0}%` }}
-                            />
+                        {isContingentEmployment(detail?.employmentType) ? (
+                          <span className="text-[11px] text-muted">
+                            {detail?.employmentType || "Contract"} · no forms
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-foreground/10">
+                              <div
+                                className="h-full bg-[var(--success)]"
+                                style={{ width: `${onboard?.percent ?? 0}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted">{onboard?.percent ?? 0}%</span>
                           </div>
-                          <span className="text-[10px] text-muted">{onboard?.percent ?? 0}%</span>
-                        </div>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <button
                             type="button"
                             onClick={() =>
-                              prof?.statusValue === "ACTIVE"
+                              prof?.statusValue === "ACTIVE" || isContingentEmployment(detail?.employmentType)
                                 ? openRecord(m.userId)
                                 : startOnboarding(
                                     m.userId,
@@ -905,7 +935,7 @@ export function HrPeopleWorkspace({
                             }
                             className="text-xs font-semibold underline"
                           >
-                            {prof?.statusValue === "ACTIVE"
+                            {prof?.statusValue === "ACTIVE" || isContingentEmployment(detail?.employmentType)
                               ? "Open record"
                               : prof
                                 ? "Continue onboarding"
@@ -1023,7 +1053,16 @@ export function HrPeopleWorkspace({
               </div>
 
               {recordTab === "personal" ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-4">
+                  {record.id || selectedUserId ? (
+                    <EmployeePassportPhotoUpload
+                      tenantSlug={tenantSlug}
+                      userId={selectedUserId || record.userId}
+                      fullName={record.fullName || selectedMember?.name}
+                      photoUrl={record.photoUrl}
+                    />
+                  ) : null}
+                  <div className="grid gap-3 sm:grid-cols-2">
                   <Field
                     label="Full name"
                     name="fullName"
@@ -1081,6 +1120,7 @@ export function HrPeopleWorkspace({
                     className="grid gap-3 sm:col-span-2 sm:grid-cols-3"
                   />
                 </div>
+                </div>
               ) : null}
 
               {recordTab === "job" ? (
@@ -1112,12 +1152,13 @@ export function HrPeopleWorkspace({
                     <Field
                       label="Employment type"
                       name="employmentType"
-                      hint="Contract / Adhoc skip full onboarding (TIN, RSA, guarantor)."
+                      hint="Contract / Adhoc / Service provider skip employee forms (biodata, guarantor, NDA)."
                     >
                       <UiSelect name="employmentType" defaultValue={record.employmentType || "Full-Time"}>
                         <option value="Full-Time">Full-Time</option>
                         <option value="Contract">Contract</option>
                         <option value="Adhoc">Adhoc</option>
+                        <option value="Service provider">Service provider</option>
                         <option value="Temporary">Temporary</option>
                         <option value="Consultant">Consultant</option>
                       </UiSelect>
@@ -1445,54 +1486,67 @@ export function HrPeopleWorkspace({
                 >
                   {pending ? "Saving…" : "Save record"}
                 </button>
-                <button
-                  type="button"
-                  className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
-                  onClick={() => openSendForm("BIODATA")}
-                >
-                  Send form to this person
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
-                  onClick={() => setShowOfferLetter(true)}
-                >
-                  Offer letter
-                </button>
-                {profiles.find((p) => p.userId === selectedMember.userId)?.statusValue !== "ACTIVE" ? (
-                  <button
-                    type="button"
-                    className="text-sm font-semibold text-[var(--accent)] underline"
-                    onClick={() => startOnboarding(selectedMember.userId)}
-                  >
-                    Open onboarding wizard
-                  </button>
-                ) : null}
+                {!recordIsServiceStaff ? (
+                  <>
+                    <button
+                      type="button"
+                      className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
+                      onClick={() => openSendForm("BIODATA")}
+                    >
+                      Send form to this person
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold"
+                      onClick={() => setShowOfferLetter(true)}
+                    >
+                      Offer letter
+                    </button>
+                    {profiles.find((p) => p.userId === selectedMember.userId)?.statusValue !== "ACTIVE" ? (
+                      <button
+                        type="button"
+                        className="text-sm font-semibold text-[var(--accent)] underline"
+                        onClick={() => startOnboarding(selectedMember.userId)}
+                      >
+                        Open onboarding wizard
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="self-center text-xs text-muted">
+                    Service / contract staff — no employee forms or offer letter required.
+                  </p>
+                )}
               </div>
             </form>
             <ProfileComplianceChecklist
               items={selectedOnboarding?.items ?? []}
               percent={selectedOnboarding?.percent ?? 0}
               tenantSlug={tenantSlug}
-              onGenerateOffer={() => setShowOfferLetter(true)}
-              onSendForm={(ft) => openSendForm(ft)}
-              onSendAllForms={openSendAllForms}
-              onPrefillFromDocs={() => {
-                void (async () => {
-                  setPending(true);
-                  try {
-                    const result = await runPrefillFromUploadedDocs(
-                      tenantSlug,
-                      selectedMember.userId,
-                    );
-                    if (notifyPrefillResult(showSnackbar, result)) {
-                      router.refresh();
+              serviceProviderMode={recordIsServiceStaff}
+              onGenerateOffer={recordIsServiceStaff ? undefined : () => setShowOfferLetter(true)}
+              onSendForm={recordIsServiceStaff ? undefined : (ft) => openSendForm(ft)}
+              onSendAllForms={recordIsServiceStaff ? undefined : openSendAllForms}
+              onPrefillFromDocs={
+                recordIsServiceStaff
+                  ? undefined
+                  : () => {
+                      void (async () => {
+                        setPending(true);
+                        try {
+                          const result = await runPrefillFromUploadedDocs(
+                            tenantSlug,
+                            selectedMember.userId,
+                          );
+                          if (notifyPrefillResult(showSnackbar, result)) {
+                            router.refresh();
+                          }
+                        } finally {
+                          setPending(false);
+                        }
+                      })();
                     }
-                  } finally {
-                    setPending(false);
-                  }
-                })();
-              }}
+              }
               prefillPending={pending}
             />
           </div>
@@ -2136,10 +2190,11 @@ export function HrPeopleWorkspace({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="add-hr-member-title" className="text-xl font-semibold text-foreground">
-              Add contract / adhoc staff
+              Add contract / service staff
             </h2>
             <p className="mt-1 text-sm text-muted">
-              For people who need payroll and HR tracking, but not a Realcorp login, pension, or tax IDs.
+              For outsourced or adhoc workers — security, cleaning, and other service companies — who need pay
+              tracking but not Realcorp login, pension, tax IDs, or employee forms.
             </p>
           </div>
           <button
@@ -2159,7 +2214,7 @@ export function HrPeopleWorkspace({
             const data = Object.fromEntries(new FormData(form));
             void runAction(
               () => createHrOnlyEmployee(tenantSlug, data),
-              "Contract / adhoc staff added.",
+              "Contract / service staff added.",
             ).then((ok) => {
               if (ok) {
                 form.reset();
@@ -2169,16 +2224,22 @@ export function HrPeopleWorkspace({
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Full name" name="fullName" required />
+            <Field label="Full name / contact person" name="fullName" required />
             <Field label="Staff type" name="employmentType" required>
-              <UiSelect name="employmentType" defaultValue="Contract">
+              <UiSelect name="employmentType" defaultValue="Service provider">
+                <option value="Service provider">Service provider</option>
                 <option value="Contract">Contract</option>
                 <option value="Adhoc">Adhoc</option>
               </UiSelect>
             </Field>
+            <Field
+              label="Service company (optional)"
+              name="serviceCompany"
+              hint="e.g. ABC Security Ltd, CleanPro Services"
+            />
             <Field label="Phone" name="phoneMobile" />
             <Field label="Email (optional)" name="workEmail" type="email" />
-            <Field label="Role / title" name="position" />
+            <Field label="Role / trade" name="position" hint="e.g. Security guard, Cleaner" />
             <Field label="Department" name="department">
               <OrgDepartmentSelect
                 tenantSlug={tenantSlug}
@@ -2194,8 +2255,10 @@ export function HrPeopleWorkspace({
           </div>
 
           <div className="mt-5">
-            <p className="text-sm font-semibold text-foreground">Bank details for payment</p>
-            <p className="mt-0.5 text-xs text-muted">Optional now — add later on the employee record if needed.</p>
+            <p className="text-sm font-semibold text-foreground">Payout details (optional)</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Skip if you pay the company invoice instead of the individual.
+            </p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               <Field label="Account name" name="bankAccountHolderName" />
               <Field label="Bank name" name="bankName" />
@@ -2204,8 +2267,8 @@ export function HrPeopleWorkspace({
           </div>
 
           <div className="mt-5 rounded-lg border border-[var(--info-line)] bg-[var(--info-wash)] px-4 py-3 text-xs text-foreground">
-            No invitation is sent and they cannot sign in. Pension stays off. TIN / RSA PIN are not required.
-            Once gross pay is set, they appear in Payslips like other ACTIVE staff.
+            No invitation, no biodata / guarantor forms, pension off. Set gross pay when you want them on
+            Payslips.
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <button

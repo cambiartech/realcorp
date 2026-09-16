@@ -1,6 +1,10 @@
 import { MembershipRole } from "@/generated/prisma";
-import type { OrgDepartment } from "@/lib/org-membership-profile";
-import { profileFromMembershipRole } from "@/lib/org-membership-profile";
+import {
+  mapOrgDepartmentToAccess,
+  profileFromMembershipRole,
+  type OrgDepartment,
+} from "@/lib/org-membership-profile";
+import { isOrgAdminOrSubAdmin } from "@/lib/org-admin-access";
 
 /** Logical departments used for task assignment and org visibility. */
 export type MembershipDepartment = OrgDepartment | "portal";
@@ -8,19 +12,13 @@ export type MembershipDepartment = OrgDepartment | "portal";
 function departmentFromStored(
   role: MembershipRole,
   department?: string | null,
-  isDepartmentLead?: boolean,
 ): MembershipDepartment | null {
-  if (department) return department as MembershipDepartment;
-  const profile = profileFromMembershipRole(role);
-  return profile.department;
-}
-
-function isDepartmentLeadMember(
-  role: MembershipRole,
-  isDepartmentLead?: boolean,
-): boolean {
-  if (isDepartmentLead != null) return isDepartmentLead;
-  return profileFromMembershipRole(role).isDepartmentLead;
+  if (role === MembershipRole.INVESTOR || role === MembershipRole.LISTING_OWNER) return "portal";
+  if (department) {
+    const mapped = mapOrgDepartmentToAccess(department);
+    if (mapped) return mapped;
+  }
+  return profileFromMembershipRole(role).department;
 }
 
 export type TaskAssigneeMember = {
@@ -31,6 +29,16 @@ export type TaskAssigneeMember = {
   isDepartmentLead?: boolean;
 };
 
+function isHelpDeskAssignee(role: MembershipRole): boolean {
+  // Anyone can request help from org operators / People leads.
+  return isOrgAdminOrSubAdmin(role) || role === MembershipRole.HR_MANAGER;
+}
+
+/**
+ * Who this person may assign tasks to.
+ * - Org admin / Subadmin / HR / platform: anyone except portal-only roles
+ * - Everyone else: their department teammates + org admins / subadmins / HR (for help)
+ */
 export function filterTaskAssigneeMembers(
   members: TaskAssigneeMember[],
   opts: {
@@ -41,19 +49,31 @@ export function filterTaskAssigneeMembers(
     actorIsDepartmentLead?: boolean;
   },
 ): TaskAssigneeMember[] {
+  const staff = members.filter((m) => departmentFromStored(m.role, m.department) !== "portal");
+
   if (canAssignTasksAcrossDepartments(opts.isPlatformAdmin, opts.actorRole)) {
-    return members.filter((m) => departmentFromStored(m.role, m.department) !== "portal");
+    return staff;
   }
 
-  const dept = opts.actorDepartment ?? profileFromMembershipRole(opts.actorRole ?? MembershipRole.SALES_EXECUTIVE).department;
-  if (!dept) {
-    const self = members.find((m) => m.id === opts.actorUserId);
-    return self ? [self] : [];
-  }
+  const actorRole = opts.actorRole ?? MembershipRole.SALES_EXECUTIVE;
+  const actorDept =
+    (opts.actorDepartment ? mapOrgDepartmentToAccess(opts.actorDepartment) : null) ??
+    profileFromMembershipRole(actorRole).department;
 
-  return members.filter(
-    (m) => departmentFromStored(m.role, m.department, m.isDepartmentLead) === dept,
-  );
+  const allowed = staff.filter((m) => {
+    if (m.id === opts.actorUserId) return true;
+    if (isHelpDeskAssignee(m.role)) return true;
+    if (!actorDept) return false;
+    return departmentFromStored(m.role, m.department) === actorDept;
+  });
+
+  // Stable unique by id (self + dept + admins may overlap).
+  const seen = new Set<string>();
+  return allowed.filter((m) => {
+    if (seen.has(m.id)) return false;
+    seen.add(m.id);
+    return true;
+  });
 }
 
 export function isTaskAssigneeAllowed(
@@ -65,14 +85,14 @@ export function isTaskAssigneeAllowed(
   return filterTaskAssigneeMembers(members, opts).some((m) => m.id === assigneeUserId);
 }
 
-/** Org admin, HR, and platform admins may assign tasks across departments. */
+/** Org admin, Subadmin, HR, and platform admins may assign tasks across departments. */
 export function canAssignTasksAcrossDepartments(
   isPlatformAdmin: boolean,
   role: MembershipRole | null | undefined,
 ): boolean {
   if (isPlatformAdmin) return true;
   if (!role) return false;
-  return role === MembershipRole.ORG_ADMIN || role === MembershipRole.SUB_ADMIN || role === MembershipRole.HR_MANAGER;
+  return isOrgAdminOrSubAdmin(role) || role === MembershipRole.HR_MANAGER;
 }
 
 /** @deprecated use departmentFromStored */

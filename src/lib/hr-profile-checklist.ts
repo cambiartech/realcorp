@@ -24,6 +24,8 @@ export type ProfileChecklistProfile = Pick<
   | "nextOfKin"
   | "guarantorInfo"
   | "employmentType"
+  | "photoUrl"
+  | "grossMonthly"
 >;
 
 export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
@@ -37,9 +39,11 @@ export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
   nextOfKin: null,
   guarantorInfo: null,
   employmentType: null,
+  photoUrl: null,
+  grossMonthly: null,
 };
 
-/** Contract / adhoc / temporary staff — paid via HR, no portal login or full statutory pack. */
+/** Contract / adhoc / service-provider staff — paid via HR, no employee form pack. */
 export function isContingentEmployment(employmentType?: string | null): boolean {
   const value = (employmentType || "").trim().toLowerCase();
   if (!value) return false;
@@ -49,7 +53,10 @@ export function isContingentEmployment(employmentType?: string | null): boolean 
     value.includes("ad-hoc") ||
     value.includes("temporary") ||
     value.includes("casual") ||
-    value.includes("consultant")
+    value.includes("consultant") ||
+    value.includes("service") ||
+    value.includes("vendor") ||
+    value.includes("outsource")
   );
 }
 
@@ -65,22 +72,25 @@ export function buildProfileChecklist(
 ): ProfileChecklistItem[] {
   const contingent = isContingentEmployment(profile.employmentType);
   if (contingent) {
+    const gross = profile.grossMonthly != null && Number(profile.grossMonthly) > 0;
     return [
       {
         id: "basics",
-        label: "Basic details (name & role)",
-        done: Boolean(profile.fullName && profile.position),
+        label: "Name & role on file",
+        done: Boolean(profile.fullName),
+        hint: "No biodata / guarantor forms needed for service providers",
       },
       {
-        id: "bank",
-        label: "Bank account for payment",
+        id: "pay",
+        label: "Pay amount set",
+        done: gross,
+        hint: "Set monthly gross so they appear on Payslips",
+      },
+      {
+        id: "payout",
+        label: "Where to pay (bank or company)",
         done: hasJson(profile.bankAccount),
-        hint: "Needed so HR can pay this person",
-      },
-      {
-        id: "phone",
-        label: "Phone contact",
-        done: Boolean(profile.phoneMobile),
+        hint: "Optional — bank details, or note the vendor company on the record",
       },
     ];
   }
@@ -91,6 +101,12 @@ export function buildProfileChecklist(
       id: "biodata",
       label: "Biodata (personal & employment)",
       done: Boolean(profile.fullName && profile.phoneMobile && profile.position),
+    },
+    {
+      id: "photo",
+      label: "Passport photo",
+      done: Boolean(profile.photoUrl),
+      hint: "Upload on the employee record or from My HR",
     },
     {
       id: "bank",

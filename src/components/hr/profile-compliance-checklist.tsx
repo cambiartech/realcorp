@@ -10,6 +10,7 @@ export function ProfileComplianceChecklist({
   percent,
   tenantSlug,
   inOnboardingWizard,
+  serviceProviderMode = false,
   onOpenDocuments,
   onGenerateOffer,
   onSendForm,
@@ -21,6 +22,8 @@ export function ProfileComplianceChecklist({
   percent: number;
   tenantSlug: string;
   inOnboardingWizard?: boolean;
+  /** Contract / adhoc / outsourced staff — no employee form pack. */
+  serviceProviderMode?: boolean;
   onOpenDocuments?: () => void;
   onGenerateOffer?: () => void;
   onSendForm?: (formType: "BIODATA" | "BANK_FORM" | "GUARANTOR" | "HEALTH") => void;
@@ -35,9 +38,16 @@ export function ProfileComplianceChecklist({
   return (
     <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-foreground">Onboarding checklist</p>
+        <p className="text-sm font-semibold text-foreground">
+          {serviceProviderMode ? "Payroll readiness" : "Onboarding checklist"}
+        </p>
         <span className="text-xs font-medium text-muted">{percent}% complete</span>
       </div>
+      {serviceProviderMode ? (
+        <p className="mb-3 text-[11px] text-muted">
+          Service / contract staff do not need biodata, guarantor, NDA, or offer-letter forms. Track pay only.
+        </p>
+      ) : null}
       <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-foreground/10">
         <div
           className="h-full rounded-full bg-[var(--success)] transition-all"
@@ -59,73 +69,81 @@ export function ProfileComplianceChecklist({
           </li>
         ))}
       </ul>
-      <div className="mt-4 flex flex-col gap-2 border-t border-foreground/10 pt-3">
-        {onPrefillFromDocs ? <PrefillWithAiButton pending={prefillPending} onClick={onPrefillFromDocs} /> : null}
-        {onGenerateOffer ? (
-          <button
-            type="button"
-            onClick={onGenerateOffer}
-            className="rounded-md border border-foreground/15 px-3 py-1.5 text-left text-xs font-semibold hover:bg-foreground/[0.06]"
-          >
-            {offer?.done ? "View / reprint offer letter" : "Generate offer letter"}
-          </button>
-        ) : null}
-        {onSendForm ? (
-          <>
-            {onSendAllForms ? (
+      {serviceProviderMode ? (
+        <div className="mt-4 border-t border-foreground/10 pt-3">
+          <Link href={`/${tenantSlug}/hr/payslips`} className="text-xs font-semibold text-foreground underline">
+            Open Payslips →
+          </Link>
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-col gap-2 border-t border-foreground/10 pt-3">
+          {onPrefillFromDocs ? <PrefillWithAiButton pending={prefillPending} onClick={onPrefillFromDocs} /> : null}
+          {onGenerateOffer ? (
+            <button
+              type="button"
+              onClick={onGenerateOffer}
+              className="rounded-md border border-foreground/15 px-3 py-1.5 text-left text-xs font-semibold hover:bg-foreground/[0.06]"
+            >
+              {offer?.done ? "View / reprint offer letter" : "Generate offer letter"}
+            </button>
+          ) : null}
+          {onSendForm ? (
+            <>
+              {onSendAllForms ? (
+                <button
+                  type="button"
+                  onClick={onSendAllForms}
+                  className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-left text-xs font-semibold text-background"
+                >
+                  Send all forms at once (biodata, bank, guarantor)
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={onSendAllForms}
-                className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-left text-xs font-semibold text-background"
+                onClick={() => onSendForm("BIODATA")}
+                className="text-xs font-semibold text-foreground underline"
               >
-                Send all forms at once (biodata, bank, guarantor)
+                Send biodata form
               </button>
-            ) : null}
+              <button
+                type="button"
+                onClick={() => onSendForm("BANK_FORM")}
+                className="text-xs font-semibold text-foreground underline"
+              >
+                Send bank form
+              </button>
+              <button
+                type="button"
+                onClick={() => onSendForm("GUARANTOR")}
+                className="text-xs font-semibold text-foreground underline"
+              >
+                Send guarantor form
+              </button>
+            </>
+          ) : null}
+          {inOnboardingWizard && onOpenDocuments ? (
             <button
               type="button"
-              onClick={() => onSendForm("BIODATA")}
+              onClick={onOpenDocuments}
+              className="text-left text-xs font-semibold text-foreground underline"
+            >
+              Upload signed NDA / documents (for this employee) →
+            </button>
+          ) : (
+            <Link
+              href={`/${tenantSlug}/hr/documents`}
               className="text-xs font-semibold text-foreground underline"
             >
-              Send biodata form
-            </button>
-            <button
-              type="button"
-              onClick={() => onSendForm("BANK_FORM")}
-              className="text-xs font-semibold text-foreground underline"
-            >
-              Send bank form
-            </button>
-            <button
-              type="button"
-              onClick={() => onSendForm("GUARANTOR")}
-              className="text-xs font-semibold text-foreground underline"
-            >
-              Send guarantor form
-            </button>
-          </>
-        ) : null}
-        {inOnboardingWizard && onOpenDocuments ? (
-          <button
-            type="button"
-            onClick={onOpenDocuments}
-            className="text-left text-xs font-semibold text-foreground underline"
-          >
-            Upload signed NDA / documents (for this employee) →
-          </button>
-        ) : (
-          <Link
-            href={`/${tenantSlug}/hr/documents`}
-            className="text-xs font-semibold text-foreground underline"
-          >
-            Upload signed NDA / documents →
-          </Link>
-        )}
-        {!nda?.done || !guarantor?.done ? (
-          <p className="text-[10px] text-muted">
-            Upload signed NDA and guarantor under Documents after the employee returns them.
-          </p>
-        ) : null}
-      </div>
+              Upload signed NDA / documents →
+            </Link>
+          )}
+          {!nda?.done || !guarantor?.done ? (
+            <p className="text-[10px] text-muted">
+              Upload signed NDA and guarantor under Documents after the employee returns them.
+            </p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

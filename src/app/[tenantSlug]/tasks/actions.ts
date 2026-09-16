@@ -74,7 +74,7 @@ async function assertAssigneeAllowed(
   if (!allowed) {
     return {
       ok: false,
-      error: "You can only assign tasks to people in your department. Org admin and HR can assign across teams.",
+      error: "You can assign tasks to people in your department, plus organization admins, subadmins, and People (HR) leads.",
     };
   }
   return null;

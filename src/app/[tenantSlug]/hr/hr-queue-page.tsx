@@ -430,7 +430,7 @@ export default async function HrQueuePage({
         name: profile.fullName || user?.name || user?.email || "Employee",
         email: profile.workEmail || user?.email || "",
         role: contingent
-          ? `${profile.employmentType || "Contract"} · No login`
+          ? `${profile.employmentType || "Contract"} · No forms`
           : "HR/payroll only · No login",
       };
     }),

@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
 import { canManageTasks } from "@/lib/tasks-access";
 import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "@/lib/membership-departments";
-import { profileFromMembershipRole, type OrgDepartment } from "@/lib/org-membership-profile";
+import { profileFromMembershipRole, mapOrgDepartmentToAccess } from "@/lib/org-membership-profile";
 import { ensureDefaultTaskSpaces } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +87,7 @@ export default async function TasksPage({
     isDepartmentLead: m.isDepartmentLead,
   }));
 
+  const memberById = new Map(allMembers.map((m) => [m.id, m]));
   const memberOptions = filterTaskAssigneeMembers(allMembers, {
     isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
     actorRole: membership?.role,
@@ -97,7 +98,7 @@ export default async function TasksPage({
 
   const initialView = view === "my" ? "my" : view === "sprint" ? "sprint" : "company";
   const department =
-    (membership?.department as OrgDepartment | null) ??
+    (membership?.department ? mapOrgDepartmentToAccess(membership.department) : null) ??
     profileFromMembershipRole(membership?.role ?? MembershipRole.SALES_EXECUTIVE).department;
 
   return (
@@ -133,7 +134,7 @@ export default async function TasksPage({
         sprintLabel: t.sprintLabel,
         assigneeUserId: t.assigneeUserId,
         assigneeLabel: t.assigneeUserId
-          ? memberOptions.find((m) => m.id === t.assigneeUserId)?.label || "Assigned"
+          ? memberById.get(t.assigneeUserId)?.label || "Assigned"
           : "Unassigned",
         dueDateLabel: t.dueDate
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.dueDate)

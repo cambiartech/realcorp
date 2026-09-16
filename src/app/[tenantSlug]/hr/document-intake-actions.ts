@@ -36,7 +36,8 @@ const createHrOnlySchema = z.object({
   phoneMobile: z.string().trim().max(40).optional(),
   position: z.string().trim().max(120).optional(),
   department: z.string().trim().max(80).optional(),
-  employmentType: z.enum(["Contract", "Adhoc"]).default("Contract"),
+  employmentType: z.enum(["Contract", "Adhoc", "Service provider"]).default("Contract"),
+  serviceCompany: z.string().trim().max(120).optional().or(z.literal("")),
   paygroupName: z.string().trim().max(80).optional(),
   grossMonthly: z.preprocess(
     (value) => (value === "" || value == null ? undefined : value),
@@ -378,6 +379,7 @@ export async function createHrOnlyEmployee(
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || "Invalid employee." };
   const email = parsed.data.workEmail?.trim().toLowerCase() || null;
   const employmentType = parsed.data.employmentType;
+  const serviceCompany = parsed.data.serviceCompany?.trim() || "";
   const bankAccount =
     parsed.data.bankAccountHolderName || parsed.data.bankName || parsed.data.bankAccountNumber
       ? {
@@ -387,7 +389,14 @@ export async function createHrOnlyEmployee(
           accountType: "Checking",
         }
       : undefined;
-  const hrNotes = `${employmentType} staff · payroll/HR record only; no portal login. Pension and statutory IDs not required.`;
+  const hrNotes = [
+    `${employmentType} · payroll/HR record only; no portal login; no employee form pack.`,
+    serviceCompany ? `Service company: ${serviceCompany}.` : null,
+    "Pension and statutory IDs not required.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const additionalInfo = serviceCompany ? { serviceCompany } : undefined;
   try {
     const user = email
       ? await prisma.user.upsert({
@@ -420,6 +429,7 @@ export async function createHrOnlyEmployee(
         employerPensionRate: 0,
         status: EmployeeProfileStatus.ACTIVE,
         bankAccount,
+        additionalInfo,
         hrNotes: membership?.status === MembershipStatus.ACTIVE ? null : hrNotes,
       },
       update: {
@@ -435,6 +445,7 @@ export async function createHrOnlyEmployee(
         employeePensionRate: 0,
         employerPensionRate: 0,
         ...(bankAccount ? { bankAccount } : {}),
+        ...(additionalInfo ? { additionalInfo } : {}),
         ...(membership?.status === MembershipStatus.ACTIVE ? {} : { hrNotes }),
       },
     });
@@ -447,7 +458,7 @@ export async function createHrOnlyEmployee(
       entityType: "EmployeeProfile",
       entityId: profile.id,
       action: "HR_ONLY_EMPLOYEE_CREATED",
-      summary: `${parsed.data.fullName} added as ${employmentType} staff without software access`,
+      summary: `${parsed.data.fullName} added as ${employmentType}${serviceCompany ? ` (${serviceCompany})` : ""} without software access`,
     });
     revalidatePath(`/${tenantSlug}/hr`);
     revalidatePath(`/${tenantSlug}/hr/people`);

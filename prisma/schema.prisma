@@ -1557,6 +1557,8 @@ model EmployeeProfile {
   nationality            String?
   phoneMobile            String?
   workEmail              String?
+  /// Passport / headshot URL (Cloudinary). Used on People records and My HR.
+  photoUrl               String?
   addressStreet          String?
   addressCity            String?
   addressState           String?

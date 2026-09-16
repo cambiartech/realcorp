@@ -129,6 +129,82 @@ export async function getHrUploadSignature(
   });
 }
 
+export async function getEmployeePhotoUploadSignature(
+  tenantSlug: string,
+  input: { fileName?: string; userId: string },
+): Promise<CloudinaryUploadSignature | CloudinaryUploadError> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  const isHr = canManageHr(Boolean(session.user.isPlatformAdmin), membership);
+  const isSelf = input.userId === session.user.id;
+  if (!isHr && !isSelf) {
+    return { ok: false, error: "You can only upload your own passport photo." };
+  }
+  if (!isHr && membership?.status !== MembershipStatus.ACTIVE && !session.user.isPlatformAdmin) {
+    return { ok: false, error: "You must be an active team member to upload a photo." };
+  }
+  return createTenantUploadSignature({
+    tenantId: tenant.id,
+    tenantSlug: tenant.slug,
+    area: "hr-photos",
+    fileName: input.fileName || `${input.userId}-passport`,
+    resourceType: "image",
+  });
+}
+
+export async function saveEmployeePhoto(
+  tenantSlug: string,
+  input: { userId: string; photoUrl: string | null },
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+
+  const isHr = canManageHr(Boolean(session.user.isPlatformAdmin), membership);
+  const isSelf = input.userId === session.user.id;
+  if (!isHr && !isSelf) {
+    return { ok: false, error: "You can only update your own passport photo." };
+  }
+
+  const photoUrl = input.photoUrl?.trim() || null;
+  if (photoUrl && !/^https:\/\//i.test(photoUrl)) {
+    return { ok: false, error: "Invalid photo URL." };
+  }
+
+  const profile = await prisma.employeeProfile.findUnique({
+    where: { tenantId_userId: { tenantId: tenant.id, userId: input.userId } },
+    select: { id: true, fullName: true },
+  });
+  if (!profile) {
+    return { ok: false, error: "Create the employee record first, then add a passport photo." };
+  }
+
+  await prisma.employeeProfile.update({
+    where: { id: profile.id },
+    data: { photoUrl },
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "User",
+    module: "HR",
+    entityType: "EMPLOYEE_PROFILE",
+    entityId: profile.id,
+    action: "UPDATE",
+    summary: photoUrl
+      ? `Updated passport photo for ${profile.fullName || "employee"}.`
+      : `Removed passport photo for ${profile.fullName || "employee"}.`,
+    metadata: { userId: input.userId, photo: Boolean(photoUrl) },
+  });
+
+  revalidateHr(tenantSlug);
+  return { ok: true };
+}
+
 export async function upsertEmployeeProfile(
   tenantSlug: string,
   input: Record<string, unknown>,
