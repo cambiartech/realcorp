@@ -66,8 +66,9 @@ import {
 import {
   buildBalanceExportLines,
   downloadFinanceReportPackXlsx,
+  downloadFinanceReportXlsx,
 } from "@/lib/finance-report-xlsx";
-import { downloadFinanceReportPdf } from "@/lib/finance-report-pdf";
+import { downloadFinanceExpenseStatementPdf, downloadFinanceReportPdf } from "@/lib/finance-report-pdf";
 import { vendorNamesMatch } from "@/lib/finance-vendor";
 import {
   expenseCategoryNamesMatch,
@@ -779,6 +780,10 @@ export function FinanceWorkspace({
   const [reportUnitFilter, setReportUnitFilter] = useState<string>("all");
   const [reportDepartmentFilter, setReportDepartmentFilter] =
     useState<string>("all");
+  /** Full operating statement vs department/project expense statement only. */
+  const [reportStatementFocus, setReportStatementFocus] = useState<
+    "full" | "expenses"
+  >("full");
   const [reportDrilldownMonth, setReportDrilldownMonth] = useState<
     string | null
   >(null);
@@ -2127,7 +2132,39 @@ export function FinanceWorkspace({
   async function exportScopedStatement(format: "excel" | "pdf") {
     setReportExporting(format);
     try {
-      if (format === "excel") {
+      if (reportStatementFocus === "expenses") {
+        const baseMeta = reportExportMeta();
+        const meta = {
+          ...baseMeta,
+          scopeLabel: `${baseMeta.scopeLabel || "All"} · Expense statement`,
+        };
+        const payload = {
+          expenses: visibleExpenseBreakdown,
+          expenseTransactions: filteredExpenses.map((e) => ({
+            date: e.expenseDateLabel,
+            amount: e.amountValue,
+            description:
+              e.vendorName !== "—"
+                ? `${e.vendorName}${e.reference ? ` · ${e.reference}` : ""}`
+                : e.reference || e.category,
+            category: e.category,
+          })),
+          kpis: {
+            totalInvoiced: 0,
+            totalCollected: 0,
+            totalExpenses: reportComparison.current.expenses,
+            totalRemitted: 0,
+            netCashflow: -reportComparison.current.expenses,
+            receivables: 0,
+            overdueReceivables: 0,
+          },
+        };
+        if (format === "excel") {
+          await downloadFinanceReportXlsx("expenses", meta, payload);
+        } else {
+          await downloadFinanceExpenseStatementPdf(meta, payload);
+        }
+      } else if (format === "excel") {
         await exportReportPack();
       } else {
         await downloadFinanceReportPdf(reportExportMeta(), {
@@ -3028,13 +3065,17 @@ export function FinanceWorkspace({
         previous: reportComparison.previous.net,
       },
     ];
-    return rows.map((row) => {
+    const scoped =
+      reportStatementFocus === "expenses"
+        ? rows.filter((row) => row.id === "expenses")
+        : rows;
+    return scoped.map((row) => {
       const change = row.current - row.previous;
       const changePct =
         row.previous !== 0 ? (change / row.previous) * 100 : null;
       return { ...row, change, changePct };
     });
-  }, [reportComparison]);
+  }, [reportComparison, reportStatementFocus]);
 
   const openPayablesTotal = useMemo(
     () =>
@@ -4891,20 +4932,25 @@ export function FinanceWorkspace({
                         Reporting scope
                       </p>
                       <p className="text-xs text-muted">
-                        Choose a project or apartment to pull that statement.
-                        Apartment reports only include records tagged to that
-                        unit.
+                        Filter by project, apartment, or department. Use{" "}
+                        <strong className="font-semibold text-foreground">
+                          Expense statement only
+                        </strong>{" "}
+                        when you need spend for one department (e.g. Marketing) —
+                        without invoiced, collected, or remitted.
                       </p>
                     </div>
                     {reportProjectFilter !== "all" ||
                     reportUnitFilter !== "all" ||
-                    reportDepartmentFilter !== "all" ? (
+                    reportDepartmentFilter !== "all" ||
+                    reportStatementFocus !== "full" ? (
                       <button
                         type="button"
                         onClick={() => {
                           setReportProjectFilter("all");
                           setReportUnitFilter("all");
                           setReportDepartmentFilter("all");
+                          setReportStatementFocus("full");
                         }}
                         className="text-xs font-semibold text-foreground underline decoration-foreground/25 underline-offset-2"
                       >
@@ -4912,7 +4958,27 @@ export function FinanceWorkspace({
                       </button>
                     ) : null}
                   </div>
-                  <div className="grid gap-3 md:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                    <label className="space-y-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                        Statement type
+                      </span>
+                      <UiSelect
+                        value={reportStatementFocus}
+                        onChange={(e) => {
+                          const next =
+                            e.target.value === "expenses" ? "expenses" : "full";
+                          setReportStatementFocus(next);
+                          if (next === "expenses") {
+                            setReportKind("overview");
+                            setReportDrilldownMonth(null);
+                          }
+                        }}
+                      >
+                        <option value="full">Full operating statement</option>
+                        <option value="expenses">Expense statement only</option>
+                      </UiSelect>
+                    </label>
                     <label className="space-y-1">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-muted">
                         Project
@@ -4988,7 +5054,10 @@ export function FinanceWorkspace({
                   role="tablist"
                   aria-label="Report sections"
                 >
-                  {REPORT_TABS.map((tab) => (
+                  {(reportStatementFocus === "expenses"
+                    ? REPORT_TABS.filter((tab) => tab.id === "overview")
+                    : REPORT_TABS
+                  ).map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
@@ -5005,7 +5074,9 @@ export function FinanceWorkspace({
                           : "border-transparent text-muted hover:text-foreground",
                       ].join(" ")}
                     >
-                      {tab.label}
+                      {reportStatementFocus === "expenses"
+                        ? "Expense statement"
+                        : tab.label}
                     </button>
                   ))}
                 </div>
@@ -5014,14 +5085,22 @@ export function FinanceWorkspace({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">
-                        Statement for {reportScopeLabel}
+                        {reportStatementFocus === "expenses"
+                          ? `Expense statement · ${reportScopeLabel}`
+                          : `Statement for ${reportScopeLabel}`}
                       </p>
                       <p className="mt-0.5 text-xs text-muted">
-                        {reportUnitFilter !== "all"
-                          ? "Only invoices, collections, and expenses tagged to this apartment / unit."
-                          : reportProjectFilter !== "all"
-                            ? "Every apartment in this project is listed below. Click a row to open that unit’s statement."
-                            : "Company-wide figures. Choose a project or apartment above to pull that report."}
+                        {reportStatementFocus === "expenses"
+                          ? reportDepartmentFilter !== "all"
+                            ? `Spend tagged to ${reportDepartmentFilter} only — no invoiced, collected, or remitted.`
+                            : "Spend only for the selected scope — no invoiced, collected, or remitted. Pick a department above for a department expense statement."
+                          : reportUnitFilter !== "all"
+                            ? "Only invoices, collections, and expenses tagged to this apartment / unit."
+                            : reportProjectFilter !== "all"
+                              ? "Every apartment in this project is listed below. Click a row to open that unit’s statement."
+                              : reportDepartmentFilter !== "all"
+                                ? `Full operating statement for ${reportDepartmentFilter} (invoiced, collected, expenses, remitted). Switch to Expense statement only for spend alone.`
+                                : "Company-wide figures. Choose a project, apartment, or department above to pull that report."}
                       </p>
                     </div>
                     <ReportScopeExportButtons
@@ -5030,7 +5109,8 @@ export function FinanceWorkspace({
                       onPdf={() => void exportScopedStatement("pdf")}
                     />
                   </div>
-                  {reportUnitFilter !== "all" &&
+                  {reportStatementFocus === "full" &&
+                  reportUnitFilter !== "all" &&
                   (projectWideOutsideUnit.expenses > 0 ||
                     projectWideOutsideUnit.collected > 0 ||
                     projectWideOutsideUnit.invoiced > 0 ||
@@ -5058,7 +5138,14 @@ export function FinanceWorkspace({
 
                 {reportKind === "overview" ? (
                   <>
-                <div className="grid gap-3 md:grid-cols-4">
+                <div
+                  className={[
+                    "grid gap-3",
+                    reportStatementFocus === "expenses"
+                      ? "md:grid-cols-1 max-w-sm"
+                      : "md:grid-cols-4",
+                  ].join(" ")}
+                >
                   {reportComparisonCards.map((card) => (
                     <div
                       key={card.id}
@@ -5111,6 +5198,7 @@ export function FinanceWorkspace({
                   ))}
                 </div>
 
+                {reportStatementFocus === "full" ? (
                 <div className="grid gap-3 lg:grid-cols-3">
                   <div className="rounded-xl border border-foreground/10 bg-foreground/[0.015] p-4">
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
@@ -5199,7 +5287,98 @@ export function FinanceWorkspace({
                     </div>
                   </div>
                 </div>
+                ) : null}
 
+                {reportStatementFocus === "expenses" ? (
+                  <>
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                      <div className="mb-3">
+                        <p className="text-sm font-semibold text-foreground">
+                          Expenses by month · {reportScopeLabel}
+                        </p>
+                        <p className="text-xs text-muted">
+                          Spend only for the selected period
+                          {reportDepartmentFilter !== "all"
+                            ? ` · ${reportDepartmentFilter}`
+                            : ""}
+                          .
+                        </p>
+                      </div>
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">Month</th>
+                              <th className="px-3 py-2">Expenses</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {visiblePnlBreakdown.map((row) => (
+                              <tr key={row.month}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {row.month}
+                                </td>
+                                <td className="px-3 py-2 font-semibold text-foreground">
+                                  {reportView.currency}{" "}
+                                  {row.expenses.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-semibold text-foreground">
+                          Expense by category
+                        </p>
+                        <ReportScopeExportButtons
+                          exporting={reportExporting}
+                          onExcel={() => void exportScopedStatement("excel")}
+                          onPdf={() => void exportScopedStatement("pdf")}
+                        />
+                      </div>
+                      {visibleExpenseBreakdown.length === 0 ? (
+                        <p className="text-sm text-muted">
+                          No expenses tagged to this scope in the selected
+                          period.
+                        </p>
+                      ) : (
+                        <div className="overflow-hidden rounded-lg border border-foreground/10">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                              <tr>
+                                <th className="px-3 py-2">Category</th>
+                                <th className="px-3 py-2">Count</th>
+                                <th className="px-3 py-2">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-foreground/10">
+                              {expenseCatPager.rows.map((row) => (
+                                <tr key={row.category}>
+                                  <td className="px-3 py-2">{row.category}</td>
+                                  <td className="px-3 py-2">{row.count}</td>
+                                  <td className="px-3 py-2 font-semibold">
+                                    {reportView.currency}{" "}
+                                    {row.total.toLocaleString()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <ClientTablePager
+                            page={expenseCatPager.page}
+                            setPage={expenseCatPager.setPage}
+                            total={expenseCatPager.total}
+                            pageSize={expenseCatPager.pageSize}
+                            itemLabel="categories"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
                 <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                   <div className="mb-3">
                     <p className="text-sm font-semibold text-foreground">
@@ -5350,6 +5529,7 @@ export function FinanceWorkspace({
                     </div>
                   )}
                 </div>
+                )}
                   </>
                 ) : null}
 

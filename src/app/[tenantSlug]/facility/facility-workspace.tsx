@@ -17,6 +17,7 @@ import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 import { MODAL_PANEL_FORM, MODAL_PANEL_SM } from "@/lib/modal-panel";
 import { InventoryItemClass } from "@/generated/prisma";
 import { AlertTriangle, Plus, Wrench } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -44,6 +45,8 @@ export function FacilityWorkspace(props: {
   tenantSlug: string;
   canManage: boolean;
   canRecord: boolean;
+  /** When Inventory module is on, point catalog/prices there. */
+  inventoryEnabled?: boolean;
   items: Array<{
     id: string;
     name: string;
@@ -168,6 +171,15 @@ export function FacilityWorkspace(props: {
           <p className="mt-1 max-w-2xl text-sm text-muted">
             Site stores, material usage, plant service dates, and damages — for Facility Managers and site teams.
           </p>
+          {props.inventoryEnabled ? (
+            <p className="mt-2 text-xs text-muted">
+              Manage catalog, suppliers, artisans, and material price history in{" "}
+              <Link href={`/${props.tenantSlug}/inventory`} className="font-semibold text-foreground underline">
+                Inventory
+              </Link>
+              .
+            </p>
+          ) : null}
         </div>
         {props.canRecord ? (
           <div className="flex flex-wrap gap-2">
@@ -258,13 +270,27 @@ export function FacilityWorkspace(props: {
       {tab === "catalog" ? (
         <Section
           title="Catalog"
-          hint="Shared list of materials, consumables, and machine types."
+          hint={
+            props.inventoryEnabled
+              ? "Shared materials list. Use Inventory for suppliers and price history."
+              : "Shared list of materials, consumables, and machine types."
+          }
           action={
-            props.canManage ? (
-              <button type="button" onClick={() => setModal("item")} className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background">
-                New item
-              </button>
-            ) : null
+            <div className="flex flex-wrap gap-2">
+              {props.inventoryEnabled ? (
+                <Link
+                  href={`/${props.tenantSlug}/inventory`}
+                  className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+                >
+                  Open Inventory
+                </Link>
+              ) : null}
+              {props.canManage ? (
+                <button type="button" onClick={() => setModal("item")} className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background">
+                  New item
+                </button>
+              ) : null}
+            </div>
           }
         >
           <SimpleTable

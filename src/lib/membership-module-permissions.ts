@@ -14,7 +14,8 @@ export type MembershipModuleKey =
   | "shortlets"
   | "listings"
   | "investor"
-  | "facility";
+  | "facility"
+  | "inventory";
 
 export type MembershipModuleAccessLevel = "none" | "read" | "edit" | "full";
 
@@ -112,6 +113,13 @@ export const MEMBERSHIP_ASSIGNABLE_MODULES: AssignableMemberModule[] = [
     description: "Site stores, usage, plant, and damages",
     entitlement: "moduleFacility",
     navKeys: ["facility"],
+  },
+  {
+    key: "inventory",
+    label: "Inventory",
+    description: "Materials catalog, suppliers, artisans, and price history",
+    entitlement: "moduleInventory",
+    navKeys: ["inventory"],
   },
 ];
 

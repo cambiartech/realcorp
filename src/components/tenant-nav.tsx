@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
@@ -27,17 +27,20 @@ import {
   MapPin,
   Megaphone,
   MessageCircle,
+  Package,
   Radio,
   Receipt,
   Search,
   Settings,
   ShoppingBag,
   Star,
+  Truck,
   TrendingDown,
   TrendingUp,
   UserCircle,
   Users,
   UsersRound,
+  Wrench,
   Home,
   Warehouse,
   type LucideIcon,
@@ -81,6 +84,7 @@ const ALL_ITEMS: NavItem[] = [
   { key: "community", label: "Community", href: "/community", mobileLabel: "Community" },
   { key: "shortlets", label: "Short Lets", href: "/shortlets", mobileLabel: "Shortlets" },
   { key: "facility", label: "Facility", href: "/facility", mobileLabel: "Facility" },
+  { key: "inventory", label: "Inventory", href: "/inventory", mobileLabel: "Inventory" },
   { key: "finance", label: "Finance", href: "/finance", mobileLabel: "Finance" },
   { key: "hr", label: "People", href: "/hr", mobileLabel: "HR" },
   { key: "team", label: "Team", href: "/team", mobileLabel: "Team" },
@@ -104,6 +108,7 @@ const NAV_ICONS: Record<TenantNavKey, LucideIcon> = {
   community: Users,
   shortlets: Home,
   facility: Warehouse,
+  inventory: Package,
   finance: CircleDollarSign,
   hr: UsersRound,
   team: Users,
@@ -209,6 +214,7 @@ export function TenantSidebar({
   shortletsAccess = null,
 }: TenantNavProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const coreItems = useCoreNavItems(tenantSlug, visibleNavKeys);
 
   const [collapsed, setCollapsed] = useState(false);
@@ -216,6 +222,7 @@ export function TenantSidebar({
   const [marketingOpen, setMarketingOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [hrOpen, setHrOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [shortletsOpen, setShortletsOpen] = useState(false);
 
   useEffect(() => {
@@ -233,6 +240,9 @@ export function TenantSidebar({
       const storedHr = window.localStorage.getItem("tenant-nav-hr-open");
       if (storedHr === "1") setHrOpen(true);
       else if (storedHr === "0") setHrOpen(false);
+      const storedInventory = window.localStorage.getItem("tenant-nav-inventory-open");
+      if (storedInventory === "1") setInventoryOpen(true);
+      else if (storedInventory === "0") setInventoryOpen(false);
       const storedShortlets = window.localStorage.getItem("tenant-nav-shortlets-open");
       if (storedShortlets === "1") setShortletsOpen(true);
       else if (storedShortlets === "0") setShortletsOpen(false);
@@ -272,6 +282,18 @@ export function TenantSidebar({
     const hrNavItem = coreItems.find((i) => i.key === "hr");
     if (!hrNavItem) return;
     if (pathname === hrNavItem.href || pathname.startsWith(`${hrNavItem.href}/`)) setHrOpen(true);
+  }, [pathname, coreItems]);
+
+  useEffect(() => {
+    const inventoryNavItem = coreItems.find((i) => i.key === "inventory");
+    if (!inventoryNavItem) return;
+    if (
+      pathname === inventoryNavItem.href ||
+      pathname.startsWith(`${inventoryNavItem.href}/`) ||
+      pathname.startsWith(`${inventoryNavItem.href}?`)
+    ) {
+      setInventoryOpen(true);
+    }
   }, [pathname, coreItems]);
 
   useEffect(() => {
@@ -317,6 +339,14 @@ export function TenantSidebar({
     setHrOpen((prev) => {
       const next = !prev;
       window.localStorage.setItem("tenant-nav-hr-open", next ? "1" : "0");
+      return next;
+    });
+  }
+
+  function toggleInventory() {
+    setInventoryOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("tenant-nav-inventory-open", next ? "1" : "0");
       return next;
     });
   }
@@ -434,6 +464,18 @@ export function TenantSidebar({
     : [];
   const hasFinanceItems = financeSubItems.length > 0;
   const hasHrItems = hrSubItems.length > 0;
+  const inventoryItem = coreItems.find((i) => i.key === "inventory");
+  const inventorySubItems: FinanceSubItem[] = inventoryItem
+    ? [
+        { id: "catalog", label: "Catalog", href: `${inventoryItem.href}?tab=catalog`, icon: Package },
+        { id: "stock", label: "Stock", href: `${inventoryItem.href}?tab=stock`, icon: Warehouse },
+        { id: "receive", label: "Receive", href: `${inventoryItem.href}?tab=receive`, icon: Truck },
+        { id: "suppliers", label: "Suppliers", href: `${inventoryItem.href}?tab=suppliers`, icon: Handshake },
+        { id: "artisans", label: "Artisans", href: `${inventoryItem.href}?tab=artisans`, icon: Wrench },
+        { id: "prices", label: "Prices", href: `${inventoryItem.href}?tab=prices`, icon: TrendingUp },
+      ]
+    : [];
+  const hasInventoryItems = inventorySubItems.length > 0;
   const shortletsItem = coreItems.find((i) => i.key === "shortlets");
   const shortletsSubItems: FinanceSubItem[] = shortletsItem
     ? buildShortletsNavItems(shortletsItem.href, shortletsAccess ?? {
@@ -498,6 +540,13 @@ export function TenantSidebar({
       );
     }
     return pathname === `${hrItem.href}/${id}`;
+  }
+
+  function isInventorySubActive(id: string) {
+    if (!inventoryItem) return false;
+    if (pathname !== inventoryItem.href) return false;
+    const tab = searchParams.get("tab") || "catalog";
+    return tab === id;
   }
 
   function isShortletsSubActive(id: string) {
@@ -777,6 +826,51 @@ export function TenantSidebar({
             </div>
           ) : null}
 
+          {/* Inventory group */}
+          {hasInventoryItems && inventoryItem ? (
+            <div className="pt-1">
+              {collapsed ? (
+                <NavLink
+                  navKey="inventory"
+                  href={inventoryItem.href}
+                  label="Inventory"
+                  active={pathname === inventoryItem.href || pathname.startsWith(`${inventoryItem.href}/`)}
+                  collapsed={true}
+                />
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={toggleInventory}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                  >
+                    <span>Inventory</span>
+                    <ChevronDown
+                      className={[
+                        "h-3.5 w-3.5 transition-transform duration-150",
+                        inventoryOpen ? "" : "-rotate-90",
+                      ].join(" ")}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  {inventoryOpen ? (
+                    <div className="mt-0.5 space-y-0.5 pl-3">
+                      {inventorySubItems.map((item) => (
+                        <SubNavLink
+                          key={item.id}
+                          href={item.href}
+                          label={item.label}
+                          icon={item.icon}
+                          active={isInventorySubActive(item.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
+
           {/* Short Lets group */}
           {hasShortletsItems && shortletsItem ? (
             <div className="pt-1">
@@ -826,13 +920,23 @@ export function TenantSidebar({
           {postGroupItems.length > 0 ? (
             <div
               className={
-                hasSalesItems || hasMarketingItems || hasFinanceItems || hasHrItems || hasShortletsItems
+                hasSalesItems ||
+                hasMarketingItems ||
+                hasFinanceItems ||
+                hasHrItems ||
+                hasInventoryItems ||
+                hasShortletsItems
                   ? "pt-1"
                   : ""
               }
             >
               {!collapsed &&
-              (hasSalesItems || hasMarketingItems || hasFinanceItems || hasHrItems || hasShortletsItems) ? (
+              (hasSalesItems ||
+                hasMarketingItems ||
+                hasFinanceItems ||
+                hasHrItems ||
+                hasInventoryItems ||
+                hasShortletsItems) ? (
                 <div className="mb-1 border-t border-foreground/10" />
               ) : null}
               {visibleNavKeys.includes("portal") ? (

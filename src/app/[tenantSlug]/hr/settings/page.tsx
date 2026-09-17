@@ -37,6 +37,7 @@ export default async function HrPeopleSettingsPage({
           moduleShortLets: true,
           moduleHr: true,
           moduleFacility: true,
+          moduleInventory: true,
           moduleTasks: true,
           moduleClients: true,
           moduleListings: true,

@@ -60,15 +60,17 @@ function requestRow(request: {
 
 function LeaveTrackerUnavailable() {
   return (
-    <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-        People operations
-      </p>
-      <h1 className="mt-1 text-2xl font-bold text-foreground">Leave tracker</h1>
-      <p className="mt-2 max-w-xl text-sm text-muted">
-        This page could not load. If a database update just ran, wait a minute and
-        try again. The rest of HR is still available from the sidebar.
-      </p>
+    <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:py-5">
+      <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+          People operations
+        </p>
+        <h1 className="mt-1 text-2xl font-bold text-foreground">Leave tracker</h1>
+        <p className="mt-2 max-w-xl text-sm text-muted">
+          This page could not load. If a database update just ran, wait a minute and
+          try again. The rest of HR is still available from the sidebar.
+        </p>
+      </div>
     </div>
   );
 }
@@ -185,7 +187,7 @@ export default async function HrLeavePage({
       ]);
 
     return (
-      <div className="space-y-4">
+      <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-4 sm:py-5">
         <HrLeaveWorkspace
           tenantSlug={tenantSlug}
           canManage={canManage}

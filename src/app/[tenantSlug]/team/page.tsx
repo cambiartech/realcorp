@@ -31,6 +31,7 @@ export default async function TenantTeamPage({ params }: { params: Promise<{ ten
           moduleShortLets: true,
           moduleHr: true,
           moduleFacility: true,
+          moduleInventory: true,
           moduleTasks: true,
           moduleClients: true,
           moduleListings: true,

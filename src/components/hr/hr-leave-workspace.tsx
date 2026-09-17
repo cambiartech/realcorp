@@ -121,7 +121,9 @@ export function HrLeaveWorkspace({
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
-  const [tab, setTab] = useState<"team" | "mine" | "policies">(canManage ? "team" : "mine");
+  const [tab, setTab] = useState<"team" | "mine" | "policies" | "holidays">(
+    canManage ? "team" : "mine",
+  );
   const [showRequest, setShowRequest] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<LeavePolicyRow | null>(null);
@@ -238,7 +240,12 @@ export function HrLeaveWorkspace({
         {[
           ...(canManage ? ([{ id: "team", label: `Team requests (${pendingTeamCount})` }] as const) : []),
           { id: "mine", label: "My leave" } as const,
-          ...(canManage ? ([{ id: "policies", label: "Policies & balances" }] as const) : []),
+          ...(canManage
+            ? ([
+                { id: "policies", label: "Leave policies" },
+                { id: "holidays", label: "Public holidays" },
+              ] as const)
+            : []),
         ].map((item) => (
           <button
             key={item.id}
@@ -358,8 +365,8 @@ export function HrLeaveWorkspace({
             <div>
               <h2 className="text-sm font-semibold text-foreground">Leave policies</h2>
               <p className="text-xs text-muted">
-                Set the days your organization actually grants — for example 22 annual days and 90 maternity days.
-                Staff file from My leave; you approve on Team requests.
+                Set days granted for each leave type with <strong>Set days</strong> (org default).
+                To deduct leave someone already took before Realcorp, use <strong>Adjust balance</strong> with a negative number for that employee.
               </p>
             </div>
             <div className="flex gap-2">
@@ -393,52 +400,57 @@ export function HrLeaveWorkspace({
               ))}
             </div>
           </div>
-          <div className="rounded-lg border border-foreground/10">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-foreground/10 px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Public holiday calendar</h2>
-                <p className="text-xs text-muted">
-                  Staff leave excludes weekends and these dates. Public holidays for the organisation
-                  country are pulled automatically and marked tentative — add custom dates here too.
-                  Short-let operations are not affected.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setPending(true);
-                    try {
-                      const res = await syncLeavePublicHolidays(tenantSlug);
-                      if (res.ok) {
-                        showSnackbar(
-                          res.upserted
-                            ? `Updated ${res.upserted} public holiday${res.upserted === 1 ? "" : "s"} (tentative).`
-                            : "Public holiday calendar is up to date.",
-                          "success",
-                        );
-                        router.refresh();
-                      } else {
-                        showSnackbar(res.error, "error");
-                      }
-                    } finally {
-                      setPending(false);
-                    }
-                  }}
-                  disabled={pending}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
-                >
-                  Sync public holidays
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowHoliday(true)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add custom holiday
-                </button>
-              </div>
+        </div>
+      ) : null}
+
+      {tab === "holidays" && canManage ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Public holiday calendar</h2>
+              <p className="text-xs text-muted">
+                Staff leave excludes weekends and these dates. Public holidays for the organisation
+                country are pulled automatically and marked tentative — add custom dates here too.
+                Short-let operations are not affected.
+              </p>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setPending(true);
+                  try {
+                    const res = await syncLeavePublicHolidays(tenantSlug);
+                    if (res.ok) {
+                      showSnackbar(
+                        res.upserted
+                          ? `Updated ${res.upserted} public holiday${res.upserted === 1 ? "" : "s"} (tentative).`
+                          : "Public holiday calendar is up to date.",
+                        "success",
+                      );
+                      router.refresh();
+                    } else {
+                      showSnackbar(res.error, "error");
+                    }
+                  } finally {
+                    setPending(false);
+                  }
+                }}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+              >
+                Sync public holidays
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowHoliday(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add custom holiday
+              </button>
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-foreground/10">
             {holidays.length ? (
               <div className="divide-y divide-foreground/10">
                 {holidays.map((holiday) => (
@@ -475,7 +487,7 @@ export function HrLeaveWorkspace({
                           setPending(false);
                         }
                       }}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 text-muted hover:text-[var(--danger)] disabled:opacity-50"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-foreground/15 text-muted hover:text-[var(--danger)] disabled:opacity-50"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -761,12 +773,27 @@ export function HrLeaveWorkspace({
             }), "Leave balance adjusted.")) setAdjustTarget(null);
           } finally { setPending(false); }
         }}>
-          <div className="border-b border-foreground/10 px-5 py-4"><h2 id="adjust-leave-title" className="text-lg font-semibold">Adjust leave balance</h2><p className="text-sm text-muted">Manual changes are recorded in the audit log.</p></div>
+          <div className="border-b border-foreground/10 px-5 py-4">
+            <h2 id="adjust-leave-title" className="text-lg font-semibold">Adjust leave balance</h2>
+            <p className="text-sm text-muted">
+              Use a <strong>negative</strong> number to deduct days already taken before Realcorp
+              (e.g. −5 if they used 5 annual days earlier this year). Positive adds days. Changes are audited.
+            </p>
+          </div>
           <div className="grid gap-3 p-5">
             <label className="text-sm"><span className="mb-1 block text-xs font-medium">Employee</span><select name="employeeProfileId" required className={inputClass}><option value="">Select employee</option>{employeeOptions.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
             <label className="text-sm"><span className="mb-1 block text-xs font-medium">Leave policy</span><select name="leaveTypeId" required className={inputClass}><option value="">Select policy</option>{policies.map((policy) => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</select></label>
-            <div className="grid grid-cols-2 gap-3"><label className="text-sm"><span className="mb-1 block text-xs font-medium">Year</span><input type="number" name="year" defaultValue={year} required className={inputClass} /></label><label className="text-sm"><span className="mb-1 block text-xs font-medium">Adjustment</span><input type="number" name="adjustmentUnits" step="0.25" required className={inputClass} /></label></div>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Reason</span><textarea name="reason" rows={3} required className={inputClass} /></label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-sm"><span className="mb-1 block text-xs font-medium">Year</span><input type="number" name="year" defaultValue={year} required className={inputClass} /></label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-medium">Adjustment (days)</span>
+                <input type="number" name="adjustmentUnits" step="0.25" required className={inputClass} placeholder="e.g. -5" />
+              </label>
+            </div>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium">Reason</span>
+              <textarea name="reason" rows={3} required className={inputClass} placeholder="e.g. 5 annual days taken before go-live in 2026" />
+            </label>
           </div>
           <div className="flex justify-end gap-2 border-t border-foreground/10 px-5 py-4"><button type="button" onClick={() => setAdjustTarget(null)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold">Cancel</button><button type="submit" disabled={pending} className="rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">{pending ? "Saving…" : "Save adjustment"}</button></div>
         </form>

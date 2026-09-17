@@ -158,6 +158,8 @@ model Tenant {
   inventoryAssets             InventoryAsset[]
   inventoryServiceLogs        InventoryServiceLog[]
   inventoryDamages            InventoryDamage[]
+  inventoryParties            InventoryParty[]
+  inventoryPricePoints        InventoryPricePoint[]
   leadCaptureForms            LeadCaptureForm[]
   leadCaptureSessions         LeadCaptureFormSession[]
   leadCaptureEvents           LeadCaptureFormEvent[]
@@ -196,6 +198,7 @@ model TenantSettings {
   moduleListings       Boolean  @default(true)
   moduleInvestorPortal Boolean  @default(false)
   moduleFacility       Boolean  @default(false)
+  moduleInventory      Boolean  @default(false)
   /// Extra nav modules per role beyond defaults, e.g. { "SALES_EXECUTIVE": ["MARKETING","FINANCE"] }
   roleModuleGrants     Json?
   orgDepartments       Json?
@@ -2477,23 +2480,26 @@ enum InventoryDamageStatus {
 }
 
 model InventoryItem {
-  id            String             @id @default(cuid())
-  tenantId      String
-  name          String
-  sku           String?
-  itemClass     InventoryItemClass
-  unitOfMeasure String             @default("pcs")
-  reorderPoint  Decimal            @default(0) @db.Decimal(14, 2)
-  isActive      Boolean            @default(true)
-  notes         String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id               String             @id @default(cuid())
+  tenantId         String
+  name             String
+  sku              String?
+  itemClass        InventoryItemClass
+  unitOfMeasure    String             @default("pcs")
+  reorderPoint     Decimal            @default(0) @db.Decimal(14, 2)
+  /// Latest known unit price (denormalized from InventoryPricePoint).
+  currentUnitPrice Decimal?           @db.Decimal(18, 2)
+  isActive         Boolean            @default(true)
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
-  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  balances   InventoryBalance[]
-  movements  InventoryMovement[]
-  assets     InventoryAsset[]
-  damages    InventoryDamage[]
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  balances    InventoryBalance[]
+  movements   InventoryMovement[]
+  assets      InventoryAsset[]
+  damages     InventoryDamage[]
+  pricePoints InventoryPricePoint[]
 
   @@index([tenantId, itemClass])
   @@index([tenantId, name])
@@ -2543,6 +2549,8 @@ model InventoryMovement {
   itemId           String
   type             InventoryMovementType
   quantity         Decimal                @db.Decimal(14, 2)
+  unitPrice        Decimal?               @db.Decimal(18, 2)
+  partyId          String?
   fromLocationId   String?
   toLocationId     String?
   projectId        String?
@@ -2552,17 +2560,20 @@ model InventoryMovement {
   recordedByLabel  String
   createdAt        DateTime               @default(now())
 
-  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  item         InventoryItem      @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  fromLocation InventoryLocation? @relation("InventoryMoveFrom", fields: [fromLocationId], references: [id], onDelete: SetNull)
-  toLocation   InventoryLocation? @relation("InventoryMoveTo", fields: [toLocationId], references: [id], onDelete: SetNull)
-  project      Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  unit         Unit?              @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item         InventoryItem       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  party        InventoryParty?     @relation(fields: [partyId], references: [id], onDelete: SetNull)
+  fromLocation InventoryLocation?  @relation("InventoryMoveFrom", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocation   InventoryLocation?  @relation("InventoryMoveTo", fields: [toLocationId], references: [id], onDelete: SetNull)
+  project      Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  unit         Unit?               @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  pricePoints  InventoryPricePoint[]
 
   @@index([tenantId, createdAt])
   @@index([tenantId, type, createdAt])
   @@index([itemId, createdAt])
   @@index([projectId])
+  @@index([partyId])
 }
 
 model InventoryAsset {
@@ -2640,4 +2651,65 @@ model InventoryDamage {
 
   @@index([tenantId, status, createdAt])
   @@index([projectId])
+}
+
+enum InventoryPartyKind {
+  SUPPLIER
+  ARTISAN
+}
+
+enum InventoryPriceSource {
+  RECEIVE
+  MANUAL
+}
+
+/// Suppliers and artisans used for materials / site work contacts.
+model InventoryParty {
+  id        String            @id @default(cuid())
+  tenantId  String
+  kind      InventoryPartyKind
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  /// e.g. Cement, Stone, Iron works
+  specialty String?
+  notes     String?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  movements   InventoryMovement[]
+  pricePoints InventoryPricePoint[]
+
+  @@index([tenantId, kind, name])
+  @@index([tenantId, isActive])
+}
+
+/// Append-only material unit-price history for reporting.
+model InventoryPricePoint {
+  id               String               @id @default(cuid())
+  tenantId         String
+  itemId           String
+  unitPrice        Decimal              @db.Decimal(18, 2)
+  currency         String               @default("NGN")
+  effectiveAt      DateTime             @default(now())
+  source           InventoryPriceSource
+  partyId          String?
+  movementId       String?
+  notes            String?
+  recordedByUserId String
+  recordedByLabel  String
+  createdAt        DateTime             @default(now())
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item     InventoryItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  party    InventoryParty?    @relation(fields: [partyId], references: [id], onDelete: SetNull)
+  movement InventoryMovement? @relation(fields: [movementId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, itemId, effectiveAt])
+  @@index([tenantId, effectiveAt])
+  @@index([partyId])
+  @@index([movementId])
 }

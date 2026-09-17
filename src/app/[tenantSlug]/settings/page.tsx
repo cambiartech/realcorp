@@ -44,6 +44,7 @@ const settingsSelect = {
   moduleShortLets: true,
   moduleHr: true,
   moduleFacility: true,
+  moduleInventory: true,
   moduleTasks: true,
   moduleClients: true,
   roleModuleGrants: true,
@@ -148,6 +149,7 @@ export default async function TenantSettingsPage({
     moduleListings: tenant.settings?.moduleListings !== false,
     moduleInvestorPortal: tenant.settings?.moduleInvestorPortal ?? false,
     moduleFacility: tenant.settings?.moduleFacility ?? false,
+    moduleInventory: tenant.settings?.moduleInventory ?? false,
   };
 
   const roleModuleGrantsJson = JSON.stringify(

@@ -15,6 +15,7 @@ const modulesOn: TenantSettingsNavSlice = {
   moduleListings: true,
   moduleInvestorPortal: true,
   moduleFacility: true,
+  moduleInventory: true,
   roleModuleGrants: null,
 };
 

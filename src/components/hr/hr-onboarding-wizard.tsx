@@ -14,6 +14,7 @@ import { UiSelect } from "@/components/ui-select";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
 import { OrgJobRoleSelect } from "@/components/org-job-role-select";
 import { PensionAdministratorField } from "@/components/pension-administrator-field";
+import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-photo-upload";
 import { useSnackbar } from "@/components/snackbar";
 import {
   notifyPrefillResult,
@@ -230,6 +231,18 @@ export function HrOnboardingWizard({
           <input type="hidden" name="pensionEnabled" value={draft.pensionEnabled} />
           <input type="hidden" name="employeePensionRate" value={draft.employeePensionRate} />
           <input type="hidden" name="employerPensionRate" value={draft.employerPensionRate} />
+          <div className="sm:col-span-2">
+            <EmployeePassportPhotoUpload
+              tenantSlug={tenantSlug}
+              userId={draft.userId}
+              fullName={draft.fullName || memberName}
+              photoUrl={draft.photoUrl}
+              compact
+            />
+            <p className="mt-1 text-[11px] text-muted">
+              HR can upload here, or the employee can add it later from My HR → My record.
+            </p>
+          </div>
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-xs font-medium">Pay template</span>
             <UiSelect

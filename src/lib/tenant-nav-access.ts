@@ -22,6 +22,7 @@ export type TenantNavKey =
   | "community"
   | "shortlets"
   | "facility"
+  | "inventory"
   | "finance"
   | "hr"
   | "team"
@@ -40,6 +41,7 @@ export type TenantSettingsNavSlice = {
   moduleWhatsApp?: boolean;
   moduleInvestorPortal?: boolean;
   moduleFacility?: boolean;
+  moduleInventory?: boolean;
   roleModuleGrants: unknown;
 };
 
@@ -60,6 +62,7 @@ const NAV_ORDER: TenantNavKey[] = [
   "community",
   "shortlets",
   "facility",
+  "inventory",
   "finance",
   "hr",
   "team",
@@ -104,6 +107,7 @@ const GRANT_TO_NAV: Record<string, TenantNavKey> = {
   HR: "hr",
   TASKS: "tasks",
   FACILITY: "facility",
+  INVENTORY: "inventory",
   CLIENTS: "clients",
 };
 
@@ -133,9 +137,9 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.FNB_STAFF:
       return ["dashboard", "shortlets", "settings"];
     case MembershipRole.FACILITY_MANAGER:
-      return ["dashboard", "projects", "facility", "tasks", "settings"];
+      return ["dashboard", "projects", "facility", "inventory", "tasks", "settings"];
     case MembershipRole.FACILITY_STAFF:
-      return ["dashboard", "facility", "tasks", "settings"];
+      return ["dashboard", "facility", "inventory", "tasks", "settings"];
     case MembershipRole.SALES_MANAGER:
       return [...SALES_STACK, "clients", "tasks", "listings", "stakeholders", "settings"];
     case MembershipRole.SALES_EXECUTIVE:
@@ -155,6 +159,7 @@ function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice):
     if (k === "community") return s.moduleCommunity;
     if (k === "shortlets") return s.moduleShortLets;
     if (k === "facility") return Boolean(s.moduleFacility);
+    if (k === "inventory") return Boolean(s.moduleInventory);
     if (k === "finance") return s.moduleFinance;
     if (k === "hr") return s.moduleHr;
     if (k === "tasks") return s.moduleTasks;
@@ -188,6 +193,7 @@ function applyRoleGrants(
     if (nav === "hr" && s.moduleHr) set.add("hr");
     if (nav === "tasks" && s.moduleTasks) set.add("tasks");
     if (nav === "facility" && s.moduleFacility) set.add("facility");
+    if (nav === "inventory" && s.moduleInventory) set.add("inventory");
     if (nav === "clients" && s.moduleClients) set.add("clients");
   }
   return NAV_ORDER.filter((k) => set.has(k));
@@ -209,6 +215,7 @@ export function normalizeSettingsNavSlice(
     moduleWhatsApp: raw?.moduleWhatsApp,
     moduleInvestorPortal: raw?.moduleInvestorPortal,
     moduleFacility: raw?.moduleFacility ?? false,
+    moduleInventory: raw?.moduleInventory ?? false,
     roleModuleGrants: raw?.roleModuleGrants ?? null,
   };
 }

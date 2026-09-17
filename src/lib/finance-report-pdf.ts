@@ -92,7 +92,7 @@ function ensureSpace(ctx: PdfCtx, needed: number) {
   if (ctx.y - needed < MARGIN) newPage(ctx);
 }
 
-function drawHeader(ctx: PdfCtx, meta: ReportExportMeta) {
+function drawHeader(ctx: PdfCtx, meta: ReportExportMeta, title = "Financial statement") {
   ctx.page.drawText(meta.companyName || "Realcorp", {
     x: MARGIN,
     y: ctx.y,
@@ -108,7 +108,7 @@ function drawHeader(ctx: PdfCtx, meta: ReportExportMeta) {
     color: MUTED,
   });
   ctx.y -= 18;
-  ctx.page.drawText("Financial statement", {
+  ctx.page.drawText(title, {
     x: MARGIN,
     y: ctx.y,
     size: 18,
@@ -352,5 +352,81 @@ export async function downloadFinanceReportPdf(meta: ReportExportMeta, data: Rep
   triggerDownload(
     new Blob([Uint8Array.from(bytes).buffer], { type: "application/pdf" }),
     `finance-statement-${reportFileSlug(meta)}-${new Date().toISOString().slice(0, 10)}.pdf`,
+  );
+}
+
+type ExpenseStatementPdfData = {
+  expenses: ExpenseRow[];
+  expenseTransactions?: Array<{
+    date: string;
+    amount: number;
+    description: string;
+    category: string;
+  }>;
+  kpis?: Pick<FinanceReportKpis, "totalExpenses">;
+};
+
+/** Department / project expense statement — spend only, no invoiced / collected / remitted. */
+export async function downloadFinanceExpenseStatementPdf(
+  meta: ReportExportMeta,
+  data: ExpenseStatementPdfData,
+) {
+  const pdf = await PDFDocument.create();
+  pdf.setTitle(`Expense statement · ${meta.scopeLabel || "All projects"}`);
+  pdf.setAuthor(meta.companyName || "Realcorp");
+  pdf.setCreator("Realcorp");
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const ctx: PdfCtx = {
+    pdf,
+    regular,
+    bold,
+    page: pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]),
+    y: PAGE_HEIGHT - MARGIN,
+  };
+
+  const totalExpenses =
+    data.kpis?.totalExpenses ??
+    data.expenses.reduce((sum, row) => sum + row.total, 0);
+  const totalCount = data.expenses.reduce((sum, row) => sum + row.count, 0);
+
+  drawHeader(ctx, meta, "Expense statement");
+
+  drawSectionTitle(ctx, "Expense summary");
+  drawTable(
+    ctx,
+    ["Total expenses", "Categories", "Transactions"],
+    [[money(meta.currency, totalExpenses), String(data.expenses.length), String(totalCount)]],
+  );
+
+  drawSectionTitle(ctx, "Expenses by category");
+  drawTable(
+    ctx,
+    ["Category", "Transactions", "Total"],
+    data.expenses.map((row) => [
+      row.category,
+      String(row.count),
+      money(meta.currency, row.total),
+    ]),
+  );
+
+  if (data.expenseTransactions?.length) {
+    drawSectionTitle(ctx, "Expense transactions");
+    drawTable(
+      ctx,
+      ["Date", "Category", "Description", "Amount"],
+      data.expenseTransactions.slice(0, 120).map((row) => [
+        row.date,
+        row.category,
+        row.description,
+        money(meta.currency, row.amount),
+      ]),
+    );
+  }
+
+  const bytes = await pdf.save();
+  triggerDownload(
+    new Blob([Uint8Array.from(bytes).buffer], { type: "application/pdf" }),
+    `expense-statement-${reportFileSlug(meta)}-${new Date().toISOString().slice(0, 10)}.pdf`,
   );
 }

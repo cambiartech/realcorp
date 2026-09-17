@@ -22,6 +22,7 @@ export function tenantModuleRevalidatePaths(
     `${base}/finance`,
     `${base}/hr`,
     `${base}/facility`,
+    `${base}/inventory`,
     `${base}/clients`,
     `${base}/portal`,
     `${base}/team`,
@@ -39,6 +40,7 @@ export function tenantModuleRevalidatePaths(
   if (changed.moduleShortLets) paths.add(`${base}/shortlets`);
   if (changed.moduleHr) paths.add(`${base}/hr`);
   if (changed.moduleFacility) paths.add(`${base}/facility`);
+  if (changed.moduleInventory) paths.add(`${base}/inventory`);
   if (changed.moduleTasks) paths.add(`${base}/tasks`);
   if (changed.moduleClients) paths.add(`${base}/clients`);
   if (changed.moduleListings) paths.add(`${base}/listings`);

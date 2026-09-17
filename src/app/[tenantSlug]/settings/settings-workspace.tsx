@@ -63,6 +63,7 @@ type SettingsWorkspaceProps = {
     moduleListings: boolean;
     moduleInvestorPortal: boolean;
     moduleFacility: boolean;
+    moduleInventory: boolean;
   };
   roleModuleGrantsJson: string;
   orgDepartments: string[];
@@ -1009,6 +1010,7 @@ const EXTRA_COLUMN_META: Record<ExtraModuleGrantToken, { title: string; subtitle
   COMMUNITY: { title: "Community", subtitle: "Community workspace" },
   FINANCE: { title: "Finance", subtitle: "Queue & invoices" },
   FACILITY: { title: "Facility", subtitle: "Stores, plant, damages" },
+  INVENTORY: { title: "Inventory", subtitle: "Catalog, suppliers, prices" },
   CLIENTS: { title: "Clients", subtitle: "Owners, balances, documents" },
 };
 
@@ -1023,8 +1025,8 @@ const ROLE_GRANT_ROW_HINT: Partial<Record<MembershipRole, string>> = {
   [MembershipRole.MARKETING_EXECUTIVE]:
     "Default: Marketing workspace (campaigns, entries, settings). Not a department lead.",
   [MembershipRole.COMMUNITY_MANAGER]: "Default: Community, Settings.",
-  [MembershipRole.FACILITY_MANAGER]: "Default: Facility, Projects, Tasks, Settings.",
-  [MembershipRole.FACILITY_STAFF]: "Default: Facility, Tasks, Settings.",
+  [MembershipRole.FACILITY_MANAGER]: "Default: Facility, Inventory, Projects, Tasks, Settings.",
+  [MembershipRole.FACILITY_STAFF]: "Default: Facility, Inventory, Tasks, Settings.",
 };
 
 function orgModuleAllowsGrant(
@@ -1034,6 +1036,7 @@ function orgModuleAllowsGrant(
     moduleCommunity: boolean;
     moduleFinance: boolean;
     moduleFacility: boolean;
+    moduleInventory: boolean;
     moduleClients: boolean;
   },
   token: ExtraModuleGrantToken,
@@ -1042,6 +1045,7 @@ function orgModuleAllowsGrant(
   if (token === "MARKETING") return modules.moduleMarketing;
   if (token === "COMMUNITY") return modules.moduleCommunity;
   if (token === "FACILITY") return modules.moduleFacility;
+  if (token === "INVENTORY") return modules.moduleInventory;
   if (token === "CLIENTS") return modules.moduleClients;
   return modules.moduleFinance;
 }
@@ -1056,6 +1060,7 @@ function RoleExtraAccessMatrix({
     moduleCommunity: boolean;
     moduleFinance: boolean;
     moduleFacility: boolean;
+    moduleInventory: boolean;
     moduleClients: boolean;
   };
   initialGrants: Partial<Record<MembershipRole, ExtraModuleGrantToken[]>>;

@@ -116,6 +116,7 @@ export default async function FacilityPage({ params }: { params: Promise<{ tenan
       tenantSlug={tenantSlug}
       canManage={canManageFacility(access)}
       canRecord={canRecordFacility(access)}
+      inventoryEnabled={Boolean(normalizeSettingsNavSlice(tenant.settings).moduleInventory)}
       items={items.map((item) => ({
         id: item.id,
         name: item.name,
