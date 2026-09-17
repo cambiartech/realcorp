@@ -366,14 +366,23 @@ type ExpenseStatementPdfData = {
   kpis?: Pick<FinanceReportKpis, "totalExpenses">;
 };
 
-/** Department / project expense statement — spend only, no invoiced / collected / remitted. */
-export async function downloadFinanceExpenseStatementPdf(
-  meta: ReportExportMeta,
-  data: ExpenseStatementPdfData,
-) {
+type ScopedTable = {
+  title: string;
+  headers: string[];
+  rows: string[][];
+};
+
+async function downloadScopedStatementPdf(input: {
+  meta: ReportExportMeta;
+  title: string;
+  filePrefix: string;
+  summaryHeaders: string[];
+  summaryRow: string[];
+  tables: ScopedTable[];
+}) {
   const pdf = await PDFDocument.create();
-  pdf.setTitle(`Expense statement · ${meta.scopeLabel || "All projects"}`);
-  pdf.setAuthor(meta.companyName || "Realcorp");
+  pdf.setTitle(`${input.title} · ${input.meta.scopeLabel || "All projects"}`);
+  pdf.setAuthor(input.meta.companyName || "Realcorp");
   pdf.setCreator("Realcorp");
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -385,48 +394,239 @@ export async function downloadFinanceExpenseStatementPdf(
     y: PAGE_HEIGHT - MARGIN,
   };
 
-  const totalExpenses =
-    data.kpis?.totalExpenses ??
-    data.expenses.reduce((sum, row) => sum + row.total, 0);
-  const totalCount = data.expenses.reduce((sum, row) => sum + row.count, 0);
-
-  drawHeader(ctx, meta, "Expense statement");
-
-  drawSectionTitle(ctx, "Expense summary");
-  drawTable(
-    ctx,
-    ["Total expenses", "Categories", "Transactions"],
-    [[money(meta.currency, totalExpenses), String(data.expenses.length), String(totalCount)]],
-  );
-
-  drawSectionTitle(ctx, "Expenses by category");
-  drawTable(
-    ctx,
-    ["Category", "Transactions", "Total"],
-    data.expenses.map((row) => [
-      row.category,
-      String(row.count),
-      money(meta.currency, row.total),
-    ]),
-  );
-
-  if (data.expenseTransactions?.length) {
-    drawSectionTitle(ctx, "Expense transactions");
-    drawTable(
-      ctx,
-      ["Date", "Category", "Description", "Amount"],
-      data.expenseTransactions.slice(0, 120).map((row) => [
-        row.date,
-        row.category,
-        row.description,
-        money(meta.currency, row.amount),
-      ]),
-    );
+  drawHeader(ctx, input.meta, input.title);
+  drawSectionTitle(ctx, "Summary");
+  drawTable(ctx, input.summaryHeaders, [input.summaryRow]);
+  for (const table of input.tables) {
+    drawSectionTitle(ctx, table.title);
+    drawTable(ctx, table.headers, table.rows);
   }
 
   const bytes = await pdf.save();
   triggerDownload(
     new Blob([Uint8Array.from(bytes).buffer], { type: "application/pdf" }),
-    `expense-statement-${reportFileSlug(meta)}-${new Date().toISOString().slice(0, 10)}.pdf`,
+    `${input.filePrefix}-${reportFileSlug(input.meta)}-${new Date().toISOString().slice(0, 10)}.pdf`,
   );
+}
+
+/** Department / project expense statement — spend only, no invoiced / collected / remitted. */
+export async function downloadFinanceExpenseStatementPdf(
+  meta: ReportExportMeta,
+  data: ExpenseStatementPdfData,
+) {
+  const totalExpenses =
+    data.kpis?.totalExpenses ??
+    data.expenses.reduce((sum, row) => sum + row.total, 0);
+  const totalCount = data.expenses.reduce((sum, row) => sum + row.count, 0);
+  const tables: ScopedTable[] = [
+    {
+      title: "Expenses by category",
+      headers: ["Category", "Transactions", "Total"],
+      rows: data.expenses.map((row) => [
+        row.category,
+        String(row.count),
+        money(meta.currency, row.total),
+      ]),
+    },
+  ];
+  if (data.expenseTransactions?.length) {
+    tables.push({
+      title: "Expense transactions",
+      headers: ["Date", "Category", "Description", "Amount"],
+      rows: data.expenseTransactions.slice(0, 120).map((row) => [
+        row.date,
+        row.category,
+        row.description,
+        money(meta.currency, row.amount),
+      ]),
+    });
+  }
+  await downloadScopedStatementPdf({
+    meta,
+    title: "Expense statement",
+    filePrefix: "expense-statement",
+    summaryHeaders: ["Total expenses", "Categories", "Transactions"],
+    summaryRow: [
+      money(meta.currency, totalExpenses),
+      String(data.expenses.length),
+      String(totalCount),
+    ],
+    tables,
+  });
+}
+
+export async function downloadFinanceIncomeStatementPdf(
+  meta: ReportExportMeta,
+  data: {
+    pnl: PnlRow[];
+    incomeByProject?: IncomeDimensionRow[];
+    incomeTransactions?: Array<{
+      date: string;
+      amount: number;
+      description: string;
+      category: string;
+    }>;
+    kpis?: Pick<FinanceReportKpis, "totalInvoiced" | "totalCollected">;
+  },
+) {
+  const invoiced =
+    data.kpis?.totalInvoiced ??
+    data.pnl.reduce((sum, row) => sum + row.invoiced, 0);
+  const collected =
+    data.kpis?.totalCollected ??
+    data.pnl.reduce((sum, row) => sum + row.collected, 0);
+  const tables: ScopedTable[] = [
+    {
+      title: "Income by month",
+      headers: ["Month", "Invoiced", "Collected"],
+      rows: data.pnl.map((row) => [
+        row.month,
+        money(meta.currency, row.invoiced),
+        money(meta.currency, row.collected),
+      ]),
+    },
+  ];
+  if (data.incomeByProject?.length) {
+    tables.push({
+      title: "Collected by project / room",
+      headers: ["Project / room", "Collected", "Deposits", "Short let", "Other"],
+      rows: data.incomeByProject.map((row) => [
+        row.label,
+        money(meta.currency, row.collected),
+        money(meta.currency, row.deposits),
+        money(meta.currency, row.shortlet),
+        money(meta.currency, row.other),
+      ]),
+    });
+  }
+  if (data.incomeTransactions?.length) {
+    tables.push({
+      title: "Collection transactions",
+      headers: ["Date", "Category", "Description", "Amount"],
+      rows: data.incomeTransactions.slice(0, 120).map((row) => [
+        row.date,
+        row.category,
+        row.description,
+        money(meta.currency, row.amount),
+      ]),
+    });
+  }
+  await downloadScopedStatementPdf({
+    meta,
+    title: "Income / collections statement",
+    filePrefix: "income-statement",
+    summaryHeaders: ["Invoiced", "Collected"],
+    summaryRow: [money(meta.currency, invoiced), money(meta.currency, collected)],
+    tables,
+  });
+}
+
+export async function downloadFinanceRemittanceStatementPdf(
+  meta: ReportExportMeta,
+  data: {
+    pnl: PnlRow[];
+    remittanceBreakdown: Array<{ label: string; count: number; total: number }>;
+    remittanceTransactions?: Array<{
+      date: string;
+      amount: number;
+      description: string;
+      category: string;
+    }>;
+    kpis?: Pick<FinanceReportKpis, "totalRemitted">;
+  },
+) {
+  const remitted =
+    data.kpis?.totalRemitted ??
+    data.remittanceBreakdown.reduce((sum, row) => sum + row.total, 0);
+  const tables: ScopedTable[] = [
+    {
+      title: "Remitted by month",
+      headers: ["Month", "Remitted"],
+      rows: data.pnl.map((row) => [
+        row.month,
+        money(meta.currency, Number(row.remitted || 0)),
+      ]),
+    },
+    {
+      title: "Remitted by client",
+      headers: ["Client", "Payments", "Total"],
+      rows: data.remittanceBreakdown.map((row) => [
+        row.label,
+        String(row.count),
+        money(meta.currency, row.total),
+      ]),
+    },
+  ];
+  if (data.remittanceTransactions?.length) {
+    tables.push({
+      title: "Remittance transactions",
+      headers: ["Date", "Client", "Description", "Amount"],
+      rows: data.remittanceTransactions.slice(0, 120).map((row) => [
+        row.date,
+        row.category,
+        row.description,
+        money(meta.currency, row.amount),
+      ]),
+    });
+  }
+  await downloadScopedStatementPdf({
+    meta,
+    title: "Remittance statement",
+    filePrefix: "remittance-statement",
+    summaryHeaders: ["Total remitted", "Clients"],
+    summaryRow: [
+      money(meta.currency, remitted),
+      String(data.remittanceBreakdown.length),
+    ],
+    tables,
+  });
+}
+
+export async function downloadFinanceReceivablesStatementPdf(
+  meta: ReportExportMeta,
+  data: {
+    receivableRows: Array<{
+      invoiceNumber: string;
+      customerName: string;
+      dueDate: string;
+      status: string;
+      balance: number;
+      overdueDays: number;
+    }>;
+    kpis?: Pick<FinanceReportKpis, "receivables" | "overdueReceivables">;
+  },
+) {
+  const open =
+    data.kpis?.receivables ??
+    data.receivableRows.reduce((sum, row) => sum + row.balance, 0);
+  const overdue =
+    data.kpis?.overdueReceivables ??
+    data.receivableRows
+      .filter((row) => row.overdueDays > 0)
+      .reduce((sum, row) => sum + row.balance, 0);
+  await downloadScopedStatementPdf({
+    meta,
+    title: "Receivables statement",
+    filePrefix: "receivables-statement",
+    summaryHeaders: ["Open receivables", "Overdue", "Open invoices"],
+    summaryRow: [
+      money(meta.currency, open),
+      money(meta.currency, overdue),
+      String(data.receivableRows.length),
+    ],
+    tables: [
+      {
+        title: "Open invoices",
+        headers: ["Invoice", "Customer", "Due", "Status", "Balance", "Overdue days"],
+        rows: data.receivableRows.slice(0, 120).map((row) => [
+          row.invoiceNumber,
+          row.customerName,
+          row.dueDate,
+          row.status,
+          money(meta.currency, row.balance),
+          String(row.overdueDays),
+        ]),
+      },
+    ],
+  });
 }

@@ -6,6 +6,7 @@ import {
   SendFinanceEmailModal,
   type FinanceEmailModalMode,
 } from "@/components/finance/send-finance-email-modal";
+import { FinanceRecordsFilterBar } from "@/components/finance/finance-records-filter-bar";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
 import Link from "next/link";
@@ -13,6 +14,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ButtonSpinner } from "@/components/button-spinner";
 import type { FinanceControls } from "@/lib/finance-controls";
+import {
+  EMPTY_FINANCE_RECORDS_FILTER,
+  filterFinanceRecords,
+  type FinanceRecordsFilterState,
+} from "@/lib/finance-records-filter";
 import { useSnackbar } from "@/components/snackbar";
 import {
   createClientRemittance,
@@ -68,7 +74,7 @@ import {
   downloadFinanceReportPackXlsx,
   downloadFinanceReportXlsx,
 } from "@/lib/finance-report-xlsx";
-import { downloadFinanceExpenseStatementPdf, downloadFinanceReportPdf } from "@/lib/finance-report-pdf";
+import { downloadFinanceExpenseStatementPdf, downloadFinanceIncomeStatementPdf, downloadFinanceReceivablesStatementPdf, downloadFinanceRemittanceStatementPdf, downloadFinanceReportPdf } from "@/lib/finance-report-pdf";
 import { vendorNamesMatch } from "@/lib/finance-vendor";
 import {
   expenseCategoryNamesMatch,
@@ -780,9 +786,9 @@ export function FinanceWorkspace({
   const [reportUnitFilter, setReportUnitFilter] = useState<string>("all");
   const [reportDepartmentFilter, setReportDepartmentFilter] =
     useState<string>("all");
-  /** Full operating statement vs department/project expense statement only. */
+  /** Full operating vs focused statements (expense / income / remittance / receivables). */
   const [reportStatementFocus, setReportStatementFocus] = useState<
-    "full" | "expenses"
+    "full" | "expenses" | "income" | "remittance" | "receivables"
   >("full");
   const [reportDrilldownMonth, setReportDrilldownMonth] = useState<
     string | null
@@ -802,6 +808,8 @@ export function FinanceWorkspace({
   const [paymentsViewTab, setPaymentsViewTab] = useState<
     "all" | "invoiced" | "direct"
   >("all");
+  const [recordsListFilter, setRecordsListFilter] =
+    useState<FinanceRecordsFilterState>({ ...EMPTY_FINANCE_RECORDS_FILTER });
   const [isCreateDirectPaymentOpen, setIsCreateDirectPaymentOpen] =
     useState(false);
   const [sendReceipt, setSendReceipt] = useState<SalesReceiptRow | null>(null);
@@ -986,6 +994,10 @@ export function FinanceWorkspace({
         | "reports";
     return "invoices";
   }, [dedicatedSlug, logFilters.recordsTab]);
+
+  useEffect(() => {
+    setRecordsListFilter({ ...EMPTY_FINANCE_RECORDS_FILTER });
+  }, [recordsTab]);
 
   useEffect(() => {
     const focus = searchParams.get("focus")?.trim();
@@ -1700,18 +1712,211 @@ export function FinanceWorkspace({
     () => salesReceipts.filter((receipt) => !receipt.voided),
     [salesReceipts],
   );
-  const invoicePager = useClientPage(invoices);
-  const receiptPager = useClientPage(liveReceipts);
-  const paymentPager = useClientPage(paymentsListFiltered, {
-    resetKey: paymentsViewTab,
-  });
-  const expensePager = useClientPage(liveExpenses);
   const liveRemittances = useMemo(
     () => remittances.filter((row) => !row.voided),
     [remittances],
   );
-  const remittancePager = useClientPage(liveRemittances);
-  const billPager = useClientPage(vendorBills);
+
+  const recordsFilterDepartments = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            ...financeOptions.departments,
+            ...invoices.map((x) => x.department),
+            ...payments.map((x) => x.department),
+            ...expenses.map((x) => x.department),
+            ...vendorBills.map((x) => x.department),
+          ].filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
+    [
+      financeOptions.departments,
+      invoices,
+      payments,
+      expenses,
+      vendorBills,
+    ],
+  );
+  const recordsFilterCategories = useMemo(
+    () =>
+      Array.from(new Set(liveExpenses.map((x) => x.category).filter(Boolean))).sort(
+        (a, b) => a.localeCompare(b),
+      ),
+    [liveExpenses],
+  );
+  const recordsFilterMethods = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            ...paymentsListFiltered.map((x) => x.method),
+            ...liveRemittances.map((x) => x.method),
+            ...financeOptions.paymentModes,
+          ].filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
+    [paymentsListFiltered, liveRemittances, financeOptions.paymentModes],
+  );
+
+  const filteredInvoiceList = useMemo(
+    () =>
+      filterFinanceRecords(invoices, recordsListFilter, (row) => ({
+        amountValue: row.amountValue,
+        dateValue: row.issuedAtValue,
+        projectId: row.projectId,
+        unitId: row.unitId,
+        department: row.department,
+        statusValue: row.statusValue,
+        statusLabel: row.status,
+        searchText: [
+          row.invoiceNumber,
+          row.title,
+          row.customerName,
+          row.projectLabel,
+          row.unitLabel,
+          row.department,
+          row.defaultEmail,
+          row.sentToEmail,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      })),
+    [invoices, recordsListFilter],
+  );
+  const filteredReceiptList = useMemo(
+    () =>
+      filterFinanceRecords(liveReceipts, recordsListFilter, (row) => ({
+        amountValue: row.amountValue,
+        dateValue: row.issuedAtValue,
+        projectId: row.projectId,
+        unitId: row.unitId,
+        method: row.paymentMode,
+        searchText: [
+          row.receiptNumber,
+          row.title,
+          row.customerName,
+          row.projectLabel,
+          row.unitLabel,
+          row.paymentMode,
+          row.depositAccount,
+          row.defaultEmail,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      })),
+    [liveReceipts, recordsListFilter],
+  );
+  const filteredPaymentList = useMemo(
+    () =>
+      filterFinanceRecords(paymentsListFiltered, recordsListFilter, (row) => ({
+        amountValue: row.amountValue,
+        dateValue: row.paidAtValue,
+        projectId: row.projectId,
+        unitId: row.unitId,
+        department: row.department,
+        method: row.method,
+        searchText: [
+          row.invoiceLabel,
+          row.method,
+          row.reference,
+          row.recordedBy,
+          row.projectLabel,
+          row.unitLabel,
+          row.department,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      })),
+    [paymentsListFiltered, recordsListFilter],
+  );
+  const filteredExpenseList = useMemo(
+    () =>
+      filterFinanceRecords(liveExpenses, recordsListFilter, (row) => ({
+        amountValue: row.amountValue,
+        dateValue: row.expenseDateValue,
+        projectId: row.projectId,
+        unitId: row.unitId,
+        department: row.department,
+        category: row.category,
+        searchText: [
+          row.category,
+          row.vendorName,
+          row.reference,
+          row.note,
+          row.projectLabel,
+          row.unitLabel,
+          row.department,
+          row.paidThroughAccount,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      })),
+    [liveExpenses, recordsListFilter],
+  );
+  const filteredRemittanceList = useMemo(
+    () =>
+      filterFinanceRecords(liveRemittances, recordsListFilter, (row) => ({
+        amountValue: row.amountValue,
+        dateValue: row.remittedAtValue,
+        projectId: row.projectId,
+        unitId: row.unitId,
+        method: row.method,
+        searchText: [
+          row.clientName,
+          row.clientEmail,
+          row.method,
+          row.reference,
+          row.note,
+          row.recordedBy,
+          row.projectLabel,
+          row.unitLabel,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      })),
+    [liveRemittances, recordsListFilter],
+  );
+  const filteredBillList = useMemo(
+    () =>
+      filterFinanceRecords(vendorBills, recordsListFilter, (row) => ({
+        amountValue: row.amountValue,
+        dateValue: row.dueDateValue || row.issuedAtValue,
+        department: row.department,
+        statusValue: row.statusValue,
+        statusLabel: row.status,
+        searchText: [
+          row.billNumber,
+          row.vendorName,
+          row.title,
+          row.department,
+          row.status,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      })),
+    [vendorBills, recordsListFilter],
+  );
+
+  const recordsFilterResetKey = `${recordsTab}:${JSON.stringify(recordsListFilter)}:${paymentsViewTab}`;
+  const invoicePager = useClientPage(filteredInvoiceList, {
+    resetKey: recordsFilterResetKey,
+  });
+  const receiptPager = useClientPage(filteredReceiptList, {
+    resetKey: recordsFilterResetKey,
+  });
+  const paymentPager = useClientPage(filteredPaymentList, {
+    resetKey: recordsFilterResetKey,
+  });
+  const expensePager = useClientPage(filteredExpenseList, {
+    resetKey: recordsFilterResetKey,
+  });
+  const remittancePager = useClientPage(filteredRemittanceList, {
+    resetKey: recordsFilterResetKey,
+  });
+  const billPager = useClientPage(filteredBillList, {
+    resetKey: recordsFilterResetKey,
+  });
   const followUpPager = useClientPage(arView.followUps);
 
   async function handleCreateBill(formData: FormData) {
@@ -2132,8 +2337,8 @@ export function FinanceWorkspace({
   async function exportScopedStatement(format: "excel" | "pdf") {
     setReportExporting(format);
     try {
+      const baseMeta = reportExportMeta();
       if (reportStatementFocus === "expenses") {
-        const baseMeta = reportExportMeta();
         const meta = {
           ...baseMeta,
           scopeLabel: `${baseMeta.scopeLabel || "All"} · Expense statement`,
@@ -2163,6 +2368,97 @@ export function FinanceWorkspace({
           await downloadFinanceReportXlsx("expenses", meta, payload);
         } else {
           await downloadFinanceExpenseStatementPdf(meta, payload);
+        }
+      } else if (reportStatementFocus === "income") {
+        const meta = {
+          ...baseMeta,
+          scopeLabel: `${baseMeta.scopeLabel || "All"} · Income statement`,
+        };
+        const incomeTransactions = [
+          ...filteredPayments.map((p) => ({
+            date: p.paidAtLabel,
+            amount: p.amountValue,
+            description: p.invoiceLabel || p.reference || "Payment",
+            category: p.isDirect ? "Direct payment" : "Invoice payment",
+          })),
+          ...filteredReceipts.map((r) => ({
+            date: r.issuedAtLabel,
+            amount: r.amountValue,
+            description: `${r.receiptNumber} · ${r.title}`,
+            category: "Sales receipt",
+          })),
+        ];
+        const payload = {
+          pnl: visiblePnlBreakdown,
+          incomeByProject: incomeByDimension,
+          incomeTransactions,
+          kpis: {
+            totalInvoiced: reportComparison.current.invoiced,
+            totalCollected: reportComparison.current.collected,
+            totalExpenses: 0,
+            totalRemitted: 0,
+            netCashflow: reportComparison.current.collected,
+            receivables: 0,
+            overdueReceivables: 0,
+          },
+        };
+        if (format === "excel") {
+          await downloadFinanceReportXlsx("income", meta, payload);
+        } else {
+          await downloadFinanceIncomeStatementPdf(meta, payload);
+        }
+      } else if (reportStatementFocus === "remittance") {
+        const meta = {
+          ...baseMeta,
+          scopeLabel: `${baseMeta.scopeLabel || "All"} · Remittance statement`,
+        };
+        const payload = {
+          pnl: visiblePnlBreakdown,
+          remittanceBreakdown: visibleRemittanceBreakdown,
+          remittanceTransactions: filteredRemittances.map((r) => ({
+            date: r.remittedAtLabel,
+            amount: r.amountValue,
+            description:
+              [r.projectLabel, r.unitLabel, r.reference].filter(Boolean).join(" · ") ||
+              "Remittance",
+            category: r.clientName,
+          })),
+          kpis: {
+            totalInvoiced: 0,
+            totalCollected: 0,
+            totalExpenses: 0,
+            totalRemitted: reportComparison.current.remitted,
+            netCashflow: -reportComparison.current.remitted,
+            receivables: 0,
+            overdueReceivables: 0,
+          },
+        };
+        if (format === "excel") {
+          await downloadFinanceReportXlsx("remittance", meta, payload);
+        } else {
+          await downloadFinanceRemittanceStatementPdf(meta, payload);
+        }
+      } else if (reportStatementFocus === "receivables") {
+        const meta = {
+          ...baseMeta,
+          scopeLabel: `${baseMeta.scopeLabel || "All"} · Receivables statement`,
+        };
+        const payload = {
+          receivableRows: openReceivableRows,
+          kpis: {
+            totalInvoiced: scopedCollections.invoicedTotal,
+            totalCollected: 0,
+            totalExpenses: 0,
+            totalRemitted: 0,
+            netCashflow: 0,
+            receivables: filteredBalanceSnapshot.receivables,
+            overdueReceivables: filteredBalanceSnapshot.overdueReceivables,
+          },
+        };
+        if (format === "excel") {
+          await downloadFinanceReportXlsx("receivables", meta, payload);
+        } else {
+          await downloadFinanceReceivablesStatementPdf(meta, payload);
         }
       } else if (format === "excel") {
         await exportReportPack();
@@ -2538,6 +2834,37 @@ export function FinanceWorkspace({
         .sort((a, b) => b.total - a.total),
     [filteredExpenses],
   );
+  const visibleRemittanceBreakdown = useMemo(
+    () =>
+      Array.from(
+        filteredRemittances.reduce((acc, row) => {
+          const key = row.clientName || "Unassigned client";
+          const current = acc.get(key) || { label: key, total: 0, count: 0 };
+          current.total += row.amountValue;
+          current.count += 1;
+          acc.set(key, current);
+          return acc;
+        }, new Map<string, { label: string; total: number; count: number }>()),
+      )
+        .map(([, v]) => v)
+        .sort((a, b) => b.total - a.total),
+    [filteredRemittances],
+  );
+  const openReceivableRows = useMemo(
+    () =>
+      filteredInvoices
+        .filter((row) => row.balanceValue > 0 && row.statusValue !== "VOID")
+        .map((row) => ({
+          invoiceNumber: row.invoiceNumber,
+          customerName: row.customerName,
+          dueDate: row.dueDateLabel,
+          status: row.status,
+          balance: row.balanceValue,
+          overdueDays: row.isOverdue ? row.overdueDays : 0,
+        }))
+        .sort((a, b) => b.overdueDays - a.overdueDays || b.balance - a.balance),
+    [filteredInvoices],
+  );
   const dimensionalPnlRows = useMemo(() => {
     const visibleMonths = new Set(visiblePnlBreakdown.map((row) => row.month));
     const monthFmt = new Intl.DateTimeFormat("en-NG", {
@@ -2859,6 +3186,23 @@ export function FinanceWorkspace({
   const expenseCatPager = useClientPage(visibleExpenseBreakdown, {
     resetKey: reportScopeKey,
   });
+  const remittanceClientPager = useClientPage(visibleRemittanceBreakdown, {
+    resetKey: reportScopeKey,
+  });
+  const receivablePager = useClientPage(openReceivableRows, {
+    resetKey: reportScopeKey,
+  });
+  const isFocusedStatement = reportStatementFocus !== "full";
+  const statementFocusLabel =
+    reportStatementFocus === "expenses"
+      ? "Expense statement"
+      : reportStatementFocus === "income"
+        ? "Income / collections"
+        : reportStatementFocus === "remittance"
+          ? "Remittance statement"
+          : reportStatementFocus === "receivables"
+            ? "Receivables statement"
+            : "Overview";
   const reportMonthLabel = useMemo(
     () => new Intl.DateTimeFormat("en-NG", { month: "short", year: "numeric" }),
     [],
@@ -3068,7 +3412,13 @@ export function FinanceWorkspace({
     const scoped =
       reportStatementFocus === "expenses"
         ? rows.filter((row) => row.id === "expenses")
-        : rows;
+        : reportStatementFocus === "income"
+          ? rows.filter((row) => row.id === "invoiced" || row.id === "collected")
+          : reportStatementFocus === "remittance"
+            ? rows.filter((row) => row.id === "remitted")
+            : reportStatementFocus === "receivables"
+              ? []
+              : rows;
     return scoped.map((row) => {
       const change = row.current - row.previous;
       const changePct =
@@ -3076,6 +3426,43 @@ export function FinanceWorkspace({
       return { ...row, change, changePct };
     });
   }, [reportComparison, reportStatementFocus]);
+
+  const receivablesComparisonCards = useMemo(() => {
+    if (reportStatementFocus !== "receivables") return [];
+    const open = filteredBalanceSnapshot.receivables;
+    const overdue = filteredBalanceSnapshot.overdueReceivables;
+    return [
+      {
+        id: "receivables",
+        label: "Open receivables",
+        current: open,
+        previous: open,
+        change: 0,
+        changePct: null as number | null,
+      },
+      {
+        id: "overdue",
+        label: "Overdue",
+        current: overdue,
+        previous: overdue,
+        change: 0,
+        changePct: null as number | null,
+      },
+      {
+        id: "invoices",
+        label: "Open invoices",
+        current: openReceivableRows.length,
+        previous: openReceivableRows.length,
+        change: 0,
+        changePct: null as number | null,
+      },
+    ];
+  }, [
+    reportStatementFocus,
+    filteredBalanceSnapshot.receivables,
+    filteredBalanceSnapshot.overdueReceivables,
+    openReceivableRows.length,
+  ]);
 
   const openPayablesTotal = useMemo(
     () =>
@@ -3870,9 +4257,89 @@ export function FinanceWorkspace({
               ) : null}
             </div>
 
+            {recordsTab === "invoices" ||
+            recordsTab === "receipts" ||
+            recordsTab === "payments" ||
+            recordsTab === "expenses" ||
+            recordsTab === "remittances" ||
+            recordsTab === "payables" ? (
+              <FinanceRecordsFilterBar
+                value={recordsListFilter}
+                onChange={setRecordsListFilter}
+                projects={allocationOptions}
+                departments={recordsFilterDepartments}
+                categories={recordsFilterCategories}
+                methods={recordsFilterMethods}
+                statuses={
+                  recordsTab === "invoices"
+                    ? [
+                        { value: "DRAFT", label: "Draft" },
+                        { value: "SENT", label: "Sent" },
+                        { value: "PARTIALLY_PAID", label: "Partially paid" },
+                        { value: "PAID", label: "Paid" },
+                        { value: "VOID", label: "Void" },
+                      ]
+                    : recordsTab === "payables"
+                      ? [
+                          { value: "OPEN", label: "Open" },
+                          { value: "PARTIAL", label: "Partial" },
+                          { value: "PAID", label: "Paid" },
+                          { value: "VOID", label: "Void" },
+                        ]
+                      : []
+                }
+                showDepartment={
+                  recordsTab === "invoices" ||
+                  recordsTab === "payments" ||
+                  recordsTab === "expenses" ||
+                  recordsTab === "payables"
+                }
+                showCategory={recordsTab === "expenses"}
+                showMethod={
+                  recordsTab === "payments" ||
+                  recordsTab === "remittances" ||
+                  recordsTab === "receipts"
+                }
+                showStatus={
+                  recordsTab === "invoices" || recordsTab === "payables"
+                }
+                showUnit={recordsTab !== "payables"}
+                resultCount={
+                  recordsTab === "invoices"
+                    ? filteredInvoiceList.length
+                    : recordsTab === "receipts"
+                      ? filteredReceiptList.length
+                      : recordsTab === "payments"
+                        ? filteredPaymentList.length
+                        : recordsTab === "expenses"
+                          ? filteredExpenseList.length
+                          : recordsTab === "remittances"
+                            ? filteredRemittanceList.length
+                            : filteredBillList.length
+                }
+                totalCount={
+                  recordsTab === "invoices"
+                    ? invoices.length
+                    : recordsTab === "receipts"
+                      ? liveReceipts.length
+                      : recordsTab === "payments"
+                        ? paymentsListFiltered.length
+                        : recordsTab === "expenses"
+                          ? liveExpenses.length
+                          : recordsTab === "remittances"
+                            ? liveRemittances.length
+                            : vendorBills.length
+                }
+              />
+            ) : null}
+
             {recordsTab === "invoices" ? (
-              invoices.length === 0 ? (
-                <p className="text-sm text-muted">No invoice records yet.</p>
+              filteredInvoiceList.length === 0 ? (
+                <p className="text-sm text-muted">
+                  {invoices.length === 0
+                    ? "No invoice records yet."
+                    : "No invoices match these filters."}
+                </p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
                   <table className="w-full text-left text-sm">
@@ -4024,8 +4491,12 @@ export function FinanceWorkspace({
                 </div>
               )
             ) : recordsTab === "receipts" ? (
-              liveReceipts.length === 0 ? (
-                <p className="text-sm text-muted">No sales receipts yet.</p>
+              filteredReceiptList.length === 0 ? (
+                <p className="text-sm text-muted">
+                  {liveReceipts.length === 0
+                    ? "No sales receipts yet."
+                    : "No sales receipts match these filters."}
+                </p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
                   <table className="w-full text-left text-sm">
@@ -4171,13 +4642,15 @@ export function FinanceWorkspace({
                     </button>
                   ))}
                 </div>
-                {paymentsListFiltered.length === 0 ? (
+                {filteredPaymentList.length === 0 ? (
                   <p className="text-sm text-muted">
-                    {paymentsViewTab === "direct"
-                      ? "No direct payments yet. Use “Record direct payment” for walk-ins, deposits, or misc. cash without an invoice."
-                      : paymentsViewTab === "invoiced"
-                        ? "No invoice-linked payments yet."
-                        : "No payment records yet."}
+                    {paymentsListFiltered.length === 0
+                      ? paymentsViewTab === "direct"
+                        ? "No direct payments yet. Use “Record direct payment” for walk-ins, deposits, or misc. cash without an invoice."
+                        : paymentsViewTab === "invoiced"
+                          ? "No invoice-linked payments yet."
+                          : "No payment records yet."
+                      : "No payments match these filters."}
                   </p>
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -4283,8 +4756,12 @@ export function FinanceWorkspace({
                 )}
               </>
             ) : recordsTab === "expenses" ? (
-              liveExpenses.length === 0 ? (
-                <p className="text-sm text-muted">No expense records yet.</p>
+              filteredExpenseList.length === 0 ? (
+                <p className="text-sm text-muted">
+                  {liveExpenses.length === 0
+                    ? "No expense records yet."
+                    : "No expenses match these filters."}
+                </p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
                   <div className="overflow-x-auto">
@@ -4423,10 +4900,11 @@ export function FinanceWorkspace({
                 </div>
               )
             ) : recordsTab === "remittances" ? (
-              liveRemittances.length === 0 ? (
+              filteredRemittanceList.length === 0 ? (
                 <p className="text-sm text-muted">
-                  No remittances recorded yet. Record an amount sent to a client
-                  — that is what they see on their dashboard.
+                  {liveRemittances.length === 0
+                    ? "No remittances recorded yet. Record an amount sent to a client — that is what they see on their dashboard."
+                    : "No remittances match these filters."}
                 </p>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -4774,10 +5252,11 @@ export function FinanceWorkspace({
                       </tbody>
                     </table>
                   </div>
-                ) : vendorBills.length === 0 ? (
+                ) : filteredBillList.length === 0 ? (
                   <p className="text-sm text-muted">
-                    No vendor bills yet. Record a bill when a supplier invoices
-                    you.
+                    {vendorBills.length === 0
+                      ? "No vendor bills yet. Record a bill when a supplier invoices you."
+                      : "No vendor bills match these filters."}
                   </p>
                 ) : (
                   <div className="overflow-hidden rounded-lg border border-foreground/10">
@@ -4932,12 +5411,10 @@ export function FinanceWorkspace({
                         Reporting scope
                       </p>
                       <p className="text-xs text-muted">
-                        Filter by project, apartment, or department. Use{" "}
-                        <strong className="font-semibold text-foreground">
-                          Expense statement only
-                        </strong>{" "}
-                        when you need spend for one department (e.g. Marketing) —
-                        without invoiced, collected, or remitted.
+                        Filter by project, apartment, or department. Pick a
+                        statement type for a focused pack — expenses, income,
+                        remittances to clients, or open receivables — without
+                        the full operating mix.
                       </p>
                     </div>
                     {reportProjectFilter !== "all" ||
@@ -4966,10 +5443,16 @@ export function FinanceWorkspace({
                       <UiSelect
                         value={reportStatementFocus}
                         onChange={(e) => {
+                          const value = e.target.value;
                           const next =
-                            e.target.value === "expenses" ? "expenses" : "full";
+                            value === "expenses" ||
+                            value === "income" ||
+                            value === "remittance" ||
+                            value === "receivables"
+                              ? value
+                              : "full";
                           setReportStatementFocus(next);
-                          if (next === "expenses") {
+                          if (next !== "full") {
                             setReportKind("overview");
                             setReportDrilldownMonth(null);
                           }
@@ -4977,6 +5460,15 @@ export function FinanceWorkspace({
                       >
                         <option value="full">Full operating statement</option>
                         <option value="expenses">Expense statement only</option>
+                        <option value="income">
+                          Income / collections only
+                        </option>
+                        <option value="remittance">
+                          Remittance statement only
+                        </option>
+                        <option value="receivables">
+                          Receivables statement only
+                        </option>
                       </UiSelect>
                     </label>
                     <label className="space-y-1">
@@ -5054,7 +5546,7 @@ export function FinanceWorkspace({
                   role="tablist"
                   aria-label="Report sections"
                 >
-                  {(reportStatementFocus === "expenses"
+                  {(isFocusedStatement
                     ? REPORT_TABS.filter((tab) => tab.id === "overview")
                     : REPORT_TABS
                   ).map((tab) => (
@@ -5074,9 +5566,7 @@ export function FinanceWorkspace({
                           : "border-transparent text-muted hover:text-foreground",
                       ].join(" ")}
                     >
-                      {reportStatementFocus === "expenses"
-                        ? "Expense statement"
-                        : tab.label}
+                      {isFocusedStatement ? statementFocusLabel : tab.label}
                     </button>
                   ))}
                 </div>
@@ -5085,22 +5575,28 @@ export function FinanceWorkspace({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">
-                        {reportStatementFocus === "expenses"
-                          ? `Expense statement · ${reportScopeLabel}`
+                        {isFocusedStatement
+                          ? `${statementFocusLabel} · ${reportScopeLabel}`
                           : `Statement for ${reportScopeLabel}`}
                       </p>
                       <p className="mt-0.5 text-xs text-muted">
                         {reportStatementFocus === "expenses"
                           ? reportDepartmentFilter !== "all"
                             ? `Spend tagged to ${reportDepartmentFilter} only — no invoiced, collected, or remitted.`
-                            : "Spend only for the selected scope — no invoiced, collected, or remitted. Pick a department above for a department expense statement."
-                          : reportUnitFilter !== "all"
-                            ? "Only invoices, collections, and expenses tagged to this apartment / unit."
-                            : reportProjectFilter !== "all"
-                              ? "Every apartment in this project is listed below. Click a row to open that unit’s statement."
-                              : reportDepartmentFilter !== "all"
-                                ? `Full operating statement for ${reportDepartmentFilter} (invoiced, collected, expenses, remitted). Switch to Expense statement only for spend alone.`
-                                : "Company-wide figures. Choose a project, apartment, or department above to pull that report."}
+                            : "Spend only for the selected scope — no invoiced, collected, or remitted."
+                          : reportStatementFocus === "income"
+                            ? "Invoiced and collected only — no expenses or remittances."
+                            : reportStatementFocus === "remittance"
+                              ? "Amounts remitted to property clients only."
+                              : reportStatementFocus === "receivables"
+                                ? "Open customer balances still owed — overdue highlighted."
+                                : reportUnitFilter !== "all"
+                                  ? "Only invoices, collections, and expenses tagged to this apartment / unit."
+                                  : reportProjectFilter !== "all"
+                                    ? "Every apartment in this project is listed below. Click a row to open that unit’s statement."
+                                    : reportDepartmentFilter !== "all"
+                                      ? `Full operating statement for ${reportDepartmentFilter}. Switch statement type for a focused pack.`
+                                      : "Company-wide figures. Choose a project, apartment, department, or statement type above."}
                       </p>
                     </div>
                     <ReportScopeExportButtons
@@ -5141,12 +5637,19 @@ export function FinanceWorkspace({
                 <div
                   className={[
                     "grid gap-3",
-                    reportStatementFocus === "expenses"
+                    reportStatementFocus === "expenses" ||
+                    reportStatementFocus === "remittance"
                       ? "md:grid-cols-1 max-w-sm"
-                      : "md:grid-cols-4",
+                      : reportStatementFocus === "income" ||
+                          reportStatementFocus === "receivables"
+                        ? "md:grid-cols-2 lg:grid-cols-3"
+                        : "md:grid-cols-4",
                   ].join(" ")}
                 >
-                  {reportComparisonCards.map((card) => (
+                  {(reportStatementFocus === "receivables"
+                    ? receivablesComparisonCards
+                    : reportComparisonCards
+                  ).map((card) => (
                     <div
                       key={card.id}
                       className="rounded-xl border border-foreground/10 bg-background p-4 shadow-sm"
@@ -5155,11 +5658,15 @@ export function FinanceWorkspace({
                         <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
                           {card.label}
                         </p>
+                        {card.changePct == null &&
+                        reportStatementFocus === "receivables" ? null : (
                         <span
                           className={[
                             "rounded-full px-2 py-0.5 text-[10px] font-semibold",
                             (
-                              card.id === "expenses"
+                              card.id === "expenses" ||
+                              card.id === "remitted" ||
+                              card.id === "overdue"
                                 ? card.change <= 0
                                 : card.change >= 0
                             )
@@ -5168,13 +5675,24 @@ export function FinanceWorkspace({
                           ].join(" ")}
                         >
                           {card.changePct == null
-                            ? "New"
+                            ? "Now"
                             : `${card.changePct >= 0 ? "+" : ""}${card.changePct.toFixed(1)}%`}
                         </span>
+                        )}
                       </div>
                       <p className="mt-3 text-xl font-semibold tracking-tight text-foreground">
-                        {reportView.currency} {card.current.toLocaleString()}
+                        {card.id === "invoices"
+                          ? card.current.toLocaleString()
+                          : `${reportView.currency} ${card.current.toLocaleString()}`}
                       </p>
+                      {reportStatementFocus === "receivables" ? (
+                        <p className="mt-2 text-xs text-muted">
+                          {card.id === "invoices"
+                            ? "Unpaid or partly paid invoices in scope"
+                            : "Outstanding balance in scope"}
+                        </p>
+                      ) : (
+                        <>
                       <p className="mt-2 text-xs text-muted">
                         Prior: {reportView.currency}{" "}
                         {card.previous.toLocaleString()}
@@ -5183,7 +5701,7 @@ export function FinanceWorkspace({
                         className={[
                           "mt-0.5 text-xs font-medium",
                           (
-                            card.id === "expenses"
+                            card.id === "expenses" || card.id === "remitted"
                               ? card.change <= 0
                               : card.change >= 0
                           )
@@ -5194,6 +5712,8 @@ export function FinanceWorkspace({
                         {card.change >= 0 ? "+" : ""}
                         {reportView.currency} {card.change.toLocaleString()}
                       </p>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -5378,6 +5898,273 @@ export function FinanceWorkspace({
                       )}
                     </div>
                   </>
+                ) : reportStatementFocus === "income" ? (
+                  <>
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            Income by month · {reportScopeLabel}
+                          </p>
+                          <p className="text-xs text-muted">
+                            Invoiced and collected only.
+                          </p>
+                        </div>
+                        <ReportScopeExportButtons
+                          exporting={reportExporting}
+                          onExcel={() => void exportScopedStatement("excel")}
+                          onPdf={() => void exportScopedStatement("pdf")}
+                        />
+                      </div>
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">Month</th>
+                              <th className="px-3 py-2">Invoiced</th>
+                              <th className="px-3 py-2">Collected</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {visiblePnlBreakdown.map((row) => (
+                              <tr key={row.month}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {row.month}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {reportView.currency}{" "}
+                                  {row.invoiced.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2 font-semibold">
+                                  {reportView.currency}{" "}
+                                  {row.collected.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                      <p className="mb-3 text-sm font-semibold text-foreground">
+                        Collected by project / room
+                      </p>
+                      {incomeByDimension.length === 0 ? (
+                        <p className="text-sm text-muted">
+                          No collections in this scope for the selected period.
+                        </p>
+                      ) : (
+                        <div className="overflow-hidden rounded-lg border border-foreground/10">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                              <tr>
+                                <th className="px-3 py-2">
+                                  {reportProjectFilter === "all"
+                                    ? "Project"
+                                    : "Apartment / room"}
+                                </th>
+                                <th className="px-3 py-2">Collected</th>
+                                <th className="px-3 py-2">Client deposits</th>
+                                <th className="px-3 py-2">Short let</th>
+                                <th className="px-3 py-2">Other</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-foreground/10">
+                              {incomePager.rows.map((row) => (
+                                <tr key={row.id}>
+                                  <td className="px-3 py-2 font-medium text-foreground">
+                                    {row.label}
+                                  </td>
+                                  <td className="px-3 py-2 font-semibold">
+                                    {reportView.currency}{" "}
+                                    {row.collected.toLocaleString()}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {reportView.currency}{" "}
+                                    {row.deposits.toLocaleString()}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {reportView.currency}{" "}
+                                    {row.shortlet.toLocaleString()}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {reportView.currency}{" "}
+                                    {row.other.toLocaleString()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <ClientTablePager
+                            page={incomePager.page}
+                            setPage={incomePager.setPage}
+                            total={incomePager.total}
+                            pageSize={incomePager.pageSize}
+                            itemLabel="projects"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : reportStatementFocus === "remittance" ? (
+                  <>
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            Remitted by month · {reportScopeLabel}
+                          </p>
+                          <p className="text-xs text-muted">
+                            Payouts to property clients only.
+                          </p>
+                        </div>
+                        <ReportScopeExportButtons
+                          exporting={reportExporting}
+                          onExcel={() => void exportScopedStatement("excel")}
+                          onPdf={() => void exportScopedStatement("pdf")}
+                        />
+                      </div>
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">Month</th>
+                              <th className="px-3 py-2">Remitted</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {visiblePnlBreakdown.map((row) => (
+                              <tr key={row.month}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {row.month}
+                                </td>
+                                <td className="px-3 py-2 font-semibold">
+                                  {reportView.currency}{" "}
+                                  {row.remitted.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                      <p className="mb-3 text-sm font-semibold text-foreground">
+                        Remitted by client
+                      </p>
+                      {visibleRemittanceBreakdown.length === 0 ? (
+                        <p className="text-sm text-muted">
+                          No remittances in this scope for the selected period.
+                        </p>
+                      ) : (
+                        <div className="overflow-hidden rounded-lg border border-foreground/10">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                              <tr>
+                                <th className="px-3 py-2">Client</th>
+                                <th className="px-3 py-2">Payments</th>
+                                <th className="px-3 py-2">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-foreground/10">
+                              {remittanceClientPager.rows.map((row) => (
+                                <tr key={row.label}>
+                                  <td className="px-3 py-2 font-medium text-foreground">
+                                    {row.label}
+                                  </td>
+                                  <td className="px-3 py-2">{row.count}</td>
+                                  <td className="px-3 py-2 font-semibold">
+                                    {reportView.currency}{" "}
+                                    {row.total.toLocaleString()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          <ClientTablePager
+                            page={remittanceClientPager.page}
+                            setPage={remittanceClientPager.setPage}
+                            total={remittanceClientPager.total}
+                            pageSize={remittanceClientPager.pageSize}
+                            itemLabel="clients"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : reportStatementFocus === "receivables" ? (
+                  <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          Open invoices · {reportScopeLabel}
+                        </p>
+                        <p className="text-xs text-muted">
+                          Balances still owed by customers in this scope.
+                        </p>
+                      </div>
+                      <ReportScopeExportButtons
+                        exporting={reportExporting}
+                        onExcel={() => void exportScopedStatement("excel")}
+                        onPdf={() => void exportScopedStatement("pdf")}
+                      />
+                    </div>
+                    {openReceivableRows.length === 0 ? (
+                      <p className="text-sm text-muted">
+                        No open receivables in this scope.
+                      </p>
+                    ) : (
+                      <div className="overflow-hidden rounded-lg border border-foreground/10">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-foreground/[0.03] text-xs uppercase tracking-wide text-muted">
+                            <tr>
+                              <th className="px-3 py-2">Invoice</th>
+                              <th className="px-3 py-2">Customer</th>
+                              <th className="px-3 py-2">Due</th>
+                              <th className="px-3 py-2">Status</th>
+                              <th className="px-3 py-2">Balance</th>
+                              <th className="px-3 py-2">Overdue</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-foreground/10">
+                            {receivablePager.rows.map((row) => (
+                              <tr key={row.invoiceNumber + row.customerName}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {row.invoiceNumber}
+                                </td>
+                                <td className="px-3 py-2">{row.customerName}</td>
+                                <td className="px-3 py-2">{row.dueDate || "—"}</td>
+                                <td className="px-3 py-2">{row.status}</td>
+                                <td className="px-3 py-2 font-semibold">
+                                  {reportView.currency}{" "}
+                                  {row.balance.toLocaleString()}
+                                </td>
+                                <td
+                                  className={[
+                                    "px-3 py-2",
+                                    row.overdueDays > 0
+                                      ? "font-semibold text-[var(--danger)]"
+                                      : "text-muted",
+                                  ].join(" ")}
+                                >
+                                  {row.overdueDays > 0
+                                    ? `${row.overdueDays}d`
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <ClientTablePager
+                          page={receivablePager.page}
+                          setPage={receivablePager.setPage}
+                          total={receivablePager.total}
+                          pageSize={receivablePager.pageSize}
+                          itemLabel="invoices"
+                        />
+                      </div>
+                    )}
+                  </div>
                 ) : (
                 <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
                   <div className="mb-3">

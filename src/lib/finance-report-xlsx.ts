@@ -16,7 +16,14 @@ import {
   type ReportMeta,
 } from "@/lib/report-xlsx-theme";
 
-export type ReportExportKind = "pnl" | "cashflow" | "expenses" | "balance";
+export type ReportExportKind =
+  | "pnl"
+  | "cashflow"
+  | "expenses"
+  | "balance"
+  | "income"
+  | "remittance"
+  | "receivables";
 
 export type ReportExportMeta = {
   companyName: string;
@@ -406,8 +413,18 @@ export async function downloadFinanceReportXlsx(
     kpis?: FinanceReportKpis;
     incomeTransactions?: TransactionRow[];
     expenseTransactions?: TransactionRow[];
+    remittanceTransactions?: TransactionRow[];
     incomeByProject?: IncomeDimensionRow[];
     clientBalances?: ClientBalanceRow[];
+    remittanceBreakdown?: Array<{ label: string; count: number; total: number }>;
+    receivableRows?: Array<{
+      invoiceNumber: string;
+      customerName: string;
+      dueDate: string;
+      status: string;
+      balance: number;
+      overdueDays: number;
+    }>;
   },
 ) {
   const workbook = createWorkbook();
@@ -452,6 +469,105 @@ export async function downloadFinanceReportXlsx(
     addExpensesSheet(workbook.addWorksheet("Expenses"), meta, data.expenses || []);
     if (data.expenseTransactions?.length) {
       addTransactionsSheet(workbook.addWorksheet("Transactions"), meta, [], data.expenseTransactions);
+    }
+  }
+  if (kind === "income") {
+    addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
+      pnl: data.pnl || [],
+      expenses: [],
+      kpis: data.kpis,
+    });
+    addPnlSheet(workbook.addWorksheet("Income by month"), meta, data.pnl || []);
+    if (data.incomeByProject?.length) {
+      addIncomeByProjectSheet(
+        workbook.addWorksheet("Income by project"),
+        meta,
+        data.incomeByProject,
+      );
+    }
+    if (data.incomeTransactions?.length) {
+      addTransactionsSheet(
+        workbook.addWorksheet("Collections"),
+        meta,
+        data.incomeTransactions,
+        [],
+      );
+    }
+  }
+  if (kind === "remittance") {
+    const remitted = data.kpis?.totalRemitted ?? 0;
+    addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
+      pnl: data.pnl || [],
+      expenses: [],
+      kpis: {
+        totalInvoiced: 0,
+        totalCollected: 0,
+        totalExpenses: 0,
+        totalRemitted: remitted,
+        netCashflow: -remitted,
+        receivables: 0,
+        overdueReceivables: 0,
+        ...(data.kpis || {}),
+      },
+    });
+    {
+      const sheet = workbook.addWorksheet("By client");
+      addReportBanner(sheet, metaToReport(meta, "Remittance by client"), 4);
+      const header = sheet.addRow(["Client", "Payments", "Total remitted"]);
+      styleHeaderRow(header);
+      (data.remittanceBreakdown || []).forEach((row, idx) => {
+        const excelRow = sheet.addRow([row.label, row.count, row.total]);
+        excelRow.getCell(3).numFmt = moneyFormat(meta.currency);
+        if (idx % 2 === 1)
+          excelRow.eachCell((c) => {
+            c.fill = solidFill(REPORT_THEME.stripe);
+          });
+      });
+      autoWidth(sheet);
+    }
+    if (data.remittanceTransactions?.length) {
+      addTransactionsSheet(
+        workbook.addWorksheet("Transactions"),
+        meta,
+        [],
+        data.remittanceTransactions,
+      );
+    }
+  }
+  if (kind === "receivables") {
+    addFinanceSummarySheet(workbook.addWorksheet("Summary"), meta, {
+      pnl: [],
+      expenses: [],
+      kpis: data.kpis,
+    });
+    {
+      const sheet = workbook.addWorksheet("Open invoices");
+      addReportBanner(sheet, metaToReport(meta, "Receivables"), 6);
+      const header = sheet.addRow([
+        "Invoice",
+        "Customer",
+        "Due date",
+        "Status",
+        "Balance",
+        "Overdue days",
+      ]);
+      styleHeaderRow(header);
+      (data.receivableRows || []).forEach((row, idx) => {
+        const excelRow = sheet.addRow([
+          row.invoiceNumber,
+          row.customerName,
+          row.dueDate,
+          row.status,
+          row.balance,
+          row.overdueDays,
+        ]);
+        excelRow.getCell(5).numFmt = moneyFormat(meta.currency);
+        if (idx % 2 === 1)
+          excelRow.eachCell((c) => {
+            c.fill = solidFill(REPORT_THEME.stripe);
+          });
+      });
+      autoWidth(sheet);
     }
   }
   if (kind === "balance") {
