@@ -140,6 +140,17 @@ export function HrPeopleSettingsWorkspace({
       <p className="mt-2 max-w-2xl text-sm text-muted">
         Defaults for this organization. Change a person only when they need an exception.
       </p>
+      <p className="mt-3 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3 text-sm text-muted">
+        Leave days and pay (annual, maternity, sick, etc.) are set per organization under{" "}
+        <Link href={`/${tenantSlug}/hr/leave`} className="font-semibold text-foreground underline">
+          Leave tracker → Leave policies → Edit policy
+        </Link>
+        . Each tenant keeps its own rules — you do not need us to change them. Use{" "}
+        <Link href={`/${tenantSlug}/hr/leave`} className="font-semibold text-foreground underline">
+          Leave balances
+        </Link>{" "}
+        to add or deduct for one person.
+      </p>
 
       <div className="mt-6">
         <UiTabs tabs={TABS} value={tab} onChange={setTab} aria-label="People settings" />

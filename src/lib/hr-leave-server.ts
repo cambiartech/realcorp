@@ -59,10 +59,11 @@ export async function ensureDefaultLeaveTypes(tenantId: string, countryCode: str
             countryCode: "NG",
             dayUnit: "CALENDAR_DAYS" as const,
             accrualMethod: "ANNUAL_GRANT" as const,
-            annualEntitlement: 90,
+            annualEntitlement: 84,
             paidPercentage: 100,
             minimumServiceMonths: 0,
-            statutoryReference: "Organization policy (Labour Act s.54 floor is 12 weeks at 50% pay)",
+            statutoryReference:
+              "Organization policy: 12 weeks (84 calendar days) at full pay (Labour Act s.54 floor is 12 weeks at 50%)",
           },
         ]
       : []),
@@ -100,15 +101,19 @@ export async function ensureDefaultLeaveTypes(tenantId: string, countryCode: str
       },
     });
   }
+  // One-time: earlier seed used 90 days; org policy is 12 weeks (84) at full pay.
+  // After this, each tenant edits their own rules under Leave policies — we do not overwrite custom values.
   const maternityFloor = existing.find((row) => row.code === "MATERNITY-NG");
-  if (maternityFloor && Number(maternityFloor.annualEntitlement) === 84) {
+  if (maternityFloor && Number(maternityFloor.annualEntitlement) === 90) {
     await prisma.hrLeaveType.update({
       where: { id: maternityFloor.id },
       data: {
-        annualEntitlement: 90,
+        annualEntitlement: 84,
         paidPercentage: 100,
         minimumServiceMonths: 0,
-        statutoryReference: "Organization policy (Labour Act s.54 floor is 12 weeks at 50% pay)",
+        dayUnit: "CALENDAR_DAYS",
+        statutoryReference:
+          "Organization policy: 12 weeks (84 calendar days) at full pay (Labour Act s.54 floor is 12 weeks at 50%)",
         lastReviewedAt: now,
       },
     });
@@ -205,4 +210,162 @@ export async function loadLeaveBalanceSummaries(input: {
       available,
     };
   });
+}
+
+/** Roster of every active employee with leave remaining for the year (HR leave balances table). */
+export async function loadLeaveEmployeeRoster(input: {
+  tenantId: string;
+  payrollCountryCode: string;
+  year: number;
+  asOf?: Date;
+}) {
+  const asOf = input.asOf ?? new Date();
+  const startOfYear = new Date(Date.UTC(input.year, 0, 1));
+  const endOfYear = new Date(Date.UTC(input.year + 1, 0, 1));
+
+  const [employees, leaveTypes] = await Promise.all([
+    prisma.employeeProfile.findMany({
+      where: { tenantId: input.tenantId, status: "ACTIVE" },
+      select: {
+        id: true,
+        fullName: true,
+        department: true,
+        payrollCountryCode: true,
+        dateOfJoining: true,
+      },
+      orderBy: { fullName: "asc" },
+      take: 500,
+    }),
+    prisma.hrLeaveType.findMany({
+      where: {
+        tenantId: input.tenantId,
+        isActive: true,
+        OR: [{ countryCode: null }, { countryCode: input.payrollCountryCode }],
+      },
+      orderBy: [{ countryCode: "desc" }, { name: "asc" }],
+    }),
+  ]);
+
+  if (!employees.length || !leaveTypes.length) {
+    return { leaveTypes, rows: [] as Array<{
+      employeeProfileId: string;
+      name: string;
+      department: string;
+      balances: Array<{
+        leaveTypeId: string;
+        name: string;
+        dayUnit: string;
+        available: number | null;
+        unlimited: boolean;
+        adjustment: number;
+        approved: number;
+        pending: number;
+      }>;
+      requestCount: number;
+    }> };
+  }
+
+  const employeeIds = employees.map((e) => e.id);
+  const typeIds = leaveTypes.map((t) => t.id);
+
+  const [requests, balances] = await Promise.all([
+    prisma.hrLeaveRequest.findMany({
+      where: {
+        tenantId: input.tenantId,
+        employeeProfileId: { in: employeeIds },
+        leaveTypeId: { in: typeIds },
+        startDate: { gte: startOfYear, lt: endOfYear },
+        status: { in: [HrLeaveRequestStatus.PENDING, HrLeaveRequestStatus.APPROVED] },
+      },
+      select: {
+        employeeProfileId: true,
+        leaveTypeId: true,
+        status: true,
+        requestedUnits: true,
+      },
+    }),
+    prisma.hrLeaveBalance.findMany({
+      where: {
+        tenantId: input.tenantId,
+        employeeProfileId: { in: employeeIds },
+        leaveTypeId: { in: typeIds },
+        year: input.year,
+      },
+    }),
+  ]);
+
+  const requestCountByEmployee = new Map<string, number>();
+  for (const request of requests) {
+    requestCountByEmployee.set(
+      request.employeeProfileId,
+      (requestCountByEmployee.get(request.employeeProfileId) || 0) + 1,
+    );
+  }
+
+  const rows = employees.map((employee) => {
+    const country = employee.payrollCountryCode || input.payrollCountryCode;
+    const applicableTypes = leaveTypes.filter(
+      (type) => !type.countryCode || type.countryCode === country,
+    );
+    const balancesForEmployee = applicableTypes.map((type) => {
+      const approved = requests
+        .filter(
+          (r) =>
+            r.employeeProfileId === employee.id &&
+            r.leaveTypeId === type.id &&
+            r.status === HrLeaveRequestStatus.APPROVED,
+        )
+        .reduce((sum, r) => sum + Number(r.requestedUnits), 0);
+      const pending = requests
+        .filter(
+          (r) =>
+            r.employeeProfileId === employee.id &&
+            r.leaveTypeId === type.id &&
+            r.status === HrLeaveRequestStatus.PENDING,
+        )
+        .reduce((sum, r) => sum + Number(r.requestedUnits), 0);
+      const balance = balances.find(
+        (b) => b.employeeProfileId === employee.id && b.leaveTypeId === type.id,
+      );
+      const accrued = accruedLeaveEntitlement({
+        policy: {
+          annualEntitlement: Number(type.annualEntitlement),
+          accrualMethod: type.accrualMethod as LeaveAccrualMethod,
+          minimumServiceMonths: type.minimumServiceMonths,
+          unlimited: type.unlimited,
+        },
+        dateOfJoining: employee.dateOfJoining,
+        asOf,
+        year: input.year,
+      });
+      const available = availableLeaveUnits({
+        accrued,
+        carried: Number(balance?.carriedUnits ?? 0),
+        adjustment: Number(balance?.adjustmentUnits ?? 0),
+        approved,
+        pending,
+        unlimited: type.unlimited,
+      });
+      return {
+        leaveTypeId: type.id,
+        name: type.name,
+        dayUnit: type.dayUnit,
+        available: Number.isFinite(available) ? available : null,
+        unlimited: type.unlimited,
+        adjustment: Number(balance?.adjustmentUnits ?? 0),
+        approved,
+        pending,
+      };
+    });
+
+    return {
+      employeeProfileId: employee.id,
+      name: employee.fullName || "Employee",
+      department: employee.department || "",
+      balances: balancesForEmployee,
+      requestCount: requestCountByEmployee.get(employee.id) || 0,
+    };
+  });
+
+  return { leaveTypes, rows };
 }

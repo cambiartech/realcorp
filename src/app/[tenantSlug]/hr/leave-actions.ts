@@ -552,6 +552,223 @@ export async function adjustLeaveBalance(
   return { ok: true };
 }
 
+/** Set annual leave to 22 for everyone and clear test adjustments / leave requests for the year. */
+export async function resetAnnualLeaveToTwentyTwo(
+  tenantSlug: string,
+): Promise<{ ok: true; clearedRequests: number } | { ok: false; error: string }> {
+  const ctx = await leaveContext(tenantSlug);
+  if (!ctx.ok) return { ok: false, error: ctx.error };
+  if (!canManageHr(Boolean(ctx.session.user.isPlatformAdmin), ctx.membership)) {
+    return { ok: false, error: "You do not have permission to reset leave." };
+  }
+
+  const year = new Date().getUTCFullYear();
+  const countryCode = ctx.tenant.settings?.payrollCountryCode || "NG";
+  await ensureDefaultLeaveTypes(ctx.tenant.id, countryCode);
+
+  const annualType = await prisma.hrLeaveType.findFirst({
+    where: {
+      tenantId: ctx.tenant.id,
+      isActive: true,
+      OR: [{ code: "ANNUAL-NG" }, { name: { equals: "Annual leave", mode: "insensitive" } }],
+    },
+    orderBy: { code: "asc" },
+  });
+  if (!annualType) {
+    return { ok: false, error: "Annual leave policy was not found. Create it under Leave policies first." };
+  }
+
+  await prisma.hrLeaveType.update({
+    where: { id: annualType.id },
+    data: {
+      annualEntitlement: 22,
+      dayUnit: HrLeaveDayUnit.WORKING_DAYS,
+      accrualMethod: HrLeaveAccrualMethod.ANNUAL_GRANT,
+      unlimited: false,
+      minimumServiceMonths: 0,
+      paidPercentage: 100,
+      lastReviewedAt: new Date(),
+      statutoryReference:
+        annualType.statutoryReference ||
+        "Organization policy (Labour Act s.18 floor is 6 working days after 12 months)",
+    },
+  });
+
+  await prisma.hrLeaveBalance.updateMany({
+    where: {
+      tenantId: ctx.tenant.id,
+      leaveTypeId: annualType.id,
+      year,
+    },
+    data: {
+      adjustmentUnits: 0,
+      adjustmentReason: "Reset to 22-day annual leave (cleared test adjustments)",
+      adjustedByUserId: ctx.session.user.id,
+      adjustedByLabel: ctx.session.user.name || ctx.session.user.email || "HR",
+      carriedUnits: 0,
+    },
+  });
+
+  const cleared = await prisma.hrLeaveRequest.updateMany({
+    where: {
+      tenantId: ctx.tenant.id,
+      leaveTypeId: annualType.id,
+      startDate: {
+        gte: new Date(Date.UTC(year, 0, 1)),
+        lt: new Date(Date.UTC(year + 1, 0, 1)),
+      },
+      status: { in: [HrLeaveRequestStatus.PENDING, HrLeaveRequestStatus.APPROVED] },
+    },
+    data: {
+      status: HrLeaveRequestStatus.CANCELLED,
+      cancelledAt: new Date(),
+      reviewNote: "Cleared during annual leave reset to 22 days",
+      reviewedAt: new Date(),
+      reviewedByUserId: ctx.session.user.id,
+      reviewedByLabel: ctx.session.user.name || ctx.session.user.email || "HR",
+    },
+  });
+
+  await writeAuditLog({
+    tenantId: ctx.tenant.id,
+    actorUserId: ctx.session.user.id,
+    actorLabel: ctx.session.user.name || ctx.session.user.email,
+    module: "HR",
+    entityType: "LEAVE_TYPE",
+    entityId: annualType.id,
+    action: "RESET",
+    summary: `Reset annual leave to 22 working days for ${year}; cleared ${cleared.count} request(s) and adjustments.`,
+  });
+  revalidateLeave(tenantSlug);
+  return { ok: true, clearedRequests: cleared.count };
+}
+
+export async function getEmployeeLeaveDetail(
+  tenantSlug: string,
+  employeeProfileId: string,
+  year?: number,
+): Promise<
+  | {
+      ok: true;
+      employee: { id: string; name: string; department: string };
+      year: number;
+      balances: Array<{
+        leaveTypeId: string;
+        name: string;
+        dayUnit: string;
+        statutoryReference: string;
+        accrued: number | null;
+        carried: number;
+        adjustment: number;
+        approved: number;
+        pending: number;
+        available: number | null;
+        unlimited: boolean;
+      }>;
+      history: Array<{
+        id: string;
+        leaveTypeName: string;
+        dayUnit: string;
+        startDate: string;
+        endDate: string;
+        requestedUnits: number;
+        reason: string;
+        status: string;
+        reviewedByLabel: string;
+        reviewNote: string;
+        createdAt: string;
+      }>;
+    }
+  | { ok: false; error: string }
+> {
+  const ctx = await leaveContext(tenantSlug);
+  if (!ctx.ok) return { ok: false, error: ctx.error };
+  if (!canManageHr(Boolean(ctx.session.user.isPlatformAdmin), ctx.membership)) {
+    return { ok: false, error: "You do not have permission to view leave balances." };
+  }
+  const profile = await prisma.employeeProfile.findFirst({
+    where: { id: employeeProfileId, tenantId: ctx.tenant.id },
+    select: {
+      id: true,
+      fullName: true,
+      department: true,
+      payrollCountryCode: true,
+      dateOfJoining: true,
+    },
+  });
+  if (!profile) return { ok: false, error: "Employee not found." };
+
+  const targetYear = year && year >= 2020 && year <= 2100 ? year : new Date().getUTCFullYear();
+  const countryCode =
+    profile.payrollCountryCode || ctx.tenant.settings?.payrollCountryCode || "NG";
+  const dateFmt = new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+  const [summaries, historyRows] = await Promise.all([
+    loadLeaveBalanceSummaries({
+      tenantId: ctx.tenant.id,
+      employeeProfileId: profile.id,
+      payrollCountryCode: countryCode,
+      department: profile.department,
+      dateOfJoining: profile.dateOfJoining,
+      year: targetYear,
+    }),
+    prisma.hrLeaveRequest.findMany({
+      where: {
+        tenantId: ctx.tenant.id,
+        employeeProfileId: profile.id,
+        startDate: {
+          gte: new Date(Date.UTC(targetYear, 0, 1)),
+          lt: new Date(Date.UTC(targetYear + 1, 0, 1)),
+        },
+      },
+      include: { leaveType: { select: { name: true, dayUnit: true } } },
+      orderBy: { startDate: "desc" },
+      take: 100,
+    }),
+  ]);
+
+  return {
+    ok: true,
+    employee: {
+      id: profile.id,
+      name: profile.fullName || "Employee",
+      department: profile.department || "",
+    },
+    year: targetYear,
+    balances: summaries.map((balance) => ({
+      leaveTypeId: balance.leaveType.id,
+      name: balance.leaveType.name,
+      dayUnit: balance.leaveType.dayUnit,
+      statutoryReference: balance.leaveType.statutoryReference || "",
+      accrued: Number.isFinite(balance.accrued) ? balance.accrued : null,
+      carried: balance.carried,
+      adjustment: balance.adjustment,
+      approved: balance.approved,
+      pending: balance.pending,
+      available: Number.isFinite(balance.available) ? balance.available : null,
+      unlimited: balance.leaveType.unlimited,
+    })),
+    history: historyRows.map((request) => ({
+      id: request.id,
+      leaveTypeName: request.leaveType.name,
+      dayUnit: request.leaveType.dayUnit,
+      startDate: dateFmt.format(request.startDate),
+      endDate: dateFmt.format(request.endDate),
+      requestedUnits: Number(request.requestedUnits),
+      reason: request.reason || "",
+      status: request.status,
+      reviewedByLabel: request.reviewedByLabel || "",
+      reviewNote: request.reviewNote || "",
+      createdAt: dateFmt.format(request.createdAt),
+    })),
+  };
+}
+
 export async function saveLeaveHoliday(
   tenantSlug: string,
   input: { date: string; name: string; countryCode?: string; regionCode?: string },

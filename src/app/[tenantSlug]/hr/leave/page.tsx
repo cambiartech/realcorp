@@ -6,6 +6,7 @@ import { canManageHr, canViewHrModule } from "@/lib/hr-access";
 import {
   ensureDefaultLeaveTypes,
   loadLeaveBalanceSummaries,
+  loadLeaveEmployeeRoster,
 } from "@/lib/hr-leave-server";
 import { redirectToLogin } from "@/lib/login-redirect";
 import { paginate, parsePage } from "@/lib/pagination";
@@ -28,6 +29,7 @@ function dateLabel(date: Date) {
 
 function requestRow(request: {
   id: string;
+  employeeProfileId?: string;
   startDate: Date;
   endDate: Date;
   requestedUnits: unknown;
@@ -42,6 +44,7 @@ function requestRow(request: {
 }) {
   return {
     id: request.id,
+    employeeProfileId: request.employeeProfileId || "",
     employeeName: request.profile.fullName || "Employee",
     department: request.profile.department || "",
     leaveTypeName: request.leaveType.name,
@@ -130,7 +133,7 @@ export default async function HrLeavePage({
     const teamWhere = { tenantId: tenant.id };
     const teamTotal = canManage ? await prisma.hrLeaveRequest.count({ where: teamWhere }) : 0;
     const pagination = paginate(teamTotal, requestedPage, 25);
-    const [myRequestRows, teamRequestRows, policies, employees, pendingTeamCount, holidays] =
+    const [myRequestRows, teamRequestRows, policies, employees, pendingTeamCount, holidays, leaveRoster] =
       await Promise.all([
         profile
           ? prisma.hrLeaveRequest.findMany({
@@ -162,7 +165,7 @@ export default async function HrLeavePage({
         canManage
           ? prisma.employeeProfile.findMany({
               where: { tenantId: tenant.id, status: EmployeeProfileStatus.ACTIVE },
-              select: { id: true, fullName: true },
+              select: { id: true, fullName: true, department: true },
               orderBy: { fullName: "asc" },
               take: 500,
             })
@@ -184,6 +187,13 @@ export default async function HrLeavePage({
               orderBy: { date: "asc" },
             })
           : Promise.resolve([]),
+        canManage
+          ? loadLeaveEmployeeRoster({
+              tenantId: tenant.id,
+              payrollCountryCode: countryCode,
+              year,
+            })
+          : Promise.resolve({ leaveTypes: [], rows: [] }),
       ]);
 
     return (
@@ -239,6 +249,23 @@ export default async function HrLeavePage({
           employeeOptions={employees.map((employee) => ({
             id: employee.id,
             name: employee.fullName || "Employee",
+            department: employee.department || "",
+          }))}
+          leaveRoster={leaveRoster.rows.map((row) => ({
+            employeeProfileId: row.employeeProfileId,
+            name: row.name,
+            department: row.department,
+            requestCount: row.requestCount,
+            balances: row.balances.map((b) => ({
+              leaveTypeId: b.leaveTypeId,
+              name: b.name,
+              dayUnit: b.dayUnit,
+              available: b.available,
+              unlimited: b.unlimited,
+              adjustment: b.adjustment,
+              approved: b.approved,
+              pending: b.pending,
+            })),
           }))}
           pendingTeamCount={pendingTeamCount}
         />
