@@ -10,6 +10,53 @@ export type LeavePolicyInput = {
 
 const DAY_MS = 86_400_000;
 
+/** Normalize profile gender for leave eligibility checks. */
+export function normalizeGender(value?: string | null) {
+  const raw = (value || "").trim().toLowerCase();
+  if (raw === "male" || raw === "m" || raw === "man" || raw === "boy") return "Male";
+  if (raw === "female" || raw === "f" || raw === "woman" || raw === "girl") return "Female";
+  if (!raw) return "";
+  return (value || "").trim();
+}
+
+export function isMaternityLeaveType(type: { code?: string | null; name?: string | null; statutoryReference?: string | null }) {
+  const blob = `${type.code || ""} ${type.name || ""} ${type.statutoryReference || ""}`.toLowerCase();
+  return (
+    blob.includes("maternity") ||
+    blob.includes("mat leave") ||
+    /\bmat\b/.test(blob) ||
+    blob.includes("confinement") ||
+    blob.includes("childbirth leave")
+  );
+}
+
+export function isPaternityLeaveType(type: { code?: string | null; name?: string | null; statutoryReference?: string | null }) {
+  const blob = `${type.code || ""} ${type.name || ""} ${type.statutoryReference || ""}`.toLowerCase();
+  return blob.includes("paternity") || blob.includes("pat leave") || /\bpat\b/.test(blob);
+}
+
+/**
+ * Maternity is female-only; paternity is male-only.
+ * If gender is blank, sex-specific policies are hidden so men without a gender set cannot request maternity.
+ */
+export function leaveTypeEligibleForGender(
+  type: { code?: string | null; name?: string | null; statutoryReference?: string | null },
+  gender?: string | null,
+) {
+  const g = normalizeGender(gender);
+  if (isMaternityLeaveType(type)) return g === "Female";
+  if (isPaternityLeaveType(type)) return g === "Male";
+  return true;
+}
+
+/** Drop sex-specific policies that do not match this employee’s gender (e.g. hide maternity for males). */
+export function filterLeaveTypesForGender<T extends { code?: string | null; name?: string | null; statutoryReference?: string | null }>(
+  types: T[],
+  gender?: string | null,
+) {
+  return types.filter((type) => leaveTypeEligibleForGender(type, gender));
+}
+
 export function parseLeaveDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Enter a valid leave date.");
   const date = new Date(`${value}T00:00:00.000Z`);

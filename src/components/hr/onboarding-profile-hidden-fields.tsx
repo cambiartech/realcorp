@@ -15,6 +15,7 @@ export function OnboardingProfileHiddenFields({
       <input type="hidden" name="status" value={status} />
       <input type="hidden" name="fullName" value={draft.fullName} />
       <input type="hidden" name="employeeNumber" value={draft.employeeNumber} />
+      <input type="hidden" name="gender" value={draft.gender} />
       <input type="hidden" name="position" value={draft.position} />
       <input type="hidden" name="department" value={draft.department} />
       <input type="hidden" name="dateOfJoining" value={draft.dateOfJoining} />
@@ -25,6 +26,10 @@ export function OnboardingProfileHiddenFields({
       <input type="hidden" name="phoneMobile" value={draft.phoneMobile} />
       <input type="hidden" name="workEmail" value={draft.workEmail} />
       <input type="hidden" name="grossMonthly" value={draft.grossMonthly} />
+      <input type="hidden" name="payrollCountryCode" value={draft.payrollCountryCode} />
+      <input type="hidden" name="pensionEnabled" value={draft.pensionEnabled} />
+      <input type="hidden" name="employeePensionRate" value={draft.employeePensionRate} />
+      <input type="hidden" name="employerPensionRate" value={draft.employerPensionRate} />
       {draft.payeeTaxMonthly && draft.taxOverrideReason ? (
         <>
           <input type="hidden" name="payeeTaxMonthly" value={draft.payeeTaxMonthly} />

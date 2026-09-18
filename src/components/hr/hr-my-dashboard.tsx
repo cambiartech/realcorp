@@ -23,6 +23,7 @@ import {
   getLeaveUploadSignature,
   requestLeave,
 } from "@/app/[tenantSlug]/hr/leave-actions";
+import { filterLeaveTypesForGender } from "@/lib/hr-leave";
 import { AppraisalRatingSelect } from "@/components/hr/appraisal-rating-select";
 import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { ButtonSpinner } from "@/components/button-spinner";
@@ -239,7 +240,11 @@ export function HrMyDashboard({
   const [showLeaveRequest, setShowLeaveRequest] = useState(false);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const router = useRouter();
-  const leaveBalances = myView.leaveBalances ?? [];
+  const profile = myView.profile;
+  const leaveBalances = useMemo(
+    () => filterLeaveTypesForGender(myView.leaveBalances ?? [], profile?.gender),
+    [myView.leaveBalances, profile?.gender],
+  );
   const leaveRequests = myView.leaveRequests ?? [];
 
   useEffect(() => {
@@ -268,8 +273,6 @@ export function HrMyDashboard({
       setArchiveMonth(monthsForYear[monthsForYear.length - 1]);
     }
   }, [monthsForYear, archiveMonth]);
-
-  const profile = myView.profile;
 
   const openAppraisals = myView.appraisals.filter(
     (a) => a.cycleStatus === "OPEN" && a.statusValue !== "REVIEWED",

@@ -26,6 +26,7 @@ import { ensureEmployeeProfileForMember } from "@/lib/hr-profile-ensure";
 import { ensureDefaultAppraisalCriteria } from "@/app/[tenantSlug]/hr/actions";
 import { loadHrOnboardingStatusForUser } from "@/lib/hr-pending-forms";
 import { ensureDefaultLeaveTypes, loadLeaveBalanceSummaries } from "@/lib/hr-leave-server";
+import { leaveTypeEligibleForGender } from "@/lib/hr-leave";
 import type { PerformanceGoalRow } from "@/lib/hr-goals-by-department";
 import type { YearlyArchiveEntry } from "@/components/hr/yearly-appraisal-archive";
 import { brandingFromSettings } from "@/lib/tenant-branding";
@@ -568,6 +569,7 @@ export default async function HrQueuePage({
           payrollCountryCode: countryCode,
           department: myProfile.department,
           dateOfJoining: myProfile.dateOfJoining,
+          gender: myProfile.gender,
           year: leaveYear,
         }),
         prisma.hrLeaveRequest.findMany({
@@ -577,19 +579,26 @@ export default async function HrQueuePage({
           take: 20,
         }),
       ]);
-      myLeaveBalances = summaries.map((balance) => ({
-        leaveTypeId: balance.leaveType.id,
-        name: balance.leaveType.name,
-        dayUnit: balance.leaveType.dayUnit,
-        statutoryReference: balance.leaveType.statutoryReference || "",
-        accrued: Number.isFinite(balance.accrued) ? balance.accrued : null,
-        carried: balance.carried,
-        adjustment: balance.adjustment,
-        approved: balance.approved,
-        pending: balance.pending,
-        available: Number.isFinite(balance.available) ? balance.available : null,
-        unlimited: balance.leaveType.unlimited,
-      }));
+      myLeaveBalances = summaries
+        .map((balance) => ({
+          leaveTypeId: balance.leaveType.id,
+          name: balance.leaveType.name,
+          dayUnit: balance.leaveType.dayUnit,
+          statutoryReference: balance.leaveType.statutoryReference || "",
+          accrued: Number.isFinite(balance.accrued) ? balance.accrued : null,
+          carried: balance.carried,
+          adjustment: balance.adjustment,
+          approved: balance.approved,
+          pending: balance.pending,
+          available: Number.isFinite(balance.available) ? balance.available : null,
+          unlimited: balance.leaveType.unlimited,
+        }))
+        .filter((balance) =>
+          leaveTypeEligibleForGender(
+            { code: "", name: balance.name, statutoryReference: balance.statutoryReference },
+            myProfile.gender,
+          ),
+        );
       myLeaveRequests = requestRows.map((request) => ({
         id: request.id,
         leaveTypeName: request.leaveType.name,

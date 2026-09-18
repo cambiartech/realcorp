@@ -19,6 +19,7 @@ import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
 import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
+import { filterLeaveTypesForGender } from "@/lib/hr-leave";
 import { ArrowLeft, CalendarDays, Check, Clock3, Pencil, Plus, Settings2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -119,6 +120,7 @@ export function HrLeaveWorkspace({
   employeeOptions,
   leaveRoster = [],
   pendingTeamCount,
+  viewerGender = "",
 }: {
   tenantSlug: string;
   canManage: boolean;
@@ -140,9 +142,15 @@ export function HrLeaveWorkspace({
   employeeOptions: Array<{ id: string; name: string; department?: string }>;
   leaveRoster?: LeaveRosterRow[];
   pendingTeamCount: number;
+  /** Used to hide maternity / paternity from “My leave” for the signed-in staff member. */
+  viewerGender?: string | null;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  const myBalances = useMemo(
+    () => filterLeaveTypesForGender(balances, viewerGender),
+    [balances, viewerGender],
+  );
   const [tab, setTab] = useState<"team" | "mine" | "policies" | "balances" | "holidays">(
     canManage ? "team" : "mine",
   );
@@ -277,7 +285,7 @@ export function HrLeaveWorkspace({
   const summary = {
     approved: myRequests.filter((request) => request.status === "APPROVED").length,
     pending: myRequests.filter((request) => request.status === "PENDING").length,
-    available: balances.reduce(
+    available: myBalances.reduce(
       (sum, balance) => sum + (balance.unlimited ? 0 : Math.max(0, balance.available ?? 0)),
       0,
     ),
@@ -404,9 +412,9 @@ export function HrLeaveWorkspace({
 
       {tab === "mine" ? (
         <div className="space-y-4">
-          {balances.length ? (
+          {myBalances.length ? (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {balances.map((balance) => (
+              {myBalances.map((balance) => (
                 <article key={balance.leaveTypeId} className="rounded-lg border border-foreground/10 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -943,13 +951,13 @@ export function HrLeaveWorkspace({
           </div>
           <div className="grid gap-4 p-5">
             <label className="text-sm"><span className="mb-1 block text-xs font-medium">Leave type</span>
-              <select name="leaveTypeId" required className={inputClass}><option value="">Select policy</option>{balances.map((balance) => <option key={balance.leaveTypeId} value={balance.leaveTypeId}>{balance.name} ({balance.unlimited ? "unlimited" : `${balance.available} available`})</option>)}</select>
+              <select name="leaveTypeId" required className={inputClass}><option value="">Select policy</option>{myBalances.map((balance) => <option key={balance.leaveTypeId} value={balance.leaveTypeId}>{balance.name} ({balance.unlimited ? "unlimited" : `${balance.available} available`})</option>)}</select>
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm"><span className="mb-1 block text-xs font-medium">Start date</span><input type="date" name="startDate" required className={inputClass} /></label>
               <label className="text-sm"><span className="mb-1 block text-xs font-medium">End date</span><input type="date" name="endDate" required className={inputClass} /></label>
             </div>
-            {balances.some((balance) => balance.dayUnit === "HOURS") ? (
+            {myBalances.some((balance) => balance.dayUnit === "HOURS") ? (
               <label className="text-sm"><span className="mb-1 block text-xs font-medium">Hours (hourly policies only)</span><input type="number" min="0.25" step="0.25" name="requestedHours" className={inputClass} /></label>
             ) : null}
             <label className="text-sm"><span className="mb-1 block text-xs font-medium">Reason</span><textarea name="reason" rows={3} className={inputClass} placeholder="Add context for your approver" /></label>

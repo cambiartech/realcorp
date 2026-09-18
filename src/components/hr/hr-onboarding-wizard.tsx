@@ -15,6 +15,7 @@ import { OrgDepartmentSelect } from "@/components/org-department-select";
 import { OrgJobRoleSelect } from "@/components/org-job-role-select";
 import { PensionAdministratorField } from "@/components/pension-administrator-field";
 import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-photo-upload";
+import { EmployeeLeaveSidePanel } from "@/components/hr/employee-leave-side-panel";
 import { useSnackbar } from "@/components/snackbar";
 import {
   notifyPrefillResult,
@@ -203,6 +204,8 @@ export function HrOnboardingWizard({
         ))}
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-[1fr_minmax(240px,280px)]">
+      <div className="min-w-0">
       {error ? (
         <p className="mb-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-xs text-[var(--danger)]">
           {error}
@@ -288,6 +291,24 @@ export function HrOnboardingWizard({
               defaultValue={draft.fullName || memberName}
               className={inputClass}
             />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs font-medium">Gender</span>
+            <UiSelect
+              name="gender"
+              defaultValue={draft.gender}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, gender: event.target.value }))
+              }
+            >
+              <option value="">—</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </UiSelect>
+            <span className="mt-1 block text-[11px] text-muted">
+              Required for maternity / paternity eligibility.
+            </span>
           </label>
           <div className="block text-sm">
             <OrgJobRoleSelect
@@ -556,6 +577,29 @@ export function HrOnboardingWizard({
             {pending ? "Activating…" : "Activate employee"}
           </button>
         )}
+      </div>
+      </div>
+      <div className="space-y-4">
+        <EmployeeLeaveSidePanel
+          tenantSlug={tenantSlug}
+          employeeProfileId={draft.id || null}
+          gender={draft.gender}
+        />
+        {step !== "compliance" ? (
+          <ProfileComplianceChecklist
+            items={checklist}
+            percent={checklistPercent}
+            tenantSlug={tenantSlug}
+            inOnboardingWizard
+            onOpenDocuments={openDocumentsForEmployee}
+            onGenerateOffer={onGenerateOffer}
+            onSendForm={onSendForm}
+            onSendAllForms={onSendAllForms}
+            onPrefillFromDocs={() => void prefillFromUploadedDocs()}
+            prefillPending={prefillPending}
+          />
+        ) : null}
+      </div>
       </div>
     </div>
   );

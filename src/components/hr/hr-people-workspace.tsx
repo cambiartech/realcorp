@@ -17,6 +17,7 @@ import { OfferLetterEditor } from "@/components/hr/offer-letter-editor";
 import { HrOnboardingWizard } from "@/components/hr/hr-onboarding-wizard";
 import { inferOnboardingStep, resolveOnboardingStep, type OnboardingStepId } from "@/lib/hr-onboarding-step";
 import { ProfileComplianceChecklist } from "@/components/hr/profile-compliance-checklist";
+import { EmployeeLeaveSidePanel } from "@/components/hr/employee-leave-side-panel";
 import { PayslipYtdCard } from "@/components/hr/payslip-ytd-card";
 import type { ProfileChecklistItem } from "@/lib/hr-profile-checklist";
 import { isContingentEmployment } from "@/lib/hr-profile-checklist";
@@ -1543,36 +1544,43 @@ export function HrPeopleWorkspace({
                 )}
               </div>
             </form>
-            <ProfileComplianceChecklist
-              items={selectedOnboarding?.items ?? []}
-              percent={selectedOnboarding?.percent ?? 0}
-              tenantSlug={tenantSlug}
-              serviceProviderMode={recordIsServiceStaff}
-              onGenerateOffer={recordIsServiceStaff ? undefined : () => setShowOfferLetter(true)}
-              onSendForm={recordIsServiceStaff ? undefined : (ft) => openSendForm(ft)}
-              onSendAllForms={recordIsServiceStaff ? undefined : openSendAllForms}
-              onPrefillFromDocs={
-                recordIsServiceStaff
-                  ? undefined
-                  : () => {
-                      void (async () => {
-                        setPending(true);
-                        try {
-                          const result = await runPrefillFromUploadedDocs(
-                            tenantSlug,
-                            selectedMember.userId,
-                          );
-                          if (notifyPrefillResult(showSnackbar, result)) {
-                            router.refresh();
+            <div className="space-y-4">
+              <EmployeeLeaveSidePanel
+                tenantSlug={tenantSlug}
+                employeeProfileId={record.id || null}
+                gender={record.gender}
+              />
+              <ProfileComplianceChecklist
+                items={selectedOnboarding?.items ?? []}
+                percent={selectedOnboarding?.percent ?? 0}
+                tenantSlug={tenantSlug}
+                serviceProviderMode={recordIsServiceStaff}
+                onGenerateOffer={recordIsServiceStaff ? undefined : () => setShowOfferLetter(true)}
+                onSendForm={recordIsServiceStaff ? undefined : (ft) => openSendForm(ft)}
+                onSendAllForms={recordIsServiceStaff ? undefined : openSendAllForms}
+                onPrefillFromDocs={
+                  recordIsServiceStaff
+                    ? undefined
+                    : () => {
+                        void (async () => {
+                          setPending(true);
+                          try {
+                            const result = await runPrefillFromUploadedDocs(
+                              tenantSlug,
+                              selectedMember.userId,
+                            );
+                            if (notifyPrefillResult(showSnackbar, result)) {
+                              router.refresh();
+                            }
+                          } finally {
+                            setPending(false);
                           }
-                        } finally {
-                          setPending(false);
-                        }
-                      })();
-                    }
-              }
-              prefillPending={pending}
-            />
+                        })();
+                      }
+                }
+                prefillPending={pending}
+              />
+            </div>
           </div>
         )
       ) : null}

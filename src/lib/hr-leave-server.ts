@@ -5,6 +5,7 @@ import prisma from "@/lib/db";
 import {
   accruedLeaveEntitlement,
   availableLeaveUnits,
+  leaveTypeEligibleForGender,
   type LeaveAccrualMethod,
 } from "@/lib/hr-leave";
 
@@ -126,13 +127,14 @@ export async function loadLeaveBalanceSummaries(input: {
   payrollCountryCode: string;
   department?: string | null;
   dateOfJoining?: Date | null;
+  gender?: string | null;
   year: number;
   asOf?: Date;
 }) {
   const asOf = input.asOf ?? new Date();
   const startOfYear = new Date(Date.UTC(input.year, 0, 1));
   const endOfYear = new Date(Date.UTC(input.year + 1, 0, 1));
-  const leaveTypes = await prisma.hrLeaveType.findMany({
+  const leaveTypesRaw = await prisma.hrLeaveType.findMany({
     where: {
       tenantId: input.tenantId,
       isActive: true,
@@ -145,6 +147,9 @@ export async function loadLeaveBalanceSummaries(input: {
     },
     orderBy: [{ countryCode: "desc" }, { name: "asc" }],
   });
+  const leaveTypes = leaveTypesRaw.filter((type) =>
+    leaveTypeEligibleForGender(type, input.gender),
+  );
   const [requests, balances] = await Promise.all([
     prisma.hrLeaveRequest.findMany({
       where: {
@@ -232,6 +237,7 @@ export async function loadLeaveEmployeeRoster(input: {
         department: true,
         payrollCountryCode: true,
         dateOfJoining: true,
+        gender: true,
       },
       orderBy: { fullName: "asc" },
       take: 500,
@@ -305,7 +311,9 @@ export async function loadLeaveEmployeeRoster(input: {
   const rows = employees.map((employee) => {
     const country = employee.payrollCountryCode || input.payrollCountryCode;
     const applicableTypes = leaveTypes.filter(
-      (type) => !type.countryCode || type.countryCode === country,
+      (type) =>
+        (!type.countryCode || type.countryCode === country) &&
+        leaveTypeEligibleForGender(type, employee.gender),
     );
     const balancesForEmployee = applicableTypes.map((type) => {
       const approved = requests

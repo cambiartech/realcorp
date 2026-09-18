@@ -13,7 +13,7 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { createTenantUploadSignature } from "@/lib/cloudinary-upload-server";
 import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
-import { countLeaveUnits, leaveDateKey, parseLeaveDate } from "@/lib/hr-leave";
+import { countLeaveUnits, leaveDateKey, leaveTypeEligibleForGender, parseLeaveDate } from "@/lib/hr-leave";
 import {
   ensureDefaultLeaveTypes,
   loadLeaveBalanceSummaries,
@@ -146,6 +146,19 @@ export async function requestLeave(
     },
   });
   if (!leaveType) return { ok: false, error: "This leave policy is not available to you." };
+  if (!leaveTypeEligibleForGender(leaveType, profile.gender)) {
+    return {
+      ok: false,
+      error:
+        leaveType.name.toLowerCase().includes("maternity") ||
+        leaveType.code.toUpperCase().includes("MATERNITY")
+          ? "Maternity leave is only available to female employees. Set gender to Female on the HR record if this is incorrect."
+          : leaveType.name.toLowerCase().includes("paternity") ||
+              leaveType.code.toUpperCase().includes("PATERNITY")
+            ? "Paternity leave is only available to male employees."
+            : "You are not eligible for this leave type.",
+    };
+  }
 
   let startDate: Date;
   let endDate: Date;
@@ -219,6 +232,7 @@ export async function requestLeave(
       profile.payrollCountryCode || ctx.tenant.settings?.payrollCountryCode || "NG",
     department: profile.department,
     dateOfJoining: profile.dateOfJoining,
+    gender: profile.gender,
     year,
     asOf: startDate,
   });
@@ -326,6 +340,16 @@ export async function reviewLeaveRequest(
     include: { profile: true, leaveType: true },
   });
   if (!request) return { ok: false, error: "This leave request is no longer pending." };
+  if (
+    parsed.data.decision === "APPROVED" &&
+    !leaveTypeEligibleForGender(request.leaveType, request.profile.gender)
+  ) {
+    return {
+      ok: false,
+      error:
+        "Cannot approve: this leave type is not available for this employee’s gender (maternity is female-only).",
+    };
+  }
   if (parsed.data.decision === "APPROVED" && !request.leaveType.allowNegativeBalance && !request.leaveType.unlimited) {
     const summaries = await loadLeaveBalanceSummaries({
       tenantId: ctx.tenant.id,
@@ -334,6 +358,7 @@ export async function reviewLeaveRequest(
         request.profile.payrollCountryCode || ctx.tenant.settings?.payrollCountryCode || "NG",
       department: request.profile.department,
       dateOfJoining: request.profile.dateOfJoining,
+      gender: request.profile.gender,
       year: request.startDate.getUTCFullYear(),
       asOf: request.startDate,
     });
@@ -650,7 +675,7 @@ export async function getEmployeeLeaveDetail(
 ): Promise<
   | {
       ok: true;
-      employee: { id: string; name: string; department: string };
+      employee: { id: string; name: string; department: string; gender: string };
       year: number;
       balances: Array<{
         leaveTypeId: string;
@@ -694,6 +719,7 @@ export async function getEmployeeLeaveDetail(
       department: true,
       payrollCountryCode: true,
       dateOfJoining: true,
+      gender: true,
     },
   });
   if (!profile) return { ok: false, error: "Employee not found." };
@@ -715,6 +741,7 @@ export async function getEmployeeLeaveDetail(
       payrollCountryCode: countryCode,
       department: profile.department,
       dateOfJoining: profile.dateOfJoining,
+      gender: profile.gender,
       year: targetYear,
     }),
     prisma.hrLeaveRequest.findMany({
@@ -738,6 +765,7 @@ export async function getEmployeeLeaveDetail(
       id: profile.id,
       name: profile.fullName || "Employee",
       department: profile.department || "",
+      gender: profile.gender || "",
     },
     year: targetYear,
     balances: summaries.map((balance) => ({

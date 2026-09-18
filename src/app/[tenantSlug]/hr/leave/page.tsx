@@ -125,6 +125,7 @@ export default async function HrLeavePage({
           payrollCountryCode: profile.payrollCountryCode || countryCode,
           department: profile.department,
           dateOfJoining: profile.dateOfJoining,
+          gender: profile.gender,
           year,
         })
       : [];
@@ -203,6 +204,7 @@ export default async function HrLeavePage({
           canManage={canManage}
           hasEmployeeProfile={Boolean(profile)}
           year={year}
+          viewerGender={profile?.gender || ""}
           balances={balances.map((balance) => ({
             leaveTypeId: balance.leaveType.id,
             name: balance.leaveType.name,
