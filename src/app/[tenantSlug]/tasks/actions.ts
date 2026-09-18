@@ -5,7 +5,7 @@ import { WorkTaskStatus } from "@/generated/prisma";
 import { absoluteAppUrl } from "@/lib/app-url";
 import prisma from "@/lib/db";
 import { sendTaskAssignedEmail } from "@/lib/email";
-import { canManageTasks, canViewTasksModule } from "@/lib/tasks-access";
+import { canAccessWorkTask, canManageTasks, canViewTasksModule } from "@/lib/tasks-access";
 import {
   isTaskAssigneeAllowed,
   type TaskAssigneeMember,
@@ -77,6 +77,22 @@ async function assertAssigneeAllowed(
       error: "You can assign tasks to people in your department, plus organization admins, subadmins, and People (HR) leads.",
     };
   }
+  return null;
+}
+
+async function assertCanAccessTask(
+  ctx: NonNullable<Awaited<ReturnType<typeof getTenantContext>>>,
+  task: { createdByUserId: string; assigneeUserId: string | null },
+): Promise<ActionResult | null> {
+  const members = await loadAssigneeMembers(ctx.tenant.id);
+  const allowed = canAccessWorkTask({
+    isPlatformAdmin: Boolean(ctx.session.user.isPlatformAdmin),
+    actorUserId: ctx.session.user.id,
+    membership: ctx.membership,
+    task,
+    members,
+  });
+  if (!allowed) return { ok: false, error: "You do not have access to this task." };
   return null;
 }
 
@@ -198,9 +214,11 @@ export async function updateWorkTaskStatus(
 
   const existing = await prisma.workTask.findFirst({
     where: { id: taskId, tenantId: ctx.tenant.id },
-    select: { id: true },
+    select: { id: true, createdByUserId: true, assigneeUserId: true },
   });
   if (!existing) return { ok: false, error: "Task not found." };
+  const accessError = await assertCanAccessTask(ctx, existing);
+  if (accessError) return accessError;
 
   await prisma.workTask.update({
     where: { id: taskId },
@@ -243,16 +261,8 @@ export async function updateWorkTask(
     select: { id: true, createdByUserId: true, assigneeUserId: true, status: true },
   });
   if (!existing) return { ok: false, error: "Task not found." };
-
-  const isOwner =
-    existing.createdByUserId === ctx.session.user.id || existing.assigneeUserId === ctx.session.user.id;
-  const isAdmin =
-    Boolean(ctx.session.user.isPlatformAdmin) ||
-    ctx.membership?.role === "ORG_ADMIN" ||
-    ctx.membership?.role === "SUB_ADMIN";
-  if (!isOwner && !isAdmin && !canManageTasks(Boolean(ctx.session.user.isPlatformAdmin), ctx.membership)) {
-    return { ok: false, error: "You cannot edit this task." };
-  }
+  const accessError = await assertCanAccessTask(ctx, existing);
+  if (accessError) return accessError;
 
   const nextStatus = parsed.data.status ?? existing.status;
   const nextAssigneeUserId = parsed.data.assigneeUserId || null;
@@ -301,14 +311,20 @@ export async function deleteWorkTask(tenantSlug: string, taskId: string): Promis
     select: { id: true, createdByUserId: true, assigneeUserId: true },
   });
   if (!existing) return { ok: false, error: "Task not found." };
+  const accessError = await assertCanAccessTask(ctx, existing);
+  if (accessError) return accessError;
 
   const isOwner =
     existing.createdByUserId === ctx.session.user.id || existing.assigneeUserId === ctx.session.user.id;
   const isAdmin =
     Boolean(ctx.session.user.isPlatformAdmin) ||
     ctx.membership?.role === "ORG_ADMIN" ||
-    ctx.membership?.role === "SUB_ADMIN";
-  if (!isOwner && !isAdmin) return { ok: false, error: "You cannot delete this task." };
+    ctx.membership?.role === "SUB_ADMIN" ||
+    ctx.membership?.role === "HR_MANAGER";
+  const isDeptLead = Boolean(ctx.membership?.isDepartmentLead);
+  if (!isOwner && !isAdmin && !isDeptLead) {
+    return { ok: false, error: "You cannot delete this task." };
+  }
 
   await prisma.workTask.delete({ where: { id: taskId } });
   revalidatePath(`/${tenantSlug}/tasks`);

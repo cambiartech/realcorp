@@ -55,6 +55,7 @@ export type WorkTaskRow = {
   projectEmoji: string | null;
   sprintLabel: string | null;
   assigneeUserId: string | null;
+  createdByUserId?: string | null;
   assigneeLabel: string;
   dueDateLabel: string | null;
   dueDateValue: string | null;
@@ -150,6 +151,8 @@ export function TasksWorkspace({
   tasks,
   members,
   canManageSpaces,
+  canViewAllOrgTasks = false,
+  isDepartmentLead = false,
   initialView = "company",
   department = null,
 }: {
@@ -160,6 +163,8 @@ export function TasksWorkspace({
   tasks: WorkTaskRow[];
   members: MemberOption[];
   canManageSpaces: boolean;
+  canViewAllOrgTasks?: boolean;
+  isDepartmentLead?: boolean;
   initialView?: ViewTab;
   department?: OrgDepartment | null;
 }) {
@@ -370,7 +375,14 @@ export function TasksWorkspace({
       <div className="mt-5 flex flex-wrap items-center gap-2 border-b border-foreground/10 pb-3">
         {(
           [
-            { id: "company" as const, label: "Company tasks" },
+            {
+              id: "company" as const,
+              label: canViewAllOrgTasks
+                ? "Company tasks"
+                : isDepartmentLead
+                  ? "Team tasks"
+                  : "Assigned & created",
+            },
             { id: "my" as const, label: "My tasks" },
             { id: "sprint" as const, label: "Current sprint" },
           ] as const

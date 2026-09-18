@@ -4,7 +4,7 @@ import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
-import { canManageTasks } from "@/lib/tasks-access";
+import { canManageTasks, canViewAllOrgTasks, workTaskVisibilityWhere } from "@/lib/tasks-access";
 import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "@/lib/membership-departments";
 import { profileFromMembershipRole, mapOrgDepartmentToAccess } from "@/lib/org-membership-profile";
 import { ensureDefaultTaskSpaces } from "./actions";
@@ -52,7 +52,31 @@ export default async function TasksPage({
 
   await ensureDefaultTaskSpaces(tenant.id);
 
-  const [spaces, projects, tasks, memberships] = await Promise.all([
+  const memberships = await prisma.membership.findMany({
+    where: { tenantId: tenant.id, status: "ACTIVE" },
+    include: { user: { select: { id: true, name: true, email: true } } },
+    take: 200,
+  });
+
+  const allMembers: TaskAssigneeMember[] = memberships.map((m) => ({
+    id: m.user.id,
+    label: m.user.name || m.user.email || "Member",
+    role: m.role,
+    department: m.department,
+    isDepartmentLead: m.isDepartmentLead,
+  }));
+
+  const isPlatformAdmin = Boolean(session.user.isPlatformAdmin);
+  const seesAllOrgTasks = canViewAllOrgTasks(isPlatformAdmin, membership);
+  const taskWhere = workTaskVisibilityWhere({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    isPlatformAdmin,
+    membership,
+    members: allMembers,
+  });
+
+  const [spaces, projects, tasks] = await Promise.all([
     prisma.taskSpace.findMany({
       where: { tenantId: tenant.id },
       orderBy: { sortOrder: "asc" },
@@ -64,7 +88,7 @@ export default async function TasksPage({
       select: { id: true, name: true, spaceId: true, sprintLabel: true, iconEmoji: true },
     }),
     prisma.workTask.findMany({
-      where: { tenantId: tenant.id },
+      where: taskWhere,
       orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
       include: {
         space: { select: { name: true, color: true } },
@@ -72,31 +96,27 @@ export default async function TasksPage({
       },
       take: 500,
     }),
-    prisma.membership.findMany({
-      where: { tenantId: tenant.id, status: "ACTIVE" },
-      include: { user: { select: { id: true, name: true, email: true } } },
-      take: 200,
-    }),
   ]);
-
-  const allMembers: TaskAssigneeMember[] = memberships.map((m) => ({
-    id: m.user.id,
-    label: m.user.name || m.user.email || "Member",
-    role: m.role,
-    department: m.department,
-    isDepartmentLead: m.isDepartmentLead,
-  }));
 
   const memberById = new Map(allMembers.map((m) => [m.id, m]));
   const memberOptions = filterTaskAssigneeMembers(allMembers, {
-    isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+    isPlatformAdmin,
     actorRole: membership?.role,
     actorUserId: session.user.id,
     actorDepartment: membership?.department,
     actorIsDepartmentLead: membership?.isDepartmentLead,
   });
 
-  const initialView = view === "my" ? "my" : view === "sprint" ? "sprint" : "company";
+  const initialView =
+    view === "my"
+      ? "my"
+      : view === "sprint"
+        ? "sprint"
+        : view === "company"
+          ? "company"
+          : seesAllOrgTasks || membership?.isDepartmentLead
+            ? "company"
+            : "my";
   const department =
     (membership?.department ? mapOrgDepartmentToAccess(membership.department) : null) ??
     profileFromMembershipRole(membership?.role ?? MembershipRole.SALES_EXECUTIVE).department;
@@ -106,6 +126,8 @@ export default async function TasksPage({
       tenantSlug={tenantSlug}
       currentUserId={session.user.id}
       department={department}
+      canViewAllOrgTasks={seesAllOrgTasks}
+      isDepartmentLead={Boolean(membership?.isDepartmentLead)}
       spaces={spaces.map((s) => ({
         id: s.id,
         name: s.name,
@@ -133,6 +155,7 @@ export default async function TasksPage({
         projectEmoji: t.project?.iconEmoji || null,
         sprintLabel: t.sprintLabel,
         assigneeUserId: t.assigneeUserId,
+        createdByUserId: t.createdByUserId,
         assigneeLabel: t.assigneeUserId
           ? memberById.get(t.assigneeUserId)?.label || "Assigned"
           : "Unassigned",
@@ -143,7 +166,7 @@ export default async function TasksPage({
         linkedEntityType: t.linkedEntityType,
       }))}
       members={memberOptions}
-      canManageSpaces={canManageTasks(Boolean(session.user.isPlatformAdmin), membership)}
+      canManageSpaces={canManageTasks(isPlatformAdmin, membership)}
       initialView={initialView}
     />
   );
