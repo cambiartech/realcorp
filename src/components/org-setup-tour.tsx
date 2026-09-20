@@ -49,7 +49,7 @@ export function OrgSetupTour({
       {!bannerDismissed ? (
         <div
           role="status"
-          className="mb-4 rounded-xl border border-[var(--warn-line)] bg-gradient-to-r from-[var(--warn-wash)] via-[var(--warn-wash)] to-transparent px-4 py-3 shadow-sm"
+          className="mb-4 rounded-xl border border-foreground/10 bg-background px-4 py-3 shadow-sm"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -59,9 +59,9 @@ export function OrgSetupTour({
                   ? `${percent}% complete — optional steps remain for a smoother rollout.`
                   : `${incompleteCritical.length} required step${incompleteCritical.length === 1 ? "" : "s"} left before finance & reporting work properly.`}
               </p>
-              <div className="mt-2 h-1.5 max-w-xs overflow-hidden rounded-full bg-foreground/10">
+              <div className="mt-2 h-1 max-w-xs overflow-hidden rounded-full bg-foreground/[0.06]">
                 <div
-                  className="h-full rounded-full bg-[var(--warn)] transition-all"
+                  className="h-full rounded-full bg-[var(--accent)] transition-all"
                   style={{ width: `${percent}%` }}
                 />
               </div>
@@ -70,7 +70,7 @@ export function OrgSetupTour({
               <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="rounded-md border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90"
+                className="rounded-md bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90"
               >
                 Open setup guide
               </button>
@@ -78,7 +78,7 @@ export function OrgSetupTour({
                 <button
                   type="button"
                   onClick={() => setBannerDismissed(true)}
-                  className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs text-muted hover:bg-foreground/[0.06]"
+                  className="rounded-md border border-foreground/12 px-3 py-1.5 text-xs text-muted hover:bg-foreground/[0.04]"
                 >
                   Dismiss
                 </button>

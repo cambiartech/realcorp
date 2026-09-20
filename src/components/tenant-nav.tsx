@@ -583,14 +583,14 @@ export function TenantSidebar({
   return (
     <aside
       className={[
-        "hidden min-h-0 shrink-0 flex-col self-stretch border-r border-foreground/10 bg-foreground/[0.02] transition-[width] duration-200 md:flex",
-        collapsed ? "w-20" : "w-64",
+        "hidden min-h-0 shrink-0 flex-col self-stretch border-r border-foreground/[0.08] bg-background transition-[width] duration-200 md:flex",
+        collapsed ? "w-[72px]" : "w-[240px]",
       ].join(" ")}
     >
-      <div className="flex min-h-0 flex-1 flex-col px-4 py-5">
+      <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
         <div
           className={
-            collapsed ? "flex shrink-0 justify-center" : "flex shrink-0 items-start justify-between gap-2"
+            collapsed ? "flex shrink-0 justify-center" : "flex shrink-0 items-center justify-between gap-2 px-1"
           }
         >
           {collapsed ? (
@@ -637,7 +637,7 @@ export function TenantSidebar({
         </div>
 
         <nav
-          className="mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1"
+          className="mt-5 min-h-0 flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden overscroll-y-contain px-0.5"
           aria-label="Workspace navigation"
         >
           {/* Dashboard + Projects always at top */}
@@ -659,7 +659,7 @@ export function TenantSidebar({
                 <button
                   type="button"
                   onClick={toggleSales}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                  className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted/80 transition-colors hover:bg-foreground/[0.03] hover:text-foreground"
                 >
                   <span>Sales</span>
                   <ChevronDown
@@ -705,7 +705,7 @@ export function TenantSidebar({
                   <button
                     type="button"
                     onClick={toggleMarketing}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted/80 transition-colors hover:bg-foreground/[0.03] hover:text-foreground"
                   >
                     <span>Marketing</span>
                     <ChevronDown
@@ -751,7 +751,7 @@ export function TenantSidebar({
                   <button
                     type="button"
                     onClick={toggleFinance}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted/80 transition-colors hover:bg-foreground/[0.03] hover:text-foreground"
                   >
                     <span>Finance</span>
                     <ChevronDown
@@ -797,7 +797,7 @@ export function TenantSidebar({
                   <button
                     type="button"
                     onClick={toggleHr}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted/80 transition-colors hover:bg-foreground/[0.03] hover:text-foreground"
                   >
                     <span>{canManageHr ? "People" : "My HR"}</span>
                     <ChevronDown
@@ -842,7 +842,7 @@ export function TenantSidebar({
                   <button
                     type="button"
                     onClick={toggleInventory}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted/80 transition-colors hover:bg-foreground/[0.03] hover:text-foreground"
                   >
                     <span>Inventory</span>
                     <ChevronDown
@@ -887,7 +887,7 @@ export function TenantSidebar({
                   <button
                     type="button"
                     onClick={toggleShortlets}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-muted transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted/80 transition-colors hover:bg-foreground/[0.03] hover:text-foreground"
                   >
                     <span>Short Lets</span>
                     <ChevronDown
@@ -1055,17 +1055,17 @@ function SidebarProfileFooter({
   }
 
   return (
-    <div className="shrink-0 border-t border-foreground/10 bg-foreground/[0.04] px-4 py-3">
-      <div className="flex items-center gap-3">
+    <div className="shrink-0 border-t border-foreground/[0.08] px-3 py-3">
+      <div className="flex items-center gap-2.5 px-1">
         <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-sm font-semibold text-foreground"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-xs font-semibold text-foreground"
           aria-hidden
         >
           {initial}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
-          {emailDisplay ? <p className="truncate text-xs text-muted">{emailDisplay}</p> : null}
+          <p className="truncate text-[13px] font-medium text-foreground">{displayName}</p>
+          {emailDisplay ? <p className="truncate text-[11px] text-muted">{emailDisplay}</p> : null}
         </div>
       </div>
     </div>
@@ -1093,26 +1093,23 @@ function NavLink({
       title={collapsed ? label : undefined}
       aria-current={active ? "page" : undefined}
       className={[
-        // A solid black pill for every active item made the whole sidebar
-        // shout. A tinted row with a copper edge reads as "you are here"
-        // without competing with the page content.
-        "relative block rounded-md px-3 py-2 text-sm transition-colors",
-        collapsed ? "text-center" : "",
-        indented ? "py-1.5 text-[0.8125rem]" : "",
+        "relative flex items-center rounded-md text-[13px] transition-colors",
+        collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-1.5",
+        indented ? "py-1.5 text-[12.5px]" : "",
         active
-          ? "bg-[var(--field)] font-semibold text-foreground before:absolute before:left-0 before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-[var(--accent)] before:content-['']"
-          : "text-muted hover:bg-[var(--field)] hover:text-foreground",
+          ? "bg-foreground/[0.06] font-medium text-foreground"
+          : "font-normal text-muted hover:bg-foreground/[0.04] hover:text-foreground",
       ].join(" ")}
     >
       {collapsed ? (
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-current/35">
-          <NavIcon navKey={navKey} className="h-3.5 w-3.5" />
+        <span className="inline-flex h-5 w-5 items-center justify-center">
+          <NavIcon navKey={navKey} className="h-[18px] w-[18px]" />
         </span>
       ) : (
-        <span className="inline-flex items-center gap-2">
-          <NavIcon navKey={navKey} className="h-4 w-4" />
-          <span>{label}</span>
-        </span>
+        <>
+          <NavIcon navKey={navKey} className="h-[18px] w-[18px] shrink-0 opacity-80" />
+          <span className="truncate">{label}</span>
+        </>
       )}
     </Link>
   );
@@ -1162,19 +1159,19 @@ function SubNavLink({
     <Link
       href={href}
       className={[
-        "flex items-center gap-2 rounded-md px-3 py-1.5 text-[0.8125rem] transition-colors",
+        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors",
         active
-          ? "bg-foreground text-background"
-          : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+          ? "bg-foreground/[0.06] font-medium text-foreground"
+          : "font-normal text-muted hover:bg-foreground/[0.04] hover:text-foreground",
       ].join(" ")}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.9} />
-      <span>{label}</span>
+      <Icon className="h-4 w-4 shrink-0 opacity-75" strokeWidth={1.75} />
+      <span className="truncate">{label}</span>
     </Link>
   );
 }
 
 function NavIcon({ navKey, className }: { navKey: TenantNavKey; className?: string }) {
   const Icon = NAV_ICONS[navKey];
-  return <Icon className={className || "h-4 w-4"} strokeWidth={1.9} />;
+  return <Icon className={className || "h-4 w-4"} strokeWidth={1.75} />;
 }
