@@ -16,12 +16,12 @@ type TenantPageShellProps = {
 
 /**
  * Shared page container for tenant app views.
- * Uses left alignment (no mx-auto) so content sits consistently beside the sidebar.
+ * Calm Stripe-like page padding; left-aligned beside the sidebar.
  */
 export function TenantPageShell({ children, width = "default", className = "" }: TenantPageShellProps) {
   return (
     <div
-      className={["w-full px-4 py-6 sm:px-6 sm:py-8", WIDTH_CLASS[width], className]
+      className={["rc-page w-full px-5 py-5 sm:px-8 sm:py-7", WIDTH_CLASS[width], className]
         .filter(Boolean)
         .join(" ")}
     >

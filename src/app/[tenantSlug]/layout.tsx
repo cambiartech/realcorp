@@ -92,19 +92,18 @@ export default async function TenantLayout({
   };
 
   return (
-    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-background text-foreground">
-      <header className="shrink-0 border-b border-foreground/10 bg-background">
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-[var(--surface)] text-foreground">
+      <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--elevated)]/90 backdrop-blur-md">
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           <TenantAppHeaderBrand tenantSlug={tenant.slug} tenantName={tenant.name} />
           <div className="flex items-center gap-2">
-            <p className="text-xs text-muted md:hidden">Tenant app</p>
             <TenantHeaderActions tenantSlug={tenant.slug} userLabel={userLabel} />
           </div>
         </div>
       </header>
       <div className="flex min-h-0 flex-1 w-full items-stretch overflow-hidden">
         <TenantSidebar {...navProps} />
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain pb-28 md:pb-24">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain bg-[var(--surface)] pb-28 md:pb-24">
           {children}
         </main>
       </div>

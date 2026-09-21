@@ -163,58 +163,49 @@ export function FacilityWorkspace(props: {
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Workspace</p>
-          <h1 className="mt-1 text-2xl font-bold text-foreground">Facility</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
+    <div className="rc-page">
+      <header className="rc-page-header">
+        <div className="min-w-0">
+          <p className="rc-page-eyebrow">Workspace</p>
+          <h1 className="rc-page-title">Facility</h1>
+          <p className="rc-page-desc">
             Site stores, material usage, plant service dates, and damages — for Facility Managers and site teams.
+            {props.inventoryEnabled ? (
+              <>
+                {" "}
+                Manage catalog and price history in{" "}
+                <Link href={`/${props.tenantSlug}/inventory`} className="font-semibold text-foreground underline">
+                  Inventory
+                </Link>
+                .
+              </>
+            ) : null}
           </p>
-          {props.inventoryEnabled ? (
-            <p className="mt-2 text-xs text-muted">
-              Manage catalog, suppliers, artisans, and material price history in{" "}
-              <Link href={`/${props.tenantSlug}/inventory`} className="font-semibold text-foreground underline">
-                Inventory
-              </Link>
-              .
-            </p>
-          ) : null}
         </div>
         {props.canRecord ? (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setModal("issue")}
-              className="rounded-md border border-foreground/15 px-3 py-2 text-sm font-semibold"
-            >
+          <div className="rc-page-actions">
+            <button type="button" onClick={() => setModal("issue")} className="rc-btn rc-btn-secondary">
               Record usage
             </button>
             {props.canManage ? (
-              <button
-                type="button"
-                onClick={() => setModal("receive")}
-                className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background"
-              >
+              <button type="button" onClick={() => setModal("receive")} className="rc-btn rc-btn-primary">
                 <Plus className="h-4 w-4" /> Receive stock
               </button>
             ) : null}
           </div>
         ) : null}
-      </div>
+      </header>
 
-      <div className="flex flex-wrap gap-1 border-b border-foreground/10">
+      <div className="rc-tabs" role="tablist">
         {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            data-active={tab === item.id}
             onClick={() => setTab(item.id)}
-            className={[
-              "border-b-2 px-4 py-2 text-sm font-medium",
-              tab === item.id
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted hover:text-foreground",
-            ].join(" ")}
+            className="rc-tab"
           >
             {item.label}
           </button>

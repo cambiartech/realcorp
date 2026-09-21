@@ -32,6 +32,7 @@ import {
   MODAL_PANEL_2XL,
 } from "@/lib/modal-panel";
 import { TenantPageShell } from "@/components/tenant-page-shell";
+import { PageHeader } from "@/components/page-header";
 import { TodayPeopleBoard } from "@/components/today-people-board";
 import type { OrgSetupStep } from "@/lib/org-setup-checklist";
 import { UiSelect } from "@/components/ui-select";
@@ -1386,39 +1387,40 @@ export function DashboardWorkspace({
   return (
     <TenantPageShell>
       {canManageOrgSetup && !orgSetupCriticalComplete ? (
-        <div className="mb-4 rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3 text-sm text-muted">
+        <div className="rc-card px-4 py-3 text-[13px] text-muted">
           <span className="font-medium text-foreground">Setup coach</span> is active at the bottom of your
-          screen — it will guide you step by step and celebrate each completion. Only visible to org admins.
+          screen — it will guide you step by step. Only visible to org admins.
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{tenantName} Dashboard</h1>
-          <div className="mt-1 text-xs text-muted">
+      <PageHeader
+        eyebrow="Overview"
+        title={tenantName}
+        description={
+          <>
             <button
               type="button"
               onClick={() => setOpenScopeFilters(true)}
-              className="font-medium text-foreground underline decoration-foreground/30 underline-offset-2 hover:decoration-foreground/60"
+              className="cursor-pointer font-medium text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/55"
             >
-              Open dashboard & filters
+              Open filters
             </button>
-            <span className="text-muted"> · or Quick actions (bottom-right)</span>
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
-          <FinancePeriodPicker
-            idPrefix="dashboard"
-            value={periodPickerValue}
-            onChange={applyPeriodPicker}
-          />
-          <div className="flex shrink-0 items-center gap-1.5">
+            <span> · or use Quick actions (bottom-right)</span>
+          </>
+        }
+        actions={
+          <>
+            <FinancePeriodPicker
+              idPrefix="dashboard"
+              value={periodPickerValue}
+              onChange={applyPeriodPicker}
+            />
             <button
               type="button"
               onClick={() => setOpenBuilder(true)}
               title="Customize dashboard"
               aria-label="Customize dashboard"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/20 text-foreground hover:bg-foreground/[0.06]"
+              className="rc-btn rc-btn-secondary rc-btn-sm !h-8 !w-8 !px-0"
             >
               <SlidersHorizontal className="h-4 w-4" />
             </button>
@@ -1428,21 +1430,21 @@ export function DashboardWorkspace({
                 onClick={() => setOpenGoal(true)}
                 title="Set fiscal goals"
                 aria-label="Set fiscal goals"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground bg-foreground text-background hover:opacity-90"
+                className="rc-btn rc-btn-primary rc-btn-sm !h-8 !w-8 !px-0"
               >
                 <Target className="h-4 w-4" />
               </button>
             ) : null}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <TodayPeopleBoard board={todayBoard} />
 
       {values.hrOnboarding.state !== "none" ? (
         <section
           className={[
-            "mt-4 rounded-lg border p-4",
+            "rc-card p-4",
             values.hrOnboarding.state === "complete"
               ? "border-[var(--success-line)] bg-[var(--success-wash)]"
               : "border-[var(--accent-line)] bg-[var(--accent-wash)]",
@@ -1450,11 +1452,11 @@ export function DashboardWorkspace({
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">HR onboarding</p>
+              <p className="text-[12.5px] font-medium text-muted">HR onboarding</p>
               {values.hrOnboarding.state === "complete" ? (
                 <>
-                  <p className="mt-1 text-sm font-semibold text-foreground">All forms submitted</p>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1 text-[14px] font-semibold text-foreground">All forms submitted</p>
+                  <p className="mt-1 text-[12.5px] text-muted">
                     {values.hrOnboarding.submittedCount} section
                     {values.hrOnboarding.submittedCount === 1 ? "" : "s"} sent to HR
                     {values.hrOnboarding.submittedAtLabel !== "—"
@@ -1464,11 +1466,11 @@ export function DashboardWorkspace({
                 </>
               ) : (
                 <>
-                  <p className="mt-1 text-sm font-semibold text-foreground">
+                  <p className="mt-1 text-[14px] font-semibold text-foreground">
                     {values.hrOnboarding.pendingCount} section
                     {values.hrOnboarding.pendingCount === 1 ? "" : "s"} still to complete
                   </p>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1 text-[12.5px] text-muted">
                     {values.hrOnboarding.sectionLabels.join(" · ")}
                     {values.hrOnboarding.dueLabel ? ` · due ${values.hrOnboarding.dueLabel}` : ""}
                   </p>
@@ -1477,25 +1479,16 @@ export function DashboardWorkspace({
             </div>
             <div className="flex flex-wrap gap-2">
               {values.hrOnboarding.state === "pending" && values.hrOnboarding.masterUrl ? (
-                <a
-                  href={values.hrOnboarding.masterUrl}
-                  className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background"
-                >
+                <a href={values.hrOnboarding.masterUrl} className="rc-btn rc-btn-primary rc-btn-sm">
                   Continue forms
                 </a>
               ) : null}
               {values.hrOnboarding.state === "complete" && values.hrOnboarding.viewUrl ? (
-                <a
-                  href={values.hrOnboarding.viewUrl}
-                  className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold hover:bg-foreground/[0.06]"
-                >
+                <a href={values.hrOnboarding.viewUrl} className="rc-btn rc-btn-secondary rc-btn-sm">
                   View forms
                 </a>
               ) : null}
-              <a
-                href={values.hrOnboarding.hrDashboardUrl}
-                className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold hover:bg-foreground/[0.06]"
-              >
+              <a href={values.hrOnboarding.hrDashboardUrl} className="rc-btn rc-btn-ghost rc-btn-sm">
                 My HR dashboard
               </a>
             </div>
@@ -1504,40 +1497,36 @@ export function DashboardWorkspace({
       ) : null}
 
       {values.tasksModuleEnabled && values.myWorkTasks.length > 0 ? (
-        <section className="mt-4 rounded-lg border border-[var(--info-line)] bg-[var(--info-wash)] px-4 py-3">
+        <section className="rc-card border-[var(--info-line)] bg-[var(--info-wash)] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Your tasks</p>
-              <span className="rounded-full border border-[var(--info-line)] bg-[var(--info-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--info)]">
-                {values.myOpenTaskCount} open
-              </span>
+              <p className="text-[12.5px] font-medium text-muted">Your tasks</p>
+              <span className="rc-pill rc-pill-info">{values.myOpenTaskCount} open</span>
             </div>
             <Link
               href={values.tasksPageUrl}
-              className="text-xs font-semibold text-[var(--info)] hover:underline"
+              className="text-[12.5px] font-semibold text-[var(--info)] hover:underline"
             >
               View all →
             </Link>
           </div>
           {values.myWorkTasks[0] ? (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-foreground/10 bg-background px-3 py-2">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-foreground/10 bg-[var(--elevated)] px-3 py-2">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{values.myWorkTasks[0].title}</p>
-                <p className="mt-0.5 truncate text-[11px] text-muted">
+                <p className="truncate text-[13.5px] font-medium text-foreground">{values.myWorkTasks[0].title}</p>
+                <p className="mt-0.5 truncate text-[11.5px] text-muted">
                   {values.myWorkTasks[0].spaceName ? `${values.myWorkTasks[0].spaceName} · ` : ""}
                   {values.myWorkTasks[0].statusLabel}
                   {values.myWorkTasks[0].dueDateLabel ? ` · Due ${values.myWorkTasks[0].dueDateLabel}` : ""}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full border border-foreground/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-muted">
-                {values.myWorkTasks[0].priority}
-              </span>
+              <span className="rc-pill rc-pill-neutral">{values.myWorkTasks[0].priority}</span>
             </div>
           ) : null}
           {values.myOpenTaskCount > 1 ? (
             <Link
               href={values.tasksPageUrl}
-              className="mt-2 inline-block text-[11px] font-medium text-muted hover:text-foreground"
+              className="mt-2 inline-block text-[11.5px] font-medium text-muted hover:text-foreground"
             >
               View {values.myOpenTaskCount - 1} more task{values.myOpenTaskCount - 1 === 1 ? "" : "s"} →
             </Link>
@@ -1546,11 +1535,11 @@ export function DashboardWorkspace({
       ) : null}
 
       {overviewKind && overviewToggleLabel ? (
-        <div className="mt-4">
+        <div>
           <button
             type="button"
             onClick={() => setShowSetupPanel((open) => !open)}
-            className="inline-flex items-center gap-2 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold text-foreground hover:bg-foreground/[0.04]"
+            className="rc-btn rc-btn-secondary rc-btn-sm"
             aria-expanded={showSetupPanel}
           >
             <span>

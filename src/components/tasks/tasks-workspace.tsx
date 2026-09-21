@@ -6,6 +6,7 @@ import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { SearchableSelect } from "@/components/searchable-select";
 import { TenantPageShell } from "@/components/tenant-page-shell";
+import { PageHeader } from "@/components/page-header";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
 import {
@@ -355,24 +356,18 @@ export function TasksWorkspace({
 
   return (
     <TenantPageShell>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
-          <p className="mt-1 max-w-xl text-sm text-muted">
-            Company work across teams — boards, sprints, and assignments. CRM follow-ups stay under Sales →
-            Activities.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-        >
-          New task
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Work"
+        title="Tasks"
+        description="Company work across teams — boards, sprints, and assignments. CRM follow-ups stay under Sales → Activities."
+        actions={
+          <button type="button" onClick={openCreateModal} className="rc-btn rc-btn-primary">
+            New task
+          </button>
+        }
+      />
 
-      <div className="mt-5 flex flex-wrap items-center gap-2 border-b border-foreground/10 pb-3">
+      <div className="rc-tabs" role="tablist">
         {(
           [
             {
@@ -390,22 +385,20 @@ export function TasksWorkspace({
           <button
             key={tab.id}
             type="button"
+            role="tab"
+            aria-selected={viewTab === tab.id}
+            data-active={viewTab === tab.id}
             onClick={() => setViewTab(tab.id)}
-            className={[
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              viewTab === tab.id
-                ? "bg-foreground text-background"
-                : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
-            ].join(" ")}
+            className="rc-tab"
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-3">
+      <div className="rc-toolbar">
         <div className="min-w-[140px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <label className="mb-1 block text-[11px] font-medium text-muted">
             Assignee
           </label>
           <UiSelect
@@ -424,7 +417,7 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[120px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <label className="mb-1 block text-[11px] font-medium text-muted">
             Status
           </label>
           <UiSelect
@@ -441,7 +434,7 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[120px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <label className="mb-1 block text-[11px] font-medium text-muted">
             Priority
           </label>
           <UiSelect
@@ -457,7 +450,7 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[140px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <label className="mb-1 block text-[11px] font-medium text-muted">
             Teamspace
           </label>
           <UiSelect value={spaceFilter} onChange={(e) => setSpaceFilter(e.target.value)} className="text-sm">
@@ -470,7 +463,7 @@ export function TasksWorkspace({
           </UiSelect>
         </div>
         <div className="min-w-[140px] flex-1">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <label className="mb-1 block text-[11px] font-medium text-muted">
             Project
           </label>
           <UiSelect

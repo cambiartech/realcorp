@@ -187,13 +187,12 @@ function TenantBrandLink({
   );
 
   return (
-    <Link href={href} className="group inline-flex min-w-0 items-center gap-2">
+    <Link href={href} className="group inline-flex min-w-0 items-center gap-2.5">
       {mark}
       <span className="min-w-0">
-        <span className="block truncate text-sm font-bold tracking-tight text-foreground group-hover:opacity-90">
+        <span className="block truncate text-[13.5px] font-semibold tracking-tight text-foreground group-hover:opacity-90">
           {tenantName}
         </span>
-        <span className="block text-[10px] text-muted">Organization</span>
       </span>
     </Link>
   );
@@ -583,8 +582,8 @@ export function TenantSidebar({
   return (
     <aside
       className={[
-        "hidden min-h-0 shrink-0 flex-col self-stretch border-r border-foreground/[0.08] bg-background transition-[width] duration-200 md:flex",
-        collapsed ? "w-[72px]" : "w-[240px]",
+        "hidden min-h-0 shrink-0 flex-col self-stretch border-r border-[var(--border-subtle)] bg-[var(--elevated)] transition-[width] duration-200 md:flex",
+        collapsed ? "w-[72px]" : "w-[232px]",
       ].join(" ")}
     >
       <div className="flex min-h-0 flex-1 flex-col px-3 py-4">
@@ -1097,17 +1096,20 @@ function NavLink({
         collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-1.5",
         indented ? "py-1.5 text-[12.5px]" : "",
         active
-          ? "bg-foreground/[0.06] font-medium text-foreground"
-          : "font-normal text-muted hover:bg-foreground/[0.04] hover:text-foreground",
+          ? "bg-foreground/[0.05] font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-foreground"
+          : "font-normal text-muted hover:bg-foreground/[0.035] hover:text-foreground",
       ].join(" ")}
     >
       {collapsed ? (
         <span className="inline-flex h-5 w-5 items-center justify-center">
-          <NavIcon navKey={navKey} className="h-[18px] w-[18px]" />
+          <NavIcon navKey={navKey} className="h-[17px] w-[17px]" />
         </span>
       ) : (
         <>
-          <NavIcon navKey={navKey} className="h-[18px] w-[18px] shrink-0 opacity-80" />
+          <NavIcon
+            navKey={navKey}
+            className={["h-[17px] w-[17px] shrink-0", active ? "opacity-90" : "opacity-70"].join(" ")}
+          />
           <span className="truncate">{label}</span>
         </>
       )}
@@ -1158,14 +1160,15 @@ function SubNavLink({
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
       className={[
-        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors",
+        "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors",
         active
-          ? "bg-foreground/[0.06] font-medium text-foreground"
-          : "font-normal text-muted hover:bg-foreground/[0.04] hover:text-foreground",
+          ? "bg-foreground/[0.05] font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-foreground"
+          : "font-normal text-muted hover:bg-foreground/[0.035] hover:text-foreground",
       ].join(" ")}
     >
-      <Icon className="h-4 w-4 shrink-0 opacity-75" strokeWidth={1.75} />
+      <Icon className={["h-3.5 w-3.5 shrink-0", active ? "opacity-85" : "opacity-65"].join(" ")} strokeWidth={1.75} />
       <span className="truncate">{label}</span>
     </Link>
   );

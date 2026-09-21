@@ -7,6 +7,8 @@ import { FormAlert, FormFieldError } from "@/components/form-message";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { ButtonSpinner } from "@/components/button-spinner";
+import { PageHeader } from "@/components/page-header";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { MODAL_PANEL_MD } from "@/lib/modal-panel";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
@@ -104,31 +106,27 @@ export function TeamWorkspace({
     : TEAM_MEMBERSHIP_ROLE_OPTIONS.filter((opt) => opt.value !== MembershipRole.ORG_ADMIN);
 
   return (
-    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Team</h1>
-          <p className="mt-1 text-sm text-muted">Manage members and invitations for {tenantName}.</p>
-        </div>
-        {canInvite ? (
-          <button
-            type="button"
-            onClick={() => setIsInviteOpen(true)}
-            className="inline-flex items-center justify-center rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-          >
-            Invite team member
-          </button>
-        ) : null}
-      </div>
+    <TenantPageShell>
+      <PageHeader
+        eyebrow="Organization"
+        title="Team"
+        description={`Manage members and invitations for ${tenantName}.`}
+        actions={
+          canInvite ? (
+            <button type="button" onClick={() => setIsInviteOpen(true)} className="rc-btn rc-btn-primary">
+              Invite team member
+            </button>
+          ) : null
+        }
+      />
 
       {!canInvite ? (
-        <p className="mt-4 rounded-lg border border-foreground/10 bg-field px-3 py-2 text-sm text-muted">
+        <p className="rc-card px-3 py-2 text-[13px] text-muted">
           Only organization admins and subadmins can create invites.
         </p>
       ) : null}
 
-      <div className="mt-6 border-b border-foreground/10">
-        <div className="flex gap-5">
+      <div className="rc-tabs" role="tablist">
           <TabButton
             active={activeTab === "members"}
             label={`Active members (${memberCount})`}
@@ -139,7 +137,6 @@ export function TeamWorkspace({
             label={`Pending invites (${inviteCount})`}
             onClick={() => setActiveTab("invites")}
           />
-        </div>
       </div>
 
       {activeTab === "members" ? (
@@ -164,7 +161,7 @@ export function TeamWorkspace({
           onClose={() => setIsInviteOpen(false)}
         />
       ) : null}
-    </div>
+    </TenantPageShell>
   );
 }
 
@@ -172,19 +169,13 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
+      data-active={active}
       onClick={onClick}
-      className={[
-        "relative py-2 text-sm font-medium transition-colors",
-        active ? "text-foreground" : "text-muted hover:text-foreground",
-      ].join(" ")}
+      className="rc-tab"
     >
       {label}
-      <span
-        className={[
-          "absolute -bottom-px left-0 h-0.5 w-full transition-colors",
-          active ? "bg-foreground" : "bg-transparent",
-        ].join(" ")}
-      />
     </button>
   );
 }

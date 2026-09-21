@@ -376,15 +376,15 @@ export function HrOnboardingWizard({
             Statutory IDs (optional)
           </p>
           <p className="sm:col-span-2 text-xs text-muted">
-            Not required to generate payslips. Skip TIN / RSA if not on file, or if the employee declined pension.
+            Not required for onboarding %. Leave blank or type NIL if they are not interested in TIN / pension.
           </p>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Tax identification number (TIN)</span>
-            <input name="taxId" defaultValue={draft.taxId} className={inputClass} />
+            <input name="taxId" defaultValue={draft.taxId} placeholder="TIN or NIL" className={inputClass} />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">RSA PIN</span>
-            <input name="rsaPin" defaultValue={draft.rsaPin} placeholder="PEN…" className={inputClass} />
+            <input name="rsaPin" defaultValue={draft.rsaPin} placeholder="PEN… or NIL" className={inputClass} />
           </label>
           <div className="sm:col-span-2">
             <PensionAdministratorField

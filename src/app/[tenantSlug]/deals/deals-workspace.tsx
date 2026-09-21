@@ -28,6 +28,8 @@ import { buildPageUrl, type Pagination, type SearchParamValue } from "@/lib/pagi
 import { createDeal, moveDealStage, moveDealStageDirect } from "./actions";
 import { getEntityTimelineLogs } from "../finance/actions";
 import { TableSearch, filterTableRows } from "@/components/table-search";
+import { PageHeader } from "@/components/page-header";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 import { SortTh, useTableSort } from "@/components/sort-th";
 import { sortTableRows } from "@/lib/table-sort";
 
@@ -307,11 +309,12 @@ export function DealsWorkspace({
   }
 
   return (
-    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Deals</h1>
-          <p className="mt-1 text-sm text-muted">Pipeline execution board from lead to close.</p>
+    <TenantPageShell>
+      <div className="rc-page-header">
+        <div className="min-w-0">
+          <p className="rc-page-eyebrow">Sales</p>
+          <h1 className="rc-page-title !mt-1">Deals</h1>
+          <p className="rc-page-desc">Pipeline execution board from lead to close.</p>
           {activeFilterChips && activeFilterChips.length > 0 ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {activeFilterChips.map((chip) => (
@@ -751,7 +754,7 @@ export function DealsWorkspace({
           </div>
         </ModalOverlay>
       ) : null}
-    </div>
+    </TenantPageShell>
   );
 }
 

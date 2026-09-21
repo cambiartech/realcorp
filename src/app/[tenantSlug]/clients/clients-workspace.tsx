@@ -28,6 +28,8 @@ import {
 } from "./actions";
 import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
 import { ClientProfileFields } from "@/components/clients/client-profile-fields";
+import { PageHeader } from "@/components/page-header";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { SortTh, useTableSort } from "@/components/sort-th";
 import { TableSearch, filterTableRows } from "@/components/table-search";
@@ -351,12 +353,12 @@ export function ClientsWorkspace({
   }
 
   return (
-    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted">Real estate</p>
-          <h1 className="mt-1 text-2xl font-bold text-foreground">Clients</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
+    <TenantPageShell>
+      <div className="rc-page-header">
+        <div className="min-w-0">
+          <p className="rc-page-eyebrow">Real estate</p>
+          <h1 className="rc-page-title">Clients</h1>
+          <p className="rc-page-desc">
             Property owners and investors — track units, pricing plans, and client documents in one place.
           </p>
           {selectedProjectId || selectedStatus ? (
@@ -1024,6 +1026,6 @@ export function ClientsWorkspace({
           router.refresh();
         }}
       />
-    </div>
+    </TenantPageShell>
   );
 }

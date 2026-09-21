@@ -1,3 +1,4 @@
+import { TenantPageShell } from "@/components/tenant-page-shell";
 "use client";
 
 import Link from "next/link";
@@ -421,13 +422,16 @@ export function HrWorkspace(props: {
   }, [teamMembers, profiles]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:py-5">
-      <div className="border-b border-foreground/10 pb-4">
-        <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{heading.title}</h1>
-        <p className="mt-0.5 text-sm text-muted">{heading.subtitle}</p>
-      </div>
+    <TenantPageShell width="medium">
+      <header className="rc-page-header border-b border-[var(--border-subtle)] pb-4">
+        <div className="min-w-0">
+          <p className="rc-page-eyebrow">People</p>
+          <h1 className="rc-page-title">{heading.title}</h1>
+          <p className="rc-page-desc">{heading.subtitle}</p>
+        </div>
+      </header>
 
-      <section className="mt-6 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4 sm:p-5">
+      <section className="rc-card p-4 sm:p-5">
         {activeTab === "people" && canManageHr ? (
           <HrPeopleWorkspace
             tenantSlug={tenantSlug}
@@ -552,6 +556,6 @@ export function HrWorkspace(props: {
           />
         ) : null}
       </section>
-    </div>
+    </TenantPageShell>
   );
 }

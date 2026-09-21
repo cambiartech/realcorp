@@ -13,7 +13,7 @@ import { UiSelect } from "@/components/ui-select";
 import { InventoryItemClass } from "@/generated/prisma";
 import { downloadCsv } from "@/lib/table-export";
 import { MODAL_PANEL_FORM, MODAL_PANEL_SM } from "@/lib/modal-panel";
-import { Download, Package, Plus, TrendingUp } from "lucide-react";
+import { Download, Plus, TrendingUp } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -179,29 +179,28 @@ export function InventoryWorkspace(props: {
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Operations</p>
-          <h1 className="mt-1 text-2xl font-bold text-foreground">Inventory</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
+    <div className="rc-page">
+      <header className="rc-page-header">
+        <div className="min-w-0">
+          <p className="rc-page-eyebrow">Operations</p>
+          <h1 className="rc-page-title">Inventory</h1>
+          <p className="rc-page-desc">
             Materials catalog, suppliers and artisans, stock receive, and historical unit prices for
             building reports.
           </p>
         </div>
-        <Package className="h-8 w-8 text-muted" />
-      </div>
+      </header>
 
-      <div className="flex flex-wrap gap-1 border-b border-foreground/10 pb-1">
+      <div className="rc-tabs" role="tablist">
         {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            data-active={tab === item.id}
             onClick={() => selectTab(item.id)}
-            className={[
-              "rounded-md px-3 py-2 text-sm font-medium",
-              tab === item.id ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]",
-            ].join(" ")}
+            className="rc-tab"
           >
             {item.label}
           </button>

@@ -1297,18 +1297,18 @@ export function HrPeopleWorkspace({
                       label="Tax identification number (TIN)"
                       name="taxId"
                       defaultValue={record.taxId}
-                      hint="Optional for payslip generation — add when available for remittances."
+                      hint="Optional — leave blank or enter NIL if not interested. Does not affect onboarding %."
                     />
                     <Field
                       label="RSA PIN"
                       name="rsaPin"
                       defaultValue={record.rsaPin}
-                      hint="Optional — leave blank if the employee is not interested in pension. Set Pension participation to Not applicable below."
+                      hint="Optional — blank or NIL if not interested. Or set Pension participation to Not applicable."
                     />
                     <PensionAdministratorField
                       defaultValue={record.pensionAdministrator}
                       options={pensionAdministrators}
-                      emptyHint="Add PFAs in People → Settings so they show as a list here."
+                      emptyHint="Optional. Pick NIL if they opted out. Add PFAs in People → Settings for the list."
                     />
                     <Field
                       label="NHF membership number"

@@ -18,6 +18,8 @@ import { createLead } from "./actions";
 import { TableSearch, filterTableRows } from "@/components/table-search";
 import { SortTh, useTableSort } from "@/components/sort-th";
 import { sortTableRows } from "@/lib/table-sort";
+import { PageHeader } from "@/components/page-header";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 
 type LeadRow = {
   id: string;
@@ -166,34 +168,38 @@ export function LeadsWorkspace({
   const warmCount = leads.filter((l) => l.score >= 40 && l.score < 70).length;
 
   return (
-    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Leads</h1>
-          <p className="mt-1 text-sm text-muted">Capture and manage prospects before they become deals.</p>
-          {activeFilterChips && activeFilterChips.length > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {activeFilterChips.map((chip) => (
+    <TenantPageShell>
+      <PageHeader
+        eyebrow="Sales"
+        title="Leads"
+        description={
+          <>
+            Capture and manage prospects before they become deals.
+            {activeFilterChips && activeFilterChips.length > 0 ? (
+              <span className="mt-2 flex flex-wrap items-center gap-2">
+                {activeFilterChips.map((chip) => (
+                  <Link
+                    key={chip.label}
+                    href={chip.clearHref}
+                    className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
+                    title={`Remove ${chip.label}`}
+                  >
+                    <span>{chip.label}</span>
+                    <span aria-hidden>×</span>
+                  </Link>
+                ))}
                 <Link
-                  key={chip.label}
-                  href={chip.clearHref}
-                  className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
-                  title={`Remove ${chip.label}`}
+                  href={`/${tenantSlug}/leads`}
+                  className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
                 >
-                  <span>{chip.label}</span>
-                  <span aria-hidden>×</span>
+                  Clear filters
                 </Link>
-              ))}
-              <Link
-                href={`/${tenantSlug}/leads`}
-                className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
-              >
-                Clear filters
-              </Link>
-            </div>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
+              </span>
+            ) : null}
+          </>
+        }
+        actions={
+          <div className="flex items-center gap-2">
           <DataExportMenu
             filename={`leads-${new Date().toISOString().slice(0, 10)}`}
             sheetName="Leads"
@@ -214,25 +220,26 @@ export function LeadsWorkspace({
             <>
               <Link
                 href={`/${tenantSlug}/leads/import`}
-                className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+                className="rc-btn rc-btn-secondary"
               >
                 Import CSV
               </Link>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
-                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+                className="rc-btn rc-btn-primary"
               >
                 New lead
               </button>
             </>
           ) : null}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="rc-toolbar">
         <div>
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Source</label>
+          <label className="mb-1 block text-[11px] font-medium text-muted">Source</label>
           <SearchableSelect
             value={searchParams.get("source") ?? ""}
             onChange={(value) => applyLeadFilter("source", value)}
@@ -243,7 +250,7 @@ export function LeadsWorkspace({
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Project</label>
+          <label className="mb-1 block text-[11px] font-medium text-muted">Project</label>
           <SearchableSelect
             value={searchParams.get("project") ?? ""}
             onChange={(value) => applyLeadFilter("project", value)}
@@ -254,7 +261,7 @@ export function LeadsWorkspace({
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Owner</label>
+          <label className="mb-1 block text-[11px] font-medium text-muted">Owner</label>
           <SearchableSelect
             value={searchParams.get("owner") ?? ""}
             onChange={(value) => applyLeadFilter("owner", value)}
@@ -266,7 +273,7 @@ export function LeadsWorkspace({
         </div>
         {campaignOptions.length > 0 ? (
           <div>
-            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">Campaign</label>
+            <label className="mb-1 block text-[11px] font-medium text-muted">Campaign</label>
             <SearchableSelect
               value={searchParams.get("campaign") ?? ""}
               onChange={(id) => applyLeadFilter("campaign", id)}
@@ -567,6 +574,6 @@ export function LeadsWorkspace({
           </div>
         </form>
       </ModalOverlay>
-    </div>
+    </TenantPageShell>
   );
 }

@@ -25,6 +25,8 @@ import { createProject, deleteProject, removeProjectStakeholder, updateProject }
 import { TableSearch, filterTableRows } from "@/components/table-search";
 import { SortTh, useTableSort } from "@/components/sort-th";
 import { sortTableRows } from "@/lib/table-sort";
+import { PageHeader } from "@/components/page-header";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 
 type ProjectRow = {
   id: string;
@@ -248,72 +250,44 @@ export function ProjectsWorkspace({
   }
 
   return (
-    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Projects</h1>
-          <p className="mt-1 text-sm text-muted">Create projects and drill into units inventory.</p>
-          {activeFilterChips && activeFilterChips.length > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {activeFilterChips.map((chip) => (
-                <Link
-                  key={chip.label}
-                  href={chip.clearHref}
-                  className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/[0.04] px-2.5 py-1 text-xs text-foreground hover:bg-foreground/[0.08]"
-                  title={`Remove ${chip.label}`}
-                >
-                  <span>{chip.label}</span>
-                  <span aria-hidden>×</span>
-                </Link>
-              ))}
-              <Link
-                href={`/${tenantSlug}/projects`}
-                className="text-xs font-semibold text-[var(--info)] underline decoration-[var(--info-line)] underline-offset-2"
-              >
-                Clear filters
-              </Link>
-            </div>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          <DataExportMenu
-            filename={`projects-${new Date().toISOString().slice(0, 10)}`}
-            sheetName="Projects"
-            headers={["Project", "Units", "Base price", "Location", "Published", "Created"]}
-            keys={["name", "units", "basePrice", "location", "published", "createdAt"]}
-            rows={projectExportRows}
-            reportTitle="Projects Portfolio"
-            companyName={tenantName}
-            kpis={[
-              { label: "Projects", value: projects.length, tone: "highlight" },
-              { label: "Total units", value: totalUnits },
-              { label: "Published listings", value: publishedCount, tone: "positive" },
-              { label: "Draft", value: projects.length - publishedCount },
-            ]}
-            breakdowns={[{ title: "Units by project", rows: inventoryBreakdown }]}
-          />
-          {listingsEnabled ? (
-            <button
-              type="button"
-              onClick={() => setIsShareOpen(true)}
-              className="inline-flex items-center justify-center rounded-md border border-foreground/20 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-foreground/[0.06]"
-            >
-              Explore &amp; embed
-            </button>
-          ) : null}
-          {canManage ? (
-            <button
-              type="button"
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center justify-center rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-            >
-              New project
-            </button>
-          ) : null}
-        </div>
-      </div>
+    <TenantPageShell>
+      <PageHeader
+        eyebrow="Delivery"
+        title="Projects"
+        description="Create projects and drill into units inventory."
+        actions={
+          <>
+            <DataExportMenu
+              filename={`projects-${new Date().toISOString().slice(0, 10)}`}
+              sheetName="Projects"
+              headers={["Project", "Units", "Base price", "Location", "Published", "Created"]}
+              keys={["name", "units", "basePrice", "location", "published", "createdAt"]}
+              rows={projectExportRows}
+              reportTitle="Projects Portfolio"
+              companyName={tenantName}
+              kpis={[
+                { label: "Projects", value: projects.length, tone: "highlight" },
+                { label: "Total units", value: totalUnits },
+                { label: "Published listings", value: publishedCount, tone: "positive" },
+                { label: "Draft", value: projects.length - publishedCount },
+              ]}
+              breakdowns={[{ title: "Units by project", rows: inventoryBreakdown }]}
+            />
+            {listingsEnabled ? (
+              <button type="button" onClick={() => setIsShareOpen(true)} className="rc-btn rc-btn-secondary">
+                Explore &amp; embed
+              </button>
+            ) : null}
+            {canManage ? (
+              <button type="button" onClick={() => setIsCreateOpen(true)} className="rc-btn rc-btn-primary">
+                New project
+              </button>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="mt-5">
+      <div>
         <div className="mb-3">
           <TableSearch
             value={tableQuery}
@@ -732,7 +706,7 @@ export function ProjectsWorkspace({
           </div>
         </ModalOverlay>
       ) : null}
-    </div>
+    </TenantPageShell>
   );
 }
 

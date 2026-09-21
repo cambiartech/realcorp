@@ -36,38 +36,46 @@ export function ProfileComplianceChecklist({
   const guarantor = items.find((i) => i.id === "guarantor");
 
   return (
-    <div className="rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4">
+    <div className="rounded-xl border border-foreground/[0.08] bg-background p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-foreground">
+        <p className="text-[13px] font-semibold text-foreground">
           {serviceProviderMode ? "Payroll readiness" : "Onboarding checklist"}
         </p>
-        <span className="text-xs font-medium text-muted">{percent}% complete</span>
+        <span className="text-[12px] font-medium tabular-nums text-muted">{percent}%</span>
       </div>
       {serviceProviderMode ? (
         <p className="mb-3 text-[11px] text-muted">
           Service / contract staff do not need biodata, guarantor, NDA, or offer-letter forms. Track pay only.
         </p>
-      ) : null}
-      <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-foreground/10">
+      ) : (
+        <p className="mb-3 text-[11px] text-muted">
+          % uses required items only. TIN / pension stay optional (blank or NIL).
+        </p>
+      )}
+      <div className="mb-3 h-1 overflow-hidden rounded-full bg-foreground/[0.06]">
         <div
-          className="h-full rounded-full bg-[var(--success)] transition-all"
+          className="h-full rounded-full bg-[var(--accent)] transition-all"
           style={{ width: `${percent}%` }}
         />
       </div>
-      <ul className="space-y-2">
+      <ul className="space-y-1.5">
         {items.map((item) => (
-          <li key={item.id} className="flex gap-2 text-sm">
+          <li key={item.id} className="flex gap-2.5 text-[13px]">
             {item.done ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--success)]" />
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--success)]" strokeWidth={1.75} />
+            ) : item.optional ? (
+              <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted/40" strokeWidth={1.5} />
             ) : (
-              <Circle className="h-4 w-4 shrink-0 text-muted" />
+              <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted" strokeWidth={1.75} />
             )}
             <span className={item.done ? "text-foreground" : "text-muted"}>
               {item.label}
               {item.optional ? (
-                <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-muted">(optional)</span>
+                <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-muted/70">
+                  optional
+                </span>
               ) : null}
-              {item.hint && !item.done ? <span className="block text-[10px]">{item.hint}</span> : null}
+              {item.hint && !item.done ? <span className="mt-0.5 block text-[11px] text-muted/80">{item.hint}</span> : null}
             </span>
           </li>
         ))}

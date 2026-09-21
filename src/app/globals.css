@@ -174,6 +174,14 @@ table th {
   border-radius: var(--r-xs);
 }
 
+/* Clickable controls always show a pointer — browsers default buttons to arrow. */
+:where(button, [role="button"], summary, .rc-btn, .rc-card-interactive) {
+  cursor: pointer;
+}
+:where(button:disabled, [role="button"][aria-disabled="true"], .rc-btn:disabled) {
+  cursor: not-allowed;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Component classes
    Use these instead of re-deriving the same utility strings per screen.
@@ -197,38 +205,134 @@ table th {
   border-radius: var(--r-md);
   box-shadow: var(--shadow-xs);
   text-align: left;
-  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
 .rc-card-interactive:hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--elevated) 92%, var(--surface));
+}
+
+/* ── Page chrome (use on every tenant screen) ──────────────────────── */
+.rc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.rc-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.rc-page-eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rc-page-title {
+  margin-top: 0.25rem;
+  font-size: 1.625rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--foreground);
+}
+.rc-page-desc {
+  margin-top: 0.375rem;
+  max-width: 42rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.rc-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Quiet filter / action strip under the header */
+.rc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--elevated);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Segmented tabs — pill track, not shouty black blocks */
+.rc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  width: fit-content;
+  max-width: 100%;
+}
+.rc-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: var(--r-sm);
+  padding: 0.375rem 0.875rem;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: background-color .12s ease, color .12s ease;
+  border: 0;
+  background: transparent;
+}
+.rc-tab:hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+.rc-tab[aria-selected="true"],
+.rc-tab[data-active="true"] {
+  background: var(--elevated);
+  color: var(--foreground);
+  box-shadow: var(--shadow-xs);
+  font-weight: 550;
 }
 
 /* ── Section heading ───────────────────────────────────────────────── */
 .rc-section-title {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--faint);
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+.rc-section-hint {
+  margin-top: 0.25rem;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
 }
 
 /* ── Metric card ───────────────────────────────────────────────────── */
 .rc-metric-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--muted);
 }
 .rc-metric-value {
-  font-size: 30px;
-  font-weight: 650;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
   color: var(--foreground);
-  margin-top: 8px;
+  margin-top: 0.375rem;
 }
 /* A zero should read as "nothing yet", not as a failed render. */
 .rc-metric-value[data-zero="true"] {
@@ -281,7 +385,7 @@ table th {
 }
 .rc-btn:disabled { opacity: .5; cursor: not-allowed; }
 .rc-btn-primary   { background: var(--foreground); color: var(--background); box-shadow: var(--shadow-xs); }
-.rc-btn-primary:hover:not(:disabled)   { background: var(--accent); }
+.rc-btn-primary:hover:not(:disabled)   { background: color-mix(in srgb, var(--foreground) 88%, black); }
 .rc-btn-secondary { background: var(--elevated); color: var(--foreground); border-color: var(--border-strong); }
 .rc-btn-secondary:hover:not(:disabled) { background: var(--field); }
 .rc-btn-ghost     { background: transparent; color: var(--muted); }

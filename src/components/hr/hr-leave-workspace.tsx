@@ -18,11 +18,11 @@ import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
-import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
+import { MODAL_PANEL_FORM, MODAL_PANEL_MD, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { filterLeaveTypesForGender } from "@/lib/hr-leave";
 import { ArrowLeft, CalendarDays, Check, Clock3, Pencil, Plus, Settings2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type LeaveRequestRow = {
   id: string;
@@ -160,6 +160,10 @@ export function HrLeaveWorkspace({
   const [showHoliday, setShowHoliday] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<LeaveRequestRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<{ profileId?: string; typeId?: string } | null>(null);
+  const [adjustEmployeeId, setAdjustEmployeeId] = useState("");
+  const [adjustTypeId, setAdjustTypeId] = useState("");
+  const [adjustYear, setAdjustYear] = useState(year);
+  const [adjustUnitsDraft, setAdjustUnitsDraft] = useState("");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState("");
@@ -199,6 +203,71 @@ export function HrLeaveWorkspace({
       policy.code === "ANNUAL-NG" ||
       policy.name.toLowerCase() === "annual leave",
   );
+
+  useEffect(() => {
+    if (!adjustTarget) return;
+    setAdjustEmployeeId(adjustTarget.profileId || "");
+    setAdjustTypeId(adjustTarget.typeId || "");
+    setAdjustYear(year);
+    setAdjustUnitsDraft("");
+  }, [adjustTarget, year]);
+
+  const adjustBalancePreview = useMemo(() => {
+    if (!adjustEmployeeId || !adjustTypeId) return null;
+    const policy = policies.find((p) => p.id === adjustTypeId);
+    if (employeeDetail?.employee.id === adjustEmployeeId) {
+      const balance = employeeDetail.balances.find((b) => b.leaveTypeId === adjustTypeId);
+      if (balance) {
+        return {
+          name: balance.name,
+          dayUnit: balance.dayUnit,
+          available: balance.available,
+          unlimited: balance.unlimited,
+          accrued: balance.accrued,
+          adjustment: balance.adjustment,
+          approved: balance.approved,
+          pending: balance.pending,
+          entitlement: policy?.annualEntitlement ?? null,
+        };
+      }
+    }
+    const row = leaveRoster.find((r) => r.employeeProfileId === adjustEmployeeId);
+    const balance = row?.balances.find((b) => b.leaveTypeId === adjustTypeId);
+    if (!balance) {
+      if (!policy) return null;
+      return {
+        name: policy.name,
+        dayUnit: policy.dayUnit,
+        available: policy.unlimited ? null : policy.annualEntitlement,
+        unlimited: policy.unlimited,
+        accrued: policy.unlimited ? null : policy.annualEntitlement,
+        adjustment: 0,
+        approved: 0,
+        pending: 0,
+        entitlement: policy.unlimited ? null : policy.annualEntitlement,
+      };
+    }
+    return {
+      name: balance.name,
+      dayUnit: balance.dayUnit,
+      available: balance.available,
+      unlimited: balance.unlimited,
+      accrued: null as number | null,
+      adjustment: balance.adjustment,
+      approved: balance.approved,
+      pending: balance.pending,
+      entitlement: policy?.unlimited ? null : (policy?.annualEntitlement ?? null),
+    };
+  }, [adjustEmployeeId, adjustTypeId, employeeDetail, leaveRoster, policies]);
+
+  const adjustDraftNumber = Number(adjustUnitsDraft);
+  const adjustProjectedAvailable =
+    adjustBalancePreview &&
+    !adjustBalancePreview.unlimited &&
+    adjustBalancePreview.available != null &&
+    Number.isFinite(adjustDraftNumber)
+      ? adjustBalancePreview.available + adjustDraftNumber
+      : null;
 
   async function openEmployeeLeave(profileId: string) {
     setTab("balances");
@@ -292,55 +361,57 @@ export function HrLeaveWorkspace({
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">People operations</p>
-          <h1 className="mt-1 text-2xl font-bold text-foreground">Leave tracker</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
+    <div className="space-y-6">
+      <div className="rc-page-header">
+        <div className="min-w-0">
+          <p className="rc-page-eyebrow">People operations</p>
+          <h1 className="rc-page-title">Leave tracker</h1>
+          <p className="rc-page-desc">
             Request time away. HR sets how many days each leave type grants — then approves requests.
           </p>
         </div>
         {hasEmployeeProfile ? (
-          <button
-            type="button"
-            onClick={() => setShowRequest(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2.5 text-sm font-semibold text-background"
-          >
-            <Plus className="h-4 w-4" />
-            Request leave
-          </button>
+          <div className="rc-page-actions">
+            <button
+              type="button"
+              onClick={() => setShowRequest(true)}
+              className="rc-btn rc-btn-primary"
+            >
+              <Plus className="h-4 w-4" />
+              Request leave
+            </button>
+          </div>
         ) : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-foreground/10 p-4">
-          <p className="text-xs text-muted">Available in {year}</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{summary.available}</p>
-          <p className="text-xs text-muted">across limited policies</p>
+        <div className="rc-card p-4">
+          <p className="rc-metric-label">Available in {year}</p>
+          <p className="rc-metric-value" data-zero={summary.available === 0}>{summary.available}</p>
+          <p className="rc-metric-hint">across limited policies</p>
         </div>
-        <div className="rounded-lg border border-foreground/10 p-4">
-          <p className="text-xs text-muted">My pending requests</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{summary.pending}</p>
+        <div className="rc-card p-4">
+          <p className="rc-metric-label">My pending requests</p>
+          <p className="rc-metric-value" data-zero={summary.pending === 0}>{summary.pending}</p>
         </div>
-        <div className="rounded-lg border border-foreground/10 p-4">
-          <p className="text-xs text-muted">My approved requests</p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{summary.approved}</p>
+        <div className="rc-card p-4">
+          <p className="rc-metric-label">My approved requests</p>
+          <p className="rc-metric-value" data-zero={summary.approved === 0}>{summary.approved}</p>
         </div>
         {canManage ? (
-          <div className="rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] p-4">
-            <p className="text-xs text-muted">Awaiting HR review</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{pendingTeamCount}</p>
+          <div className="rc-card border-[var(--danger-line)] bg-[var(--danger-wash)] p-4">
+            <p className="rc-metric-label">Awaiting HR review</p>
+            <p className="rc-metric-value" data-zero={pendingTeamCount === 0}>{pendingTeamCount}</p>
           </div>
         ) : (
-          <div className="rounded-lg border border-foreground/10 p-4">
-            <CalendarDays className="h-5 w-5 text-muted" />
-            <p className="mt-2 text-xs text-muted">Weekends and configured public holidays are excluded.</p>
+          <div className="rc-card p-4">
+            <CalendarDays className="h-5 w-5 text-muted" strokeWidth={1.75} />
+            <p className="mt-2 text-[12.5px] text-muted">Weekends and configured public holidays are excluded.</p>
           </div>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-foreground/10 pb-1">
+      <div className="rc-tabs" role="tablist">
         {[
           ...(canManage ? ([{ id: "team", label: `Team requests (${pendingTeamCount})` }] as const) : []),
           { id: "mine", label: "My leave" } as const,
@@ -355,11 +426,11 @@ export function HrLeaveWorkspace({
           <button
             key={item.id}
             type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            data-active={tab === item.id}
             onClick={() => setTab(item.id)}
-            className={[
-              "rounded-md px-3 py-2 text-sm font-medium",
-              tab === item.id ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06]",
-            ].join(" ")}
+            className="rc-tab"
           >
             {item.label}
           </button>
@@ -393,14 +464,14 @@ export function HrLeaveWorkspace({
                       setPending(false);
                     }
                   }}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--success)] px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-[var(--success)] px-2.5 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Check className="h-3.5 w-3.5" /> Approve
                 </button>
                 <button
                   type="button"
                   onClick={() => setReviewTarget(request)}
-                  className="inline-flex items-center gap-1 rounded-md border border-foreground/15 px-2.5 py-1.5 text-xs font-semibold"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-foreground/12 bg-background px-2.5 py-1.5 text-[12px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.04]"
                 >
                   <X className="h-3.5 w-3.5" /> Decline
                 </button>
@@ -469,17 +540,17 @@ export function HrLeaveWorkspace({
 
       {tab === "policies" && canManage ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Leave policies</h2>
-              <p className="text-xs text-muted">
+          <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-foreground/[0.08] bg-background p-4 shadow-sm">
+            <div className="min-w-0 max-w-2xl">
+              <h2 className="text-[15px] font-semibold text-foreground">Leave policies</h2>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted">
                 These rules belong to <strong>this organization only</strong>. Change days, pay %,
                 and units with <strong>Edit policy</strong> — other tenants keep their own settings.
                 Defaults (e.g. annual 22 days, maternity 12 weeks at full pay) are starters you can
                 override anytime. Per-person add/deduct is on <strong>Leave balances</strong>.
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 disabled={pending}
@@ -508,27 +579,35 @@ export function HrLeaveWorkspace({
                     setPending(false);
                   }
                 }}
-                className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/12 bg-background px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.04] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Reset to 22 days
               </button>
-              <button type="button" onClick={() => setAdjustTarget({})} className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setAdjustTarget({})}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/12 bg-background px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.04]"
+              >
                 Adjust balance
               </button>
-              <button type="button" onClick={() => setShowPolicy(true)} className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background">
+              <button
+                type="button"
+                onClick={() => setShowPolicy(true)}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-foreground px-3.5 py-2 text-[13px] font-semibold text-background transition-opacity hover:opacity-90"
+              >
                 <Settings2 className="h-3.5 w-3.5" /> New policy
               </button>
             </div>
           </div>
-          <div className="overflow-hidden rounded-lg border border-foreground/10">
-            <div className="divide-y divide-foreground/10">
+          <div className="overflow-hidden rounded-xl border border-foreground/[0.08] bg-background shadow-sm">
+            <div className="divide-y divide-foreground/[0.06]">
               {policies.map((policy) => (
-                <div key={policy.id} className="grid gap-3 px-4 py-3 md:grid-cols-[1.2fr_.7fr_.7fr_1.2fr_auto] md:items-center">
+                <div key={policy.id} className="grid gap-3 px-4 py-3.5 md:grid-cols-[1.2fr_.7fr_.7fr_1.2fr_auto] md:items-center">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">{policy.name}</p>
-                    <p className="text-xs text-muted">{policy.code} · {policy.countryCode || "All countries"}</p>
+                    <p className="text-[14px] font-semibold text-foreground">{policy.name}</p>
+                    <p className="mt-0.5 text-[12px] text-muted">{policy.code} · {policy.countryCode || "All countries"}</p>
                   </div>
-                  <p className="text-xs text-muted">
+                  <p className="text-[12px] text-muted">
                     {policy.unlimited
                       ? "Unlimited"
                       : `${policy.annualEntitlement} ${unitLabel(policy.dayUnit, policy.annualEntitlement)} / year`}
@@ -538,14 +617,14 @@ export function HrLeaveWorkspace({
                       ? " · 12 weeks"
                       : ""}
                   </p>
-                  <p className="text-xs text-muted">
+                  <p className="text-[12px] text-muted">
                     {policy.paidPercentage}% paid · {policy.accrualMethod.toLowerCase().replace("_", " ")}
                   </p>
-                  <p className="text-xs text-muted">{policy.statutoryReference || "Organization policy"}</p>
+                  <p className="text-[12px] text-muted">{policy.statutoryReference || "Organization policy"}</p>
                   <button
                     type="button"
                     onClick={() => setEditingPolicy(policy)}
-                    className="inline-flex items-center justify-center gap-1 rounded-md border border-foreground/15 px-2.5 py-1.5 text-xs font-semibold"
+                    className="inline-flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-foreground/12 bg-background px-2.5 py-1.5 text-[12px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.04]"
                   >
                     <Pencil className="h-3.5 w-3.5" /> Edit policy
                   </button>
@@ -560,10 +639,10 @@ export function HrLeaveWorkspace({
         <div className="space-y-4">
           {!selectedEmployeeId ? (
             <>
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">Leave balances · {year}</h2>
-                  <p className="text-xs text-muted">
+              <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-foreground/[0.08] bg-background p-4 shadow-sm">
+                <div className="min-w-0 max-w-2xl">
+                  <h2 className="text-[15px] font-semibold text-foreground">Leave balances · {year}</h2>
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted">
                     Everyone listed below
                     {annualPolicy
                       ? ` · Annual leave policy is ${annualPolicy.annualEntitlement} working days`
@@ -572,7 +651,7 @@ export function HrLeaveWorkspace({
                     <button
                       type="button"
                       onClick={() => setTab("policies")}
-                      className="font-semibold underline decoration-foreground/25 underline-offset-2"
+                      className="cursor-pointer font-semibold underline decoration-foreground/25 underline-offset-2"
                     >
                       Leave policies → Set days
                     </button>
@@ -580,7 +659,7 @@ export function HrLeaveWorkspace({
                   </p>
                 </div>
                 <label className="w-full max-w-xs text-sm">
-                  <span className="mb-1 block text-xs font-medium text-muted">Search staff</span>
+                  <span className="mb-1 block text-[12px] font-medium text-muted">Search staff</span>
                   <input
                     value={employeeSearch}
                     onChange={(e) => setEmployeeSearch(e.target.value)}
@@ -589,22 +668,22 @@ export function HrLeaveWorkspace({
                   />
                 </label>
               </div>
-              <div className="overflow-hidden rounded-lg border border-foreground/10">
+              <div className="overflow-hidden rounded-xl border border-foreground/[0.08] bg-background shadow-sm">
                 {filteredRoster.length === 0 ? (
-                  <p className="px-4 py-8 text-center text-sm text-muted">No matching employees.</p>
+                  <p className="px-4 py-8 text-center text-[13px] text-muted">No matching employees.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[780px] text-left text-sm">
-                      <thead className="bg-foreground/[0.03] text-xs text-muted">
+                    <table className="w-full min-w-[780px] text-left text-[13px]">
+                      <thead className="bg-foreground/[0.03] text-[12px] text-muted">
                         <tr>
-                          <th className="px-4 py-3">Employee</th>
-                          <th className="px-4 py-3">Annual left</th>
-                          <th className="px-4 py-3">Other leave</th>
-                          <th className="px-4 py-3">Requests</th>
-                          <th className="px-4 py-3 text-right">Action</th>
+                          <th className="px-4 py-3 font-medium">Employee</th>
+                          <th className="px-4 py-3 font-medium">Annual left</th>
+                          <th className="px-4 py-3 font-medium">Other leave</th>
+                          <th className="px-4 py-3 font-medium">Requests</th>
+                          <th className="px-4 py-3 text-right font-medium">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-foreground/10">
+                      <tbody className="divide-y divide-foreground/[0.06]">
                         {filteredRoster.map((row) => {
                           const annual = row.balances.find(
                             (b) =>
@@ -620,12 +699,12 @@ export function HrLeaveWorkspace({
                                 <button
                                   type="button"
                                   onClick={() => void openEmployeeLeave(row.employeeProfileId)}
-                                  className="text-left"
+                                  className="cursor-pointer text-left"
                                 >
                                   <p className="font-medium text-foreground underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60">
                                     {row.name}
                                   </p>
-                                  <p className="text-xs text-muted">
+                                  <p className="text-[12px] text-muted">
                                     {row.department || "No department"}
                                   </p>
                                 </button>
@@ -637,13 +716,13 @@ export function HrLeaveWorkspace({
                                     : `${annual.available ?? 0} days`
                                   : "—"}
                                 {annual && annual.adjustment !== 0 ? (
-                                  <p className="text-xs font-normal text-muted">
+                                  <p className="text-[12px] font-normal text-muted">
                                     adj {annual.adjustment > 0 ? "+" : ""}
                                     {annual.adjustment}
                                   </p>
                                 ) : null}
                               </td>
-                              <td className="px-4 py-3 text-xs text-muted">
+                              <td className="px-4 py-3 text-[12px] text-muted">
                                 {others.length
                                   ? others
                                       .map(
@@ -659,7 +738,7 @@ export function HrLeaveWorkspace({
                                   <button
                                     type="button"
                                     onClick={() => void openEmployeeLeave(row.employeeProfileId)}
-                                    className="text-xs font-semibold underline decoration-foreground/25 underline-offset-2"
+                                    className="cursor-pointer text-[12px] font-semibold underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
                                   >
                                     History
                                   </button>
@@ -671,7 +750,7 @@ export function HrLeaveWorkspace({
                                         typeId: annual?.leaveTypeId,
                                       })
                                     }
-                                    className="text-xs font-semibold underline decoration-foreground/25 underline-offset-2"
+                                    className="cursor-pointer text-[12px] font-semibold underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
                                   >
                                     Add / deduct
                                   </button>
@@ -696,14 +775,14 @@ export function HrLeaveWorkspace({
                       setSelectedEmployeeId(null);
                       setEmployeeDetail(null);
                     }}
-                    className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-muted hover:text-foreground"
+                    className="mb-2 inline-flex cursor-pointer items-center gap-1 text-[12px] font-semibold text-muted transition-colors hover:text-foreground"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" /> All employees
                   </button>
-                  <h2 className="text-sm font-semibold text-foreground">
+                  <h2 className="text-[15px] font-semibold text-foreground">
                     {employeeDetail?.employee.name || "Employee"}
                   </h2>
-                  <p className="text-xs text-muted">
+                  <p className="mt-0.5 text-[12px] text-muted">
                     {employeeDetail?.employee.department || "No department"} · {year} leave year
                   </p>
                 </div>
@@ -712,7 +791,7 @@ export function HrLeaveWorkspace({
                   onClick={() =>
                     setAdjustTarget({ profileId: selectedEmployeeId || undefined })
                   }
-                  className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/12 bg-background px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.04]"
                 >
                   Adjust balance
                 </button>
@@ -846,14 +925,13 @@ export function HrLeaveWorkspace({
 
       {tab === "holidays" && canManage ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Public holiday calendar</h2>
-              <p className="text-xs text-muted">
+          <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-foreground/[0.08] bg-background p-4 shadow-sm">
+            <div className="min-w-0 max-w-2xl">
+              <h2 className="text-[15px] font-semibold text-foreground">Public holiday calendar</h2>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted">
                 Working-day leave skips weekends and these dates — holidays are not deducted from
                 staff balances. Public holidays for the organisation country are pulled automatically
-                and marked tentative — add custom dates here too. Short-let operations are not
-                affected.
+                and marked tentative — add custom dates here too.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -879,34 +957,34 @@ export function HrLeaveWorkspace({
                   }
                 }}
                 disabled={pending}
-                className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/12 bg-background px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.04] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Sync public holidays
               </button>
               <button
                 type="button"
                 onClick={() => setShowHoliday(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/12 bg-background px-3.5 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.04]"
               >
                 <Plus className="h-3.5 w-3.5" /> Add custom holiday
               </button>
             </div>
           </div>
-          <div className="overflow-hidden rounded-lg border border-foreground/10">
+          <div className="overflow-hidden rounded-xl border border-foreground/[0.08] bg-background shadow-sm">
             {holidays.length ? (
-              <div className="divide-y divide-foreground/10">
+              <div className="divide-y divide-foreground/[0.06]">
                 {holidays.map((holiday) => (
-                  <div key={holiday.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div key={holiday.id} className="flex items-center justify-between gap-3 px-4 py-3.5">
                     <div>
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="text-[14px] font-medium text-foreground">
                         {holiday.name}
                         {holiday.tentative ? (
-                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                          <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200/80">
                             Tentative
                           </span>
                         ) : null}
                       </p>
-                      <p className="text-xs text-muted">
+                      <p className="mt-0.5 text-[12px] text-muted">
                         {holiday.date} · {holiday.countryCode || "All countries"}
                         {holiday.regionCode ? ` / ${holiday.regionCode}` : ""}
                         {holiday.source === "PUBLIC" || holiday.source === "GOOGLE"
@@ -929,7 +1007,7 @@ export function HrLeaveWorkspace({
                           setPending(false);
                         }
                       }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-foreground/15 text-muted hover:text-[var(--danger)] disabled:opacity-50"
+                      className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-foreground/12 text-muted transition-colors hover:border-[var(--danger-line)] hover:bg-[var(--danger-wash)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -937,7 +1015,7 @@ export function HrLeaveWorkspace({
                 ))}
               </div>
             ) : (
-              <p className="px-4 py-6 text-center text-sm text-muted">No holidays configured for {year}.</p>
+              <p className="px-4 py-8 text-center text-[13px] text-muted">No holidays configured for {year}.</p>
             )}
           </div>
         </div>
@@ -1206,46 +1284,222 @@ export function HrLeaveWorkspace({
         </form>
       </ModalOverlay>
 
-      <ModalOverlay open={Boolean(adjustTarget)} onClose={() => !pending && setAdjustTarget(null)} panelClassName={MODAL_PANEL_XS} aria-labelledby="adjust-leave-title">
+      <ModalOverlay
+        open={Boolean(adjustTarget)}
+        onClose={() => !pending && setAdjustTarget(null)}
+        panelClassName={MODAL_PANEL_MD}
+        aria-labelledby="adjust-leave-title"
+      >
         <form
           key={`${adjustTarget?.profileId || ""}-${adjustTarget?.typeId || ""}`}
           onSubmit={async (event) => {
-          event.preventDefault();
-          const data = new FormData(event.currentTarget);
-          setPending(true);
-          try {
-            if (await finish(await adjustLeaveBalance(tenantSlug, {
-              employeeProfileId: String(data.get("employeeProfileId") || ""),
-              leaveTypeId: String(data.get("leaveTypeId") || ""),
-              year: Number(data.get("year")),
-              adjustmentUnits: Number(data.get("adjustmentUnits")),
-              reason: String(data.get("reason") || ""),
-            }), "Leave balance adjusted.")) setAdjustTarget(null);
-          } finally { setPending(false); }
-        }}>
-          <div className="border-b border-foreground/10 px-5 py-4">
-            <h2 id="adjust-leave-title" className="text-lg font-semibold">Adjust leave balance</h2>
-            <p className="text-sm text-muted">
-              Use a <strong>negative</strong> number to deduct days already taken before Realcorp
-              (e.g. −5 if they used 5 annual days earlier this year). Positive adds days. Changes are audited.
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            setPending(true);
+            try {
+              if (
+                await finish(
+                  await adjustLeaveBalance(tenantSlug, {
+                    employeeProfileId: String(data.get("employeeProfileId") || ""),
+                    leaveTypeId: String(data.get("leaveTypeId") || ""),
+                    year: Number(data.get("year")),
+                    adjustmentUnits: Number(data.get("adjustmentUnits")),
+                    reason: String(data.get("reason") || ""),
+                  }),
+                  "Leave balance adjusted.",
+                )
+              ) {
+                setAdjustTarget(null);
+                if (selectedEmployeeId) void refreshEmployeeDetail();
+              }
+            } finally {
+              setPending(false);
+            }
+          }}
+        >
+          <div className="border-b border-[var(--border-subtle)] px-6 py-5">
+            <h2 id="adjust-leave-title" className="text-[1.125rem] font-semibold tracking-tight">
+              Adjust leave balance
+            </h2>
+            <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-muted">
+              Use a <strong className="font-medium text-foreground">negative</strong> number to deduct
+              days already taken before Realcorp (e.g. −5). Positive adds days. Changes are audited.
             </p>
           </div>
-          <div className="grid gap-3 p-5">
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Employee</span><select name="employeeProfileId" required defaultValue={adjustTarget?.profileId || ""} className={inputClass}><option value="">Select employee</option>{employeeOptions.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
-            <label className="text-sm"><span className="mb-1 block text-xs font-medium">Leave policy</span><select name="leaveTypeId" required defaultValue={adjustTarget?.typeId || ""} className={inputClass}><option value="">Select policy</option>{policies.map((policy) => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</select></label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm"><span className="mb-1 block text-xs font-medium">Year</span><input type="number" name="year" defaultValue={year} required className={inputClass} /></label>
+
+          <div className="grid gap-4 px-6 py-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm sm:col-span-1">
+                <span className="mb-1.5 block text-[12.5px] font-medium text-muted">Employee</span>
+                <select
+                  name="employeeProfileId"
+                  required
+                  value={adjustEmployeeId}
+                  onChange={(e) => setAdjustEmployeeId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select employee</option>
+                  {employeeOptions.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="text-sm">
-                <span className="mb-1 block text-xs font-medium">Adjustment (days)</span>
-                <input type="number" name="adjustmentUnits" step="0.25" required className={inputClass} placeholder="e.g. -5" />
+                <span className="mb-1.5 block text-[12.5px] font-medium text-muted">Leave policy</span>
+                <select
+                  name="leaveTypeId"
+                  required
+                  value={adjustTypeId}
+                  onChange={(e) => setAdjustTypeId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select policy</option>
+                  {policies.map((policy) => (
+                    <option key={policy.id} value={policy.id}>
+                      {policy.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {adjustBalancePreview ? (
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-3.5">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[12.5px] font-medium text-muted">
+                      Current balance · {adjustYear}
+                    </p>
+                    <p className="mt-1 text-[1.75rem] font-semibold tracking-tight tabular-nums text-foreground">
+                      {adjustBalancePreview.unlimited
+                        ? "∞"
+                        : adjustBalancePreview.available ?? "—"}
+                      {!adjustBalancePreview.unlimited ? (
+                        <span className="ml-1.5 text-[13px] font-medium text-muted">
+                          {unitLabel(adjustBalancePreview.dayUnit, adjustBalancePreview.available ?? undefined)} left
+                        </span>
+                      ) : (
+                        <span className="ml-1.5 text-[13px] font-medium text-muted">unlimited</span>
+                      )}
+                    </p>
+                  </div>
+                  {adjustProjectedAvailable != null ? (
+                    <div className="text-right">
+                      <p className="text-[12.5px] font-medium text-muted">After this adjustment</p>
+                      <p
+                        className={[
+                          "mt-1 text-[1.25rem] font-semibold tabular-nums tracking-tight",
+                          adjustProjectedAvailable < 0 ? "text-[var(--danger)]" : "text-foreground",
+                        ].join(" ")}
+                      >
+                        {adjustProjectedAvailable}
+                        <span className="ml-1 text-[12.5px] font-medium text-muted">
+                          {unitLabel(adjustBalancePreview.dayUnit, adjustProjectedAvailable)}
+                        </span>
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                {!adjustBalancePreview.unlimited ? (
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-[var(--border-subtle)] pt-3 text-[12.5px] sm:grid-cols-4">
+                    {adjustBalancePreview.entitlement != null ? (
+                      <div>
+                        <dt className="text-muted">Policy grant</dt>
+                        <dd className="font-medium tabular-nums text-foreground">
+                          {adjustBalancePreview.entitlement}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {adjustBalancePreview.accrued != null ? (
+                      <div>
+                        <dt className="text-muted">Granted</dt>
+                        <dd className="font-medium tabular-nums text-foreground">
+                          {adjustBalancePreview.accrued}
+                        </dd>
+                      </div>
+                    ) : null}
+                    <div>
+                      <dt className="text-muted">Prior adjustments</dt>
+                      <dd className="font-medium tabular-nums text-foreground">
+                        {adjustBalancePreview.adjustment > 0 ? "+" : ""}
+                        {adjustBalancePreview.adjustment}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Approved used</dt>
+                      <dd className="font-medium tabular-nums text-foreground">
+                        {adjustBalancePreview.approved}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Pending</dt>
+                      <dd className="font-medium tabular-nums text-foreground">
+                        {adjustBalancePreview.pending}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3 text-[13px] text-muted">
+                Select an employee and leave policy to see their current balance.
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <label className="text-sm">
+                <span className="mb-1.5 block text-[12.5px] font-medium text-muted">Year</span>
+                <input
+                  type="number"
+                  name="year"
+                  required
+                  value={adjustYear}
+                  onChange={(e) => setAdjustYear(Number(e.target.value) || year)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1.5 block text-[12.5px] font-medium text-muted">
+                  Adjustment ({adjustBalancePreview ? unitLabel(adjustBalancePreview.dayUnit) : "days"})
+                </span>
+                <input
+                  type="number"
+                  name="adjustmentUnits"
+                  step="0.25"
+                  required
+                  value={adjustUnitsDraft}
+                  onChange={(e) => setAdjustUnitsDraft(e.target.value)}
+                  className={inputClass}
+                  placeholder="e.g. -5"
+                />
               </label>
             </div>
             <label className="text-sm">
-              <span className="mb-1 block text-xs font-medium">Reason</span>
-              <textarea name="reason" rows={3} required className={inputClass} placeholder="e.g. 5 annual days taken before go-live in 2026" />
+              <span className="mb-1.5 block text-[12.5px] font-medium text-muted">Reason</span>
+              <textarea
+                name="reason"
+                rows={3}
+                required
+                className={inputClass}
+                placeholder="e.g. 5 annual days taken before go-live in 2026"
+              />
             </label>
           </div>
-          <div className="flex justify-end gap-2 border-t border-foreground/10 px-5 py-4"><button type="button" onClick={() => setAdjustTarget(null)} className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold">Cancel</button><button type="submit" disabled={pending} className="rounded-md bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">{pending ? "Saving…" : "Save adjustment"}</button></div>
+
+          <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
+            <button
+              type="button"
+              onClick={() => setAdjustTarget(null)}
+              className="rc-btn rc-btn-secondary"
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={pending} className="rc-btn rc-btn-primary">
+              {pending ? "Saving…" : "Save adjustment"}
+            </button>
+          </div>
         </form>
       </ModalOverlay>
 

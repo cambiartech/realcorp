@@ -19,6 +19,8 @@ import type { CaptureFormField } from "@/lib/capture-form-types";
 import { formatEnumLabel } from "@/lib/ui-format";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createCampaign } from "./actions";
+import { PageHeader } from "@/components/page-header";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 
 type CampaignRow = {
   id: string;
@@ -111,11 +113,12 @@ export function MarketingWorkspace({
   }, [showSnackbar, state]);
 
   return (
-    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Marketing</h1>
-          <p className="mt-1 text-sm text-muted">
+    <TenantPageShell>
+      <PageHeader
+        eyebrow="Growth"
+        title="Marketing"
+        description={
+          <>
             Campaigns, capture forms, and lead attribution for{" "}
             <span className="font-medium text-foreground">{tenantName}</span>. Control whether new
             submissions go to Sales immediately or wait in{" "}
@@ -123,20 +126,18 @@ export function MarketingWorkspace({
               Marketing settings
             </a>
             .
-          </p>
-        </div>
-        {canEdit && tab === "campaigns" ? (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-          >
-            New campaign
-          </button>
-        ) : null}
-      </div>
+          </>
+        }
+        actions={
+          canEdit && tab === "campaigns" ? (
+            <button type="button" onClick={() => setOpen(true)} className="rc-btn rc-btn-primary">
+              New campaign
+            </button>
+          ) : null
+        }
+      />
 
-      <div className="mt-6 flex gap-2 border-b border-foreground/10">
+      <div className="rc-tabs" role="tablist">
         {(
           [
             ["forms", "Capture forms"],
@@ -146,12 +147,11 @@ export function MarketingWorkspace({
           <button
             key={key}
             type="button"
+            role="tab"
+            aria-selected={tab === key}
+            data-active={tab === key}
             onClick={() => setTab(key)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${
-              tab === key
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted hover:text-foreground"
-            }`}
+            className="rc-tab"
           >
             {label}
           </button>
@@ -326,15 +326,15 @@ export function MarketingWorkspace({
           </div>
         </form>
       </ModalOverlay>
-    </div>
+    </TenantPageShell>
   );
 }
 
 function KpiCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
+    <div className="rc-card px-4 py-3.5">
+      <p className="rc-metric-label">{label}</p>
+      <p className="rc-metric-value !text-[1.5rem]">{value}</p>
     </div>
   );
 }

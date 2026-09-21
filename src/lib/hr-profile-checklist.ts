@@ -1,4 +1,5 @@
 import type { EmployeeProfile, HrDocumentCategory } from "@/generated/prisma";
+import { statutoryIdsSettled } from "@/lib/hr-statutory";
 
 function hasJson(obj: unknown): boolean {
   if (!obj || typeof obj !== "object") return false;
@@ -22,6 +23,8 @@ export type ProfileChecklistProfile = Pick<
   | "bankAccount"
   | "taxId"
   | "rsaPin"
+  | "pensionAdministrator"
+  | "pensionEnabled"
   | "emergencyContact"
   | "nextOfKin"
   | "guarantorInfo"
@@ -37,6 +40,8 @@ export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
   bankAccount: null,
   taxId: null,
   rsaPin: null,
+  pensionAdministrator: null,
+  pensionEnabled: true,
   emergencyContact: null,
   nextOfKin: null,
   guarantorInfo: null,
@@ -118,10 +123,15 @@ export function buildProfileChecklist(
     },
     {
       id: "statutory",
-      label: "Statutory IDs (TIN / RSA PIN)",
-      done: Boolean(profile.taxId && profile.rsaPin),
+      label: "Statutory IDs (TIN / pension)",
+      done: statutoryIdsSettled({
+        taxId: profile.taxId,
+        rsaPin: profile.rsaPin,
+        pensionAdministrator: profile.pensionAdministrator,
+        pensionEnabled: profile.pensionEnabled,
+      }),
       optional: true,
-      hint: "Optional for payroll — skip if the employee opts out of pension or TIN is not on file yet",
+      hint: "Does not affect onboarding %. Leave blank, set NIL, or mark pension Not applicable if they are not interested.",
     },
     {
       id: "emergency",
