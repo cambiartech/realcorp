@@ -39,6 +39,7 @@ export function mergeProfileDraftFromForm(draft: ProfileDetailRow, form: HTMLFor
     bankAccountHolderName: field(fd, "bankAccountHolderName") || draft.bankAccountHolderName,
     bankName: field(fd, "bankName") || draft.bankName,
     bankAccountNumber: field(fd, "bankAccountNumber") || draft.bankAccountNumber,
+    bankCode: field(fd, "bankCode") || draft.bankCode,
     bankAccountType: field(fd, "bankAccountType") || draft.bankAccountType,
     bankReceivePayments: field(fd, "bankReceivePayments") || draft.bankReceivePayments,
     emergencyName: field(fd, "emergencyName") || draft.emergencyName,

@@ -98,8 +98,9 @@ export function OrgDepartmentsEditor({
         <>
           <h3 className="text-sm font-semibold text-foreground">Departments</h3>
           <p className="mt-1 text-xs text-muted">
-            One shared list for Team invites, People, Finance, and reporting. Add a name and it is saved immediately —
-            you do not need a second save step.
+            Org units for invites, People, Finance, and reporting — e.g. Finance, Sales, Operations.
+            Job titles (Front Desk Officer) and access roles live under People / Team, not here. Add a
+            department name and it saves immediately.
           </p>
         </>
       )}
@@ -125,7 +126,7 @@ export function OrgDepartmentsEditor({
               void addDepartment();
             }
           }}
-          placeholder="Add custom department"
+          placeholder="e.g. Operations, Facility"
           disabled={saving}
           className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
         />

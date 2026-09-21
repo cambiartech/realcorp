@@ -28,6 +28,11 @@ export function HrWorkspace(props: {
   activeTab: HrTab;
   initialMyTab?: string;
   canManageHr: boolean;
+  payrollAvailableBalanceLabel: string;
+  fundingBankName: string;
+  fundingAccountNumber: string;
+  fundingAccountName: string;
+  fundingAccountLabel: string;
   aiEnabled: boolean;
   currentUserId: string;
   teamMembers: Array<{ userId: string; name: string; email: string; role: string; hasProfile: boolean }>;
@@ -186,6 +191,8 @@ export function HrWorkspace(props: {
   departments: string[];
   jobRoles: string[];
   pensionAdministrators: string[];
+  taskManagersByUserId: Record<string, Array<{ userId: string; label: string }>>;
+  managerCandidates: Array<{ userId: string; label: string }>;
   yearlyArchive: YearlyArchiveEntry[];
   staffPerformancePeriods: Array<{ year: number; month: number; label: string; start: string; end: string }>;
   staffPerformanceInput: {
@@ -341,6 +348,11 @@ export function HrWorkspace(props: {
     currency,
     activeTab,
     canManageHr,
+    payrollAvailableBalanceLabel,
+    fundingBankName,
+    fundingAccountNumber,
+    fundingAccountName,
+    fundingAccountLabel,
     aiEnabled,
     teamMembers,
     profiles,
@@ -366,6 +378,8 @@ export function HrWorkspace(props: {
     departments,
     jobRoles,
     pensionAdministrators,
+    taskManagersByUserId,
+    managerCandidates,
     yearlyArchive,
     staffPerformancePeriods,
     staffPerformanceInput,
@@ -452,6 +466,8 @@ export function HrWorkspace(props: {
             departments={departments}
             jobRoles={jobRoles}
             pensionAdministrators={pensionAdministrators}
+            taskManagersByUserId={taskManagersByUserId}
+            managerCandidates={managerCandidates}
           />
         ) : null}
 
@@ -474,6 +490,11 @@ export function HrWorkspace(props: {
             payrollReadyByPaygroup={payrollReadyByPaygroup}
             unassignedPayrollCount={unassignedPayrollCount}
             draftPayslipRunCount={draftPayslipRunCount}
+            payrollAvailableBalanceLabel={payrollAvailableBalanceLabel}
+            fundingBankName={fundingBankName}
+            fundingAccountNumber={fundingAccountNumber}
+            fundingAccountName={fundingAccountName}
+            fundingAccountLabel={fundingAccountLabel}
           />
         ) : null}
 

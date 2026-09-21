@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
 import { canManageTasks, canViewAllOrgTasks, workTaskVisibilityWhere } from "@/lib/tasks-access";
 import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "@/lib/membership-departments";
+import { loadManageeUserIds } from "@/lib/employee-task-managers";
 import { profileFromMembershipRole, mapOrgDepartmentToAccess } from "@/lib/org-membership-profile";
 import { ensureDefaultTaskSpaces } from "./actions";
 
@@ -99,12 +100,14 @@ export default async function TasksPage({
   ]);
 
   const memberById = new Map(allMembers.map((m) => [m.id, m]));
+  const manageeUserIds = await loadManageeUserIds(tenant.id, session.user.id);
   const memberOptions = filterTaskAssigneeMembers(allMembers, {
     isPlatformAdmin,
     actorRole: membership?.role,
     actorUserId: session.user.id,
     actorDepartment: membership?.department,
     actorIsDepartmentLead: membership?.isDepartmentLead,
+    manageeUserIds,
   });
 
   const initialView =

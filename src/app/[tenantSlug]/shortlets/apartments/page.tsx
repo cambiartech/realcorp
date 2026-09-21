@@ -7,8 +7,15 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function ApartmentsPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
+export default async function ApartmentsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tenantSlug: string }>;
+  searchParams: Promise<{ location?: string }>;
+}) {
   const { tenantSlug } = await params;
+  const sp = await searchParams;
   const ctx = await loadShortletsContext(tenantSlug);
   if (!ctx.access.canManage) notFound();
 
@@ -34,6 +41,9 @@ export default async function ApartmentsPage({ params }: { params: Promise<{ ten
     }),
   ]);
 
+  const initialLocationId =
+    sp.location && locations.some((l) => l.id === sp.location) ? sp.location : "";
+
   return (
     <ApartmentsWorkspace
       tenantSlug={ctx.tenant.slug}
@@ -41,6 +51,7 @@ export default async function ApartmentsPage({ params }: { params: Promise<{ ten
       currencies={ctx.currencies}
       locationOptions={locations.map((l) => ({ id: l.id, label: l.name }))}
       defaultServiceCharge={ctx.pmsSettings.serviceCharge}
+      initialLocationId={initialLocationId}
       projectUnitOptions={sortByUnitLabel(
         projectUnits.map((u) => ({
           id: u.id,
@@ -50,28 +61,30 @@ export default async function ApartmentsPage({ params }: { params: Promise<{ ten
       )}
       apartments={sortByUnitLabel(
         apartments.map((u) => ({
-        id: u.id,
-        name: u.name,
-        locationName: u.property?.name || "",
-        propertyId: u.propertyId || "",
-        floor: u.floor || "",
-        roomLayout: u.roomLayout || "",
-        nightlyRate: Number(u.nightlyRate),
-        nightlyRateLabel: `${u.currency} ${Number(u.nightlyRate).toLocaleString()}`,
-        cleaningFee: u.cleaningFee != null ? Number(u.cleaningFee) : null,
-        serviceCharge: u.serviceCharge != null ? Number(u.serviceCharge) : null,
-        cautionFee: u.cautionFee != null ? Number(u.cautionFee) : null,
-        currency: u.currency,
-        sizeSqFt: u.sizeSqFt,
-        maxOccupancy: u.maxOccupancy,
-        description: u.description || "",
-        amenities: Array.isArray(u.amenities) ? (u.amenities as string[]) : [],
-        listingStatus: formatEnumLabel(u.listingStatus),
-        listingStatusValue: u.listingStatus,
-        housekeepingStatus: formatEnumLabel(u.housekeepingStatus),
-        isActive: u.isActive,
-        linkedProjectUnit: u.projectUnit ? `${u.projectUnit.project.name} · ${u.projectUnit.label}` : null,
-      })),
+          id: u.id,
+          name: u.name,
+          locationName: u.property?.name || "",
+          propertyId: u.propertyId || "",
+          floor: u.floor || "",
+          roomLayout: u.roomLayout || "",
+          nightlyRate: Number(u.nightlyRate),
+          nightlyRateLabel: `${u.currency} ${Number(u.nightlyRate).toLocaleString()}`,
+          cleaningFee: u.cleaningFee != null ? Number(u.cleaningFee) : null,
+          serviceCharge: u.serviceCharge != null ? Number(u.serviceCharge) : null,
+          cautionFee: u.cautionFee != null ? Number(u.cautionFee) : null,
+          currency: u.currency,
+          sizeSqFt: u.sizeSqFt,
+          maxOccupancy: u.maxOccupancy,
+          description: u.description || "",
+          amenities: Array.isArray(u.amenities) ? (u.amenities as string[]) : [],
+          listingStatus: formatEnumLabel(u.listingStatus),
+          listingStatusValue: u.listingStatus,
+          housekeepingStatus: formatEnumLabel(u.housekeepingStatus),
+          isActive: u.isActive,
+          linkedProjectUnit: u.projectUnit
+            ? `${u.projectUnit.project.name} · ${u.projectUnit.label}`
+            : null,
+        })),
         (row) => row.name,
       )}
     />

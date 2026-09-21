@@ -9,17 +9,24 @@ import { RoomsWorkspace } from "./rooms-workspace";
 
 export const dynamic = "force-dynamic";
 
-export default async function RoomsPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
+export default async function RoomsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tenantSlug: string }>;
+  searchParams: Promise<{ location?: string }>;
+}) {
   const { tenantSlug } = await params;
+  const sp = await searchParams;
   const ctx = await loadShortletsContext(tenantSlug);
   const now = new Date();
 
-  const [units, teamMembers] = await Promise.all([
+  const [units, teamMembers, locations] = await Promise.all([
     prisma.shortletUnit.findMany({
       where: { tenantId: ctx.tenant.id },
       orderBy: { name: "asc" },
       include: {
-        property: { select: { name: true } },
+        property: { select: { id: true, name: true } },
         activeReservation: {
           select: { guestName: true, checkOut: true, status: true },
         },
@@ -30,9 +37,16 @@ export default async function RoomsPage({ params }: { params: Promise<{ tenantSl
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.shortletProperty.findMany({
+      where: { tenantId: ctx.tenant.id, isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true },
+    }),
   ]);
 
   const summary = countByHousekeepingStatus(units);
+  const initialLocationId =
+    sp.location && locations.some((l) => l.id === sp.location) ? sp.location : "";
 
   const rooms = units.map((u) => {
     const res = u.activeReservation;
@@ -52,6 +66,7 @@ export default async function RoomsPage({ params }: { params: Promise<{ tenantSl
     return {
       id: u.id,
       name: u.name,
+      propertyId: u.propertyId || u.property?.id || null,
       propertyName: u.property?.name || null,
       location: u.location || "—",
       status: formatEnumLabel(u.housekeepingStatus),
@@ -76,6 +91,8 @@ export default async function RoomsPage({ params }: { params: Promise<{ tenantSl
         id: m.user.id,
         label: m.user.name || m.user.email || "Staff",
       }))}
+      locationOptions={locations.map((l) => ({ id: l.id, label: l.name }))}
+      initialLocationId={initialLocationId}
     />
   );
 }

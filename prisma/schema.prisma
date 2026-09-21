@@ -127,6 +127,7 @@ model Tenant {
   bankStatementImports        BankStatementImport[]
   bankStatementRows           BankStatementRow[]
   employeeProfiles            EmployeeProfile[]
+  employeeTaskManagers        EmployeeTaskManager[]
   hrAppraisalActions          HrAppraisalAction[]
   hrAppraisalCycles           HrAppraisalCycle[]
   hrAppraisals                HrAppraisal[]
@@ -164,6 +165,9 @@ model Tenant {
   leadCaptureSessions         LeadCaptureFormSession[]
   leadCaptureEvents           LeadCaptureFormEvent[]
   platformErrorEvents         PlatformErrorEvent[]
+  payrollFundingReceipts      PayrollFundingReceipt[]
+  payrollLedgerEntries        PayrollLedgerEntry[]
+  payrollTenantBalance        PayrollTenantBalance?
 }
 
 model TenantSettings {
@@ -233,6 +237,9 @@ model TenantSettings {
   financeCurrencies   Json?
   /// e.g. { expenseApprovalThreshold, firstReminderAfterDays, secondReminderAfterDays }
   financeControls     Json?
+  /// Payroll disbursement: fee schedule + Realcorp funding instructions (not client wallets yet).
+  /// Shape: { feeFlatNaira, feePercentBps, feeCapNaira?, activeProvider?, fundingAccountLabel?, fundingBankName?, fundingAccountNumber?, fundingAccountName? }
+  payrollDisbursementSettings Json?
   /// SALES_IMMEDIATE = marketing inbound appears on Sales Leads now.
   /// MARKETING_HOLD = marketing reviews entries, then pushes to Sales.
   marketingLeadRouting MarketingLeadRouting @default(SALES_IMMEDIATE)
@@ -1633,6 +1640,25 @@ model EmployeeProfile {
   @@index([tenantId, payTemplateId])
 }
 
+/// Explicit grant: managerUserId may assign WorkTasks to reportUserId across departments.
+model EmployeeTaskManager {
+  id              String   @id @default(cuid())
+  tenantId        String
+  /// The employee who receives tasks (Front Desk person, etc.).
+  reportUserId    String
+  /// The person allowed to assign them work (e.g. a Sales teammate).
+  managerUserId   String
+  createdAt       DateTime @default(now())
+  createdByUserId String?
+  createdByLabel  String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, reportUserId, managerUserId])
+  @@index([tenantId, managerUserId])
+  @@index([tenantId, reportUserId])
+}
+
 model HrDocument {
   id                String             @id @default(cuid())
   tenantId          String
@@ -1901,6 +1927,96 @@ model CelebrationSendLog {
 
   @@unique([tenantId, employeeProfileId, kind, sentOn])
   @@index([tenantId, sentOn])
+}
+
+/// Inbound payroll float: client funds Realcorp → ops verify → ledger credit.
+enum PayrollFundingStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  VOIDED
+}
+
+enum PayrollLedgerEntryType {
+  FUNDING_CREDIT
+  PAYOUT_DEBIT
+  FEE_DEBIT
+  ADJUSTMENT_CREDIT
+  ADJUSTMENT_DEBIT
+  PAYOUT_REVERSAL
+}
+
+/// Claim or ops-recorded inbound transfer awaiting / completed verification.
+model PayrollFundingReceipt {
+  id                 String               @id @default(cuid())
+  tenantId           String
+  amount             Decimal              @db.Decimal(18, 2)
+  currency           String               @default("NGN")
+  /// Client bank transfer / narration reference. Unique per tenant — prevents double-credit.
+  paymentReference   String
+  senderName         String?
+  senderBank         String?
+  bankReceivedAt     DateTime?
+  status             PayrollFundingStatus @default(PENDING)
+  notes              String?
+  createdByUserId    String?
+  createdByLabel     String?
+  verifiedAt         DateTime?
+  verifiedByUserId   String?
+  verifiedByLabel    String?
+  rejectedAt         DateTime?
+  rejectedByUserId   String?
+  rejectedByLabel    String?
+  rejectionReason    String?
+  voidedAt           DateTime?
+  voidedByUserId     String?
+  voidedByLabel      String?
+  voidReason         String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ledgerEntry  PayrollLedgerEntry?
+
+  @@unique([tenantId, paymentReference])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+/// Append-only tenant payroll float ledger. Amounts are always positive; type implies credit/debit.
+model PayrollLedgerEntry {
+  id                   String                  @id @default(cuid())
+  tenantId             String
+  entryType            PayrollLedgerEntryType
+  amount               Decimal                 @db.Decimal(18, 2)
+  currency             String                  @default("NGN")
+  /// Available balance after applying this entry (same currency).
+  balanceAfter         Decimal                 @db.Decimal(18, 2)
+  fundingReceiptId     String?                 @unique
+  disbursementBatchId  String?
+  /// Caller-supplied unique key per tenant — retries must not double-post.
+  idempotencyKey       String
+  description          String
+  createdByUserId      String?
+  createdByLabel       String?
+  createdAt            DateTime                @default(now())
+
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fundingReceipt PayrollFundingReceipt? @relation(fields: [fundingReceiptId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entryType])
+}
+
+/// Cached Available balance — updated only inside the same DB transaction as a ledger entry.
+model PayrollTenantBalance {
+  tenantId          String   @id
+  availableBalance  Decimal  @default(0) @db.Decimal(18, 2)
+  currency          String   @default("NGN")
+  updatedAt         DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model HrPayslip {

@@ -29,6 +29,7 @@ import {
   markPayslipPayments,
   deletePayrollAdjustment,
   savePayrollAdjustment,
+  submitPayrollFundingClaim,
 } from "@/app/[tenantSlug]/hr/actions";
 import { MODAL_PANEL_FORM } from "@/lib/modal-panel";
 
@@ -112,6 +113,11 @@ export function HrPayslipsWorkspace({
   payrollReadyByPaygroup,
   unassignedPayrollCount,
   draftPayslipRunCount,
+  payrollAvailableBalanceLabel,
+  fundingBankName,
+  fundingAccountNumber,
+  fundingAccountName,
+  fundingAccountLabel,
 }: {
   tenantSlug: string;
   companyName: string;
@@ -124,9 +130,15 @@ export function HrPayslipsWorkspace({
   payrollReadyByPaygroup: Array<{ name: string; count: number }>;
   unassignedPayrollCount: number;
   draftPayslipRunCount: number;
+  payrollAvailableBalanceLabel: string;
+  fundingBankName: string;
+  fundingAccountNumber: string;
+  fundingAccountName: string;
+  fundingAccountLabel: string;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  const [fundingOpen, setFundingOpen] = useState(false);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -275,6 +287,109 @@ export function HrPayslipsWorkspace({
         periodStatus={periodStatus}
         periodPaidCount={periodPaidCount}
       />
+
+      <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Payroll Available balance</p>
+            <p className="mt-1 font-mono text-2xl font-bold text-foreground">
+              {currency} {payrollAvailableBalanceLabel}
+            </p>
+            <p className="mt-1 max-w-xl text-xs text-muted">
+              Fund Realcorp’s payroll account, then submit the transfer reference. Balance only increases after
+              Realcorp verifies the credit — not when you submit the claim.
+            </p>
+            {(fundingBankName || fundingAccountNumber) && (
+              <p className="mt-2 text-xs text-foreground">
+                {fundingAccountLabel ? <span className="font-medium">{fundingAccountLabel}: </span> : null}
+                {[fundingBankName, fundingAccountNumber, fundingAccountName].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold"
+            onClick={() => setFundingOpen((v) => !v)}
+          >
+            {fundingOpen ? "Hide claim form" : "I transferred funds"}
+          </button>
+        </div>
+        {fundingOpen ? (
+          <form
+            className="mt-4 grid gap-3 border-t border-foreground/10 pt-4 sm:grid-cols-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              void runAction(
+                () =>
+                  submitPayrollFundingClaim(tenantSlug, {
+                    amount: String(fd.get("amount") || ""),
+                    paymentReference: String(fd.get("paymentReference") || ""),
+                    senderName: String(fd.get("senderName") || ""),
+                    senderBank: String(fd.get("senderBank") || ""),
+                    notes: String(fd.get("notes") || ""),
+                  }),
+                "Funding claim submitted. Waiting for Realcorp verification.",
+              ).then((ok) => {
+                if (ok) {
+                  setFundingOpen(false);
+                  e.currentTarget.reset();
+                }
+              });
+            }}
+          >
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-medium">Amount transferred</span>
+              <input
+                name="amount"
+                required
+                inputMode="decimal"
+                placeholder="2500000.00"
+                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-medium">Payment reference</span>
+              <input
+                name="paymentReference"
+                required
+                placeholder="Bank narration / reference"
+                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-medium">Sender name</span>
+              <input
+                name="senderName"
+                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-medium">Sender bank</span>
+              <input
+                name="senderBank"
+                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block text-xs font-medium">Notes</span>
+              <input
+                name="notes"
+                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={pending}
+                className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+              >
+                Submit claim for verification
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">

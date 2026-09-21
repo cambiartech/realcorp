@@ -15,7 +15,7 @@
     "db:seed-demo": "tsx prisma/seed-demo-only.ts",
     "db:sync-locations": "tsx scripts/sync-nigeria-locations.ts",
     "db:studio": "prisma studio",
-    "test:payroll": "tsx --test src/lib/payroll/**/*.test.ts",
+    "test:payroll": "tsx --test src/lib/payroll/payroll.test.ts src/lib/payroll/disbursement/money.test.ts src/lib/payroll/disbursement/bank-account.test.ts",
     "test:leave": "tsx --test src/lib/hr-leave.test.ts",
     "test:locations": "tsx --test src/lib/nigeria-locations.test.ts",
     "test:finance": "tsx --test src/lib/finance-vat.test.ts src/lib/finance-income.test.ts",

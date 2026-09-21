@@ -33,6 +33,7 @@ import { brandingFromSettings } from "@/lib/tenant-branding";
 import { mergeOrgDepartments } from "@/lib/org-departments";
 import { mergeOrgJobRoles } from "@/lib/org-job-roles";
 import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
+import { getAvailableBalanceNaira, parsePayrollDisbursementSettings } from "@/lib/payroll/disbursement";
 import { loadTenantRequest } from "@/lib/tenant-request";
 import { redirect } from "next/navigation";
 import { formatEnumLabel } from "@/lib/ui-format";
@@ -514,6 +515,14 @@ export default async function HrQueuePage({
     };
   });
   const tenantBrand = brandingFromSettings(tenant.name, tenant.settings);
+  const disbursementSettings = parsePayrollDisbursementSettings(
+    tenant.settings?.payrollDisbursementSettings,
+  );
+  const availableBalanceRaw = await getAvailableBalanceNaira(prisma, tenant.id);
+  const payrollAvailableBalanceLabel = Number(availableBalanceRaw).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   const previewEmployee = previewEmployeeUserId
     ? members.find((m) => m.user.id === previewEmployeeUserId)
     : null;
@@ -626,6 +635,47 @@ export default async function HrQueuePage({
   ]).sort((a, b) => a.localeCompare(b));
 
   const pensionAdministrators = parsePensionAdministrators(tenant.settings?.pensionAdministrators);
+
+  const taskManagerRows =
+    canManage && loadDirectory
+      ? await prisma.employeeTaskManager.findMany({
+          where: { tenantId: tenant.id },
+          select: { reportUserId: true, managerUserId: true },
+        })
+      : [];
+  const managerIdSet = new Set(taskManagerRows.map((r) => r.managerUserId));
+  const managerUsers =
+    managerIdSet.size > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: [...managerIdSet] } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+  const managerLabelById = new Map(
+    managerUsers.map((u) => [u.id, u.name || u.email || "Member"] as const),
+  );
+  const taskManagersByUserId: Record<string, Array<{ userId: string; label: string }>> = {};
+  for (const row of taskManagerRows) {
+    const list = taskManagersByUserId[row.reportUserId] || [];
+    list.push({
+      userId: row.managerUserId,
+      label: managerLabelById.get(row.managerUserId) || "Member",
+    });
+    taskManagersByUserId[row.reportUserId] = list;
+  }
+  const managerCandidates =
+    canManage && loadDirectory
+      ? (
+          await prisma.membership.findMany({
+            where: { tenantId: tenant.id, status: MembershipStatus.ACTIVE },
+            include: { user: { select: { id: true, name: true, email: true } } },
+            take: 300,
+          })
+        ).map((m) => ({
+          userId: m.user.id,
+          label: m.user.name || m.user.email || "Member",
+        }))
+      : [];
 
   const performanceGoalRows: PerformanceGoalRow[] = goals.map((g) => ({
     id: g.id,
@@ -843,6 +893,11 @@ export default async function HrQueuePage({
       payrollReadyByPaygroup={payrollReadyByPaygroup}
       unassignedPayrollCount={unassignedPayrollCount}
       draftPayslipRunCount={draftPayslipRunCount}
+      payrollAvailableBalanceLabel={payrollAvailableBalanceLabel}
+      fundingBankName={disbursementSettings.fundingBankName || ""}
+      fundingAccountNumber={disbursementSettings.fundingAccountNumber || ""}
+      fundingAccountName={disbursementSettings.fundingAccountName || ""}
+      fundingAccountLabel={disbursementSettings.fundingAccountLabel || ""}
       ytdByUserId={profiles.map((p) => ({
         userId: p.userId,
         ytd: ytdByProfileId.get(p.id) ?? {
@@ -918,6 +973,8 @@ export default async function HrQueuePage({
       departments={departments}
       jobRoles={jobRoles}
       pensionAdministrators={pensionAdministrators}
+      taskManagersByUserId={taskManagersByUserId}
+      managerCandidates={managerCandidates}
       yearlyArchive={yearlyArchive}
       staffPerformancePeriods={staffPerformancePeriods.map((p) => ({
         year: p.year,

@@ -143,5 +143,6 @@ export function resolveShortletsAccess(ctx: ShortletsAccessContext) {
 export function defaultShortletsLanding(role: MembershipRole | null | undefined): string {
   if (role === MembershipRole.HOUSEKEEPING_MANAGER) return "rooms";
   if (role === MembershipRole.FNB_STAFF) return "folio";
-  return "front-desk";
+  // Managers land on Locations — the hub for multi-site portfolios
+  return "locations";
 }

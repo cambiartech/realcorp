@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useSnackbar } from "@/components/snackbar";
 import { ModalOverlay } from "@/components/modal-overlay";
@@ -85,8 +86,8 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
         <div>
           <h2 className="text-lg font-semibold">Locations</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Sites and buildings where your short-let apartments live — Akoka HQ, Lekki branch, etc.
-            Independent from sales Projects.
+            Start here. Each location has its own board for the apartments on that site — open the board
+            to work a 20+ unit site without mixing other branches.
           </p>
         </div>
         <button
@@ -126,13 +127,33 @@ export function LocationsWorkspace({ tenantSlug, locations }: Props) {
             <tbody>
               {locations.map((loc) => (
                 <tr key={loc.id} className="border-t border-foreground/10">
-                  <td className="px-4 py-3 font-medium">{loc.name}</td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/${tenantSlug}/shortlets/locations/${loc.id}`}
+                      className="font-medium text-foreground underline-offset-2 hover:underline"
+                    >
+                      {loc.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-muted">{loc.locationCode || "—"}</td>
                   <td className="px-4 py-3">{loc.city || "—"}</td>
-                  <td className="px-4 py-3">{loc.apartmentCount}</td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/${tenantSlug}/shortlets/locations/${loc.id}`}
+                      className="font-medium underline-offset-2 hover:underline"
+                    >
+                      {loc.apartmentCount}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3">{loc.isActive ? "Active" : "Inactive"}</td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap gap-1">
+                      <Link
+                        href={`/${tenantSlug}/shortlets/locations/${loc.id}`}
+                        className="rounded border border-foreground bg-foreground px-2 py-1 text-xs font-semibold text-background"
+                      >
+                        Open board
+                      </Link>
                       <button
                         type="button"
                         disabled={isPending}

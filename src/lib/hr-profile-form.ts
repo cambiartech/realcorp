@@ -92,16 +92,23 @@ export function formDataToEmployeeProfilePayload(fd: FormData): Record<string, u
   const bankHolder = str(fd.get("bankAccountHolderName"));
   const bankName = str(fd.get("bankName"));
   const bankNumber = str(fd.get("bankAccountNumber"));
+  const bankCode = str(fd.get("bankCode"));
   const bankType = str(fd.get("bankAccountType")) || "Checking";
 
   const emergencyName = str(fd.get("emergencyName"));
   const nextOfKinName = str(fd.get("nextOfKinName"));
 
-  if (fd.has("bankAccountHolderName") || fd.has("bankName") || fd.has("bankAccountNumber")) {
+  if (
+    fd.has("bankAccountHolderName") ||
+    fd.has("bankName") ||
+    fd.has("bankAccountNumber") ||
+    fd.has("bankCode")
+  ) {
     payload.bankAccountJson = {
       accountHolderName: bankHolder,
       bankName,
       accountNumber: bankNumber,
+      bankCode,
       accountType: bankType,
       receivePayments: str(fd.get("bankReceivePayments")) === "yes",
     };
@@ -196,6 +203,7 @@ export type ProfileDetailRow = {
   bankAccountHolderName: string;
   bankName: string;
   bankAccountNumber: string;
+  bankCode: string;
   bankAccountType: string;
   bankReceivePayments: string;
   emergencyName: string;
@@ -329,6 +337,7 @@ export function profileToDetailRow(p: {
     bankAccountHolderName: jsonField(bank, "accountHolderName"),
     bankName: jsonField(bank, "bankName"),
     bankAccountNumber: jsonField(bank, "accountNumber"),
+    bankCode: jsonField(bank, "bankCode"),
     bankAccountType: jsonField(bank, "accountType") || "Checking",
     bankReceivePayments: receive === "true" || receive === "yes" ? "yes" : "no",
     emergencyName: jsonField(ec, "name"),

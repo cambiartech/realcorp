@@ -31,11 +31,12 @@ export type ShortletsNavItem = {
 
 export function buildShortletsNavItems(baseHref: string, access: ShortletsNavAccess): Array<ShortletsNavItem & { href: string }> {
   const items: ShortletsNavItem[] = [
-    { id: "front-desk", label: "Front desk", hrefSuffix: "/front-desk", icon: ConciergeBell, show: access.canManage },
-    { id: "rooms", label: "Room board", hrefSuffix: "/rooms", icon: BedDouble, show: access.canManage || access.canHousekeeping },
-    { id: "reservations", label: "Reservations", hrefSuffix: "/reservations", icon: CalendarDays, show: access.canManage },
+    // Setup → ops flow: sites first, then inventory, then live ops
     { id: "locations", label: "Locations", hrefSuffix: "/locations", icon: MapPin, show: access.canManage },
     { id: "apartments", label: "Apartments", hrefSuffix: "/apartments", icon: Building2, show: access.canManage },
+    { id: "rooms", label: "Room board", hrefSuffix: "/rooms", icon: BedDouble, show: access.canManage || access.canHousekeeping },
+    { id: "front-desk", label: "Front desk", hrefSuffix: "/front-desk", icon: ConciergeBell, show: access.canManage },
+    { id: "reservations", label: "Reservations", hrefSuffix: "/reservations", icon: CalendarDays, show: access.canManage },
     { id: "guests", label: "Guests", hrefSuffix: "/guests", icon: Users, show: access.canManage },
     {
       id: "inspections",

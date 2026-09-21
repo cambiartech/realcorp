@@ -424,6 +424,15 @@ export function HrOnboardingWizard({
             <input name="bankAccountNumber" defaultValue={draft.bankAccountNumber} className={inputClass} />
           </label>
           <label className="block text-sm">
+            <span className="mb-1 block text-xs font-medium">Bank code</span>
+            <input
+              name="bankCode"
+              defaultValue={draft.bankCode}
+              placeholder="e.g. 058"
+              className={inputClass}
+            />
+          </label>
+          <label className="block text-sm">
             <span className="mb-1 block text-xs font-medium">Emergency contact</span>
             <input name="emergencyName" defaultValue={draft.emergencyName} className={inputClass} />
           </label>
@@ -519,6 +528,7 @@ export function HrOnboardingWizard({
             <input type="hidden" name="bankAccountHolderName" value={draft.bankAccountHolderName} />
             <input type="hidden" name="bankName" value={draft.bankName} />
             <input type="hidden" name="bankAccountNumber" value={draft.bankAccountNumber} />
+            <input type="hidden" name="bankCode" value={draft.bankCode} />
             <input type="hidden" name="emergencyName" value={draft.emergencyName} />
             <input type="hidden" name="emergencyPhone" value={draft.emergencyPhone} />
           </form>

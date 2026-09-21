@@ -1,6 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
+import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { assignHousekeeperToUnit, updateHousekeepingStatus } from "../actions";
@@ -8,6 +10,7 @@ import { assignHousekeeperToUnit, updateHousekeepingStatus } from "../actions";
 type Room = {
   id: string;
   name: string;
+  propertyId: string | null;
   propertyName: string | null;
   location: string;
   status: string;
@@ -19,12 +22,16 @@ type Room = {
   assignedToLabel: string | null;
 };
 
+type LocationOption = { id: string; label: string };
+
 type Props = {
   tenantSlug: string;
   canHousekeeping: boolean;
   rooms: Room[];
   summary: { vacantClean: number; vacantDirty: number; occupied: number; outOfOrder: number };
   teamOptions: Array<{ id: string; label: string }>;
+  locationOptions: LocationOption[];
+  initialLocationId: string;
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -34,9 +41,49 @@ const STATUS_STYLES: Record<string, string> = {
   OUT_OF_ORDER: "border-[var(--border-subtle)] bg-[var(--surface)]",
 };
 
-export function RoomsWorkspace({ tenantSlug, canHousekeeping, rooms, summary, teamOptions }: Props) {
+export function RoomsWorkspace({
+  tenantSlug,
+  canHousekeeping,
+  rooms,
+  summary,
+  teamOptions,
+  locationOptions,
+  initialLocationId,
+}: Props) {
   const { showSnackbar } = useSnackbar();
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [locationId, setLocationId] = useState(initialLocationId);
+
+  const filtered = useMemo(() => {
+    if (!locationId) return rooms;
+    return rooms.filter((r) => r.propertyId === locationId);
+  }, [rooms, locationId]);
+
+  const filteredSummary = useMemo(() => {
+    const counts = { vacantClean: 0, vacantDirty: 0, occupied: 0, outOfOrder: 0 };
+    for (const r of filtered) {
+      if (r.statusValue === "VACANT_CLEAN") counts.vacantClean += 1;
+      else if (r.statusValue === "VACANT_DIRTY") counts.vacantDirty += 1;
+      else if (r.statusValue === "OCCUPIED") counts.occupied += 1;
+      else counts.outOfOrder += 1;
+    }
+    return counts;
+  }, [filtered]);
+
+  const displaySummary = locationId ? filteredSummary : summary;
+  const selectedLocation = locationOptions.find((l) => l.id === locationId);
+
+  function setLocationFilter(next: string) {
+    setLocationId(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("location", next);
+    else params.delete("location");
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname);
+  }
 
   function setStatus(unitId: string, status: "VACANT_CLEAN" | "VACANT_DIRTY" | "OUT_OF_ORDER") {
     startTransition(async () => {
@@ -56,21 +103,76 @@ export function RoomsWorkspace({ tenantSlug, canHousekeeping, rooms, summary, te
 
   return (
     <div className="rc-page !gap-5">
+      {locationOptions.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-medium text-muted">Location</p>
+          <button
+            type="button"
+            onClick={() => setLocationFilter("")}
+            className={[
+              "rounded-full px-3 py-1 text-xs font-semibold",
+              !locationId
+                ? "bg-foreground text-background"
+                : "border border-foreground/15 text-foreground",
+            ].join(" ")}
+          >
+            All ({rooms.length})
+          </button>
+          {locationOptions.map((loc) => {
+            const count = rooms.filter((r) => r.propertyId === loc.id).length;
+            return (
+              <button
+                key={loc.id}
+                type="button"
+                onClick={() => setLocationFilter(loc.id)}
+                className={[
+                  "rounded-full px-3 py-1 text-xs font-semibold",
+                  locationId === loc.id
+                    ? "bg-foreground text-background"
+                    : "border border-foreground/15 text-foreground",
+                ].join(" ")}
+              >
+                {loc.label} ({count})
+              </button>
+            );
+          })}
+          {locationId ? (
+            <Link
+              href={`/${tenantSlug}/shortlets/locations/${locationId}`}
+              className="text-xs font-semibold underline underline-offset-2"
+            >
+              Open {selectedLocation?.label || "location"} board →
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Clean & vacant" value={summary.vacantClean} tone="success" />
-        <Stat label="Dirty & vacant" value={summary.vacantDirty} tone="warn" />
-        <Stat label="Occupied" value={summary.occupied} tone="info" />
-        <Stat label="Out of order" value={summary.outOfOrder} />
+        <Stat label="Clean & vacant" value={displaySummary.vacantClean} tone="success" />
+        <Stat label="Dirty & vacant" value={displaySummary.vacantDirty} tone="warn" />
+        <Stat label="Occupied" value={displaySummary.occupied} tone="info" />
+        <Stat label="Out of order" value={displaySummary.outOfOrder} />
       </section>
 
-      {rooms.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="rc-empty">
-          <p className="rc-empty-title">No rooms yet</p>
-          <p className="rc-empty-body">Add apartments under Short Lets → Apartments to populate the board.</p>
+          <p className="rc-empty-title">No rooms{locationId ? " at this location" : " yet"}</p>
+          <p className="rc-empty-body">
+            {locationId
+              ? "Add apartments to this location, or switch to All."
+              : "Add apartments under Short Lets → Apartments to populate the board."}
+          </p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {rooms.map((room) => (
+        <div
+          className={[
+            "grid gap-3",
+            filtered.length > 16
+              ? "sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+              : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+          ].join(" ")}
+        >
+          {filtered.map((room) => (
             <article
               key={room.id}
               className={[
@@ -157,7 +259,7 @@ export function RoomsWorkspace({ tenantSlug, canHousekeeping, rooms, summary, te
                       type="button"
                       disabled={isPending}
                       onClick={() => setStatus(room.id, "OUT_OF_ORDER")}
-                      className="rc-btn rc-btn-ghost rc-btn-sm"
+                      className="rc-btn rc-btn-secondary rc-btn-sm"
                     >
                       Out of order
                     </button>
@@ -181,20 +283,18 @@ function Stat({
   value: number;
   tone?: "success" | "warn" | "info";
 }) {
-  const wash =
+  const toneClass =
     tone === "success"
       ? "border-[var(--success-line)] bg-[var(--success-wash)]"
       : tone === "warn"
         ? "border-[var(--warn-line)] bg-[var(--warn-wash)]"
         : tone === "info"
           ? "border-[var(--info-line)] bg-[var(--info-wash)]"
-          : "border-[var(--border-subtle)] bg-[var(--elevated)]";
+          : "border-foreground/10 bg-foreground/[0.02]";
   return (
-    <div className={["rounded-xl border p-4 shadow-sm", wash].join(" ")}>
-      <p className="rc-metric-label">{label}</p>
-      <p className="rc-metric-value" data-zero={value === 0}>
-        {value}
-      </p>
+    <div className={`rounded-lg border p-4 ${toneClass}`}>
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }

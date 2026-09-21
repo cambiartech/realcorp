@@ -876,7 +876,7 @@ export function TenantSidebar({
               {collapsed ? (
                 <NavLink
                   navKey="shortlets"
-                  href={`${shortletsItem.href}/front-desk`}
+                  href={`${shortletsItem.href}/locations`}
                   label="Short Lets"
                   active={pathname === shortletsItem.href || pathname.startsWith(`${shortletsItem.href}/`)}
                   collapsed={true}

@@ -30,14 +30,14 @@ export type TaskAssigneeMember = {
 };
 
 function isHelpDeskAssignee(role: MembershipRole): boolean {
-  // Anyone can request help from org operators / People leads.
   return isOrgAdminOrSubAdmin(role) || role === MembershipRole.HR_MANAGER;
 }
 
 /**
  * Who this person may assign tasks to.
  * - Org admin / Subadmin / HR / platform: anyone except portal-only roles
- * - Everyone else: their department teammates + org admins / subadmins / HR (for help)
+ * - Explicit task managers: their designated reports (any department)
+ * - Everyone else: their department teammates + org admins / subadmins / HR
  */
 export function filterTaskAssigneeMembers(
   members: TaskAssigneeMember[],
@@ -47,6 +47,8 @@ export function filterTaskAssigneeMembers(
     actorUserId: string;
     actorDepartment?: string | null;
     actorIsDepartmentLead?: boolean;
+    /** User IDs this actor is allowed to assign across departments (EmployeeTaskManager). */
+    manageeUserIds?: string[];
   },
 ): TaskAssigneeMember[] {
   const staff = members.filter((m) => departmentFromStored(m.role, m.department) !== "portal");
@@ -55,6 +57,7 @@ export function filterTaskAssigneeMembers(
     return staff;
   }
 
+  const manageeSet = new Set(opts.manageeUserIds ?? []);
   const actorRole = opts.actorRole ?? MembershipRole.SALES_EXECUTIVE;
   const actorDept =
     (opts.actorDepartment ? mapOrgDepartmentToAccess(opts.actorDepartment) : null) ??
@@ -62,12 +65,12 @@ export function filterTaskAssigneeMembers(
 
   const allowed = staff.filter((m) => {
     if (m.id === opts.actorUserId) return true;
+    if (manageeSet.has(m.id)) return true;
     if (isHelpDeskAssignee(m.role)) return true;
     if (!actorDept) return false;
     return departmentFromStored(m.role, m.department) === actorDept;
   });
 
-  // Stable unique by id (self + dept + admins may overlap).
   const seen = new Set<string>();
   return allowed.filter((m) => {
     if (seen.has(m.id)) return false;

@@ -1691,6 +1691,132 @@ export async function finalizePayslipRun(tenantSlug: string, runId: string): Pro
   return { ok: true };
 }
 
+export async function submitPayrollFundingClaim(
+  tenantSlug: string,
+  input: { amount: string; paymentReference: string; senderName?: string; senderBank?: string; notes?: string },
+): Promise<PayslipActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const { PayrollLedgerError, submitFundingReceipt } = await import("@/lib/payroll/disbursement");
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await submitFundingReceipt(tx, {
+        tenantId: tenant.id,
+        amountNaira: input.amount,
+        paymentReference: input.paymentReference,
+        senderName: input.senderName,
+        senderBank: input.senderBank,
+        notes: input.notes,
+        actor: {
+          userId: session.user!.id!,
+          label: session.user!.name || session.user!.email || "HR",
+        },
+      });
+    });
+  } catch (err) {
+    if (err instanceof PayrollLedgerError) return { ok: false, error: err.message };
+    console.error("submitPayrollFundingClaim", err);
+    return { ok: false, error: "Could not submit funding claim." };
+  }
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email || "HR",
+    module: "HR",
+    entityType: "PAYROLL_FUNDING",
+    entityId: tenant.id,
+    action: "SUBMIT_FUNDING_CLAIM",
+    summary: `Submitted payroll funding claim ref ${input.paymentReference.trim().toUpperCase()}`,
+  });
+
+  revalidateHr(tenantSlug);
+  return { ok: true };
+}
+
+export async function setEmployeeTaskManagers(
+  tenantSlug: string,
+  input: { employeeUserId: string; managerUserIds: string[] },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const reportUserId = input.employeeUserId.trim();
+  if (!reportUserId) return { ok: false, error: "Employee is required." };
+
+  const profile = await prisma.employeeProfile.findFirst({
+    where: { tenantId: tenant.id, userId: reportUserId },
+    select: { id: true, fullName: true },
+  });
+  if (!profile) return { ok: false, error: "People record not found." };
+
+  const uniqueManagers = Array.from(
+    new Set(input.managerUserIds.map((id) => id.trim()).filter((id) => id && id !== reportUserId)),
+  );
+
+  if (uniqueManagers.length > 0) {
+    const active = await prisma.membership.findMany({
+      where: {
+        tenantId: tenant.id,
+        status: MembershipStatus.ACTIVE,
+        userId: { in: uniqueManagers },
+      },
+      select: { userId: true },
+    });
+    if (active.length !== uniqueManagers.length) {
+      return { ok: false, error: "Every manager must be an active teammate." };
+    }
+  }
+
+  const actorLabel = session.user.name || session.user.email || "HR";
+
+  await prisma.$transaction(async (tx) => {
+    await tx.employeeTaskManager.deleteMany({
+      where: { tenantId: tenant.id, reportUserId },
+    });
+    if (uniqueManagers.length > 0) {
+      await tx.employeeTaskManager.createMany({
+        data: uniqueManagers.map((managerUserId) => ({
+          tenantId: tenant.id,
+          reportUserId,
+          managerUserId,
+          createdByUserId: session.user!.id!,
+          createdByLabel: actorLabel,
+        })),
+      });
+    }
+  });
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "HR",
+    entityType: "EMPLOYEE_TASK_MANAGER",
+    entityId: profile.id,
+    action: "SET_TASK_MANAGERS",
+    summary: `Set ${uniqueManagers.length} task manager(s) for ${profile.fullName || reportUserId}`,
+  });
+
+  revalidateHr(tenantSlug);
+  revalidatePath(`/${tenantSlug}/tasks`);
+  return { ok: true };
+}
+
 export async function markPayslipPayments(
   tenantSlug: string,
   input: Record<string, unknown>,

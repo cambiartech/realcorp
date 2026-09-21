@@ -33,7 +33,7 @@ export function ShortletsSubnav({
   const items = buildShortletsNavItems(base, access);
 
   return (
-    <nav className="rc-tabs max-w-full overflow-x-auto" aria-label="Short lets navigation">
+    <nav className="rc-tabs rc-tabs--inverse max-w-full overflow-x-auto" aria-label="Short lets navigation">
       {items.map((item) => {
         const href = item.href;
         const active =
@@ -41,6 +41,7 @@ export function ShortletsSubnav({
           (item.id === "front-desk" && pathname === base) ||
           (item.id === "locations" && pathname.startsWith(`${base}/locations`)) ||
           (item.id === "apartments" && pathname.startsWith(`${base}/apartments`)) ||
+          (item.id === "rooms" && pathname.startsWith(`${base}/rooms`)) ||
           (item.id === "reservations" && pathname.startsWith(`${base}/reservations`));
         const Icon = item.icon;
         return (

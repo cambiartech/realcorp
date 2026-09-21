@@ -481,3 +481,177 @@ export async function updateTenantModulesFromPlatform(tenantId: string, formData
   }
   return { ok: true };
 }
+
+type MoneyActionResult = { ok: true; message?: string } | { ok: false; error: string };
+
+function actorFromSession(session: { user: { id?: string | null; name?: string | null; email?: string | null } }) {
+  return {
+    userId: session.user.id || "platform",
+    label: session.user.name || session.user.email || "Platform admin",
+  };
+}
+
+export async function platformRecordAndVerifyPayrollFunding(input: {
+  tenantSlug: string;
+  amount: string;
+  paymentReference: string;
+  senderName?: string;
+  senderBank?: string;
+  notes?: string;
+}): Promise<MoneyActionResult> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(input.tenantSlug);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const { PayrollLedgerError, submitFundingReceipt, verifyFundingReceipt } = await import(
+    "@/lib/payroll/disbursement"
+  );
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const receipt = await submitFundingReceipt(tx, {
+        tenantId: tenant.id,
+        amountNaira: input.amount,
+        paymentReference: input.paymentReference,
+        senderName: input.senderName,
+        senderBank: input.senderBank,
+        notes: input.notes,
+        actor: actorFromSession(gate.session),
+      });
+      await verifyFundingReceipt(tx, {
+        tenantId: tenant.id,
+        receiptId: receipt.id,
+        actor: actorFromSession(gate.session),
+      });
+    });
+  } catch (err) {
+    if (err instanceof PayrollLedgerError) return { ok: false, error: err.message };
+    console.error("platformRecordAndVerifyPayrollFunding", err);
+    return { ok: false, error: "Could not credit funding. No partial credit was applied." };
+  }
+
+  revalidatePath(`/platform/tenants/${tenant.slug}`);
+  revalidatePath(`/${tenant.slug}/hr`);
+  return { ok: true, message: "Funding verified and Available balance credited." };
+}
+
+export async function platformVerifyPayrollFunding(input: {
+  tenantSlug: string;
+  receiptId: string;
+}): Promise<MoneyActionResult> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(input.tenantSlug);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const { PayrollLedgerError, verifyFundingReceipt } = await import("@/lib/payroll/disbursement");
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await verifyFundingReceipt(tx, {
+        tenantId: tenant.id,
+        receiptId: input.receiptId,
+        actor: actorFromSession(gate.session),
+      });
+    });
+  } catch (err) {
+    if (err instanceof PayrollLedgerError) return { ok: false, error: err.message };
+    console.error("platformVerifyPayrollFunding", err);
+    return { ok: false, error: "Could not verify funding." };
+  }
+
+  revalidatePath(`/platform/tenants/${tenant.slug}`);
+  revalidatePath(`/${tenant.slug}/hr`);
+  return { ok: true, message: "Funding verified." };
+}
+
+export async function platformRejectPayrollFunding(input: {
+  tenantSlug: string;
+  receiptId: string;
+  reason: string;
+}): Promise<MoneyActionResult> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(input.tenantSlug);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const { PayrollLedgerError, rejectFundingReceipt } = await import("@/lib/payroll/disbursement");
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await rejectFundingReceipt(tx, {
+        tenantId: tenant.id,
+        receiptId: input.receiptId,
+        reason: input.reason,
+        actor: actorFromSession(gate.session),
+      });
+    });
+  } catch (err) {
+    if (err instanceof PayrollLedgerError) return { ok: false, error: err.message };
+    console.error("platformRejectPayrollFunding", err);
+    return { ok: false, error: "Could not reject funding." };
+  }
+
+  revalidatePath(`/platform/tenants/${tenant.slug}`);
+  return { ok: true, message: "Funding rejected." };
+}
+
+export async function platformSavePayrollDisbursementSettings(input: {
+  tenantSlug: string;
+  feeFlatNaira: number;
+  feePercentBps: number;
+  feeCapNaira?: number;
+  fundingBankName?: string;
+  fundingAccountNumber?: string;
+  fundingAccountName?: string;
+  fundingAccountLabel?: string;
+}): Promise<MoneyActionResult> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(input.tenantSlug);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const { payrollDisbursementSettingsSchema, parsePayrollDisbursementSettings } = await import(
+    "@/lib/payroll/disbursement"
+  );
+
+  const existing = await prisma.tenantSettings.findUnique({
+    where: { tenantId: tenant.id },
+    select: { payrollDisbursementSettings: true },
+  });
+  const current = parsePayrollDisbursementSettings(existing?.payrollDisbursementSettings);
+
+  const parsed = payrollDisbursementSettingsSchema.safeParse({
+    feeFlatNaira: input.feeFlatNaira,
+    feePercentBps: input.feePercentBps,
+    feeCapNaira: input.feeCapNaira,
+    activeProvider: current.activeProvider ?? null,
+    fundingBankName: input.fundingBankName || "",
+    fundingAccountNumber: input.fundingAccountNumber || "",
+    fundingAccountName: input.fundingAccountName || "",
+    fundingAccountLabel: input.fundingAccountLabel || "",
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message || "Invalid settings." };
+  }
+
+  await prisma.tenantSettings.upsert({
+    where: { tenantId: tenant.id },
+    create: {
+      tenantId: tenant.id,
+      payrollDisbursementSettings: parsed.data,
+    },
+    update: {
+      payrollDisbursementSettings: parsed.data,
+    },
+  });
+
+  revalidatePath(`/platform/tenants/${tenant.slug}`);
+  revalidatePath(`/${tenant.slug}/hr`);
+  return { ok: true, message: "Disbursement settings saved." };
+}

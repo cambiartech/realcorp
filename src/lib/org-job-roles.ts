@@ -5,6 +5,9 @@ export const DEFAULT_ORG_JOB_ROLES = [
   "Accountant",
   "HR Officer",
   "Operations Officer",
+  "Front Desk Officer",
+  "Housekeeping Lead",
+  "Site Supervisor",
 ] as const;
 
 export function normalizeOrgJobRoleName(raw: string): string {

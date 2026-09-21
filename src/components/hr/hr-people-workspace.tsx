@@ -45,6 +45,7 @@ import { calculatePayroll } from "@/lib/payroll/engine";
 import { NIGERIA_STATES } from "@/lib/nigeria-locations";
 import { OrgDepartmentSelect } from "@/components/org-department-select";
 import { OrgJobRoleSelect } from "@/components/org-job-role-select";
+import { EmployeeTaskManagersEditor } from "@/components/hr/employee-task-managers-editor";
 import { PensionAdministratorField } from "@/components/pension-administrator-field";
 import { TableSearch, filterTableRows } from "@/components/table-search";
 import { SortTh, useTableSort } from "@/components/sort-th";
@@ -244,6 +245,8 @@ export function HrPeopleWorkspace({
   departments,
   jobRoles,
   pensionAdministrators,
+  taskManagersByUserId = {},
+  managerCandidates = [],
 }: {
   tenantSlug: string;
   companyName: string;
@@ -315,6 +318,8 @@ export function HrPeopleWorkspace({
   departments: string[];
   jobRoles: string[];
   pensionAdministrators: string[];
+  taskManagersByUserId?: Record<string, Array<{ userId: string; label: string }>>;
+  managerCandidates?: Array<{ userId: string; label: string }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -677,6 +682,7 @@ export function HrPeopleWorkspace({
       bankAccountHolderName: member.name,
       bankName: "",
       bankAccountNumber: "",
+      bankCode: "",
       bankAccountType: "Checking",
       bankReceivePayments: "yes",
       emergencyName: "",
@@ -1163,6 +1169,27 @@ export function HrPeopleWorkspace({
                       label="Reports to"
                       name="reportingToLabel"
                       defaultValue={record.reportingToLabel}
+                      hint="Display label on the People record. For task assign rights, use Task managers below."
+                    />
+                    <EmployeeTaskManagersEditor
+                      key={`${record.userId}-${(taskManagersByUserId[record.userId] || [])
+                        .map((m) => m.userId)
+                        .join(",")}`}
+                      tenantSlug={tenantSlug}
+                      employeeUserId={record.userId}
+                      employeeName={record.fullName || selectedMember?.name || "this employee"}
+                      initialManagers={(taskManagersByUserId[record.userId] || []).map((m) => ({
+                        userId: m.userId,
+                        label: m.label,
+                      }))}
+                      candidates={
+                        managerCandidates.length > 0
+                          ? managerCandidates
+                          : teamMembers.map((m) => ({
+                              userId: m.userId,
+                              label: m.name || m.email,
+                            }))
+                      }
                     />
                     <Field
                       label="Employment type"
@@ -1403,6 +1430,12 @@ export function HrPeopleWorkspace({
                     label="Account number"
                     name="bankAccountNumber"
                     defaultValue={record.bankAccountNumber}
+                  />
+                  <Field
+                    label="Bank code"
+                    name="bankCode"
+                    defaultValue={record.bankCode}
+                    hint="CBN / Paystack code (e.g. 058). Required for salary disbursement."
                   />
                   <Field label="Account type" name="bankAccountType" defaultValue={record.bankAccountType}>
                     <UiSelect name="bankAccountType" defaultValue={record.bankAccountType || "Checking"}>

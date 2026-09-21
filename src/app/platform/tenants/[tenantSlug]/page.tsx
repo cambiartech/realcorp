@@ -2,19 +2,32 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { MembershipRole, MembershipStatus } from "@/generated/prisma";
+import { MembershipRole, MembershipStatus, PayrollFundingStatus } from "@/generated/prisma";
 import { buildInviteUrl, classifyInvite, inviteStatusLabel } from "@/lib/invitation-utils";
 import { normalizeTenantModuleFlags, tenantModuleSummary } from "@/lib/tenant-module-definitions";
+import { getAvailableBalanceNaira, parsePayrollDisbursementSettings } from "@/lib/payroll/disbursement";
 import { PlatformModulesForm } from "../../modules-form";
 import { TenantInvitesWorkspace, type PlatformInviteRow } from "./tenant-invites-workspace";
 import { TenantMembersWorkspace, type PlatformMemberRow } from "./tenant-members-workspace";
 import { InviteTokenLookup } from "../../invite-token-lookup";
+import {
+  PlatformPayrollFundingWorkspace,
+  type PlatformFundingRow,
+  type PlatformLedgerRow,
+} from "./payroll-funding-workspace";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Organization invites · Platform",
 };
+
+function moneyLabel(value: { toString(): string } | string | number) {
+  const n = Number(typeof value === "object" ? value.toString() : value);
+  return Number.isFinite(n)
+    ? n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "0.00";
+}
 
 export default async function PlatformTenantInvitesPage({
   params,
@@ -33,6 +46,7 @@ export default async function PlatformTenantInvitesPage({
       id: true,
       name: true,
       slug: true,
+      defaultCurrency: true,
       settings: true,
       invitations: {
         orderBy: { createdAt: "desc" },
@@ -46,6 +60,15 @@ export default async function PlatformTenantInvitesPage({
           },
         },
         orderBy: { createdAt: "desc" },
+      },
+      payrollFundingReceipts: {
+        where: { status: PayrollFundingStatus.PENDING },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+      },
+      payrollLedgerEntries: {
+        orderBy: { createdAt: "desc" },
+        take: 20,
       },
     },
   });
@@ -74,9 +97,10 @@ export default async function PlatformTenantInvitesPage({
       role: invite.role.replaceAll("_", " "),
       status: mappedStatus,
       statusLabel: inviteStatusLabel(status),
-      expiresAtLabel: new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
-        invite.expiresAt,
-      ),
+      expiresAtLabel: new Intl.DateTimeFormat("en-NG", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(invite.expiresAt),
       acceptedAtLabel: invite.acceptedAt
         ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(
             invite.acceptedAt,
@@ -88,6 +112,35 @@ export default async function PlatformTenantInvitesPage({
       canRefresh: status === "valid" || status === "expired",
     };
   });
+
+  const availableBalanceLabel = moneyLabel(await getAvailableBalanceNaira(prisma, tenant.id));
+  const disbursement = parsePayrollDisbursementSettings(tenant.settings?.payrollDisbursementSettings);
+
+  const pendingFunding: PlatformFundingRow[] = tenant.payrollFundingReceipts.map((r) => ({
+    id: r.id,
+    amountLabel: moneyLabel(r.amount),
+    paymentReference: r.paymentReference,
+    status: r.status,
+    senderName: r.senderName,
+    createdAtLabel: new Intl.DateTimeFormat("en-NG", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(r.createdAt),
+    createdByLabel: r.createdByLabel,
+    verifiedAtLabel: null,
+  }));
+
+  const recentLedger: PlatformLedgerRow[] = tenant.payrollLedgerEntries.map((e) => ({
+    id: e.id,
+    entryType: e.entryType,
+    amountLabel: moneyLabel(e.amount),
+    balanceAfterLabel: moneyLabel(e.balanceAfter),
+    description: e.description,
+    createdAtLabel: new Intl.DateTimeFormat("en-NG", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(e.createdAt),
+  }));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -120,6 +173,21 @@ export default async function PlatformTenantInvitesPage({
       </div>
 
       <div className="mt-8 space-y-8">
+        <PlatformPayrollFundingWorkspace
+          tenantSlug={tenant.slug}
+          tenantId={tenant.id}
+          availableBalanceLabel={availableBalanceLabel}
+          currency={tenant.defaultCurrency || "NGN"}
+          pending={pendingFunding}
+          recentLedger={recentLedger}
+          feeFlatNaira={disbursement.feeFlatNaira}
+          feePercentBps={disbursement.feePercentBps}
+          feeCapNaira={disbursement.feeCapNaira ?? ""}
+          fundingBankName={disbursement.fundingBankName || ""}
+          fundingAccountNumber={disbursement.fundingAccountNumber || ""}
+          fundingAccountName={disbursement.fundingAccountName || ""}
+          fundingAccountLabel={disbursement.fundingAccountLabel || ""}
+        />
         <InviteTokenLookup />
         <TenantMembersWorkspace tenantSlug={tenant.slug} tenantName={tenant.name} members={members} />
         <TenantInvitesWorkspace

@@ -10,6 +10,7 @@ import {
   isTaskAssigneeAllowed,
   type TaskAssigneeMember,
 } from "@/lib/membership-departments";
+import { loadManageeUserIds } from "@/lib/employee-task-managers";
 import {
   createWorkTaskInputSchema,
   createTaskSpaceInputSchema,
@@ -70,11 +71,13 @@ async function assertAssigneeAllowed(
     actorUserId: ctx.session.user.id,
     actorDepartment: ctx.membership?.department ?? undefined,
     actorIsDepartmentLead: ctx.membership?.isDepartmentLead,
+    manageeUserIds: await loadManageeUserIds(ctx.tenant.id, ctx.session.user.id),
   });
   if (!allowed) {
     return {
       ok: false,
-      error: "You can assign tasks to people in your department, plus organization admins, subadmins, and People (HR) leads.",
+      error:
+        "You can assign within your department, to org admins / HR, or to people who list you as a task manager on their People record.",
     };
   }
   return null;
