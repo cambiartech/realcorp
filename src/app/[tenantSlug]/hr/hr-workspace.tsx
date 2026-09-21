@@ -1,8 +1,8 @@
-import { TenantPageShell } from "@/components/tenant-page-shell";
 "use client";
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 import { HrAppraisalsWorkspace } from "@/components/hr/hr-appraisals-workspace";
 import { HrDocumentsWorkspace } from "@/components/hr/hr-documents-workspace";
 import { HrMyDashboard } from "@/components/hr/hr-my-dashboard";
