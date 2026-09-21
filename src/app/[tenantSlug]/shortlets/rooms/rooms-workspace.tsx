@@ -31,7 +31,7 @@ const STATUS_STYLES: Record<string, string> = {
   VACANT_CLEAN: "border-[var(--success-line)] bg-[var(--success-wash)]",
   VACANT_DIRTY: "border-[var(--warn-line)] bg-[var(--warn-wash)]",
   OCCUPIED: "border-[var(--info-line)] bg-[var(--info-wash)]",
-  OUT_OF_ORDER: "border-foreground/20 bg-foreground/[0.04]",
+  OUT_OF_ORDER: "border-[var(--border-subtle)] bg-[var(--surface)]",
 };
 
 export function RoomsWorkspace({ tenantSlug, canHousekeeping, rooms, summary, teamOptions }: Props) {
@@ -55,125 +55,146 @@ export function RoomsWorkspace({ tenantSlug, canHousekeeping, rooms, summary, te
   }
 
   return (
-    <div className="space-y-6">
+    <div className="rc-page !gap-5">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Clean & vacant" value={summary.vacantClean} />
-        <Stat label="Dirty & vacant" value={summary.vacantDirty} />
-        <Stat label="Occupied" value={summary.occupied} />
+        <Stat label="Clean & vacant" value={summary.vacantClean} tone="success" />
+        <Stat label="Dirty & vacant" value={summary.vacantDirty} tone="warn" />
+        <Stat label="Occupied" value={summary.occupied} tone="info" />
         <Stat label="Out of order" value={summary.outOfOrder} />
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {rooms.map((room) => (
-          <article
-            key={room.id}
-            className={[
-              "rounded-lg border p-4",
-              STATUS_STYLES[room.statusValue] || STATUS_STYLES.OUT_OF_ORDER,
-              room.alertLevel === "overdue"
-                ? "ring-2 ring-[var(--danger-line)]"
-                : room.alertLevel === "due-soon"
-                  ? "ring-2 ring-[var(--warn-line)]"
-                  : "",
-            ].join(" ")}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="font-semibold text-foreground">{room.name}</h3>
-                <p className="text-xs text-muted">
-                  {room.propertyName ? `${room.propertyName} · ` : ""}
-                  {room.location}
+      {rooms.length === 0 ? (
+        <div className="rc-empty">
+          <p className="rc-empty-title">No rooms yet</p>
+          <p className="rc-empty-body">Add apartments under Short Lets → Apartments to populate the board.</p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {rooms.map((room) => (
+            <article
+              key={room.id}
+              className={[
+                "rounded-xl border p-4 shadow-sm",
+                STATUS_STYLES[room.statusValue] || STATUS_STYLES.OUT_OF_ORDER,
+                room.alertLevel === "overdue"
+                  ? "ring-2 ring-[var(--danger-line)]"
+                  : room.alertLevel === "due-soon"
+                    ? "ring-2 ring-[var(--warn-line)]"
+                    : "",
+              ].join(" ")}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="truncate text-[14px] font-semibold tracking-tight text-foreground">
+                    {room.name}
+                  </h3>
+                  <p className="mt-0.5 truncate text-[12px] text-muted">
+                    {room.propertyName ? `${room.propertyName} · ` : ""}
+                    {room.location}
+                  </p>
+                </div>
+                <span className="rc-pill rc-pill-neutral shrink-0 !text-[10px]">{room.status}</span>
+              </div>
+              {room.guestLabel ? (
+                <p className="mt-2 text-[13px] font-medium text-foreground">{room.guestLabel}</p>
+              ) : null}
+              {room.checkoutLabel ? (
+                <p
+                  className={[
+                    "mt-1 text-[12px]",
+                    room.alertLevel === "overdue" ? "font-semibold text-[var(--danger)]" : "text-muted",
+                  ].join(" ")}
+                >
+                  Checkout: {room.checkoutLabel}
                 </p>
-              </div>
-              <span className="rounded-full border border-foreground/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-                {room.status}
-              </span>
-            </div>
-            {room.guestLabel ? <p className="mt-2 text-sm">{room.guestLabel}</p> : null}
-            {room.checkoutLabel ? (
-              <p
-                className={[
-                  "mt-1 text-xs",
-                  room.alertLevel === "overdue" ? "font-semibold text-[var(--danger)]" : "text-muted",
-                ].join(" ")}
-              >
-                Checkout: {room.checkoutLabel}
-              </p>
-            ) : null}
-            {canHousekeeping ? (
-              <div className="mt-3">
-                <label className="text-[11px] text-muted">
-                  Assigned to
-                  <UiSelect
-                    className="mt-1 text-xs"
-                    value={room.assignedToUserId || ""}
-                    onChange={(e) => assign(room.id, e.target.value)}
-                    disabled={isPending}
-                  >
-                    <option value="">Unassigned</option>
-                    {teamOptions.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </UiSelect>
-                </label>
-              </div>
-            ) : room.assignedToLabel ? (
-              <p className="mt-2 text-xs text-muted">Assigned: {room.assignedToLabel}</p>
-            ) : null}
-            {canHousekeeping && room.statusValue !== "OCCUPIED" ? (
-              <div className="mt-3 flex flex-wrap gap-1">
-                {room.statusValue !== "VACANT_CLEAN" ? (
-                  <ActionBtn disabled={isPending} onClick={() => setStatus(room.id, "VACANT_CLEAN")}>
-                    Mark clean
-                  </ActionBtn>
-                ) : null}
-                {room.statusValue !== "VACANT_DIRTY" ? (
-                  <ActionBtn disabled={isPending} onClick={() => setStatus(room.id, "VACANT_DIRTY")}>
-                    Mark dirty
-                  </ActionBtn>
-                ) : null}
-                {room.statusValue !== "OUT_OF_ORDER" ? (
-                  <ActionBtn disabled={isPending} onClick={() => setStatus(room.id, "OUT_OF_ORDER")}>
-                    Out of order
-                  </ActionBtn>
-                ) : null}
-              </div>
-            ) : null}
-          </article>
-        ))}
-      </div>
+              ) : null}
+              {canHousekeeping ? (
+                <div className="mt-3">
+                  <label className="block text-[12px] font-medium text-muted">
+                    Assigned to
+                    <UiSelect
+                      className="mt-1 text-[13px]"
+                      value={room.assignedToUserId || ""}
+                      onChange={(e) => assign(room.id, e.target.value)}
+                      disabled={isPending}
+                    >
+                      <option value="">Unassigned</option>
+                      {teamOptions.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </UiSelect>
+                  </label>
+                </div>
+              ) : room.assignedToLabel ? (
+                <p className="mt-2 text-[12px] text-muted">Assigned: {room.assignedToLabel}</p>
+              ) : null}
+              {canHousekeeping && room.statusValue !== "OCCUPIED" ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {room.statusValue !== "VACANT_CLEAN" ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setStatus(room.id, "VACANT_CLEAN")}
+                      className="rc-btn rc-btn-primary rc-btn-sm"
+                    >
+                      Mark clean
+                    </button>
+                  ) : null}
+                  {room.statusValue !== "VACANT_DIRTY" ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setStatus(room.id, "VACANT_DIRTY")}
+                      className="rc-btn rc-btn-secondary rc-btn-sm"
+                    >
+                      Mark dirty
+                    </button>
+                  ) : null}
+                  {room.statusValue !== "OUT_OF_ORDER" ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setStatus(room.id, "OUT_OF_ORDER")}
+                      className="rc-btn rc-btn-ghost rc-btn-sm"
+                    >
+                      Out of order
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-foreground/10 p-4">
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
-    </div>
-  );
-}
-
-function ActionBtn({
-  children,
-  onClick,
-  disabled,
+function Stat({
+  label,
+  value,
+  tone,
 }: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
+  label: string;
+  value: number;
+  tone?: "success" | "warn" | "info";
 }) {
+  const wash =
+    tone === "success"
+      ? "border-[var(--success-line)] bg-[var(--success-wash)]"
+      : tone === "warn"
+        ? "border-[var(--warn-line)] bg-[var(--warn-wash)]"
+        : tone === "info"
+          ? "border-[var(--info-line)] bg-[var(--info-wash)]"
+          : "border-[var(--border-subtle)] bg-[var(--elevated)]";
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded border border-foreground/15 px-2 py-1 text-[11px] hover:bg-foreground/[0.06] disabled:opacity-50"
-    >
-      {children}
-    </button>
+    <div className={["rounded-xl border p-4 shadow-sm", wash].join(" ")}>
+      <p className="rc-metric-label">{label}</p>
+      <p className="rc-metric-value" data-zero={value === 0}>
+        {value}
+      </p>
+    </div>
   );
 }

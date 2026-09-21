@@ -23,6 +23,12 @@ const SHORTLETS_DEFAULT_ROLES = new Set<MembershipRole>([
   MembershipRole.FNB_STAFF,
 ]);
 
+const SHORTLETS_MANAGE_ROLES = new Set<MembershipRole>([
+  MembershipRole.ORG_ADMIN,
+  MembershipRole.SUB_ADMIN,
+  MembershipRole.HOUSEKEEPING_MANAGER,
+]);
+
 function isActiveMember(membership: ShortletsAccessContext["membership"]) {
   return membership?.status === MembershipStatus.ACTIVE;
 }
@@ -47,6 +53,12 @@ function hasDefaultShortletsRole(ctx: ShortletsAccessContext): boolean {
   return r != null && SHORTLETS_DEFAULT_ROLES.has(r);
 }
 
+/** Explicit module grant that can mutate short-lets ops (not read-only). */
+function hasShortletsEditGrant(ctx: ShortletsAccessContext): boolean {
+  const level = shortletsPermissionLevel(ctx);
+  return level === "full" || level === "edit";
+}
+
 export function canAccessShortLets(ctx: ShortletsAccessContext): boolean {
   if (ctx.isPlatformAdmin) return true;
   if (!isActiveMember(ctx.membership)) return false;
@@ -61,16 +73,24 @@ export function canManageShortLets(ctx: ShortletsAccessContext): boolean {
   const level = shortletsPermissionLevel(ctx);
   if (level === "full" || level === "edit") return true;
   if (level === "none" || level === "read") return false;
-  const r = role(ctx.membership)!;
-  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.SUB_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
+  const r = role(ctx.membership);
+  return r != null && SHORTLETS_MANAGE_ROLES.has(r);
 }
 
+/**
+ * Room board / inspections mutations.
+ * Full access and View & edit module grants must be able to mark rooms and assign staff —
+ * previously only "full" counted, so Full-access ops could see Room board but not edit.
+ */
 export function canManageHousekeeping(ctx: ShortletsAccessContext): boolean {
   if (ctx.isPlatformAdmin) return true;
   if (!isActiveMember(ctx.membership)) return false;
-  if (shortletsPermissionLevel(ctx) === "full") return true;
-  const r = role(ctx.membership)!;
-  return r === MembershipRole.ORG_ADMIN || r === MembershipRole.SUB_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
+  if (hasShortletsEditGrant(ctx)) return true;
+  if (shortletsPermissionLevel(ctx) === "none" || shortletsPermissionLevel(ctx) === "read") {
+    return false;
+  }
+  const r = role(ctx.membership);
+  return r != null && SHORTLETS_MANAGE_ROLES.has(r);
 }
 
 export function canPostFolio(ctx: ShortletsAccessContext): boolean {
@@ -96,9 +116,17 @@ export function canViewShortletReports(ctx: ShortletsAccessContext): boolean {
   return r === MembershipRole.ORG_ADMIN || r === MembershipRole.SUB_ADMIN || r === MembershipRole.HOUSEKEEPING_MANAGER;
 }
 
+/**
+ * PMS settings. Org/sub admins always; explicit Full access also (matches Team → Full access label).
+ * View & edit can operate day-to-day without changing org-wide PMS config.
+ */
 export function canManageShortletSettings(ctx: ShortletsAccessContext): boolean {
   if (ctx.isPlatformAdmin) return true;
   if (!isActiveMember(ctx.membership)) return false;
+  if (shortletsPermissionLevel(ctx) === "full") return true;
+  if (shortletsPermissionLevel(ctx) === "none" || shortletsPermissionLevel(ctx) === "read") {
+    return false;
+  }
   return ctx.membership!.role === MembershipRole.ORG_ADMIN || ctx.membership!.role === MembershipRole.SUB_ADMIN;
 }
 

@@ -132,7 +132,7 @@ export const MEMBERSHIP_MODULE_ACCESS_OPTIONS: Array<{
   { value: "none", label: "No access", hint: "Hide this module for this person" },
   { value: "read", label: "Read only", hint: "View records — no create or edit" },
   { value: "edit", label: "View & edit", hint: "Update existing records" },
-  { value: "full", label: "Full access", hint: "View, edit, create, and manage" },
+  { value: "full", label: "Full access", hint: "View, edit, create, and manage (including Short Lets room board & PMS settings)" },
 ];
 
 const LEVELS = new Set<MembershipModuleAccessLevel>(["none", "read", "edit", "full"]);

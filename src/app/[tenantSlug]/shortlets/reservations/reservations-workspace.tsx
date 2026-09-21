@@ -80,8 +80,14 @@ export function ReservationsWorkspace({
   const [payOpen, setPayOpen] = useState<string | null>(null);
   const [folioOpen, setFolioOpen] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState<string | null>(null);
+  const [assignAndCheckIn, setAssignAndCheckIn] = useState(false);
   const [assignUnitId, setAssignUnitId] = useState(unitOptions[0]?.id || "");
-  const [payForm, setPayForm] = useState({ amount: "", paidAt: "", method: "Transfer", reference: "" });
+  const [payForm, setPayForm] = useState({
+    amount: "",
+    paidAt: new Date().toISOString().slice(0, 10),
+    method: "Transfer",
+    reference: "",
+  });
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -114,11 +120,16 @@ export function ReservationsWorkspace({
     });
   }, [reservations, statusFilter, search]);
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>, msg = "Saved.") {
+  function run(fn: () => Promise<{ ok: boolean; error?: string }>, msg = "Saved.", onSuccess?: () => void) {
     startTransition(async () => {
       const res = await fn();
-      if (res.ok) showSnackbar(msg, "success");
-      else showSnackbar(res.error || "Could not save.", "error");
+      if (res.ok) {
+        showSnackbar(msg, "success");
+        onSuccess?.();
+        router.refresh();
+      } else {
+        showSnackbar(res.error || "Could not save.", "error");
+      }
     });
   }
 
@@ -142,7 +153,7 @@ export function ReservationsWorkspace({
   }));
 
   return (
-    <div className="space-y-4">
+    <div className="rc-page !gap-4">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <KpiCard
           label="Total"
@@ -163,7 +174,7 @@ export function ReservationsWorkspace({
           onClick={() => setStatusFilter("CONFIRMED")}
         />
         <KpiCard
-          label="Checked in"
+          label="In-house"
           value={kpis.checkedIn}
           active={statusFilter === "CHECKED_IN"}
           onClick={() => setStatusFilter("CHECKED_IN")}
@@ -247,10 +258,7 @@ export function ReservationsWorkspace({
             />
           ) : null}
           {canManage ? (
-            <Link
-              href={newBookingHref()}
-              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
-            >
+            <Link href={newBookingHref()} className="rc-btn rc-btn-primary">
               New booking
             </Link>
           ) : null}
@@ -275,70 +283,72 @@ export function ReservationsWorkspace({
             }))}
         />
       ) : reservations.length === 0 ? (
-        <div className="rounded-lg border border-foreground/10 p-8 text-center">
-          <p className="font-medium">No reservations yet</p>
-          <p className="mt-1 text-sm text-muted">
+        <div className="rc-empty">
+          <p className="rc-empty-title">No reservations yet</p>
+          <p className="rc-empty-body">
             Create your first booking — apartment assignment is optional until check-in.
           </p>
           {canManage ? (
-            <Link
-              href={newBookingHref()}
-              className="mt-4 inline-block rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
-            >
+            <Link href={newBookingHref()} className="rc-btn rc-btn-primary">
               Create first booking
             </Link>
           ) : null}
         </div>
       ) : visibleReservations.length === 0 ? (
-        <p className="rounded-lg border border-foreground/10 p-6 text-sm text-muted">
+        <p className="rc-card px-4 py-6 text-center text-[13px] text-muted">
           No reservations match your filters.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-foreground/10">
-          <table className="min-w-full text-sm">
-            <thead className="bg-foreground/[0.03] text-left text-xs uppercase tracking-wide text-muted">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--elevated)] shadow-sm">
+          <table className="rc-table">
+            <thead>
               <tr>
-                <th className="px-4 py-3">Guest</th>
-                <th className="px-4 py-3">Booking</th>
-                <th className="px-4 py-3">Source</th>
-                <th className="px-4 py-3">Apartment</th>
-                <th className="px-4 py-3">Stay</th>
-                <th className="px-4 py-3">Total</th>
-                <th className="px-4 py-3">Balance</th>
-                <th className="px-4 py-3">Status</th>
-                {canManage ? <th className="px-4 py-3">Actions</th> : null}
+                <th>Guest</th>
+                <th>Booking</th>
+                <th>Source</th>
+                <th>Apartment</th>
+                <th>Stay</th>
+                <th>Total</th>
+                <th>Balance</th>
+                <th>Status</th>
+                {canManage ? <th>Actions</th> : null}
               </tr>
             </thead>
             <tbody>
               {visibleReservations.map((r) => (
-                <tr key={r.id} className="border-t border-foreground/10">
-                  <td className="px-4 py-3 font-medium">{r.guestName}</td>
-                  <td className="px-4 py-3 text-xs text-muted">{r.bookingNumber || "—"}</td>
-                  <td className="px-4 py-3">{r.source}</td>
-                  <td className="px-4 py-3">
+                <tr key={r.id}>
+                  <td className="font-medium">{r.guestName}</td>
+                  <td className="text-[12px] text-muted">{r.bookingNumber || "—"}</td>
+                  <td>{r.source}</td>
+                  <td>
                     {r.hasApartment ? r.unitName : <span className="text-[var(--warn)]">{r.unitName}</span>}
                   </td>
-                  <td className="px-4 py-3">{r.stayLabel}</td>
-                  <td className="px-4 py-3">{r.totalAmountLabel}</td>
-                  <td className="px-4 py-3">{r.balanceLabel}</td>
-                  <td className="px-4 py-3">{r.status}</td>
+                  <td>{r.stayLabel}</td>
+                  <td>{r.totalAmountLabel}</td>
+                  <td>{r.balanceLabel}</td>
+                  <td>{r.status}</td>
                   {canManage ? (
-                    <td className="px-4 py-3">
+                    <td>
                       <div className="flex flex-wrap gap-1">
                         {!r.hasApartment ? (
-                          <ActionBtn
+                          <button
+                            type="button"
                             disabled={isPending}
+                            className="rc-btn rc-btn-secondary rc-btn-sm"
                             onClick={() => {
                               setAssignOpen(r.id);
+                              setAssignAndCheckIn(false);
                               setAssignUnitId(unitOptions[0]?.id || "");
                             }}
                           >
-                            Assign apartment
-                          </ActionBtn>
+                            Assign
+                          </button>
                         ) : null}
                         {r.statusValue === "PENDING" ? (
-                          <ActionBtn
+                          <button
+                            type="button"
                             disabled={isPending}
+                            className="rc-btn rc-btn-secondary rc-btn-sm"
                             onClick={() =>
                               run(
                                 () => updateShortletReservationStatus(tenantSlug, r.id, "CONFIRMED"),
@@ -347,45 +357,77 @@ export function ReservationsWorkspace({
                             }
                           >
                             Confirm
-                          </ActionBtn>
+                          </button>
                         ) : null}
                         {isPreArrivalStatus(r.statusValue) ? (
-                          <ActionBtn
-                            disabled={isPending}
-                            onClick={() =>
-                              run(
-                                () => updateShortletReservationStatus(tenantSlug, r.id, "CHECKED_IN"),
-                                "Checked in.",
-                              )
-                            }
-                          >
-                            Check in
-                          </ActionBtn>
+                          r.hasApartment ? (
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              className="rc-btn rc-btn-primary rc-btn-sm"
+                              onClick={() =>
+                                run(
+                                  () => updateShortletReservationStatus(tenantSlug, r.id, "CHECKED_IN"),
+                                  "Checked in.",
+                                )
+                              }
+                            >
+                              Check in
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isPending || unitOptions.length === 0}
+                              className="rc-btn rc-btn-primary rc-btn-sm"
+                              onClick={() => {
+                                setAssignOpen(r.id);
+                                setAssignAndCheckIn(true);
+                                setAssignUnitId(unitOptions[0]?.id || "");
+                              }}
+                            >
+                              Assign & check in
+                            </button>
+                          )
                         ) : null}
                         {r.statusValue === "CHECKED_IN" ? (
-                          <ActionBtn
+                          <button
+                            type="button"
                             disabled={isPending}
-                            onClick={() =>
-                              run(
-                                () => updateShortletReservationStatus(tenantSlug, r.id, "CHECKED_OUT"),
-                                "Checked out.",
-                              )
-                            }
+                            className="rc-btn rc-btn-primary rc-btn-sm"
+                            onClick={() => setFolioOpen(r.id)}
                           >
-                            Check out
-                          </ActionBtn>
+                            Settle & check out
+                          </button>
                         ) : null}
                         {isPreArrivalStatus(r.statusValue) || r.statusValue === "CHECKED_IN" ? (
                           <>
-                            <ActionBtn disabled={isPending} onClick={() => setFolioOpen(r.id)}>
+                            <button
+                              type="button"
+                              className="rc-btn rc-btn-ghost rc-btn-sm"
+                              onClick={() => setFolioOpen(r.id)}
+                            >
                               Guest bill
-                            </ActionBtn>
-                            <ActionBtn disabled={isPending} onClick={() => setPayOpen(r.id)}>
+                            </button>
+                            <button
+                              type="button"
+                              className="rc-btn rc-btn-ghost rc-btn-sm"
+                              onClick={() => {
+                                setPayOpen(r.id);
+                                setPayForm({
+                                  amount: "",
+                                  paidAt: new Date().toISOString().slice(0, 10),
+                                  method: "Transfer",
+                                  reference: "",
+                                });
+                              }}
+                            >
                               Payment
-                            </ActionBtn>
+                            </button>
                             {isPreArrivalStatus(r.statusValue) ? (
-                              <ActionBtn
+                              <button
+                                type="button"
                                 disabled={isPending}
+                                className="rc-btn rc-btn-ghost rc-btn-sm"
                                 onClick={() =>
                                   run(
                                     () => updateShortletReservationStatus(tenantSlug, r.id, "NO_SHOW"),
@@ -394,10 +436,12 @@ export function ReservationsWorkspace({
                                 }
                               >
                                 No show
-                              </ActionBtn>
+                              </button>
                             ) : null}
-                            <ActionBtn
+                            <button
+                              type="button"
                               disabled={isPending}
+                              className="rc-btn rc-btn-ghost rc-btn-sm"
                               onClick={() =>
                                 run(
                                   () => updateShortletReservationStatus(tenantSlug, r.id, "CANCELLED"),
@@ -406,7 +450,7 @@ export function ReservationsWorkspace({
                               }
                             >
                               Cancel
-                            </ActionBtn>
+                            </button>
                           </>
                         ) : null}
                       </div>
@@ -436,30 +480,42 @@ export function ReservationsWorkspace({
       {assignOpen ? (
         <ModalOverlay
           open={Boolean(assignOpen)}
-          onClose={() => setAssignOpen(null)}
+          onClose={() => !isPending && setAssignOpen(null)}
           panelClassName={MODAL_PANEL_LG}
         >
-          <h2 className="text-lg font-bold">Assign apartment</h2>
-          <p className="mt-1 text-sm text-muted">
-            Choose a short-let apartment for this booking. Pricing will be calculated from the apartment
-            rates.
+          <h2 className="text-[1.125rem] font-semibold tracking-tight">
+            {assignAndCheckIn ? "Assign & check in" : "Assign apartment"}
+          </h2>
+          <p className="mt-1 text-[13px] text-muted">
+            Choose a clean vacant apartment for this booking.
+            {assignAndCheckIn ? " Guest will be checked in after assignment." : ""}
           </p>
           <form
             className="mt-4 space-y-3"
             onSubmit={(e) => {
               e.preventDefault();
+              const reservationId = assignOpen;
+              const unitId = assignUnitId;
+              const alsoCheckIn = assignAndCheckIn;
               run(
-                () =>
-                  assignShortletReservationApartment(tenantSlug, {
-                    reservationId: assignOpen,
-                    unitId: assignUnitId,
-                  }),
-                "Apartment assigned.",
+                async () => {
+                  const assigned = await assignShortletReservationApartment(tenantSlug, {
+                    reservationId,
+                    unitId,
+                  });
+                  if (!assigned.ok) return assigned;
+                  if (!alsoCheckIn) return assigned;
+                  return updateShortletReservationStatus(tenantSlug, reservationId, "CHECKED_IN");
+                },
+                alsoCheckIn ? "Assigned and checked in." : "Apartment assigned.",
+                () => {
+                  setAssignOpen(null);
+                  setAssignAndCheckIn(false);
+                },
               );
-              setAssignOpen(null);
             }}
           >
-            <label className="block text-sm text-muted">
+            <label className="block text-[12.5px] font-medium text-muted">
               Apartment
               <UiSelect
                 className="mt-1"
@@ -477,17 +533,21 @@ export function ReservationsWorkspace({
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setAssignOpen(null)}
-                className="rounded-md border px-3 py-2 text-sm"
+                onClick={() => {
+                  setAssignOpen(null);
+                  setAssignAndCheckIn(false);
+                }}
+                disabled={isPending}
+                className="rc-btn rc-btn-secondary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending || !assignUnitId}
-                className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background"
+                className="rc-btn rc-btn-primary"
               >
-                Assign
+                {isPending ? "Working…" : assignAndCheckIn ? "Assign & check in" : "Assign"}
               </button>
             </div>
           </form>
@@ -497,10 +557,10 @@ export function ReservationsWorkspace({
       {payOpen ? (
         <ModalOverlay
           open={Boolean(payOpen)}
-          onClose={() => setPayOpen(null)}
+          onClose={() => !isPending && setPayOpen(null)}
           panelClassName={MODAL_PANEL_LG}
         >
-          <h2 className="text-lg font-bold">Record payment</h2>
+          <h2 className="text-[1.125rem] font-semibold tracking-tight">Record payment</h2>
           <form
             className="mt-4 space-y-3"
             onSubmit={(e) => {
@@ -514,13 +574,13 @@ export function ReservationsWorkspace({
                     reference: payForm.reference || undefined,
                   }),
                 "Payment recorded.",
+                () => setPayOpen(null),
               );
-              setPayOpen(null);
             }}
           >
             <input
               type="number"
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
               placeholder="Amount"
               value={payForm.amount}
               onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
@@ -528,25 +588,35 @@ export function ReservationsWorkspace({
             />
             <input
               type="date"
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
               value={payForm.paidAt}
               onChange={(e) => setPayForm((f) => ({ ...f, paidAt: e.target.value }))}
               required
+            />
+            <input
+              className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+              placeholder="Method"
+              value={payForm.method}
+              onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))}
+              required
+            />
+            <input
+              className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+              placeholder="Reference (optional)"
+              value={payForm.reference}
+              onChange={(e) => setPayForm((f) => ({ ...f, reference: e.target.value }))}
             />
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setPayOpen(null)}
-                className="rounded-md border px-3 py-2 text-sm"
+                disabled={isPending}
+                className="rc-btn rc-btn-secondary"
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="rounded-md bg-foreground px-3 py-2 text-sm font-semibold text-background"
-              >
-                Save
+              <button type="submit" disabled={isPending} className="rc-btn rc-btn-primary">
+                {isPending ? "Saving…" : "Save payment"}
               </button>
             </div>
           </form>
@@ -572,33 +642,14 @@ function KpiCard({
       type="button"
       onClick={onClick}
       className={[
-        "rounded-lg border p-4 text-left transition-colors",
-        active ? "border-foreground bg-foreground/[0.04]" : "border-foreground/10 hover:border-foreground/20",
+        "rc-card-interactive p-3.5",
+        active ? "border-foreground/30 ring-1 ring-foreground/15" : "",
       ].join(" ")}
     >
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
-    </button>
-  );
-}
-
-function ActionBtn({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded border border-foreground/15 px-2 py-1 text-[11px] hover:bg-foreground/[0.06] disabled:opacity-50"
-    >
-      {children}
+      <p className="rc-metric-label">{label}</p>
+      <p className="rc-metric-value !text-[1.35rem]" data-zero={value === 0}>
+        {value}
+      </p>
     </button>
   );
 }

@@ -69,7 +69,7 @@ export default async function RoomsPage({ params }: { params: Promise<{ tenantSl
   return (
     <RoomsWorkspace
       tenantSlug={ctx.tenant.slug}
-      canHousekeeping={ctx.access.canHousekeeping}
+      canHousekeeping={ctx.access.canHousekeeping || ctx.access.canManage}
       rooms={sortByUnitLabel(rooms, (room) => room.name)}
       summary={summary}
       teamOptions={teamMembers.map((m) => ({

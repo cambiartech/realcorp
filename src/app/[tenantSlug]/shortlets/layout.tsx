@@ -1,4 +1,5 @@
 import { ShortletsSubnav } from "@/components/shortlets/shortlets-subnav";
+import { TenantPageShell } from "@/components/tenant-page-shell";
 import { loadShortletsContext } from "@/lib/shortlets-loaders";
 
 export default async function ShortletsLayout({
@@ -12,24 +13,25 @@ export default async function ShortletsLayout({
   const ctx = await loadShortletsContext(tenantSlug);
 
   return (
-    <div className="w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Short Lets</h1>
-        <p className="mt-1 text-sm text-muted">
-          Hospitality operations — bookings, guests, housekeeping, and folio.
-        </p>
-      </div>
-      <div className="mt-6">
-        <ShortletsSubnav
-          tenantSlug={ctx.tenant.slug}
-          canManage={ctx.access.canManage}
-          canHousekeeping={ctx.access.canHousekeeping}
-          canPostFolio={ctx.access.canPostFolio}
-          canSettings={ctx.access.canSettings}
-          canReports={ctx.access.canReports}
-        />
-      </div>
-      <div className="mt-6">{children}</div>
-    </div>
+    <TenantPageShell>
+      <header className="rc-page-header">
+        <div className="min-w-0">
+          <p className="rc-page-eyebrow">Hospitality</p>
+          <h1 className="rc-page-title">Short Lets</h1>
+          <p className="rc-page-desc">
+            Bookings, guests, housekeeping, and guest bill — ready for the front desk.
+          </p>
+        </div>
+      </header>
+      <ShortletsSubnav
+        tenantSlug={ctx.tenant.slug}
+        canManage={ctx.access.canManage}
+        canHousekeeping={ctx.access.canHousekeeping}
+        canPostFolio={ctx.access.canPostFolio}
+        canSettings={ctx.access.canSettings}
+        canReports={ctx.access.canReports}
+      />
+      <div>{children}</div>
+    </TenantPageShell>
   );
 }

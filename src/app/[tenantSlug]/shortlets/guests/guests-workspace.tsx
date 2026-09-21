@@ -35,30 +35,27 @@ export function GuestsWorkspace({ tenantSlug, canManage, guests }: Props) {
   }, [guests, query]);
 
   const bookingReturn = encodeURIComponent(`/${tenantSlug}/shortlets/reservations/new`);
+  const addHref = `/${tenantSlug}/shortlets/guests/new?returnTo=${bookingReturn}`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Short-let guests</h2>
-          <p className="mt-1 max-w-xl text-sm text-muted">
-            Reusable guest profiles for repeat bookings — separate from sales clients. Ready for future
-            marketplace self-service bookings.
+    <div className="rc-page !gap-4">
+      <div className="rc-page-header">
+        <div className="min-w-0">
+          <h2 className="rc-section-title">Short-let guests</h2>
+          <p className="rc-section-hint">
+            Reusable guest profiles for repeat bookings — separate from sales clients.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="rc-page-actions">
           <input
             type="search"
-            className="min-w-[220px] rounded-md border border-foreground/15 px-3 py-2 text-sm"
+            className="min-w-[220px] rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
             placeholder="Search name, email, phone…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           {canManage ? (
-            <Link
-              href={`/${tenantSlug}/shortlets/guests/new?returnTo=${bookingReturn}`}
-              className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
-            >
+            <Link href={addHref} className="rc-btn rc-btn-primary">
               Add guest
             </Link>
           ) : null}
@@ -66,51 +63,50 @@ export function GuestsWorkspace({ tenantSlug, canManage, guests }: Props) {
       </div>
 
       {guests.length === 0 ? (
-        <div className="rounded-lg border border-foreground/10 p-8 text-center">
-          <p className="font-medium">No guests yet</p>
-          <p className="mt-1 text-sm text-muted">
+        <div className="rc-empty">
+          <p className="rc-empty-title">No guests yet</p>
+          <p className="rc-empty-body">
             Create guest profiles before booking — they can be reused across stays.
           </p>
           {canManage ? (
-            <Link
-              href={`/${tenantSlug}/shortlets/guests/new?returnTo=${bookingReturn}`}
-              className="mt-4 inline-block rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
-            >
+            <Link href={addHref} className="rc-btn rc-btn-primary">
               Add first guest
             </Link>
           ) : null}
         </div>
+      ) : filtered.length === 0 ? (
+        <p className="rc-card px-4 py-6 text-center text-[13px] text-muted">No guests match that search.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-foreground/10">
-          <table className="min-w-full text-sm">
-            <thead className="bg-foreground/[0.03] text-left text-xs uppercase tracking-wide text-muted">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--elevated)] shadow-sm">
+          <table className="rc-table">
+            <thead>
               <tr>
-                <th className="px-4 py-3">Guest</th>
-                <th className="px-4 py-3">Contact</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Stays</th>
-                <th className="px-4 py-3">Last stay</th>
-                <th className="px-4 py-3">Added</th>
-                {canManage ? <th className="px-4 py-3">Actions</th> : null}
+                <th>Guest</th>
+                <th>Contact</th>
+                <th>Type</th>
+                <th>Stays</th>
+                <th>Last stay</th>
+                <th>Added</th>
+                {canManage ? <th>Actions</th> : null}
               </tr>
             </thead>
             <tbody>
               {filtered.map((g) => (
-                <tr key={g.id} className="border-t border-foreground/10">
-                  <td className="px-4 py-3 font-medium">{g.fullName}</td>
-                  <td className="px-4 py-3 text-muted">
+                <tr key={g.id}>
+                  <td className="font-medium">{g.fullName}</td>
+                  <td className="text-muted">
                     {g.email || g.phone || "—"}
-                    {g.email && g.phone ? <span className="block text-xs">{g.phone}</span> : null}
+                    {g.email && g.phone ? <span className="block text-[12px]">{g.phone}</span> : null}
                   </td>
-                  <td className="px-4 py-3">{g.guestType}</td>
-                  <td className="px-4 py-3">{g.reservationCount}</td>
-                  <td className="px-4 py-3">{g.lastStayLabel || "—"}</td>
-                  <td className="px-4 py-3 text-muted">{g.createdAtLabel}</td>
+                  <td>{g.guestType}</td>
+                  <td className="num">{g.reservationCount}</td>
+                  <td>{g.lastStayLabel || "—"}</td>
+                  <td className="text-muted">{g.createdAtLabel}</td>
                   {canManage ? (
-                    <td className="px-4 py-3">
+                    <td>
                       <Link
                         href={`/${tenantSlug}/shortlets/reservations/new?guestId=${encodeURIComponent(g.id)}`}
-                        className="rounded border px-2 py-1 text-xs hover:bg-foreground/[0.04]"
+                        className="rc-btn rc-btn-secondary rc-btn-sm"
                       >
                         Book again
                       </Link>
@@ -120,9 +116,6 @@ export function GuestsWorkspace({ tenantSlug, canManage, guests }: Props) {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-muted">No guests match your search.</p>
-          ) : null}
         </div>
       )}
     </div>
