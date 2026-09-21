@@ -292,7 +292,7 @@ export function HrPeopleSettingsWorkspace({
         <div className="mt-6" role="tabpanel">
           <TabPanel
             title="Departments"
-            description="Shared list for Team invites, People, Finance, and reporting. Add a name and it is saved immediately."
+            description="Org teams for invites, People, Finance, and reporting. Job titles (Front Desk Officer) belong under Job titles — not as departments."
           >
             <OrgDepartmentsEditor
               tenantSlug={tenantSlug}

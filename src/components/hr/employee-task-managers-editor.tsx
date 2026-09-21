@@ -70,7 +70,7 @@ export function EmployeeTaskManagersEditor({
       <p className="mt-1 text-[11px] text-muted">
         These people can assign Tasks to {employeeName || "this employee"} even if they work in
         another department — e.g. a Sales teammate assigning Front Desk. Separate from Department
-        lead.
+        lead. Saving managers also creates a draft People record if one does not exist yet.
       </p>
 
       {managers.length > 0 ? (

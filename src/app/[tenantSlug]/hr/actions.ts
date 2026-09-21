@@ -52,6 +52,7 @@ import {
 import prisma from "@/lib/db";
 import { canManageHr } from "@/lib/hr-access";
 import { ensureEmployeeNumber } from "@/lib/hr-employee-number";
+import { ensureEmployeeProfileForMember } from "@/lib/hr-profile-ensure";
 import { calculatePayroll, PayrollConfigurationError } from "@/lib/payroll/engine";
 import { resolveManualPayeOverride } from "@/lib/payroll/tax-override";
 import {
@@ -1758,11 +1759,31 @@ export async function setEmployeeTaskManagers(
   const reportUserId = input.employeeUserId.trim();
   if (!reportUserId) return { ok: false, error: "Employee is required." };
 
+  const member = await prisma.membership.findFirst({
+    where: { tenantId: tenant.id, userId: reportUserId, status: MembershipStatus.ACTIVE },
+    include: { user: { select: { name: true, email: true } } },
+  });
+  if (!member) {
+    return { ok: false, error: "That person is not an active teammate in this organization." };
+  }
+
+  // Task managers need an EmployeeProfile row. Creating the draft record here means
+  // HR can assign managers before the full Job & pay form has been saved once.
+  await ensureEmployeeProfileForMember(tenant.id, reportUserId, {
+    name: member.user.name,
+    email: member.user.email,
+  });
+
   const profile = await prisma.employeeProfile.findFirst({
     where: { tenantId: tenant.id, userId: reportUserId },
     select: { id: true, fullName: true },
   });
-  if (!profile) return { ok: false, error: "People record not found." };
+  if (!profile) {
+    return {
+      ok: false,
+      error: "Could not create a People record for this teammate. Open Employee record and Save once, then retry.",
+    };
+  }
 
   const uniqueManagers = Array.from(
     new Set(input.managerUserIds.map((id) => id.trim()).filter((id) => id && id !== reportUserId)),
@@ -2898,3 +2919,62 @@ export async function reviewEmployeeProfileUpdates(
   revalidateHr(tenantSlug);
   return { ok: true, processed: profiles.length };
 }
+
+/**
+ * Phase 1: create a Paystack disbursement batch from a finalized run and send transfers.
+ * Requires Available ledger balance ≥ net salaries + platform fees, and PAYSTACK_SECRET_KEY.
+ */
+export async function disbursePayslipRunViaPaystack(
+  tenantSlug: string,
+  payslipRunId: string,
+): Promise<ActionResult & { batchId?: string; success?: number; failed?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const actor = {
+    userId: session.user.id,
+    label: session.user.name || session.user.email || "HR",
+  };
+
+  const { createDisbursementBatchFromRun, executeDisbursementBatch } = await import(
+    "@/lib/payroll/disbursement"
+  );
+
+  const created = await createDisbursementBatchFromRun(tenant.id, payslipRunId, actor);
+  if (!created.ok) return { ok: false, error: created.error };
+
+  const executed = await executeDisbursementBatch(tenant.id, created.batchId, actor);
+  if (!executed.ok) return { ok: false, error: executed.error, batchId: created.batchId };
+
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: actor.userId,
+    actorLabel: actor.label,
+    module: "HR",
+    entityType: "PAYROLL_DISBURSEMENT",
+    entityId: created.batchId,
+    action: "DISBURSE_PAYSTACK",
+    summary: `Disbursed payslip run via Paystack (${executed.success} success, ${executed.failed} failed).`,
+    metadata: {
+      payslipRunId,
+      batchId: created.batchId,
+      success: executed.success,
+      failed: executed.failed,
+    },
+  });
+
+  revalidateHr(tenantSlug);
+  return {
+    ok: true,
+    batchId: created.batchId,
+    success: executed.success,
+    failed: executed.failed,
+  };
+}
+

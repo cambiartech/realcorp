@@ -168,6 +168,8 @@ model Tenant {
   payrollFundingReceipts      PayrollFundingReceipt[]
   payrollLedgerEntries        PayrollLedgerEntry[]
   payrollTenantBalance        PayrollTenantBalance?
+  payrollDisbursementBatches  PayrollDisbursementBatch[]
+  payrollDisbursementLines    PayrollDisbursementLine[]
 }
 
 model TenantSettings {
@@ -1755,9 +1757,10 @@ model HrPayslipRun {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
-  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payslips    HrPayslip[]
-  adjustments HrPayrollAdjustment[]
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payslips           HrPayslip[]
+  adjustments        HrPayrollAdjustment[]
+  disbursementBatches PayrollDisbursementBatch[]
 
   @@unique([tenantId, year, month])
   @@index([tenantId, status])
@@ -2019,6 +2022,98 @@ model PayrollTenantBalance {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
+enum PayrollDisbursementBatchStatus {
+  DRAFT
+  SENDING
+  PARTIAL
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PayrollDisbursementLineStatus {
+  PENDING
+  SENDING
+  SUCCESS
+  FAILED
+  REVERSED
+  SKIPPED
+}
+
+/// One payout attempt for a finalized payslip run (Phase 1 — Paystack Transfers).
+model PayrollDisbursementBatch {
+  id                       String                         @id @default(cuid())
+  tenantId                 String
+  payslipRunId             String
+  /// PAYSTACK | FLUTTERWAVE
+  provider                 String                         @default("PAYSTACK")
+  status                   PayrollDisbursementBatchStatus @default(DRAFT)
+  currency                 String                         @default("NGN")
+  totalNet                 Decimal                        @db.Decimal(18, 2)
+  totalPlatformFee         Decimal                        @db.Decimal(18, 2)
+  totalProviderFeeEstimate Decimal                        @default(0) @db.Decimal(18, 2)
+  lineCount                Int                            @default(0)
+  successCount             Int                            @default(0)
+  failedCount              Int                            @default(0)
+  skippedCount             Int                            @default(0)
+  /// Unique per tenant — retries must not create a second money move for the same run send.
+  idempotencyKey           String
+  createdByUserId          String?
+  createdByLabel           String?
+  approvedByUserId         String?
+  approvedByLabel          String?
+  approvedAt               DateTime?
+  startedAt                DateTime?
+  completedAt              DateTime?
+  lastError                String?
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
+
+  tenant Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run    HrPayslipRun              @relation(fields: [payslipRunId], references: [id], onDelete: Cascade)
+  lines  PayrollDisbursementLine[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([payslipRunId])
+}
+
+model PayrollDisbursementLine {
+  id                   String                        @id @default(cuid())
+  batchId              String
+  tenantId             String
+  payslipId            String
+  employeeProfileId    String
+  amount               Decimal                       @db.Decimal(18, 2)
+  platformFee          Decimal                       @db.Decimal(18, 2)
+  providerFeeEstimate  Decimal                       @default(0) @db.Decimal(18, 2)
+  currency             String                        @default("NGN")
+  accountNumber        String
+  bankCode             String
+  accountName          String
+  accountNameResolved  String?
+  recipientCode        String?
+  /// Our idempotent reference sent to the provider.
+  providerReference    String
+  transferCode         String?
+  providerTransferId   String?
+  status               PayrollDisbursementLineStatus @default(PENDING)
+  failureReason        String?
+  paidAt               DateTime?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+
+  batch   PayrollDisbursementBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  tenant  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payslip HrPayslip                @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, payslipId])
+  @@unique([tenantId, providerReference])
+  @@index([batchId, status])
+  @@index([payslipId])
+  @@index([tenantId, status])
+}
+
 model HrPayslip {
   id                    String                 @id @default(cuid())
   tenantId              String
@@ -2051,14 +2146,16 @@ model HrPayslip {
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
-  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  run     HrPayslipRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
-  profile EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  run                HrPayslipRun               @relation(fields: [runId], references: [id], onDelete: Cascade)
+  profile            EmployeeProfile            @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  disbursementLines  PayrollDisbursementLine[]
 
   @@unique([runId, employeeProfileId])
   @@index([tenantId, employeeProfileId])
   @@index([tenantId, paymentStatus])
   @@index([tenantId, jurisdictionCode])
+  @@index([disbursementBatchId])
 }
 
 model HrPerformanceGoal {

@@ -41,5 +41,22 @@ export {
 export {
   parsePayrollDisbursementSettings,
   payrollDisbursementSettingsSchema,
+  tenantHasDedicatedVirtualAccount,
   type PayrollDisbursementSettings,
 } from "./settings";
+
+export {
+  createDisbursementBatchFromRun,
+  executeDisbursementBatch,
+  applyPaystackTransferWebhook,
+  refreshBatchCounts,
+  type DisburseActor,
+} from "./batch";
+
+export {
+  isPaystackConfigured,
+  paystackGetBalances,
+  verifyPaystackWebhookSignature,
+} from "./paystack";
+
+export { estimatePaystackTransferFeeKobo } from "./provider-fees";

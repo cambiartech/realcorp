@@ -26,6 +26,10 @@ import {
   updateWorkTask,
   updateWorkTaskStatus,
 } from "@/app/[tenantSlug]/tasks/actions";
+import {
+  isCompletedTaskOnActiveShelf,
+  TASK_COMPLETED_SHELF_DAYS,
+} from "@/lib/task-completed-shelf";
 
 export type TaskSpaceRow = {
   id: string;
@@ -60,6 +64,8 @@ export type WorkTaskRow = {
   assigneeLabel: string;
   dueDateLabel: string | null;
   dueDateValue: string | null;
+  completedAt?: string | null;
+  completedAtLabel?: string | null;
   linkedEntityType: string | null;
 };
 
@@ -91,7 +97,7 @@ function defaultSpaceIdForDepartment(spaces: TaskSpaceRow[], department: OrgDepa
   return spaces.find((s) => s.slug === "company-hq")?.id || spaces[0]?.id || "";
 }
 
-type ViewTab = "company" | "my" | "sprint";
+type ViewTab = "company" | "my" | "sprint" | "history";
 
 const STATUS_COLUMNS: Array<{
   id: WorkTaskRow["status"];
@@ -193,15 +199,30 @@ export function TasksWorkspace({
 
   const filteredTasks = useMemo(() => {
     let rows = tasks.filter((t) => t.status !== "CANCELLED");
-    if (viewTab === "my") rows = rows.filter((t) => t.assigneeUserId === currentUserId);
-    if (viewTab === "sprint") rows = rows.filter((t) => Boolean(t.sprintLabel));
+    if (viewTab === "history") {
+      rows = rows.filter((t) => t.status === "DONE");
+    } else {
+      if (viewTab === "my") rows = rows.filter((t) => t.assigneeUserId === currentUserId);
+      if (viewTab === "sprint") rows = rows.filter((t) => Boolean(t.sprintLabel));
+      // Keep Done column tidy: older completions live in Completed history.
+      rows = rows.filter((t) => isCompletedTaskOnActiveShelf(t));
+    }
     if (spaceFilter !== "all") rows = rows.filter((t) => t.spaceId === spaceFilter);
     if (assigneeFilter === "unassigned") rows = rows.filter((t) => !t.assigneeUserId);
     else if (assigneeFilter === "me") rows = rows.filter((t) => t.assigneeUserId === currentUserId);
     else if (assigneeFilter !== "all") rows = rows.filter((t) => t.assigneeUserId === assigneeFilter);
-    if (statusFilter !== "all") rows = rows.filter((t) => t.status === statusFilter);
+    if (viewTab !== "history" && statusFilter !== "all") {
+      rows = rows.filter((t) => t.status === statusFilter);
+    }
     if (priorityFilter !== "all") rows = rows.filter((t) => t.priority === priorityFilter);
     if (projectFilter !== "all") rows = rows.filter((t) => t.projectId === projectFilter);
+    if (viewTab === "history") {
+      rows = [...rows].sort((a, b) => {
+        const aMs = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        const bMs = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        return bMs - aMs;
+      });
+    }
     return rows;
   }, [
     tasks,
@@ -380,6 +401,7 @@ export function TasksWorkspace({
             },
             { id: "my" as const, label: "My tasks" },
             { id: "sprint" as const, label: "Current sprint" },
+            { id: "history" as const, label: "Completed history" },
           ] as const
         ).map((tab) => (
           <button
@@ -424,6 +446,7 @@ export function TasksWorkspace({
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="text-sm"
+            disabled={viewTab === "history"}
           >
             <option value="all">All statuses</option>
             {STATUS_COLUMNS.map((s) => (
@@ -492,8 +515,9 @@ export function TasksWorkspace({
       </div>
 
       <p className="mt-2 text-xs text-muted">
-        Showing {filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"}
-        {activeFilterCount > 0 ? " matching filters" : ""}
+        {viewTab === "history"
+          ? `Showing ${filteredTasks.length} completed task${filteredTasks.length === 1 ? "" : "s"} — useful for appraisals and performance reviews.`
+          : `Showing ${filteredTasks.length} task${filteredTasks.length === 1 ? "" : "s"}${activeFilterCount > 0 ? " matching filters" : ""}. Done items leave the board after ${TASK_COMPLETED_SHELF_DAYS} days (see Completed history).`}
       </p>
 
       {viewTab === "sprint" ? (
@@ -503,6 +527,69 @@ export function TasksWorkspace({
         </p>
       ) : null}
 
+      {viewTab === "history" ? (
+        <div className="mt-4 overflow-hidden rounded-lg border border-foreground/10">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead className="border-b border-foreground/10 bg-foreground/[0.03] text-[11px] uppercase tracking-wide text-muted">
+              <tr>
+                <th className="px-3 py-2.5 font-semibold">Task</th>
+                <th className="px-3 py-2.5 font-semibold">Assignee</th>
+                <th className="px-3 py-2.5 font-semibold">Project</th>
+                <th className="px-3 py-2.5 font-semibold">Priority</th>
+                <th className="px-3 py-2.5 font-semibold">Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-10 text-center text-xs text-muted">
+                    No completed tasks yet.
+                  </td>
+                </tr>
+              ) : (
+                filteredTasks.map((task) => (
+                  <tr
+                    key={task.id}
+                    className="border-b border-foreground/[0.06] last:border-0 hover:bg-foreground/[0.02]"
+                  >
+                    <td className="px-3 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => openEditTask(task)}
+                        className="text-left font-medium text-foreground hover:underline"
+                      >
+                        {task.title}
+                      </button>
+                      {task.spaceName ? (
+                        <p className="mt-0.5 text-[11px] text-muted">{task.spaceName}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted">{task.assigneeLabel}</td>
+                    <td className="px-3 py-2.5 text-muted">
+                      {task.projectName
+                        ? `${task.projectEmoji ? `${task.projectEmoji} ` : ""}${task.projectName}`
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={[
+                          "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                          PRIORITY_STYLE[task.priority],
+                        ].join(" ")}
+                      >
+                        {task.priority}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 tabular-nums text-muted">
+                      {task.completedAtLabel || "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
       <div
         className={`mt-4 grid gap-3 overflow-x-auto pb-4 ${visibleColumns.length === 1 ? "max-w-sm" : visibleColumns.length === 2 ? "lg:grid-cols-2" : visibleColumns.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}
       >
@@ -650,6 +737,7 @@ export function TasksWorkspace({
           );
         })}
       </div>
+      )}
 
       <section className="mt-6 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">

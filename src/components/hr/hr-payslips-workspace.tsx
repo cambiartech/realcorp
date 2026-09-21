@@ -17,6 +17,7 @@ import {
 import { ModalOverlay } from "@/components/modal-overlay";
 import { PdfDownloadButton } from "@/components/pdf-download-button";
 import { PayrollWorkflowGuide } from "@/components/hr/payroll-workflow-guide";
+import { PayrollFloatPanel } from "@/components/hr/payroll-float-panel";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -30,6 +31,7 @@ import {
   deletePayrollAdjustment,
   savePayrollAdjustment,
   submitPayrollFundingClaim,
+  disbursePayslipRunViaPaystack,
 } from "@/app/[tenantSlug]/hr/actions";
 import { MODAL_PANEL_FORM } from "@/lib/modal-panel";
 
@@ -118,6 +120,10 @@ export function HrPayslipsWorkspace({
   fundingAccountNumber,
   fundingAccountName,
   fundingAccountLabel,
+  dvaAccountNumber = "",
+  dvaBankName = "",
+  dvaAccountName = "",
+  dvaPurpose = "",
 }: {
   tenantSlug: string;
   companyName: string;
@@ -135,6 +141,10 @@ export function HrPayslipsWorkspace({
   fundingAccountNumber: string;
   fundingAccountName: string;
   fundingAccountLabel: string;
+  dvaAccountNumber?: string;
+  dvaBankName?: string;
+  dvaAccountName?: string;
+  dvaPurpose?: string;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -288,35 +298,22 @@ export function HrPayslipsWorkspace({
         periodPaidCount={periodPaidCount}
       />
 
-      <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Payroll Available balance</p>
-            <p className="mt-1 font-mono text-2xl font-bold text-foreground">
-              {currency} {payrollAvailableBalanceLabel}
-            </p>
-            <p className="mt-1 max-w-xl text-xs text-muted">
-              Fund Realcorp’s payroll account, then submit the transfer reference. Balance only increases after
-              Realcorp verifies the credit — not when you submit the claim.
-            </p>
-            {(fundingBankName || fundingAccountNumber) && (
-              <p className="mt-2 text-xs text-foreground">
-                {fundingAccountLabel ? <span className="font-medium">{fundingAccountLabel}: </span> : null}
-                {[fundingBankName, fundingAccountNumber, fundingAccountName].filter(Boolean).join(" · ")}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold"
-            onClick={() => setFundingOpen((v) => !v)}
-          >
-            {fundingOpen ? "Hide claim form" : "I transferred funds"}
-          </button>
-        </div>
-        {fundingOpen ? (
+      <PayrollFloatPanel
+        currency={currency}
+        availableBalanceLabel={payrollAvailableBalanceLabel}
+        fundingOpen={fundingOpen}
+        onToggleFunding={() => setFundingOpen((v) => !v)}
+        dvaAccountNumber={dvaAccountNumber}
+        dvaBankName={dvaBankName}
+        dvaAccountName={dvaAccountName}
+        dvaPurpose={dvaPurpose}
+        fundingBankName={fundingBankName}
+        fundingAccountNumber={fundingAccountNumber}
+        fundingAccountName={fundingAccountName}
+        fundingAccountLabel={fundingAccountLabel}
+        fundingForm={
           <form
-            className="mt-4 grid gap-3 border-t border-foreground/10 pt-4 sm:grid-cols-2"
+            className="grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
@@ -345,7 +342,7 @@ export function HrPayslipsWorkspace({
                 required
                 inputMode="decimal"
                 placeholder="2500000.00"
-                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 font-mono text-sm"
               />
             </label>
             <label className="block text-sm">
@@ -354,42 +351,42 @@ export function HrPayslipsWorkspace({
                 name="paymentReference"
                 required
                 placeholder="Bank narration / reference"
-                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-sm">
               <span className="mb-1 block text-xs font-medium">Sender name</span>
               <input
                 name="senderName"
-                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-sm">
               <span className="mb-1 block text-xs font-medium">Sender bank</span>
               <input
                 name="senderBank"
-                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-sm sm:col-span-2">
               <span className="mb-1 block text-xs font-medium">Notes</span>
               <input
                 name="notes"
-                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
               />
             </label>
             <div className="sm:col-span-2">
               <button
                 type="submit"
                 disabled={pending}
-                className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                className="rounded-lg bg-foreground px-4 py-2.5 text-xs font-semibold text-background disabled:opacity-50"
               >
                 Submit claim for verification
               </button>
             </div>
           </form>
-        ) : null}
-      </div>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
@@ -669,39 +666,72 @@ export function HrPayslipsWorkspace({
               </div>
 
               {selectedRun.statusValue === "FINALIZED" && filteredPayslips.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-2 border-b border-foreground/10 bg-foreground/[0.02] px-4 py-2.5">
-                  <input
-                    type="text"
-                    placeholder="Bank ref (optional)"
-                    value={paymentRef}
-                    onChange={(e) => setPaymentRef(e.target.value)}
-                    className="min-w-[140px] rounded-md border border-foreground/15 bg-field px-2 py-1 text-xs"
-                  />
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => void markPayments(Array.from(selectedIds), "PAID")}
-                    className="inline-flex items-center gap-1 rounded-md border border-foreground/20 px-2.5 py-1 text-xs font-semibold hover:bg-foreground/[0.06] disabled:opacity-50"
-                  >
-                    <Banknote className="h-3 w-3" />
-                    Mark selected paid
-                  </button>
-                  <button
-                    type="button"
-                    disabled={pending || filteredPaymentStats.pending === 0}
-                    onClick={() =>
-                      void markPayments(
-                        filteredPayslips.filter((p) => p.paymentStatusValue !== "PAID").map((p) => p.id),
-                        "PAID",
-                      )
-                    }
-                    className="inline-flex items-center gap-1 rounded-md border border-[var(--success-line)] bg-[var(--success-wash)] px-2.5 py-1 text-xs font-semibold text-[var(--success)] disabled:opacity-50"
-                  >
-                    Mark all {filteredPaymentStats.pending} pending paid
-                  </button>
-                  <button type="button" onClick={selectAllVisible} className="text-xs text-muted underline">
-                    Select all shown
-                  </button>
+                <div className="flex flex-col gap-3 border-b border-foreground/10 bg-foreground/[0.02] px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={pending || filteredPaymentStats.pending === 0}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `Send ${filteredPaymentStats.pending} unpaid slip(s) via Paystack?\n\nThis debits Available float and pays staff bank accounts.`,
+                          )
+                        ) {
+                          return;
+                        }
+                        void runAction(
+                          () => disbursePayslipRunViaPaystack(tenantSlug, selectedRun.id),
+                          () => "Paystack disbursement started. Webhooks will mark slips paid.",
+                        );
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                    >
+                      <Banknote className="h-3.5 w-3.5" />
+                      Pay {filteredPaymentStats.pending} via Paystack
+                    </button>
+                    <p className="text-[11px] text-muted">
+                      Needs float balance + staff NUBAN & bank codes. Or mark paid manually after your own transfer.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Manual bank ref"
+                      value={paymentRef}
+                      onChange={(e) => setPaymentRef(e.target.value)}
+                      className="min-w-[140px] rounded-lg border border-foreground/15 bg-field px-2.5 py-1.5 text-xs"
+                    />
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => void markPayments(Array.from(selectedIds), "PAID")}
+                      className="inline-flex items-center gap-1 rounded-lg border border-foreground/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-foreground/[0.06] disabled:opacity-50"
+                    >
+                      Mark selected paid
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending || filteredPaymentStats.pending === 0}
+                      onClick={() =>
+                        void markPayments(
+                          filteredPayslips
+                            .filter((p) => p.paymentStatusValue !== "PAID")
+                            .map((p) => p.id),
+                          "PAID",
+                        )
+                      }
+                      className="inline-flex items-center gap-1 rounded-lg border border-foreground/15 px-2.5 py-1.5 text-xs font-semibold text-muted hover:text-foreground disabled:opacity-50"
+                    >
+                      Mark all pending
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectAllVisible}
+                      className="text-xs text-muted underline"
+                    >
+                      Select all
+                    </button>
+                  </div>
                 </div>
               ) : null}
 
@@ -849,7 +879,7 @@ export function HrPayslipsWorkspace({
                                     className="inline-flex items-center gap-1 rounded-md border border-foreground/15 px-2 py-1 text-xs font-semibold hover:bg-foreground/[0.06] disabled:opacity-50"
                                   >
                                     <Plus className="h-3 w-3" />
-                                    Adjust
+                                    Bonus / adjust
                                   </button>
                                 ) : null}
                                 <button
@@ -914,11 +944,13 @@ export function HrPayslipsWorkspace({
           <>
             <div>
               <h2 id="payroll-adjustment-title" className="text-xl font-semibold text-foreground">
-                Adjust {adjustmentTarget.employeeName} · {selectedRun.label}
+                Bonus &amp; adjustments · {adjustmentTarget.employeeName}
               </h2>
               <p className="mt-1 text-sm text-muted">
-                These items affect this month only. Contractual gross remains unchanged; gross and net pay recalculate
-                immediately.
+                Add a performance bonus, overtime, commission, or a one-off deduction for{" "}
+                <span className="font-medium text-foreground">{selectedRun.label}</span> only. Contractual
+                gross stays the same; tax and net recalculate immediately. Available while the month is
+                still a draft.
               </p>
             </div>
 

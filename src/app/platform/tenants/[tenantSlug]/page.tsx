@@ -187,6 +187,15 @@ export default async function PlatformTenantInvitesPage({
           fundingAccountNumber={disbursement.fundingAccountNumber || ""}
           fundingAccountName={disbursement.fundingAccountName || ""}
           fundingAccountLabel={disbursement.fundingAccountLabel || ""}
+          dvaProvider={disbursement.dvaProvider || "PAYSTACK"}
+          dvaAccountNumber={disbursement.dvaAccountNumber || ""}
+          dvaBankName={disbursement.dvaBankName || ""}
+          dvaAccountName={disbursement.dvaAccountName || ""}
+          dvaBankCode={disbursement.dvaBankCode || ""}
+          dvaProviderAccountId={disbursement.dvaProviderAccountId || ""}
+          dvaCustomerCode={disbursement.dvaCustomerCode || ""}
+          dvaPurpose={disbursement.dvaPurpose || "PAYROLL_FLOAT"}
+          dvaNotes={disbursement.dvaNotes || ""}
         />
         <InviteTokenLookup />
         <TenantMembersWorkspace tenantSlug={tenant.slug} tenantName={tenant.name} members={members} />

@@ -1014,7 +1014,7 @@ export function HrPeopleWorkspace({
             to view or edit their HR record.
           </div>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[1fr_minmax(240px,280px)]">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,380px)]">
             <form
               className="rounded-lg border border-foreground/10 p-4 sm:p-5"
               onSubmit={(e) => {

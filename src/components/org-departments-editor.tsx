@@ -48,6 +48,7 @@ export function OrgDepartmentsEditor({
     if (!next) return;
     if (isDefaultOrgDepartment(next)) {
       setNewDepartment("");
+      showSnackbar(`${next} is already a built-in department.`, "error");
       return;
     }
     if (customDepartments.some((d) => d.toLowerCase() === next.toLowerCase())) {
@@ -78,45 +79,155 @@ export function OrgDepartmentsEditor({
       return;
     }
     if (isDefaultOrgDepartment(next)) {
-      setEditError("That name is already a default department.");
+      setEditError("That name is reserved for a built-in department.");
       return;
     }
-    if (customDepartments.some((d) => d !== editing && d.toLowerCase() === next.toLowerCase())) {
-      setEditError("A department with that name already exists.");
+    if (
+      next.toLowerCase() !== editing.toLowerCase() &&
+      customDepartments.some((d) => d.toLowerCase() === next.toLowerCase())
+    ) {
+      setEditError("That department already exists.");
       return;
     }
-    const ok = await persist(
-      customDepartments.map((d) => (d === editing ? next : d)),
-      "Department renamed.",
-    );
+    const updated = customDepartments.map((d) => (d === editing ? next : d));
+    const ok = await persist(updated, `Renamed to ${next}.`);
     if (ok) cancelEdit();
   }
 
+  async function removeDepartment(department: string) {
+    const ok = await persist(
+      customDepartments.filter((d) => d !== department),
+      `${department} removed.`,
+    );
+    if (ok && editing === department) cancelEdit();
+  }
+
   return (
-    <div id="org-departments" className="scroll-mt-6">
-      {compact ? null : (
+    <div className={compact ? "" : "rounded-lg border border-foreground/10 p-4"}>
+      {!compact ? (
         <>
-          <h3 className="text-sm font-semibold text-foreground">Departments</h3>
+          <p className="text-sm font-semibold text-foreground">Departments</p>
           <p className="mt-1 text-xs text-muted">
             Org units for invites, People, Finance, and reporting — e.g. Finance, Sales, Operations.
-            Job titles (Front Desk Officer) and access roles live under People / Team, not here. Add a
-            department name and it saves immediately.
+            Do not add job titles here (Front Desk Officer belongs under Job titles / People record).
+            Access roles stay on Team invites.
           </p>
         </>
+      ) : (
+        <p className="mb-3 text-xs text-muted">
+          Teams only — not job titles. Front Desk / Receptionist go under Job titles on the employee
+          record. Built-ins below cannot be deleted.
+        </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {DEFAULT_ORG_DEPARTMENTS.map((department) => (
-          <span
-            key={department}
-            className="inline-flex rounded-full border border-foreground/20 bg-foreground/[0.03] px-2.5 py-1 text-[11px] font-medium text-foreground"
-          >
-            {department} (default)
-          </span>
-        ))}
+      <div className="overflow-hidden rounded-lg border border-foreground/10">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-foreground/10 bg-foreground/[0.03] text-[11px] uppercase tracking-wide text-muted">
+            <tr>
+              <th className="px-3 py-2.5 font-semibold">Department</th>
+              <th className="px-3 py-2.5 font-semibold">Type</th>
+              <th className="px-3 py-2.5 font-semibold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DEFAULT_ORG_DEPARTMENTS.map((department) => (
+              <tr key={department} className="border-b border-foreground/[0.06]">
+                <td className="px-3 py-2.5 font-medium text-foreground">{department}</td>
+                <td className="px-3 py-2.5 text-xs text-muted">Built-in</td>
+                <td className="px-3 py-2.5 text-right text-[11px] text-muted">Locked</td>
+              </tr>
+            ))}
+            {customDepartments.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-3 py-6 text-center text-xs text-muted">
+                  No custom departments yet — add Operations, Facility, etc. below.
+                </td>
+              </tr>
+            ) : (
+              customDepartments.map((department) => (
+                <tr key={department} className="border-b border-foreground/[0.06] last:border-0">
+                  <td className="px-3 py-2.5">
+                    {editing === department ? (
+                      <div className="space-y-1">
+                        <input
+                          autoFocus
+                          value={draft}
+                          onChange={(e) => {
+                            setDraft(e.target.value);
+                            setEditError("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void commitEdit();
+                            }
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancelEdit();
+                            }
+                          }}
+                          className="w-full max-w-xs rounded-md border border-foreground/15 bg-field px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                          aria-label={`Rename ${department}`}
+                        />
+                        {editError ? <p className="text-[11px] text-[var(--danger)]">{editError}</p> : null}
+                      </div>
+                    ) : (
+                      <span className="font-medium text-foreground">{department}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-muted">Custom</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center justify-end gap-1">
+                      {editing === department ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void commitEdit()}
+                            className="rounded px-2 py-1 text-[11px] font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-40"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="rounded px-2 py-1 text-[11px] text-muted hover:bg-foreground/[0.06]"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => startEdit(department)}
+                            className="rounded p-1.5 text-muted hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-40"
+                            aria-label={`Edit ${department}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void removeDepartment(department)}
+                            className="rounded p-1.5 text-muted hover:bg-[var(--danger-wash)] hover:text-[var(--danger)] disabled:opacity-40"
+                            aria-label={`Remove ${department}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      <div className="mt-3 flex max-w-lg items-center gap-2">
+      <div className="mt-3 flex max-w-xl items-center gap-2">
         <input
           value={newDepartment}
           onChange={(e) => setNewDepartment(e.target.value)}
@@ -126,7 +237,7 @@ export function OrgDepartmentsEditor({
               void addDepartment();
             }
           }}
-          placeholder="e.g. Operations, Facility"
+          placeholder="e.g. Operations, Facility — not Front Desk"
           disabled={saving}
           className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
         />
@@ -139,87 +250,6 @@ export function OrgDepartmentsEditor({
           {saving ? "Saving…" : "Add"}
         </button>
       </div>
-
-      <div className="mt-2 flex max-w-lg flex-wrap gap-2">
-        {customDepartments.length === 0 ? (
-          <span className="text-[11px] text-muted">No custom departments yet.</span>
-        ) : (
-          customDepartments.map((department) =>
-            editing === department ? (
-              <span
-                key={department}
-                className="inline-flex items-center gap-1 rounded-full border border-foreground/30 bg-background px-2 py-1"
-              >
-                <input
-                  autoFocus
-                  value={draft}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    setEditError("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void commitEdit();
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelEdit();
-                    }
-                  }}
-                  className="w-40 rounded border border-foreground/15 bg-field px-2 py-0.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/30"
-                  aria-label={`Rename ${department}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => void commitEdit()}
-                  className="rounded px-1.5 text-[10px] font-semibold text-foreground hover:bg-foreground/[0.08]"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="rounded px-1 text-[10px] text-muted hover:bg-foreground/[0.08] hover:text-foreground"
-                >
-                  Cancel
-                </button>
-              </span>
-            ) : (
-              <span
-                key={department}
-                className="inline-flex items-center gap-1 rounded-full border border-foreground/20 px-2.5 py-1 text-[11px] font-medium text-foreground"
-              >
-                {department}
-                <button
-                  type="button"
-                  aria-label={`Rename ${department}`}
-                  title="Rename"
-                  onClick={() => startEdit(department)}
-                  className="rounded p-0.5 text-muted hover:bg-foreground/[0.08] hover:text-foreground"
-                >
-                  <Pencil className="h-3 w-3" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Remove ${department}`}
-                  title="Remove"
-                  onClick={() =>
-                    void persist(
-                      customDepartments.filter((x) => x !== department),
-                      `${department} removed.`,
-                    )
-                  }
-                  className="rounded p-0.5 text-muted hover:bg-foreground/[0.08] hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ),
-          )
-        )}
-      </div>
-      {editError ? <p className="mt-1 text-[11px] text-[var(--danger)]">{editError}</p> : null}
     </div>
   );
 }

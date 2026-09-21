@@ -609,6 +609,15 @@ export async function platformSavePayrollDisbursementSettings(input: {
   fundingAccountNumber?: string;
   fundingAccountName?: string;
   fundingAccountLabel?: string;
+  dvaProvider?: "PAYSTACK" | "FLUTTERWAVE" | "";
+  dvaAccountNumber?: string;
+  dvaBankName?: string;
+  dvaAccountName?: string;
+  dvaBankCode?: string;
+  dvaProviderAccountId?: string;
+  dvaCustomerCode?: string;
+  dvaPurpose?: string;
+  dvaNotes?: string;
 }): Promise<MoneyActionResult> {
   const gate = await requirePlatformAdmin();
   if (!gate.ok) return gate;
@@ -635,6 +644,15 @@ export async function platformSavePayrollDisbursementSettings(input: {
     fundingAccountNumber: input.fundingAccountNumber || "",
     fundingAccountName: input.fundingAccountName || "",
     fundingAccountLabel: input.fundingAccountLabel || "",
+    dvaProvider: input.dvaProvider ?? current.dvaProvider ?? "PAYSTACK",
+    dvaAccountNumber: input.dvaAccountNumber ?? "",
+    dvaBankName: input.dvaBankName ?? "",
+    dvaAccountName: input.dvaAccountName ?? "",
+    dvaBankCode: input.dvaBankCode ?? "",
+    dvaProviderAccountId: input.dvaProviderAccountId ?? "",
+    dvaCustomerCode: input.dvaCustomerCode ?? "",
+    dvaPurpose: input.dvaPurpose || "PAYROLL_FLOAT",
+    dvaNotes: input.dvaNotes ?? "",
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message || "Invalid settings." };
@@ -652,6 +670,128 @@ export async function platformSavePayrollDisbursementSettings(input: {
   });
 
   revalidatePath(`/platform/tenants/${tenant.slug}`);
+  revalidatePath("/platform/payroll");
   revalidatePath(`/${tenant.slug}/hr`);
-  return { ok: true, message: "Disbursement settings saved." };
+  return { ok: true, message: "Disbursement & DVA settings saved." };
 }
+
+export async function platformPaystackStatus(): Promise<
+  | {
+      ok: true;
+      configured: boolean;
+      keyMode: "test" | "live" | "unknown" | "missing";
+      balances: Array<{ currency: string; balanceLabel: string }>;
+      balanceError?: string;
+      webhookPath: string;
+    }
+  | { ok: false; error: string }
+> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const { isPaystackConfigured, paystackGetBalances, koboToNairaString } = await import(
+    "@/lib/payroll/disbursement"
+  );
+  const key = process.env.PAYSTACK_SECRET_KEY?.trim() || "";
+  const configured = isPaystackConfigured();
+  let keyMode: "test" | "live" | "unknown" | "missing" = "missing";
+  if (key.startsWith("sk_test_")) keyMode = "test";
+  else if (key.startsWith("sk_live_")) keyMode = "live";
+  else if (key) keyMode = "unknown";
+
+  const balances: Array<{ currency: string; balanceLabel: string }> = [];
+  let balanceError: string | undefined;
+  if (configured) {
+    const res = await paystackGetBalances();
+    if (!res.ok) {
+      balanceError = res.error;
+    } else {
+      for (const row of res.data || []) {
+        // Paystack returns balance in kobo for NGN
+        const label =
+          row.currency === "NGN"
+            ? koboToNairaString(Math.max(0, Math.trunc(row.balance)))
+            : String(row.balance);
+        balances.push({ currency: row.currency, balanceLabel: label });
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    configured,
+    keyMode,
+    balances,
+    balanceError,
+    webhookPath: "/api/webhooks/paystack",
+  };
+}
+
+export async function platformResolveSalaryAccount(input: {
+  accountNumber: string;
+  bankCode: string;
+}): Promise<
+  | { ok: true; accountNumber: string; accountName: string }
+  | { ok: false; error: string }
+> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const { normalizeNuban, normalizeBankCode } = await import("@/lib/payroll/disbursement");
+  const { paystackResolveAccount } = await import("@/lib/payroll/disbursement/paystack");
+
+  const nuban = normalizeNuban(input.accountNumber);
+  if (!nuban.ok) return { ok: false, error: nuban.error };
+  const code = normalizeBankCode(input.bankCode);
+  if (!code.ok) return { ok: false, error: code.error };
+
+  const res = await paystackResolveAccount(nuban.accountNumber, code.bankCode);
+  if (!res.ok) return { ok: false, error: res.error };
+  return {
+    ok: true,
+    accountNumber: res.data.account_number,
+    accountName: res.data.account_name,
+  };
+}
+
+export async function platformDisbursePayslipRun(input: {
+  tenantSlug: string;
+  payslipRunId: string;
+}): Promise<
+  | { ok: true; batchId: string; success: number; failed: number; message: string }
+  | { ok: false; error: string }
+> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const tenant = await loadTenantBySlug(input.tenantSlug);
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+
+  const actor = {
+    userId: gate.session.user!.id!,
+    label: gate.session.user!.name || gate.session.user!.email || "Platform admin",
+  };
+
+  const { createDisbursementBatchFromRun, executeDisbursementBatch } = await import(
+    "@/lib/payroll/disbursement"
+  );
+
+  const created = await createDisbursementBatchFromRun(tenant.id, input.payslipRunId, actor);
+  if (!created.ok) return { ok: false, error: created.error };
+
+  const executed = await executeDisbursementBatch(tenant.id, created.batchId, actor);
+  if (!executed.ok) return { ok: false, error: executed.error };
+
+  revalidatePath("/platform/payroll");
+  revalidatePath(`/platform/tenants/${tenant.slug}`);
+  revalidatePath(`/${tenant.slug}/hr/payslips`);
+
+  return {
+    ok: true,
+    batchId: created.batchId,
+    success: executed.success,
+    failed: executed.failed,
+    message: `Paystack batch ${created.batchId}: ${executed.success} ok, ${executed.failed} failed.`,
+  };
+}
+

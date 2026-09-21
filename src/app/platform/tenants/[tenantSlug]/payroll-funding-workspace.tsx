@@ -43,6 +43,15 @@ type Props = {
   fundingAccountNumber: string;
   fundingAccountName: string;
   fundingAccountLabel: string;
+  dvaProvider: string;
+  dvaAccountNumber: string;
+  dvaBankName: string;
+  dvaAccountName: string;
+  dvaBankCode: string;
+  dvaProviderAccountId: string;
+  dvaCustomerCode: string;
+  dvaPurpose: string;
+  dvaNotes: string;
 };
 
 export function PlatformPayrollFundingWorkspace(props: Props) {
@@ -66,7 +75,7 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
   }
 
   return (
-    <section className="rounded-lg border border-foreground/10 bg-background p-5">
+    <section id="payroll-float" className="scroll-mt-6 rounded-lg border border-foreground/10 bg-background p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Payroll float</h2>
@@ -275,6 +284,18 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
               fundingAccountNumber: String(fd.get("fundingAccountNumber") || ""),
               fundingAccountName: String(fd.get("fundingAccountName") || ""),
               fundingAccountLabel: String(fd.get("fundingAccountLabel") || ""),
+              dvaProvider: (String(fd.get("dvaProvider") || "PAYSTACK") as
+                | "PAYSTACK"
+                | "FLUTTERWAVE"
+                | "") || "PAYSTACK",
+              dvaAccountNumber: String(fd.get("dvaAccountNumber") || ""),
+              dvaBankName: String(fd.get("dvaBankName") || ""),
+              dvaAccountName: String(fd.get("dvaAccountName") || ""),
+              dvaBankCode: String(fd.get("dvaBankCode") || ""),
+              dvaProviderAccountId: String(fd.get("dvaProviderAccountId") || ""),
+              dvaCustomerCode: String(fd.get("dvaCustomerCode") || ""),
+              dvaPurpose: String(fd.get("dvaPurpose") || "PAYROLL_FLOAT"),
+              dvaNotes: String(fd.get("dvaNotes") || ""),
             }),
           );
         }}
@@ -325,7 +346,7 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
           />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block text-xs font-medium">Realcorp bank name</span>
+          <span className="mb-1 block text-xs font-medium">Fallback bank name</span>
           <input
             name="fundingBankName"
             defaultValue={props.fundingBankName}
@@ -333,7 +354,7 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
           />
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block text-xs font-medium">Realcorp account number</span>
+          <span className="mb-1 block text-xs font-medium">Fallback account number</span>
           <input
             name="fundingAccountNumber"
             defaultValue={props.fundingAccountNumber}
@@ -341,10 +362,104 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
           />
         </label>
         <label className="block text-sm sm:col-span-2">
-          <span className="mb-1 block text-xs font-medium">Account name</span>
+          <span className="mb-1 block text-xs font-medium">Fallback account name</span>
           <input
             name="fundingAccountName"
             defaultValue={props.fundingAccountName}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+          />
+        </label>
+
+        <div className="sm:col-span-2 mt-2 border-t border-foreground/10 pt-5">
+          <h3 className="text-sm font-semibold text-foreground">
+            Dedicated Virtual Account (per tenant)
+          </h3>
+          <p className="mt-1 text-xs text-muted">
+            Create the DVA in Paystack for this org, then paste details here. The org sees this as
+            where to fund payroll float. Investor / other purposes can use separate DVAs later with a
+            different purpose tag.
+          </p>
+        </div>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Provider</span>
+          <select
+            name="dvaProvider"
+            defaultValue={props.dvaProvider || "PAYSTACK"}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+          >
+            <option value="PAYSTACK">Paystack</option>
+            <option value="FLUTTERWAVE">Flutterwave</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Purpose</span>
+          <select
+            name="dvaPurpose"
+            defaultValue={props.dvaPurpose || "PAYROLL_FLOAT"}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+          >
+            <option value="PAYROLL_FLOAT">Payroll float</option>
+            <option value="INVESTOR">Investor / capital</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">DVA account number</span>
+          <input
+            name="dvaAccountNumber"
+            defaultValue={props.dvaAccountNumber}
+            placeholder="From Paystack Virtual Accounts"
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">DVA bank name</span>
+          <input
+            name="dvaBankName"
+            defaultValue={props.dvaBankName}
+            placeholder="e.g. Wema Bank"
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">DVA account name</span>
+          <input
+            name="dvaAccountName"
+            defaultValue={props.dvaAccountName}
+            placeholder="Usually Realcorp / tenant slug"
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">DVA bank code (optional)</span>
+          <input
+            name="dvaBankCode"
+            defaultValue={props.dvaBankCode}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Paystack dedicated account id</span>
+          <input
+            name="dvaProviderAccountId"
+            defaultValue={props.dvaProviderAccountId}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Paystack customer code</span>
+          <input
+            name="dvaCustomerCode"
+            defaultValue={props.dvaCustomerCode}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+        </label>
+        <label className="block text-sm sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium">Notes (internal)</span>
+          <input
+            name="dvaNotes"
+            defaultValue={props.dvaNotes}
+            placeholder="e.g. Created 21 Sep for BO Properties payroll"
             className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
           />
         </label>

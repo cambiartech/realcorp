@@ -115,11 +115,13 @@ export default async function TasksPage({
       ? "my"
       : view === "sprint"
         ? "sprint"
-        : view === "company"
-          ? "company"
-          : seesAllOrgTasks || membership?.isDepartmentLead
+        : view === "history"
+          ? "history"
+          : view === "company"
             ? "company"
-            : "my";
+            : seesAllOrgTasks || membership?.isDepartmentLead
+              ? "company"
+              : "my";
   const department =
     (membership?.department ? mapOrgDepartmentToAccess(membership.department) : null) ??
     profileFromMembershipRole(membership?.role ?? MembershipRole.SALES_EXECUTIVE).department;
@@ -166,6 +168,10 @@ export default async function TasksPage({
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.dueDate)
           : null,
         dueDateValue: t.dueDate ? t.dueDate.toISOString().slice(0, 10) : null,
+        completedAt: t.completedAt ? t.completedAt.toISOString() : null,
+        completedAtLabel: t.completedAt
+          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.completedAt)
+          : null,
         linkedEntityType: t.linkedEntityType,
       }))}
       members={memberOptions}

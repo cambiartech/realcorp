@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Banknote, FileCheck, Landmark, Send } from "lucide-react";
+import { ArrowRight, Banknote, FileCheck, Landmark, Send, Wallet } from "lucide-react";
 
 export function PayrollWorkflowGuide({
   tenantSlug,
@@ -21,53 +21,84 @@ export function PayrollWorkflowGuide({
   const steps = [
     {
       icon: FileCheck,
-      title: "1. Setup",
+      title: "Setup people",
       body:
         payrollReadyCount > 0
-          ? `${payrollReadyCount} employee${payrollReadyCount === 1 ? "" : "s"} ready (ACTIVE + monthly gross on People → Job).`
-          : "No one ready yet — set gross pay on People → Job and mark profiles ACTIVE.",
+          ? `${payrollReadyCount} ready (ACTIVE + gross + bank on People).`
+          : "Set gross, bank code, and ACTIVE on People → Job & Bank.",
       link: payrollReadyCount === 0 ? `/${tenantSlug}/hr/people` : undefined,
       linkLabel: "Open People",
+      done: payrollReadyCount > 0,
+    },
+    {
+      icon: Wallet,
+      title: "Fund float",
+      body: "Copy the payroll account above, transfer, submit the reference. Balance rises after Realcorp verifies.",
+      done: false,
     },
     {
       icon: Send,
-      title: "2. Generate, adjust & publish",
+      title: "Generate & publish",
       body:
         periodStatus === "none"
-          ? `Generate ${periodLabel ?? "the month"}, add any one-time bonuses or deductions, then publish after review.`
+          ? `Generate ${periodLabel ?? "the month"}, review, then publish.`
           : periodStatus === "DRAFT"
-            ? `${periodLabel}: ${periodSlipCount} draft slip${periodSlipCount === 1 ? "" : "s"} — use Adjust for bonuses, reimbursements or deductions before publishing.`
-            : `${periodLabel}: published — ${periodSlipCount} slip${periodSlipCount === 1 ? "" : "s"} visible to employees.`,
+            ? `${periodLabel}: ${periodSlipCount} draft — adjust if needed, then publish.`
+            : `${periodLabel}: published · ${periodSlipCount} slip${periodSlipCount === 1 ? "" : "s"}.`,
+      done: periodStatus === "FINALIZED",
     },
     {
       icon: Banknote,
-      title: "3. Mark salary paid",
+      title: "Pay staff",
       body:
         periodStatus === "FINALIZED"
           ? periodPaidCount >= periodSlipCount && periodSlipCount > 0
-            ? `All ${periodPaidCount} bank transfers recorded for this month.`
-            : periodSlipCount > 0
-              ? `${periodPaidCount} of ${periodSlipCount} marked paid — use the table after you pay each person (or bulk mark).`
-              : "After publishing, record bank payments here. This is separate from publishing the payslip PDF."
-          : "After you publish, mark each row Paid once salary hits their bank account.",
+            ? `All ${periodPaidCount} marked paid.`
+            : `${periodPaidCount}/${periodSlipCount} paid — Pay via Paystack or mark paid manually.`
+          : "After publish: Pay via Paystack (auto) or mark paid after bank transfer.",
+      done: periodStatus === "FINALIZED" && periodSlipCount > 0 && periodPaidCount >= periodSlipCount,
     },
     {
       icon: Landmark,
-      title: "4. File remittances",
-      body: "Export PAYE, pension (by PFA), NHF, and NSITF for the same month and file with the agencies.",
+      title: "Remittances",
+      body: "Export PAYE, pension, NHF, NSITF for the same month.",
       link: `/${tenantSlug}/hr/remittances`,
       linkLabel: "Open remittances",
+      done: false,
     },
   ];
 
   return (
-    <div className="rounded-xl border border-foreground/10 bg-gradient-to-br from-foreground/[0.03] to-transparent p-4">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">How payroll works</p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {steps.map((s) => (
-          <div key={s.title} className="rounded-lg border border-foreground/10 bg-foreground/[0.02]/80 p-3">
-            <div className="mb-1.5 flex items-center gap-2">
-              <s.icon className="h-4 w-4 text-muted" />
+    <div className="rounded-2xl border border-foreground/10 bg-background p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+            Payroll path
+          </p>
+          <p className="mt-0.5 text-sm text-muted">Follow in order — float first, then pay.</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {steps.map((s, i) => (
+          <div
+            key={s.title}
+            className={[
+              "relative rounded-xl border p-3.5",
+              s.done
+                ? "border-[var(--success-line)] bg-[var(--success-wash)]/40"
+                : "border-foreground/10 bg-foreground/[0.02]",
+            ].join(" ")}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <span
+                className={[
+                  "flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold",
+                  s.done ? "bg-[var(--success)] text-white" : "bg-foreground/10 text-foreground",
+                ].join(" ")}
+              >
+                {i + 1}
+              </span>
+              <s.icon className="h-3.5 w-3.5 text-muted" />
               <span className="text-sm font-semibold text-foreground">{s.title}</span>
             </div>
             <p className="text-xs leading-relaxed text-muted">{s.body}</p>
@@ -83,11 +114,6 @@ export function PayrollWorkflowGuide({
           </div>
         ))}
       </div>
-      <p className="mt-3 text-[11px] text-muted">
-        <strong className="text-foreground">Published</strong> = employee can download the payslip.{" "}
-        <strong className="text-foreground">Paid</strong> = you confirm the net salary was transferred
-        (manual; no bank API).
-      </p>
     </div>
   );
 }

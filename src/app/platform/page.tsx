@@ -40,6 +40,13 @@ export default async function PlatformHomePage() {
       </Link>
 
       <p className="mt-4 text-sm text-muted">
+        Payroll float (fund → verify → ledger)?{" "}
+        <Link href="/platform/payroll" className="font-semibold text-foreground underline underline-offset-2">
+          Open Payroll float →
+        </Link>
+      </p>
+
+      <p className="mt-4 text-sm text-muted">
         Debug a production crash?{" "}
         <Link href="/platform/errors" className="font-semibold text-foreground underline underline-offset-2">
           Error lookup →

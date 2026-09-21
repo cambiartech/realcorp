@@ -204,7 +204,7 @@ export function HrOnboardingWizard({
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_minmax(240px,280px)]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
       <div className="min-w-0">
       {error ? (
         <p className="mb-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-xs text-[var(--danger)]">
