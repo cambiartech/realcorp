@@ -537,6 +537,18 @@ export async function adjustLeaveBalance(
   ]);
   if (!profile || !leaveType) return { ok: false, error: "Employee or leave policy not found." };
   const actorLabel = ctx.session.user.name || ctx.session.user.email || "HR";
+  const existing = await prisma.hrLeaveBalance.findUnique({
+    where: {
+      employeeProfileId_leaveTypeId_year: {
+        employeeProfileId: profile.id,
+        leaveTypeId: leaveType.id,
+        year: parsed.data.year,
+      },
+    },
+    select: { adjustmentUnits: true },
+  });
+  // Input is a delta (+9 add days, −5 deduct), not a replacement of the stored adjustment.
+  const nextAdjustment = Number(existing?.adjustmentUnits ?? 0) + parsed.data.adjustmentUnits;
   await prisma.hrLeaveBalance.upsert({
     where: {
       employeeProfileId_leaveTypeId_year: {
@@ -550,13 +562,13 @@ export async function adjustLeaveBalance(
       employeeProfileId: profile.id,
       leaveTypeId: leaveType.id,
       year: parsed.data.year,
-      adjustmentUnits: parsed.data.adjustmentUnits,
+      adjustmentUnits: nextAdjustment,
       adjustmentReason: parsed.data.reason,
       adjustedByUserId: ctx.session.user.id,
       adjustedByLabel: actorLabel,
     },
     update: {
-      adjustmentUnits: parsed.data.adjustmentUnits,
+      adjustmentUnits: nextAdjustment,
       adjustmentReason: parsed.data.reason,
       adjustedByUserId: ctx.session.user.id,
       adjustedByLabel: actorLabel,
@@ -570,8 +582,13 @@ export async function adjustLeaveBalance(
     entityType: "LEAVE_BALANCE",
     entityId: `${profile.id}:${leaveType.id}:${parsed.data.year}`,
     action: "ADJUST",
-    summary: `Adjusted ${profile.fullName || "employee"}'s ${leaveType.name} balance by ${parsed.data.adjustmentUnits}.`,
-    metadata: { reason: parsed.data.reason },
+    summary: `Adjusted ${profile.fullName || "employee"}'s ${leaveType.name} by ${parsed.data.adjustmentUnits > 0 ? "+" : ""}${parsed.data.adjustmentUnits} (total adjustment now ${nextAdjustment > 0 ? "+" : ""}${nextAdjustment}).`,
+    metadata: {
+      reason: parsed.data.reason,
+      delta: parsed.data.adjustmentUnits,
+      previousAdjustment: existing?.adjustmentUnits ?? 0,
+      nextAdjustment,
+    },
   });
   revalidateLeave(tenantSlug);
   return { ok: true };

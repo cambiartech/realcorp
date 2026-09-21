@@ -18,7 +18,7 @@ import { FileDropZone } from "@/components/hr/file-drop-zone";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { useSnackbar } from "@/components/snackbar";
 import { uploadViaCloudinarySignature } from "@/lib/cloudinary-upload-client";
-import { MODAL_PANEL_FORM, MODAL_PANEL_MD, MODAL_PANEL_XS } from "@/lib/modal-panel";
+import { MODAL_PANEL_FORM, MODAL_PANEL_LG, MODAL_PANEL_XS } from "@/lib/modal-panel";
 import { filterLeaveTypesForGender } from "@/lib/hr-leave";
 import { ArrowLeft, CalendarDays, Check, Clock3, Pencil, Plus, Settings2, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -261,12 +261,18 @@ export function HrLeaveWorkspace({
   }, [adjustEmployeeId, adjustTypeId, employeeDetail, leaveRoster, policies]);
 
   const adjustDraftNumber = Number(adjustUnitsDraft);
+  const hasAdjustDraft =
+    adjustUnitsDraft.trim() !== "" && Number.isFinite(adjustDraftNumber);
   const adjustProjectedAvailable =
     adjustBalancePreview &&
     !adjustBalancePreview.unlimited &&
     adjustBalancePreview.available != null &&
-    Number.isFinite(adjustDraftNumber)
+    hasAdjustDraft
       ? adjustBalancePreview.available + adjustDraftNumber
+      : null;
+  const adjustProjectedTotalAdj =
+    adjustBalancePreview && hasAdjustDraft
+      ? adjustBalancePreview.adjustment + adjustDraftNumber
       : null;
 
   async function openEmployeeLeave(profileId: string) {
@@ -1287,7 +1293,7 @@ export function HrLeaveWorkspace({
       <ModalOverlay
         open={Boolean(adjustTarget)}
         onClose={() => !pending && setAdjustTarget(null)}
-        panelClassName={MODAL_PANEL_MD}
+        panelClassName={MODAL_PANEL_LG}
         aria-labelledby="adjust-leave-title"
       >
         <form
@@ -1317,19 +1323,21 @@ export function HrLeaveWorkspace({
             }
           }}
         >
-          <div className="border-b border-[var(--border-subtle)] px-6 py-5">
+          <div className="border-b border-[var(--border-subtle)] px-6 py-5 sm:px-7">
             <h2 id="adjust-leave-title" className="text-[1.125rem] font-semibold tracking-tight">
               Adjust leave balance
             </h2>
-            <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-muted">
-              Use a <strong className="font-medium text-foreground">negative</strong> number to deduct
-              days already taken before Realcorp (e.g. −5). Positive adds days. Changes are audited.
+            <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-muted">
+              Enter a <strong className="font-medium text-foreground">change</strong> to apply on top of
+              today’s balance — <code className="rounded bg-field px-1 py-0.5 text-[12px]">+9</code> adds
+              nine days, <code className="rounded bg-field px-1 py-0.5 text-[12px]">−5</code> deducts five.
+              It does not replace prior adjustments. Changes are audited.
             </p>
           </div>
 
-          <div className="grid gap-4 px-6 py-5">
+          <div className="grid gap-5 px-6 py-5 sm:px-7">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm sm:col-span-1">
+              <label className="text-sm">
                 <span className="mb-1.5 block text-[12.5px] font-medium text-muted">Employee</span>
                 <select
                   name="employeeProfileId"
@@ -1366,65 +1374,76 @@ export function HrLeaveWorkspace({
             </div>
 
             {adjustBalancePreview ? (
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-3.5">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <p className="text-[12.5px] font-medium text-muted">
-                      Current balance · {adjustYear}
-                    </p>
+              <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]">
+                <div className="grid gap-0 sm:grid-cols-3">
+                  <div className="border-b border-[var(--border-subtle)] px-4 py-4 sm:border-b-0 sm:border-r">
+                    <p className="text-[12px] font-medium text-muted">Now · {adjustYear}</p>
                     <p className="mt-1 text-[1.75rem] font-semibold tracking-tight tabular-nums text-foreground">
+                      {adjustBalancePreview.unlimited ? "∞" : (adjustBalancePreview.available ?? "—")}
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] text-muted">
                       {adjustBalancePreview.unlimited
-                        ? "∞"
-                        : adjustBalancePreview.available ?? "—"}
-                      {!adjustBalancePreview.unlimited ? (
-                        <span className="ml-1.5 text-[13px] font-medium text-muted">
-                          {unitLabel(adjustBalancePreview.dayUnit, adjustBalancePreview.available ?? undefined)} left
-                        </span>
-                      ) : (
-                        <span className="ml-1.5 text-[13px] font-medium text-muted">unlimited</span>
-                      )}
+                        ? "Unlimited"
+                        : `${unitLabel(adjustBalancePreview.dayUnit, adjustBalancePreview.available ?? undefined)} left`}
                     </p>
                   </div>
-                  {adjustProjectedAvailable != null ? (
-                    <div className="text-right">
-                      <p className="text-[12.5px] font-medium text-muted">After this adjustment</p>
-                      <p
-                        className={[
-                          "mt-1 text-[1.25rem] font-semibold tabular-nums tracking-tight",
-                          adjustProjectedAvailable < 0 ? "text-[var(--danger)]" : "text-foreground",
-                        ].join(" ")}
-                      >
-                        {adjustProjectedAvailable}
-                        <span className="ml-1 text-[12.5px] font-medium text-muted">
-                          {unitLabel(adjustBalancePreview.dayUnit, adjustProjectedAvailable)}
-                        </span>
-                      </p>
-                    </div>
-                  ) : null}
+                  <div className="border-b border-[var(--border-subtle)] px-4 py-4 sm:border-b-0 sm:border-r">
+                    <p className="text-[12px] font-medium text-muted">This change</p>
+                    <p
+                      className={[
+                        "mt-1 text-[1.75rem] font-semibold tracking-tight tabular-nums",
+                        !hasAdjustDraft
+                          ? "text-faint"
+                          : adjustDraftNumber < 0
+                            ? "text-[var(--danger)]"
+                            : adjustDraftNumber > 0
+                              ? "text-[var(--success)]"
+                              : "text-foreground",
+                      ].join(" ")}
+                    >
+                      {!hasAdjustDraft
+                        ? "—"
+                        : `${adjustDraftNumber > 0 ? "+" : ""}${adjustDraftNumber}`}
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] text-muted">
+                      {hasAdjustDraft
+                        ? `Will ${adjustDraftNumber >= 0 ? "add to" : "deduct from"} balance`
+                        : "Type a number below"}
+                    </p>
+                  </div>
+                  <div className="px-4 py-4">
+                    <p className="text-[12px] font-medium text-muted">After save</p>
+                    <p
+                      className={[
+                        "mt-1 text-[1.75rem] font-semibold tracking-tight tabular-nums",
+                        adjustProjectedAvailable == null
+                          ? "text-faint"
+                          : adjustProjectedAvailable < 0
+                            ? "text-[var(--danger)]"
+                            : "text-foreground",
+                      ].join(" ")}
+                    >
+                      {adjustBalancePreview.unlimited
+                        ? "∞"
+                        : adjustProjectedAvailable == null
+                          ? "—"
+                          : adjustProjectedAvailable}
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] text-muted">
+                      {adjustBalancePreview.unlimited
+                        ? "Still unlimited"
+                        : adjustProjectedAvailable == null
+                          ? "Waiting for change"
+                          : `${unitLabel(adjustBalancePreview.dayUnit, adjustProjectedAvailable)} left`}
+                    </p>
+                  </div>
                 </div>
                 {!adjustBalancePreview.unlimited ? (
-                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-[var(--border-subtle)] pt-3 text-[12.5px] sm:grid-cols-4">
-                    {adjustBalancePreview.entitlement != null ? (
-                      <div>
-                        <dt className="text-muted">Policy grant</dt>
-                        <dd className="font-medium tabular-nums text-foreground">
-                          {adjustBalancePreview.entitlement}
-                        </dd>
-                      </div>
-                    ) : null}
-                    {adjustBalancePreview.accrued != null ? (
-                      <div>
-                        <dt className="text-muted">Granted</dt>
-                        <dd className="font-medium tabular-nums text-foreground">
-                          {adjustBalancePreview.accrued}
-                        </dd>
-                      </div>
-                    ) : null}
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-[var(--border-subtle)] px-4 py-3 text-[12.5px] sm:grid-cols-5">
                     <div>
-                      <dt className="text-muted">Prior adjustments</dt>
+                      <dt className="text-muted">Policy grant</dt>
                       <dd className="font-medium tabular-nums text-foreground">
-                        {adjustBalancePreview.adjustment > 0 ? "+" : ""}
-                        {adjustBalancePreview.adjustment}
+                        {adjustBalancePreview.entitlement ?? "—"}
                       </dd>
                     </div>
                     <div>
@@ -1439,6 +1458,21 @@ export function HrLeaveWorkspace({
                         {adjustBalancePreview.pending}
                       </dd>
                     </div>
+                    <div>
+                      <dt className="text-muted">Prior adjustments</dt>
+                      <dd className="font-medium tabular-nums text-foreground">
+                        {adjustBalancePreview.adjustment > 0 ? "+" : ""}
+                        {adjustBalancePreview.adjustment}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Adjustments after save</dt>
+                      <dd className="font-medium tabular-nums text-foreground">
+                        {adjustProjectedTotalAdj == null
+                          ? "—"
+                          : `${adjustProjectedTotalAdj > 0 ? "+" : ""}${adjustProjectedTotalAdj}`}
+                      </dd>
+                    </div>
                   </dl>
                 ) : null}
               </div>
@@ -1448,7 +1482,7 @@ export function HrLeaveWorkspace({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-[7rem_1fr]">
               <label className="text-sm">
                 <span className="mb-1.5 block text-[12.5px] font-medium text-muted">Year</span>
                 <input
@@ -1462,7 +1496,7 @@ export function HrLeaveWorkspace({
               </label>
               <label className="text-sm">
                 <span className="mb-1.5 block text-[12.5px] font-medium text-muted">
-                  Adjustment ({adjustBalancePreview ? unitLabel(adjustBalancePreview.dayUnit) : "days"})
+                  Change ({adjustBalancePreview ? unitLabel(adjustBalancePreview.dayUnit) : "days"})
                 </span>
                 <input
                   type="number"
@@ -1472,7 +1506,7 @@ export function HrLeaveWorkspace({
                   value={adjustUnitsDraft}
                   onChange={(e) => setAdjustUnitsDraft(e.target.value)}
                   className={inputClass}
-                  placeholder="e.g. -5"
+                  placeholder="e.g. +9 or −5"
                 />
               </label>
             </div>
@@ -1480,15 +1514,15 @@ export function HrLeaveWorkspace({
               <span className="mb-1.5 block text-[12.5px] font-medium text-muted">Reason</span>
               <textarea
                 name="reason"
-                rows={3}
+                rows={2}
                 required
                 className={inputClass}
-                placeholder="e.g. 5 annual days taken before go-live in 2026"
+                placeholder="e.g. Restoring days incorrectly deducted at go-live"
               />
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4">
+          <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-6 py-4 sm:px-7">
             <button
               type="button"
               onClick={() => setAdjustTarget(null)}
