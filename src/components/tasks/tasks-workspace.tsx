@@ -80,20 +80,13 @@ export type WorkTaskRow = {
 export type MemberOption = { id: string; label: string };
 
 const DEPT_SPACE_SLUG: Partial<Record<OrgDepartment, string>> = {
+  sales: "company-hq",
+  finance: "company-hq",
   hr: "people",
   marketing: "product",
   operations: "engineering",
   community: "people",
-};
-
-const DEPT_TASK_LABEL: Record<OrgDepartment, string> = {
-  sales: "Sales task",
-  finance: "Finance task",
-  marketing: "Marketing task",
-  community: "Community task",
-  hr: "People (HR) task",
-  operations: "Operations task",
-  facility: "Facility task",
+  facility: "engineering",
 };
 
 function defaultSpaceIdForDepartment(spaces: TaskSpaceRow[], department: OrgDepartment | null | undefined) {
@@ -453,7 +446,46 @@ export function TasksWorkspace({
   }
 
   const projectsForSpace = projects.filter((p) => !createSpaceId || p.spaceId === createSpaceId);
+  const createSpaceName = spaces.find((s) => s.id === createSpaceId)?.name || "this teamspace";
+  const projectSelectOptions =
+    projectsForSpace.length > 0
+      ? projectsForSpace.map((p) => ({
+          value: p.id,
+          label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
+        }))
+      : projects.map((p) => {
+          const spaceName = spaces.find((s) => s.id === p.spaceId)?.name || "Other";
+          return {
+            value: p.id,
+            label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
+            group: spaceName,
+          };
+        });
+  const projectEmptyText =
+    projects.length === 0
+      ? "No projects yet — leave as None"
+      : projectsForSpace.length === 0
+        ? `No projects in ${createSpaceName} — pick from other teamspaces or leave as None`
+        : "No matches";
   const projectsForEditSpace = projects.filter((p) => !editSpaceId || p.spaceId === editSpaceId);
+  const assigneeOptions = (() => {
+    const opts = members.map((m) => ({ value: m.id, label: m.label }));
+    if (currentUserId && !opts.some((o) => o.value === currentUserId)) {
+      opts.unshift({ value: currentUserId, label: "Me" });
+    }
+    return opts;
+  })();
+  const projectsForEditSelect =
+    projectsForEditSpace.length > 0
+      ? projectsForEditSpace.map((p) => ({
+          value: p.id,
+          label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
+        }))
+      : projects.map((p) => ({
+          value: p.id,
+          label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
+          group: spaces.find((s) => s.id === p.spaceId)?.name || "Other",
+        }));
 
   return (
     <TenantPageShell>
@@ -1012,11 +1044,9 @@ export function TasksWorkspace({
                   defaultValue={editingTask.projectId || ""}
                   allowEmpty
                   emptyLabel="None"
+                  emptyText="No projects yet — leave as None"
                   searchPlaceholder="Search projects…"
-                  options={projectsForEditSpace.map((p) => ({
-                    value: p.id,
-                    label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
-                  }))}
+                  options={projectsForEditSelect}
                 />
               </div>
             </div>
@@ -1028,7 +1058,7 @@ export function TasksWorkspace({
                 allowEmpty
                 emptyLabel="Unassigned"
                 searchPlaceholder="Search people…"
-                options={members.map((m) => ({ value: m.id, label: m.label }))}
+                options={assigneeOptions}
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1160,14 +1190,10 @@ export function TasksWorkspace({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              {department ? DEPT_TASK_LABEL[department] : "New task"}
-            </h2>
-            {department ? (
-              <p className="mt-0.5 text-xs text-muted">
-                Defaults to your department teamspace — adjust assignee and due date below.
-              </p>
-            ) : null}
+            <h2 className="text-lg font-semibold text-foreground">New task</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              Pick a teamspace and assignee. Project is optional — skip it if you do not use projects yet.
+            </p>
           </div>
           <button
             type="button"
@@ -1218,12 +1244,17 @@ export function TasksWorkspace({
                 defaultValue=""
                 allowEmpty
                 emptyLabel="None"
+                emptyText={projectEmptyText}
                 searchPlaceholder="Search projects…"
-                options={projectsForSpace.map((p) => ({
-                  value: p.id,
-                  label: `${p.iconEmoji ? `${p.iconEmoji} ` : ""}${p.name}`,
-                }))}
+                options={projectSelectOptions}
               />
+              {projectsForSpace.length === 0 ? (
+                <p className="mt-1 text-[11px] text-muted">
+                  {projects.length === 0
+                    ? "Projects are optional. You can create tasks without them."
+                    : `Nothing under ${createSpaceName} yet — other teamspace projects are listed, or leave None.`}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -1235,7 +1266,7 @@ export function TasksWorkspace({
                 allowEmpty
                 emptyLabel="Unassigned"
                 searchPlaceholder="Search people…"
-                options={members.map((m) => ({ value: m.id, label: m.label }))}
+                options={assigneeOptions}
               />
             </div>
             <div>

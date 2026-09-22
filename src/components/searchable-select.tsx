@@ -271,7 +271,9 @@ export function SearchableSelect({
                 </button>
               ) : null}
               {visibleGroups.length === 0 ? (
-                <p className="px-3 py-4 text-sm text-muted">{emptyText}</p>
+                query.trim() || !allowEmpty ? (
+                  <p className="px-3 py-4 text-sm text-muted">{emptyText}</p>
+                ) : null
               ) : (
                 visibleGroups.map((group) => (
                   <div key={group.label || "__ungrouped"}>
