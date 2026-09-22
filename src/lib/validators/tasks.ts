@@ -27,7 +27,8 @@ const workTaskFieldsSchema = z.object({
   recurrenceFrequency: recurrenceFrequencySchema.optional().nullable(),
   recurrenceEndMode: recurrenceEndModeSchema.optional(),
   recurrenceEndsAt: z.string().trim().optional(),
-  recurrenceMaxOccurrences: z.coerce.number().int().min(1).max(999).optional().nullable(),
+  /** Pass a number or null — do not coerce (null must not become 0). */
+  recurrenceMaxOccurrences: z.number().int().min(1).max(999).nullable().optional(),
 });
 
 function refineRecurrence(

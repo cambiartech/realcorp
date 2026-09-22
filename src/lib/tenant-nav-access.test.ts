@@ -64,3 +64,37 @@ test("Clients can be granted to one person from Team module access", () => {
   });
   assert.equal(keys.includes("clients"), true);
 });
+
+test("front desk / ops staff can open Tasks (assigned work from Sales, etc.)", () => {
+  for (const role of [MembershipRole.FNB_STAFF, MembershipRole.HOUSEKEEPING_MANAGER] as const) {
+    const keys = getVisibleNavKeys({
+      role,
+      isPlatformAdmin: false,
+      membershipStatus: MembershipStatus.ACTIVE,
+      settings: modulesOn,
+    });
+    assert.equal(keys.includes("tasks"), true, `${role} should see tasks`);
+    assert.equal(keys.includes("shortlets"), true);
+  }
+});
+
+test("active staff keep Tasks even when Team module access set tasks to none", () => {
+  const keys = getVisibleNavKeys({
+    role: MembershipRole.FNB_STAFF,
+    isPlatformAdmin: false,
+    membershipStatus: MembershipStatus.ACTIVE,
+    settings: modulesOn,
+    userModulePermissions: { tasks: "none" },
+  });
+  assert.equal(keys.includes("tasks"), true);
+});
+
+test("investors still do not get staff Tasks", () => {
+  const keys = getVisibleNavKeys({
+    role: MembershipRole.INVESTOR,
+    isPlatformAdmin: false,
+    membershipStatus: MembershipStatus.ACTIVE,
+    settings: modulesOn,
+  });
+  assert.equal(keys.includes("tasks"), false);
+});

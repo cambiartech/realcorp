@@ -288,28 +288,42 @@ export async function createWorkTask(
   const recurrence = resolveRecurrenceFields(parsed.data);
   const seriesId = recurrence.recurrenceFrequency ? crypto.randomUUID() : null;
 
-  const created = await prisma.workTask.create({
-    data: {
-      tenantId: ctx.tenant.id,
-      title: parsed.data.title,
-      description: parsed.data.description || null,
-      status,
-      priority: parsed.data.priority ?? "MEDIUM",
-      spaceId: parsed.data.spaceId || null,
-      projectId: parsed.data.projectId || null,
-      assigneeUserId: parsed.data.assigneeUserId || null,
-      dueDate: parsed.data.dueDate ? parseOptionalDate(parsed.data.dueDate) : null,
-      sprintLabel: parsed.data.sprintLabel || null,
-      completedAt,
-      createdByUserId: ctx.session.user.id,
-      recurrenceFrequency: recurrence.recurrenceFrequency,
-      recurrenceSeriesId: seriesId,
-      recurrenceIndex: seriesId ? 0 : null,
-      recurrenceEndsAt: recurrence.recurrenceEndsAt,
-      recurrenceMaxOccurrences: recurrence.recurrenceMaxOccurrences,
-      recurrenceActive: recurrence.recurrenceActive,
-    },
-  });
+  let created;
+  try {
+    created = await prisma.workTask.create({
+      data: {
+        tenantId: ctx.tenant.id,
+        title: parsed.data.title,
+        description: parsed.data.description || null,
+        status,
+        priority: parsed.data.priority ?? "MEDIUM",
+        spaceId: parsed.data.spaceId || null,
+        projectId: parsed.data.projectId || null,
+        assigneeUserId: parsed.data.assigneeUserId || null,
+        dueDate: parsed.data.dueDate ? parseOptionalDate(parsed.data.dueDate) : null,
+        sprintLabel: parsed.data.sprintLabel || null,
+        completedAt,
+        createdByUserId: ctx.session.user.id,
+        recurrenceFrequency: recurrence.recurrenceFrequency,
+        recurrenceSeriesId: seriesId,
+        recurrenceIndex: seriesId ? 0 : null,
+        recurrenceEndsAt: recurrence.recurrenceEndsAt,
+        recurrenceMaxOccurrences: recurrence.recurrenceMaxOccurrences,
+        recurrenceActive: recurrence.recurrenceActive,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[tasks] createWorkTask failed", message);
+    if (/recurrence|column .* does not exist|WorkTaskRecurrenceFrequency/i.test(message)) {
+      return {
+        ok: false,
+        error:
+          "Tasks database update is pending. Ask a platform admin to redeploy (prisma migrate deploy), then try again.",
+      };
+    }
+    return { ok: false, error: "Could not create the task. Please try again." };
+  }
 
   await notifyTaskAssignee({
     tenantSlug,

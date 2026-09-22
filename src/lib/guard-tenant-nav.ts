@@ -36,6 +36,7 @@ export function assertTenantNavAccess(
     !canAccessNavKey(required, {
       role: membership?.role,
       isPlatformAdmin: Boolean(session.user.isPlatformAdmin),
+      membershipStatus: membership?.status,
       settings: normalized,
       userModulePermissions: parseMembershipModulePermissions(membership?.modulePermissions),
     })

@@ -33,9 +33,24 @@ function isHelpDeskAssignee(role: MembershipRole): boolean {
   return isOrgAdminOrSubAdmin(role) || role === MembershipRole.HR_MANAGER;
 }
 
+function isManagerAssigneeRole(role: MembershipRole | null | undefined): boolean {
+  if (!role) return false;
+  return (
+    role === MembershipRole.SALES_MANAGER ||
+    role === MembershipRole.FINANCE_MANAGER ||
+    role === MembershipRole.MARKETING_MANAGER ||
+    role === MembershipRole.COMMUNITY_MANAGER ||
+    role === MembershipRole.HOUSEKEEPING_MANAGER ||
+    role === MembershipRole.FACILITY_MANAGER ||
+    role === MembershipRole.HR_MANAGER ||
+    isOrgAdminOrSubAdmin(role)
+  );
+}
+
 /**
  * Who this person may assign tasks to.
- * - Org admin / Subadmin / HR / platform: anyone except portal-only roles
+ * - Org admin / Subadmin / HR / platform / department leads / manager roles: any staff
+ *   (e.g. Sales Manager → Front Desk / Operations)
  * - Explicit task managers: their designated reports (any department)
  * - Everyone else: their department teammates + org admins / subadmins / HR
  */
@@ -53,7 +68,7 @@ export function filterTaskAssigneeMembers(
 ): TaskAssigneeMember[] {
   const staff = members.filter((m) => departmentFromStored(m.role, m.department) !== "portal");
 
-  if (canAssignTasksAcrossDepartments(opts.isPlatformAdmin, opts.actorRole)) {
+  if (canAssignTasksAcrossDepartments(opts.isPlatformAdmin, opts.actorRole, opts.actorIsDepartmentLead)) {
     return staff;
   }
 
@@ -88,14 +103,18 @@ export function isTaskAssigneeAllowed(
   return filterTaskAssigneeMembers(members, opts).some((m) => m.id === assigneeUserId);
 }
 
-/** Org admin, Subadmin, HR, and platform admins may assign tasks across departments. */
+/**
+ * Org admin, Subadmin, HR, platform, department leads, and named manager roles
+ * may assign tasks across departments (Sales → Front Desk, etc.).
+ */
 export function canAssignTasksAcrossDepartments(
   isPlatformAdmin: boolean,
   role: MembershipRole | null | undefined,
+  isDepartmentLead?: boolean | null,
 ): boolean {
   if (isPlatformAdmin) return true;
-  if (!role) return false;
-  return isOrgAdminOrSubAdmin(role) || role === MembershipRole.HR_MANAGER;
+  if (isDepartmentLead) return true;
+  return isManagerAssigneeRole(role);
 }
 
 /** @deprecated use departmentFromStored */

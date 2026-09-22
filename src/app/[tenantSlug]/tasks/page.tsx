@@ -77,7 +77,7 @@ export default async function TasksPage({
     members: allMembers,
   });
 
-  const [spaces, projects, tasks] = await Promise.all([
+  const [spaces, projects, tasksResult] = await Promise.all([
     prisma.taskSpace.findMany({
       where: { tenantId: tenant.id },
       orderBy: { sortOrder: "asc" },
@@ -88,16 +88,31 @@ export default async function TasksPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true, spaceId: true, sprintLabel: true, iconEmoji: true },
     }),
-    prisma.workTask.findMany({
-      where: taskWhere,
-      orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
-      include: {
-        space: { select: { name: true, color: true } },
-        project: { select: { name: true, iconEmoji: true } },
-      },
-      take: 500,
-    }),
+    prisma.workTask
+      .findMany({
+        where: taskWhere,
+        orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+        include: {
+          space: { select: { name: true, color: true } },
+          project: { select: { name: true, iconEmoji: true } },
+        },
+        take: 500,
+      })
+      .then((rows) => ({ ok: true as const, rows }))
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("[tasks] workTask.findMany failed", message);
+        return { ok: false as const, message };
+      }),
   ]);
+
+  const tasksLoadError =
+    tasksResult.ok
+      ? null
+      : /recurrence|column .* does not exist|WorkTaskRecurrenceFrequency/i.test(tasksResult.message)
+        ? "Tasks need a quick database update (recurring tasks migration). Ask a platform admin to redeploy or run prisma migrate deploy, then refresh."
+        : "Could not load tasks right now. Try again in a moment.";
+  const tasks = tasksResult.ok ? tasksResult.rows : [];
 
   const memberById = new Map(allMembers.map((m) => [m.id, m]));
   const manageeUserIds = await loadManageeUserIds(tenant.id, session.user.id);
@@ -133,6 +148,7 @@ export default async function TasksPage({
       department={department}
       canViewAllOrgTasks={seesAllOrgTasks}
       isDepartmentLead={Boolean(membership?.isDepartmentLead)}
+      loadError={tasksLoadError}
       spaces={spaces.map((s) => ({
         id: s.id,
         name: s.name,
@@ -173,12 +189,12 @@ export default async function TasksPage({
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.completedAt)
           : null,
         linkedEntityType: t.linkedEntityType,
-        recurrenceFrequency: t.recurrenceFrequency,
-        recurrenceActive: t.recurrenceActive,
+        recurrenceFrequency: t.recurrenceFrequency ?? null,
+        recurrenceActive: Boolean(t.recurrenceActive),
         recurrenceEndsAtValue: t.recurrenceEndsAt
           ? t.recurrenceEndsAt.toISOString().slice(0, 10)
           : null,
-        recurrenceMaxOccurrences: t.recurrenceMaxOccurrences,
+        recurrenceMaxOccurrences: t.recurrenceMaxOccurrences ?? null,
       }))}
       members={memberOptions}
       canManageSpaces={canManageTasks(isPlatformAdmin, membership)}

@@ -133,9 +133,9 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.COMMUNITY_MANAGER:
       return ["dashboard", "tasks", "community", "settings"];
     case MembershipRole.HOUSEKEEPING_MANAGER:
-      return ["dashboard", "shortlets", "settings"];
+      return ["dashboard", "shortlets", "tasks", "settings"];
     case MembershipRole.FNB_STAFF:
-      return ["dashboard", "shortlets", "settings"];
+      return ["dashboard", "shortlets", "tasks", "settings"];
     case MembershipRole.FACILITY_MANAGER:
       return ["dashboard", "projects", "facility", "inventory", "tasks", "settings"];
     case MembershipRole.FACILITY_STAFF:
@@ -253,6 +253,13 @@ export function getVisibleNavKeys(opts: {
       userModulePermissions,
       settings as Partial<TenantModuleFlags>,
     );
+  }
+  // Assigned work must stay reachable: active staff always keep Tasks when the org module is on,
+  // even if Team → Module access set Tasks to "No access".
+  if (!portalOnly && settings.moduleTasks && active && !keys.includes("tasks")) {
+    const set = new Set(keys);
+    set.add("tasks");
+    keys = NAV_ORDER.filter((k) => set.has(k));
   }
   if (portalOnly && settings.moduleShortLets) {
     const set = new Set(keys);

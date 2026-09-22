@@ -170,6 +170,7 @@ export function TasksWorkspace({
   isDepartmentLead = false,
   initialView = "company",
   department = null,
+  loadError = null,
 }: {
   tenantSlug: string;
   currentUserId: string;
@@ -182,6 +183,7 @@ export function TasksWorkspace({
   isDepartmentLead?: boolean;
   initialView?: ViewTab;
   department?: OrgDepartment | null;
+  loadError?: string | null;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -465,6 +467,15 @@ export function TasksWorkspace({
           </button>
         }
       />
+
+      {loadError ? (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-[var(--warn-line)] bg-[var(--warn-wash)] px-4 py-3 text-sm text-[var(--warn)]"
+        >
+          {loadError}
+        </div>
+      ) : null}
 
       <div className="rc-tabs" role="tablist">
         {(

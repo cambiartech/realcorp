@@ -5,13 +5,14 @@ import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "./membership
 
 const members: TaskAssigneeMember[] = [
   { id: "sales-1", label: "Sales Kid", role: MembershipRole.SALES_EXECUTIVE, department: "Sales" },
+  { id: "sales-mgr", label: "Sales Manager", role: MembershipRole.SALES_MANAGER, department: "Sales" },
   { id: "ops-fd", label: "Front Desk", role: MembershipRole.HOUSEKEEPING_MANAGER, department: "Operations" },
   { id: "ops-2", label: "Housekeeping", role: MembershipRole.FNB_STAFF, department: "Operations" },
   { id: "finance-1", label: "Finance", role: MembershipRole.FINANCE_MANAGER, department: "Finance" },
   { id: "admin-1", label: "Admin", role: MembershipRole.ORG_ADMIN, department: null },
 ];
 
-test("sales cannot assign Front Desk without a manager grant", () => {
+test("sales executive cannot assign Front Desk without a manager grant", () => {
   const allowed = filterTaskAssigneeMembers(members, {
     isPlatformAdmin: false,
     actorRole: MembershipRole.SALES_EXECUTIVE,
@@ -25,7 +26,7 @@ test("sales cannot assign Front Desk without a manager grant", () => {
   assert.equal(ids.includes("finance-1"), false);
 });
 
-test("sales can assign Front Desk when listed as their task manager", () => {
+test("sales executive can assign Front Desk when listed as their task manager", () => {
   const allowed = filterTaskAssigneeMembers(members, {
     isPlatformAdmin: false,
     actorRole: MembershipRole.SALES_EXECUTIVE,
@@ -37,6 +38,20 @@ test("sales can assign Front Desk when listed as their task manager", () => {
   assert.ok(ids.includes("ops-fd"));
   assert.equal(ids.includes("ops-2"), false);
   assert.equal(ids.includes("finance-1"), false);
+});
+
+test("sales manager can assign Front Desk across departments", () => {
+  const allowed = filterTaskAssigneeMembers(members, {
+    isPlatformAdmin: false,
+    actorRole: MembershipRole.SALES_MANAGER,
+    actorUserId: "sales-mgr",
+    actorDepartment: "Sales",
+    actorIsDepartmentLead: true,
+  });
+  const ids = allowed.map((m) => m.id);
+  assert.ok(ids.includes("ops-fd"));
+  assert.ok(ids.includes("ops-2"));
+  assert.ok(ids.includes("finance-1"));
 });
 
 test("org admin still sees everyone", () => {
