@@ -12,14 +12,43 @@ import {
 } from "@/lib/membership-departments";
 import { loadManageeUserIds } from "@/lib/employee-task-managers";
 import {
+  buildNextWorkTaskOccurrence,
+  type SpawnableWorkTask,
+  type WorkTaskRecurrenceFrequency,
+} from "@/lib/work-task-recurrence";
+import {
   createWorkTaskInputSchema,
   createTaskSpaceInputSchema,
+  deleteWorkTaskInputSchema,
+  stopWorkTaskRecurrenceInputSchema,
   updateWorkTaskInputSchema,
   updateWorkTaskStatusInputSchema,
 } from "@/lib/validators/tasks";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
+
+const SPAWN_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  priority: true,
+  spaceId: true,
+  projectId: true,
+  assigneeUserId: true,
+  createdByUserId: true,
+  dueDate: true,
+  sprintLabel: true,
+  linkedEntityType: true,
+  linkedEntityId: true,
+  recurrenceFrequency: true,
+  recurrenceSeriesId: true,
+  recurrenceIndex: true,
+  recurrenceEndsAt: true,
+  recurrenceMaxOccurrences: true,
+  recurrenceActive: true,
+  status: true,
+} as const;
 
 async function getTenantContext(tenantSlug: string) {
   const session = await auth();
@@ -111,6 +140,88 @@ function formatTaskPriority(priority?: string | null) {
   return priority.charAt(0) + priority.slice(1).toLowerCase();
 }
 
+function parseOptionalDate(value?: string | null): Date | null {
+  if (!value?.trim()) return null;
+  const date = new Date(`${value.trim()}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function resolveRecurrenceFields(input: {
+  recurrenceFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | null;
+  recurrenceEndMode?: "NEVER" | "UNTIL_DATE" | "AFTER_COUNT";
+  recurrenceEndsAt?: string;
+  recurrenceMaxOccurrences?: number | null;
+}): {
+  recurrenceFrequency: WorkTaskRecurrenceFrequency | null;
+  recurrenceEndsAt: Date | null;
+  recurrenceMaxOccurrences: number | null;
+  recurrenceActive: boolean;
+} {
+  const frequency = input.recurrenceFrequency ?? null;
+  if (!frequency) {
+    return {
+      recurrenceFrequency: null,
+      recurrenceEndsAt: null,
+      recurrenceMaxOccurrences: null,
+      recurrenceActive: false,
+    };
+  }
+  const endMode = input.recurrenceEndMode ?? "NEVER";
+  return {
+    recurrenceFrequency: frequency,
+    recurrenceEndsAt: endMode === "UNTIL_DATE" ? parseOptionalDate(input.recurrenceEndsAt) : null,
+    recurrenceMaxOccurrences:
+      endMode === "AFTER_COUNT" ? (input.recurrenceMaxOccurrences ?? null) : null,
+    recurrenceActive: true,
+  };
+}
+
+async function spawnNextIfNeeded(
+  tenantId: string,
+  task: SpawnableWorkTask & { id: string; status: WorkTaskStatus },
+) {
+  const next = buildNextWorkTaskOccurrence(task);
+  if (!next) return null;
+
+  // Avoid duplicate active heads if two DONE transitions race.
+  const existingActive = await prisma.workTask.findFirst({
+    where: {
+      tenantId,
+      recurrenceSeriesId: next.recurrenceSeriesId,
+      recurrenceActive: true,
+      status: { notIn: [WorkTaskStatus.DONE, WorkTaskStatus.CANCELLED] },
+      id: { not: task.id },
+    },
+    select: { id: true },
+  });
+  if (existingActive) return null;
+
+  return prisma.workTask.create({
+    data: {
+      tenantId,
+      title: next.title,
+      description: next.description,
+      status: WorkTaskStatus.TODO,
+      priority: next.priority,
+      spaceId: next.spaceId,
+      projectId: next.projectId,
+      assigneeUserId: next.assigneeUserId,
+      createdByUserId: next.createdByUserId,
+      dueDate: next.dueDate,
+      sprintLabel: next.sprintLabel,
+      linkedEntityType: next.linkedEntityType,
+      linkedEntityId: next.linkedEntityId,
+      recurrenceFrequency: next.recurrenceFrequency,
+      recurrenceSeriesId: next.recurrenceSeriesId,
+      recurrenceIndex: next.recurrenceIndex,
+      recurrenceEndsAt: next.recurrenceEndsAt,
+      recurrenceMaxOccurrences: next.recurrenceMaxOccurrences,
+      recurrenceActive: true,
+      completedAt: null,
+    },
+  });
+}
+
 async function notifyTaskAssignee(input: {
   tenantSlug: string;
   tenantName: string;
@@ -157,6 +268,10 @@ export async function createWorkTask(
     assigneeUserId?: string;
     dueDate?: string;
     sprintLabel?: string;
+    recurrenceFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | null;
+    recurrenceEndMode?: "NEVER" | "UNTIL_DATE" | "AFTER_COUNT";
+    recurrenceEndsAt?: string;
+    recurrenceMaxOccurrences?: number | null;
   },
 ): Promise<ActionResult & { taskId?: string }> {
   const ctx = await getTenantContext(tenantSlug);
@@ -170,6 +285,8 @@ export async function createWorkTask(
 
   const status = parsed.data.status ?? WorkTaskStatus.TODO;
   const completedAt = status === WorkTaskStatus.DONE ? new Date() : null;
+  const recurrence = resolveRecurrenceFields(parsed.data);
+  const seriesId = recurrence.recurrenceFrequency ? crypto.randomUUID() : null;
 
   const created = await prisma.workTask.create({
     data: {
@@ -181,10 +298,16 @@ export async function createWorkTask(
       spaceId: parsed.data.spaceId || null,
       projectId: parsed.data.projectId || null,
       assigneeUserId: parsed.data.assigneeUserId || null,
-      dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
+      dueDate: parsed.data.dueDate ? parseOptionalDate(parsed.data.dueDate) : null,
       sprintLabel: parsed.data.sprintLabel || null,
       completedAt,
       createdByUserId: ctx.session.user.id,
+      recurrenceFrequency: recurrence.recurrenceFrequency,
+      recurrenceSeriesId: seriesId,
+      recurrenceIndex: seriesId ? 0 : null,
+      recurrenceEndsAt: recurrence.recurrenceEndsAt,
+      recurrenceMaxOccurrences: recurrence.recurrenceMaxOccurrences,
+      recurrenceActive: recurrence.recurrenceActive,
     },
   });
 
@@ -217,19 +340,40 @@ export async function updateWorkTaskStatus(
 
   const existing = await prisma.workTask.findFirst({
     where: { id: taskId, tenantId: ctx.tenant.id },
-    select: { id: true, createdByUserId: true, assigneeUserId: true },
+    select: SPAWN_SELECT,
   });
   if (!existing) return { ok: false, error: "Task not found." };
   const accessError = await assertCanAccessTask(ctx, existing);
   if (accessError) return accessError;
 
+  const nextStatus = parsed.data.status;
+  const becomingDone = nextStatus === WorkTaskStatus.DONE && existing.status !== WorkTaskStatus.DONE;
+  const becomingCancelled =
+    nextStatus === WorkTaskStatus.CANCELLED && existing.status !== WorkTaskStatus.CANCELLED;
+
+  const spawnFrom =
+    becomingDone && existing.recurrenceActive
+      ? {
+          ...existing,
+          status: nextStatus,
+          recurrenceFrequency: existing.recurrenceFrequency as WorkTaskRecurrenceFrequency | null,
+        }
+      : null;
+
   await prisma.workTask.update({
     where: { id: taskId },
     data: {
-      status: parsed.data.status,
-      completedAt: parsed.data.status === WorkTaskStatus.DONE ? new Date() : null,
+      status: nextStatus,
+      completedAt: nextStatus === WorkTaskStatus.DONE ? new Date() : null,
+      ...((becomingCancelled || becomingDone) && existing.recurrenceActive
+        ? { recurrenceActive: false }
+        : {}),
     },
   });
+
+  if (spawnFrom) {
+    await spawnNextIfNeeded(ctx.tenant.id, spawnFrom);
+  }
 
   revalidatePath(`/${tenantSlug}/tasks`);
   return { ok: true };
@@ -248,6 +392,10 @@ export async function updateWorkTask(
     assigneeUserId?: string;
     dueDate?: string;
     sprintLabel?: string;
+    recurrenceFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | null;
+    recurrenceEndMode?: "NEVER" | "UNTIL_DATE" | "AFTER_COUNT";
+    recurrenceEndsAt?: string;
+    recurrenceMaxOccurrences?: number | null;
   },
 ): Promise<ActionResult> {
   const ctx = await getTenantContext(tenantSlug);
@@ -261,7 +409,7 @@ export async function updateWorkTask(
 
   const existing = await prisma.workTask.findFirst({
     where: { id: parsed.data.taskId, tenantId: ctx.tenant.id },
-    select: { id: true, createdByUserId: true, assigneeUserId: true, status: true },
+    select: SPAWN_SELECT,
   });
   if (!existing) return { ok: false, error: "Task not found." };
   const accessError = await assertCanAccessTask(ctx, existing);
@@ -270,6 +418,97 @@ export async function updateWorkTask(
   const nextStatus = parsed.data.status ?? existing.status;
   const nextAssigneeUserId = parsed.data.assigneeUserId || null;
   const assigneeChanged = nextAssigneeUserId !== existing.assigneeUserId;
+  const becomingDone = nextStatus === WorkTaskStatus.DONE && existing.status !== WorkTaskStatus.DONE;
+  const becomingCancelled =
+    nextStatus === WorkTaskStatus.CANCELLED && existing.status !== WorkTaskStatus.CANCELLED;
+
+  const recurrenceInputProvided =
+    parsed.data.recurrenceFrequency !== undefined ||
+    parsed.data.recurrenceEndMode !== undefined ||
+    parsed.data.recurrenceEndsAt !== undefined ||
+    parsed.data.recurrenceMaxOccurrences !== undefined;
+
+  let recurrencePatch: Record<string, unknown> = {};
+  if (recurrenceInputProvided) {
+    const recurrence = resolveRecurrenceFields({
+      recurrenceFrequency: parsed.data.recurrenceFrequency,
+      recurrenceEndMode: parsed.data.recurrenceEndMode,
+      recurrenceEndsAt: parsed.data.recurrenceEndsAt,
+      recurrenceMaxOccurrences: parsed.data.recurrenceMaxOccurrences,
+    });
+    if (!recurrence.recurrenceFrequency) {
+      recurrencePatch = {
+        recurrenceFrequency: null,
+        recurrenceActive: false,
+        recurrenceEndsAt: null,
+        recurrenceMaxOccurrences: null,
+        // Keep seriesId/index for history linkage on past DONE rows; clear on this card if stopping.
+        recurrenceSeriesId: existing.recurrenceSeriesId,
+        recurrenceIndex: existing.recurrenceIndex,
+      };
+    } else if (existing.recurrenceSeriesId && existing.recurrenceFrequency) {
+      recurrencePatch = {
+        recurrenceFrequency: recurrence.recurrenceFrequency,
+        recurrenceEndsAt: recurrence.recurrenceEndsAt,
+        recurrenceMaxOccurrences: recurrence.recurrenceMaxOccurrences,
+        recurrenceActive: becomingCancelled ? false : true,
+        recurrenceSeriesId: existing.recurrenceSeriesId,
+        recurrenceIndex: existing.recurrenceIndex ?? 0,
+      };
+    } else {
+      recurrencePatch = {
+        recurrenceFrequency: recurrence.recurrenceFrequency,
+        recurrenceEndsAt: recurrence.recurrenceEndsAt,
+        recurrenceMaxOccurrences: recurrence.recurrenceMaxOccurrences,
+        recurrenceActive: becomingCancelled ? false : true,
+        recurrenceSeriesId: crypto.randomUUID(),
+        recurrenceIndex: 0,
+      };
+    }
+  } else if (becomingCancelled && existing.recurrenceActive) {
+    recurrencePatch = { recurrenceActive: false };
+  }
+
+  const spawnFrom: (SpawnableWorkTask & { id: string; status: WorkTaskStatus }) | null =
+    becomingDone &&
+    (Boolean(recurrencePatch.recurrenceActive) ||
+      (!recurrenceInputProvided && existing.recurrenceActive))
+      ? {
+          id: existing.id,
+          title: parsed.data.title,
+          description: parsed.data.description || null,
+          priority: parsed.data.priority ?? existing.priority,
+          spaceId: parsed.data.spaceId || null,
+          projectId: parsed.data.projectId || null,
+          assigneeUserId: nextAssigneeUserId,
+          createdByUserId: existing.createdByUserId,
+          dueDate: parsed.data.dueDate ? parseOptionalDate(parsed.data.dueDate) : null,
+          sprintLabel: parsed.data.sprintLabel || null,
+          linkedEntityType: existing.linkedEntityType,
+          linkedEntityId: existing.linkedEntityId,
+          recurrenceFrequency:
+            (recurrencePatch.recurrenceFrequency as WorkTaskRecurrenceFrequency | null | undefined) ??
+            (existing.recurrenceFrequency as WorkTaskRecurrenceFrequency | null),
+          recurrenceSeriesId:
+            (recurrencePatch.recurrenceSeriesId as string | null | undefined) ??
+            existing.recurrenceSeriesId,
+          recurrenceIndex:
+            (recurrencePatch.recurrenceIndex as number | null | undefined) ?? existing.recurrenceIndex,
+          recurrenceEndsAt:
+            (recurrencePatch.recurrenceEndsAt as Date | null | undefined) ?? existing.recurrenceEndsAt,
+          recurrenceMaxOccurrences:
+            (recurrencePatch.recurrenceMaxOccurrences as number | null | undefined) ??
+            existing.recurrenceMaxOccurrences,
+          recurrenceActive: true,
+          status: nextStatus,
+        }
+      : null;
+
+  if (becomingDone && spawnFrom) {
+    recurrencePatch = { ...recurrencePatch, recurrenceActive: false };
+  } else if (becomingCancelled && existing.recurrenceActive) {
+    recurrencePatch = { ...recurrencePatch, recurrenceActive: false };
+  }
 
   await prisma.workTask.update({
     where: { id: parsed.data.taskId },
@@ -281,11 +520,16 @@ export async function updateWorkTask(
       spaceId: parsed.data.spaceId || null,
       projectId: parsed.data.projectId || null,
       assigneeUserId: nextAssigneeUserId,
-      dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
+      dueDate: parsed.data.dueDate ? parseOptionalDate(parsed.data.dueDate) : null,
       sprintLabel: parsed.data.sprintLabel || null,
       completedAt: nextStatus === WorkTaskStatus.DONE ? new Date() : null,
+      ...recurrencePatch,
     },
   });
+
+  if (spawnFrom) {
+    await spawnNextIfNeeded(ctx.tenant.id, spawnFrom);
+  }
 
   if (assigneeChanged) {
     await notifyTaskAssignee({
@@ -305,13 +549,64 @@ export async function updateWorkTask(
   return { ok: true };
 }
 
-export async function deleteWorkTask(tenantSlug: string, taskId: string): Promise<ActionResult> {
+export async function stopWorkTaskRecurrence(
+  tenantSlug: string,
+  taskId: string,
+): Promise<ActionResult> {
   const ctx = await getTenantContext(tenantSlug);
   if (!ctx) return { ok: false, error: "You do not have access." };
 
+  const parsed = stopWorkTaskRecurrenceInputSchema.safeParse({ taskId });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
   const existing = await prisma.workTask.findFirst({
-    where: { id: taskId, tenantId: ctx.tenant.id },
-    select: { id: true, createdByUserId: true, assigneeUserId: true },
+    where: { id: parsed.data.taskId, tenantId: ctx.tenant.id },
+    select: {
+      id: true,
+      createdByUserId: true,
+      assigneeUserId: true,
+      recurrenceActive: true,
+      recurrenceFrequency: true,
+    },
+  });
+  if (!existing) return { ok: false, error: "Task not found." };
+  const accessError = await assertCanAccessTask(ctx, existing);
+  if (accessError) return accessError;
+
+  if (!existing.recurrenceFrequency || !existing.recurrenceActive) {
+    return { ok: false, error: "This task is not an active repeating series." };
+  }
+
+  await prisma.workTask.update({
+    where: { id: existing.id },
+    data: { recurrenceActive: false },
+  });
+
+  revalidatePath(`/${tenantSlug}/tasks`);
+  return { ok: true };
+}
+
+export async function deleteWorkTask(
+  tenantSlug: string,
+  taskId: string,
+  scope: "THIS" | "SERIES" = "THIS",
+): Promise<ActionResult> {
+  const ctx = await getTenantContext(tenantSlug);
+  if (!ctx) return { ok: false, error: "You do not have access." };
+
+  const parsed = deleteWorkTaskInputSchema.safeParse({ taskId, scope });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
+
+  const existing = await prisma.workTask.findFirst({
+    where: { id: parsed.data.taskId, tenantId: ctx.tenant.id },
+    select: {
+      id: true,
+      createdByUserId: true,
+      assigneeUserId: true,
+      recurrenceSeriesId: true,
+      recurrenceActive: true,
+      status: true,
+    },
   });
   if (!existing) return { ok: false, error: "Task not found." };
   const accessError = await assertCanAccessTask(ctx, existing);
@@ -329,7 +624,27 @@ export async function deleteWorkTask(tenantSlug: string, taskId: string): Promis
     return { ok: false, error: "You cannot delete this task." };
   }
 
-  await prisma.workTask.delete({ where: { id: taskId } });
+  // SERIES: remove this active occurrence; completed history stays. No further spawns.
+  // THIS: same for a recurring head (deleting the only open card ends the series).
+  await prisma.workTask.delete({ where: { id: existing.id } });
+
+  if (
+    parsed.data.scope === "SERIES" &&
+    existing.recurrenceSeriesId &&
+    existing.status !== WorkTaskStatus.DONE &&
+    existing.status !== WorkTaskStatus.CANCELLED
+  ) {
+    // Ensure no other incomplete heads remain active (defensive).
+    await prisma.workTask.updateMany({
+      where: {
+        tenantId: ctx.tenant.id,
+        recurrenceSeriesId: existing.recurrenceSeriesId,
+        status: { notIn: [WorkTaskStatus.DONE, WorkTaskStatus.CANCELLED] },
+      },
+      data: { recurrenceActive: false },
+    });
+  }
+
   revalidatePath(`/${tenantSlug}/tasks`);
   return { ok: true };
 }

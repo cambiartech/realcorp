@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { WorkTaskPriority, WorkTaskStatus } from "@/generated/prisma";
 
-export const createWorkTaskInputSchema = z.object({
+const recurrenceFrequencySchema = z.enum(["DAILY", "WEEKLY", "MONTHLY"]);
+const recurrenceEndModeSchema = z.enum(["NEVER", "UNTIL_DATE", "AFTER_COUNT"]);
+
+const workTaskFieldsSchema = z.object({
   title: z.string().trim().min(2, "Title is required.").max(200, "Title is too long."),
   description: z
     .string()
@@ -21,16 +24,63 @@ export const createWorkTaskInputSchema = z.object({
     .max(40, "Sprint label is too long.")
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
+  recurrenceFrequency: recurrenceFrequencySchema.optional().nullable(),
+  recurrenceEndMode: recurrenceEndModeSchema.optional(),
+  recurrenceEndsAt: z.string().trim().optional(),
+  recurrenceMaxOccurrences: z.coerce.number().int().min(1).max(999).optional().nullable(),
 });
+
+function refineRecurrence(
+  data: z.infer<typeof workTaskFieldsSchema>,
+  ctx: z.RefinementCtx,
+) {
+  const frequency = data.recurrenceFrequency ?? null;
+  if (!frequency) return;
+  if (!data.dueDate?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Set a due date when the task repeats.",
+      path: ["dueDate"],
+    });
+  }
+  const endMode = data.recurrenceEndMode ?? "NEVER";
+  if (endMode === "UNTIL_DATE" && !data.recurrenceEndsAt?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Pick an end date for the series.",
+      path: ["recurrenceEndsAt"],
+    });
+  }
+  if (endMode === "AFTER_COUNT" && (data.recurrenceMaxOccurrences == null || data.recurrenceMaxOccurrences < 1)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter how many times the task should repeat.",
+      path: ["recurrenceMaxOccurrences"],
+    });
+  }
+}
+
+export const createWorkTaskInputSchema = workTaskFieldsSchema.superRefine(refineRecurrence);
 
 export const updateWorkTaskStatusInputSchema = z.object({
   taskId: z.string().trim().min(1),
   status: z.nativeEnum(WorkTaskStatus),
 });
 
-export const updateWorkTaskInputSchema = createWorkTaskInputSchema.extend({
+export const updateWorkTaskInputSchema = workTaskFieldsSchema
+  .extend({
+    taskId: z.string().trim().min(1),
+    status: z.nativeEnum(WorkTaskStatus).optional(),
+  })
+  .superRefine(refineRecurrence);
+
+export const deleteWorkTaskInputSchema = z.object({
   taskId: z.string().trim().min(1),
-  status: z.nativeEnum(WorkTaskStatus).optional(),
+  scope: z.enum(["THIS", "SERIES"]).optional().default("THIS"),
+});
+
+export const stopWorkTaskRecurrenceInputSchema = z.object({
+  taskId: z.string().trim().min(1),
 });
 
 export const createTaskSpaceInputSchema = z.object({

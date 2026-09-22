@@ -2284,6 +2284,12 @@ enum WorkTaskPriority {
   URGENT
 }
 
+enum WorkTaskRecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 enum TaskProjectStatus {
   ACTIVE
   ARCHIVED
@@ -2350,6 +2356,13 @@ model WorkTask {
   /// Future HR/CRM links: HR_APPRAISAL | HR_GOAL | LEAD | DEAL
   linkedEntityType String?
   linkedEntityId   String?
+  /// Planner-style recurrence: one active occurrence; next spawns on DONE
+  recurrenceFrequency      WorkTaskRecurrenceFrequency?
+  recurrenceSeriesId       String?
+  recurrenceIndex          Int?
+  recurrenceEndsAt         DateTime?
+  recurrenceMaxOccurrences Int?
+  recurrenceActive         Boolean                       @default(false)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -2362,6 +2375,7 @@ model WorkTask {
   @@index([tenantId, spaceId])
   @@index([tenantId, projectId])
   @@index([tenantId, linkedEntityType, linkedEntityId])
+  @@index([tenantId, recurrenceSeriesId])
 }
 
 // ——— Clients (property owners / investors) ———

@@ -173,6 +173,12 @@ export default async function TasksPage({
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.completedAt)
           : null,
         linkedEntityType: t.linkedEntityType,
+        recurrenceFrequency: t.recurrenceFrequency,
+        recurrenceActive: t.recurrenceActive,
+        recurrenceEndsAtValue: t.recurrenceEndsAt
+          ? t.recurrenceEndsAt.toISOString().slice(0, 10)
+          : null,
+        recurrenceMaxOccurrences: t.recurrenceMaxOccurrences,
       }))}
       members={memberOptions}
       canManageSpaces={canManageTasks(isPlatformAdmin, membership)}

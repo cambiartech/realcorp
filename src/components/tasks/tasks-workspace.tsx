@@ -23,6 +23,7 @@ import {
   createWorkTask,
   createTaskSpace,
   deleteWorkTask,
+  stopWorkTaskRecurrence,
   updateWorkTask,
   updateWorkTaskStatus,
 } from "@/app/[tenantSlug]/tasks/actions";
@@ -30,6 +31,7 @@ import {
   isCompletedTaskOnActiveShelf,
   TASK_COMPLETED_SHELF_DAYS,
 } from "@/lib/task-completed-shelf";
+import { recurrenceFrequencyLabel } from "@/lib/work-task-recurrence";
 
 export type TaskSpaceRow = {
   id: string;
@@ -45,6 +47,8 @@ export type TaskProjectRow = {
   sprintLabel: string | null;
   iconEmoji: string | null;
 };
+
+export type WorkTaskRecurrenceFrequency = "DAILY" | "WEEKLY" | "MONTHLY";
 
 export type WorkTaskRow = {
   id: string;
@@ -67,6 +71,10 @@ export type WorkTaskRow = {
   completedAt?: string | null;
   completedAtLabel?: string | null;
   linkedEntityType: string | null;
+  recurrenceFrequency: WorkTaskRecurrenceFrequency | null;
+  recurrenceActive: boolean;
+  recurrenceEndsAtValue: string | null;
+  recurrenceMaxOccurrences: number | null;
 };
 
 export type MemberOption = { id: string; label: string };
@@ -188,14 +196,25 @@ export function TasksWorkspace({
   const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
   const preferredSpaceId = defaultSpaceIdForDepartment(spaces, department);
   const [createSpaceId, setCreateSpaceId] = useState(preferredSpaceId);
+  const [createRecurrenceFrequency, setCreateRecurrenceFrequency] = useState<"" | WorkTaskRecurrenceFrequency>("");
+  const [createRecurrenceEndMode, setCreateRecurrenceEndMode] = useState<"NEVER" | "UNTIL_DATE" | "AFTER_COUNT">(
+    "NEVER",
+  );
+  const [editRecurrenceFrequency, setEditRecurrenceFrequency] = useState<"" | WorkTaskRecurrenceFrequency>("");
+  const [editRecurrenceEndMode, setEditRecurrenceEndMode] = useState<"NEVER" | "UNTIL_DATE" | "AFTER_COUNT">(
+    "NEVER",
+  );
+  const [taskToDelete, setTaskToDelete] = useState<WorkTaskRow | null>(null);
+  const [deleteScope, setDeleteScope] = useState<"THIS" | "SERIES">("THIS");
+  const [editingTask, setEditingTask] = useState<WorkTaskRow | null>(null);
+  const [editSpaceId, setEditSpaceId] = useState(spaces[0]?.id || "");
 
   function openCreateModal() {
     setCreateSpaceId(preferredSpaceId);
+    setCreateRecurrenceFrequency("");
+    setCreateRecurrenceEndMode("NEVER");
     setIsCreateOpen(true);
   }
-  const [taskToDelete, setTaskToDelete] = useState<WorkTaskRow | null>(null);
-  const [editingTask, setEditingTask] = useState<WorkTaskRow | null>(null);
-  const [editSpaceId, setEditSpaceId] = useState(spaces[0]?.id || "");
 
   const filteredTasks = useMemo(() => {
     let rows = tasks.filter((t) => t.status !== "CANCELLED");
@@ -275,6 +294,12 @@ export function TasksWorkspace({
 
   async function handleCreate(formData: FormData) {
     startTransition(async () => {
+      const frequencyRaw = String(formData.get("recurrenceFrequency") || "");
+      const endModeRaw = String(formData.get("recurrenceEndMode") || "NEVER") as
+        | "NEVER"
+        | "UNTIL_DATE"
+        | "AFTER_COUNT";
+      const maxRaw = String(formData.get("recurrenceMaxOccurrences") || "").trim();
       const result = await createWorkTask(tenantSlug, {
         title: String(formData.get("title") || ""),
         description: String(formData.get("description") || "") || undefined,
@@ -284,12 +309,21 @@ export function TasksWorkspace({
         dueDate: String(formData.get("dueDate") || "") || undefined,
         sprintLabel: String(formData.get("sprintLabel") || "") || undefined,
         priority: (String(formData.get("priority") || "MEDIUM") as WorkTaskRow["priority"]) || "MEDIUM",
+        recurrenceFrequency: frequencyRaw
+          ? (frequencyRaw as WorkTaskRecurrenceFrequency)
+          : null,
+        recurrenceEndMode: frequencyRaw ? endModeRaw : undefined,
+        recurrenceEndsAt: String(formData.get("recurrenceEndsAt") || "") || undefined,
+        recurrenceMaxOccurrences: maxRaw ? Number(maxRaw) : null,
       });
       if (!result.ok) {
         showSnackbar(result.error, "error");
         return;
       }
-      showSnackbar("Task created.", "success");
+      showSnackbar(
+        frequencyRaw ? "Recurring task created." : "Task created.",
+        "success",
+      );
       setIsCreateOpen(false);
       router.refresh();
     });
@@ -302,24 +336,34 @@ export function TasksWorkspace({
         showSnackbar(result.error, "error");
         return;
       }
+      if (status === "DONE") {
+        showSnackbar("Task completed. Next occurrence created if it repeats.", "success");
+      } else if (status === "CANCELLED") {
+        showSnackbar("Task cancelled. Repeating series stopped if it was active.", "success");
+      }
       router.refresh();
     });
   }
 
   function handleDeleteRequest(task: WorkTaskRow) {
+    setDeleteScope(task.recurrenceActive && task.recurrenceFrequency ? "SERIES" : "THIS");
     setTaskToDelete(task);
   }
 
   function handleDeleteConfirm() {
     if (!taskToDelete) return;
     const taskId = taskToDelete.id;
+    const scope = deleteScope;
     startTransition(async () => {
-      const result = await deleteWorkTask(tenantSlug, taskId);
+      const result = await deleteWorkTask(tenantSlug, taskId, scope);
       if (!result.ok) {
         showSnackbar(result.error, "error");
         return;
       }
-      showSnackbar("Task deleted.", "success");
+      showSnackbar(
+        scope === "SERIES" ? "Task removed and series ended." : "Task deleted.",
+        "success",
+      );
       setTaskToDelete(null);
       router.refresh();
     });
@@ -327,12 +371,26 @@ export function TasksWorkspace({
 
   function openEditTask(task: WorkTaskRow) {
     setEditSpaceId(task.spaceId || spaces[0]?.id || "");
+    setEditRecurrenceFrequency(task.recurrenceFrequency || "");
+    setEditRecurrenceEndMode(
+      task.recurrenceMaxOccurrences
+        ? "AFTER_COUNT"
+        : task.recurrenceEndsAtValue
+          ? "UNTIL_DATE"
+          : "NEVER",
+    );
     setEditingTask(task);
   }
 
   async function handleEdit(formData: FormData) {
     if (!editingTask) return;
     startTransition(async () => {
+      const frequencyRaw = String(formData.get("recurrenceFrequency") || "");
+      const endModeRaw = String(formData.get("recurrenceEndMode") || "NEVER") as
+        | "NEVER"
+        | "UNTIL_DATE"
+        | "AFTER_COUNT";
+      const maxRaw = String(formData.get("recurrenceMaxOccurrences") || "").trim();
       const result = await updateWorkTask(tenantSlug, {
         taskId: editingTask.id,
         title: String(formData.get("title") || ""),
@@ -344,12 +402,32 @@ export function TasksWorkspace({
         dueDate: String(formData.get("dueDate") || "") || undefined,
         sprintLabel: String(formData.get("sprintLabel") || "") || undefined,
         priority: (String(formData.get("priority") || "MEDIUM") as WorkTaskRow["priority"]) || "MEDIUM",
+        recurrenceFrequency: frequencyRaw
+          ? (frequencyRaw as WorkTaskRecurrenceFrequency)
+          : null,
+        recurrenceEndMode: frequencyRaw ? endModeRaw : "NEVER",
+        recurrenceEndsAt: String(formData.get("recurrenceEndsAt") || "") || undefined,
+        recurrenceMaxOccurrences: maxRaw ? Number(maxRaw) : null,
       });
       if (!result.ok) {
         showSnackbar(result.error, "error");
         return;
       }
       showSnackbar("Task updated.", "success");
+      setEditingTask(null);
+      router.refresh();
+    });
+  }
+
+  function handleStopRecurrence() {
+    if (!editingTask) return;
+    startTransition(async () => {
+      const result = await stopWorkTaskRecurrence(tenantSlug, editingTask.id);
+      if (!result.ok) {
+        showSnackbar(result.error, "error");
+        return;
+      }
+      showSnackbar("Stopped repeating. This task stays open as a one-off.", "success");
       setEditingTask(null);
       router.refresh();
     });
@@ -672,6 +750,11 @@ export function TasksWorkspace({
                             {task.sprintLabel}
                           </span>
                         ) : null}
+                        {task.recurrenceFrequency && task.recurrenceActive ? (
+                          <span className="rounded-full border border-foreground/20 bg-foreground/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                            {recurrenceFrequencyLabel(task.recurrenceFrequency)}
+                          </span>
+                        ) : null}
                         <span
                           className={[
                             "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
@@ -727,6 +810,8 @@ export function TasksWorkspace({
                 type="button"
                 onClick={() => {
                   setCreateSpaceId(spaceFilter !== "all" ? spaceFilter : spaces[0]?.id || "");
+                  setCreateRecurrenceFrequency("");
+                  setCreateRecurrenceEndMode("NEVER");
                   setIsCreateOpen(true);
                 }}
                 className="m-2 rounded-md border border-dashed border-foreground/15 px-2 py-1.5 text-xs text-muted hover:border-foreground/30 hover:text-foreground"
@@ -784,6 +869,43 @@ export function TasksWorkspace({
             <span className="font-medium text-foreground">&ldquo;{taskToDelete.title}&rdquo;</span> will be
             removed permanently. This cannot be undone.
           </p>
+          {taskToDelete.recurrenceFrequency && taskToDelete.recurrenceActive ? (
+            <fieldset className="mt-4 space-y-2">
+              <legend className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Recurring series
+              </legend>
+              <label className="flex items-start gap-2 text-sm text-foreground">
+                <input
+                  type="radio"
+                  name="deleteScope"
+                  className="mt-1"
+                  checked={deleteScope === "THIS"}
+                  onChange={() => setDeleteScope("THIS")}
+                />
+                <span>
+                  This task only
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Removes this card. Completing it would have created the next one — that stops.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm text-foreground">
+                <input
+                  type="radio"
+                  name="deleteScope"
+                  className="mt-1"
+                  checked={deleteScope === "SERIES"}
+                  onChange={() => setDeleteScope("SERIES")}
+                />
+                <span>
+                  Stop and remove this task (end series)
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Ends the repeat. Past completed occurrences stay in history.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+          ) : null}
           <div className="mt-5 flex justify-end gap-2">
             <button
               type="button"
@@ -904,6 +1026,7 @@ export function TasksWorkspace({
                 <input
                   name="dueDate"
                   type="date"
+                  required={Boolean(editRecurrenceFrequency)}
                   defaultValue={editingTask.dueDateValue || ""}
                   className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
                 />
@@ -918,7 +1041,86 @@ export function TasksWorkspace({
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm text-muted">Repeat</label>
+                <UiSelect
+                  name="recurrenceFrequency"
+                  value={editRecurrenceFrequency}
+                  onChange={(e) =>
+                    setEditRecurrenceFrequency((e.target.value || "") as "" | WorkTaskRecurrenceFrequency)
+                  }
+                >
+                  <option value="">Does not repeat</option>
+                  <option value="DAILY">Daily</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">Monthly</option>
+                </UiSelect>
+              </div>
+              {editRecurrenceFrequency ? (
+                <div>
+                  <label className="mb-1 block text-sm text-muted">Ends</label>
+                  <UiSelect
+                    name="recurrenceEndMode"
+                    value={editRecurrenceEndMode}
+                    onChange={(e) =>
+                      setEditRecurrenceEndMode(
+                        e.target.value as "NEVER" | "UNTIL_DATE" | "AFTER_COUNT",
+                      )
+                    }
+                  >
+                    <option value="NEVER">Never (keep going)</option>
+                    <option value="UNTIL_DATE">On a date</option>
+                    <option value="AFTER_COUNT">After a number of times</option>
+                  </UiSelect>
+                </div>
+              ) : (
+                <div />
+              )}
+            </div>
+            {editRecurrenceFrequency && editRecurrenceEndMode === "UNTIL_DATE" ? (
+              <div>
+                <label className="mb-1 block text-sm text-muted">End date</label>
+                <input
+                  name="recurrenceEndsAt"
+                  type="date"
+                  required
+                  defaultValue={editingTask.recurrenceEndsAtValue || ""}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+            ) : null}
+            {editRecurrenceFrequency && editRecurrenceEndMode === "AFTER_COUNT" ? (
+              <div>
+                <label className="mb-1 block text-sm text-muted">Number of times</label>
+                <input
+                  name="recurrenceMaxOccurrences"
+                  type="number"
+                  min={1}
+                  max={999}
+                  required
+                  defaultValue={editingTask.recurrenceMaxOccurrences ?? 12}
+                  className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+                />
+              </div>
+            ) : null}
+            {editRecurrenceFrequency ? (
+              <p className="text-xs text-muted">
+                Completing this card creates the next occurrence with the next due date. Cancel stops the
+                series.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+              {editingTask.recurrenceActive && editingTask.recurrenceFrequency ? (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={handleStopRecurrence}
+                  className="mr-auto rounded-md border border-foreground/15 px-4 py-2 text-sm text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
+                >
+                  Stop repeating
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setEditingTask(null)}
@@ -1041,6 +1243,7 @@ export function TasksWorkspace({
               <input
                 name="dueDate"
                 type="date"
+                required={Boolean(createRecurrenceFrequency)}
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
@@ -1053,6 +1256,74 @@ export function TasksWorkspace({
               />
             </div>
           </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-muted">Repeat</label>
+              <UiSelect
+                name="recurrenceFrequency"
+                value={createRecurrenceFrequency}
+                onChange={(e) =>
+                  setCreateRecurrenceFrequency((e.target.value || "") as "" | WorkTaskRecurrenceFrequency)
+                }
+              >
+                <option value="">Does not repeat</option>
+                <option value="DAILY">Daily</option>
+                <option value="WEEKLY">Weekly</option>
+                <option value="MONTHLY">Monthly</option>
+              </UiSelect>
+            </div>
+            {createRecurrenceFrequency ? (
+              <div>
+                <label className="mb-1 block text-sm text-muted">Ends</label>
+                <UiSelect
+                  name="recurrenceEndMode"
+                  value={createRecurrenceEndMode}
+                  onChange={(e) =>
+                    setCreateRecurrenceEndMode(
+                      e.target.value as "NEVER" | "UNTIL_DATE" | "AFTER_COUNT",
+                    )
+                  }
+                >
+                  <option value="NEVER">Never (keep going)</option>
+                  <option value="UNTIL_DATE">On a date</option>
+                  <option value="AFTER_COUNT">After a number of times</option>
+                </UiSelect>
+              </div>
+            ) : (
+              <div />
+            )}
+          </div>
+          {createRecurrenceFrequency && createRecurrenceEndMode === "UNTIL_DATE" ? (
+            <div>
+              <label className="mb-1 block text-sm text-muted">End date</label>
+              <input
+                name="recurrenceEndsAt"
+                type="date"
+                required
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+          ) : null}
+          {createRecurrenceFrequency && createRecurrenceEndMode === "AFTER_COUNT" ? (
+            <div>
+              <label className="mb-1 block text-sm text-muted">Number of times</label>
+              <input
+                name="recurrenceMaxOccurrences"
+                type="number"
+                min={1}
+                max={999}
+                required
+                defaultValue={12}
+                className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
+              />
+            </div>
+          ) : null}
+          {createRecurrenceFrequency ? (
+            <p className="text-xs text-muted">
+              Only the current card stays on the board. Mark it complete to spawn the next one — safe for
+              long-running daily/weekly routines.
+            </p>
+          ) : null}
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
