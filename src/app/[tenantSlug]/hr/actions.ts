@@ -244,6 +244,39 @@ export async function upsertEmployeeProfile(
   if (parsed.data.payTemplateId && !selectedPayTemplate) {
     return { ok: false, error: "The selected pay template is not available in this organization." };
   }
+
+  let reportsToPatch: { reportsToUserId: string | null; reportingToLabel: string | null } | null = null;
+  if (has("reportsToUserId")) {
+    const managerUserId = parsed.data.reportsToUserId || "";
+    if (!managerUserId) {
+      reportsToPatch = { reportsToUserId: null, reportingToLabel: null };
+    } else if (managerUserId === parsed.data.userId) {
+      return { ok: false, error: "Someone cannot report to themselves." };
+    } else {
+      const manager = await prisma.employeeProfile.findFirst({
+        where: { tenantId: tenant.id, userId: managerUserId },
+        select: { userId: true, fullName: true, reportsToUserId: true },
+      });
+      if (!manager) return { ok: false, error: "Choose a person who already has a People record." };
+      const seen = new Set<string>([parsed.data.userId]);
+      let cursor: string | null = manager.userId;
+      while (cursor) {
+        if (seen.has(cursor)) {
+          return { ok: false, error: "That reporting line would loop. Pick someone above them." };
+        }
+        seen.add(cursor);
+        const next: { reportsToUserId: string | null } | null = await prisma.employeeProfile.findFirst({
+          where: { tenantId: tenant.id, userId: cursor },
+          select: { reportsToUserId: true },
+        });
+        cursor = next?.reportsToUserId ?? null;
+      }
+      reportsToPatch = {
+        reportsToUserId: manager.userId,
+        reportingToLabel: manager.fullName || "Manager",
+      };
+    }
+  }
   const orgPay = parseOrgPayrollSettings(
     tenant.settings?.payrollCountryCode,
     tenant.settings?.payrollSettings,
@@ -328,9 +361,11 @@ export async function upsertEmployeeProfile(
     ...(pickDate("dateOfJoining", parsed.data.dateOfJoining) !== undefined
       ? { dateOfJoining: pickDate("dateOfJoining", parsed.data.dateOfJoining) }
       : {}),
-    ...(pickStr("reportingToLabel", parsed.data.reportingToLabel) !== undefined
-      ? { reportingToLabel: pickStr("reportingToLabel", parsed.data.reportingToLabel) }
-      : {}),
+    ...(reportsToPatch
+      ? reportsToPatch
+      : pickStr("reportingToLabel", parsed.data.reportingToLabel) !== undefined
+        ? { reportingToLabel: pickStr("reportingToLabel", parsed.data.reportingToLabel) }
+        : {}),
     ...(pickStr("employmentType", parsed.data.employmentType) !== undefined
       ? { employmentType: pickStr("employmentType", parsed.data.employmentType) }
       : {}),
@@ -411,7 +446,8 @@ export async function upsertEmployeeProfile(
     position: parsed.data.position || null,
     department: parsed.data.department || null,
     dateOfJoining: parsed.data.dateOfJoining ? new Date(parsed.data.dateOfJoining) : null,
-    reportingToLabel: parsed.data.reportingToLabel || null,
+    reportsToUserId: reportsToPatch?.reportsToUserId ?? null,
+    reportingToLabel: reportsToPatch?.reportingToLabel ?? parsed.data.reportingToLabel ?? null,
     employmentType: parsed.data.employmentType || null,
     workSchedule: parsed.data.workSchedule || null,
     paygroupName: parsed.data.paygroupName || null,

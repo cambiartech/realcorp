@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { Download, FileSpreadsheet, Send, UserPlus, Users } from "lucide-react";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { UiTabs } from "@/components/ui-tabs";
 import { ButtonSpinner } from "@/components/button-spinner";
 import { ModalOverlay } from "@/components/modal-overlay";
@@ -650,6 +651,7 @@ export function HrPeopleWorkspace({
       position: "",
       department: "",
       dateOfJoining: "",
+      reportsToUserId: "",
       reportingToLabel: "",
       employmentType: "",
       workSchedule: "",
@@ -1165,12 +1167,23 @@ export function HrPeopleWorkspace({
                       type="date"
                       defaultValue={record.dateOfJoining}
                     />
-                    <Field
-                      label="Reports to"
-                      name="reportingToLabel"
-                      defaultValue={record.reportingToLabel}
-                      hint="Display label on the People record. For task assign rights, use Task managers below."
-                    />
+                    <div>
+                      <label className="mb-1 block text-sm text-muted">Reports to</label>
+                      <SearchableSelect
+                        name="reportsToUserId"
+                        defaultValue={record.reportsToUserId || ""}
+                        allowEmpty
+                        emptyLabel="Nobody — top of their line"
+                        searchPlaceholder="Search people…"
+                        options={teamMembers
+                          .filter((member) => member.userId !== record.userId)
+                          .map((member) => ({ value: member.userId, label: member.name }))}
+                      />
+                      <p className="mt-1 text-[11px] text-muted">
+                        Builds the org chart. Staff only see their own line up to the top, not the whole company.
+                        Task assign rights stay under Task managers.
+                      </p>
+                    </div>
                     <EmployeeTaskManagersEditor
                       key={`${record.userId}-${(taskManagersByUserId[record.userId] || [])
                         .map((m) => m.userId)

@@ -35,6 +35,7 @@ export function formDataToEmployeeProfilePayload(fd: FormData): Record<string, u
     "position",
     "department",
     "dateOfJoining",
+    "reportsToUserId",
     "reportingToLabel",
     "employmentType",
     "workSchedule",
@@ -171,6 +172,7 @@ export type ProfileDetailRow = {
   position: string;
   department: string;
   dateOfJoining: string;
+  reportsToUserId: string;
   reportingToLabel: string;
   employmentType: string;
   workSchedule: string;
@@ -245,6 +247,7 @@ export function profileToDetailRow(p: {
   position: string | null;
   department: string | null;
   dateOfJoining: Date | null;
+  reportsToUserId?: string | null;
   reportingToLabel: string | null;
   employmentType: string | null;
   workSchedule: string | null;
@@ -305,6 +308,7 @@ export function profileToDetailRow(p: {
     position: p.position || "",
     department: p.department || "",
     dateOfJoining: p.dateOfJoining ? p.dateOfJoining.toISOString().slice(0, 10) : "",
+    reportsToUserId: p.reportsToUserId || "",
     reportingToLabel: p.reportingToLabel || "",
     employmentType: p.employmentType || "",
     workSchedule: p.workSchedule || "",

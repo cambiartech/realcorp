@@ -124,6 +124,11 @@ export const upsertEmployeeProfileSchema = z.object({
     .max(120)
     .optional()
     .transform((v) => (v && v !== "" ? v : undefined)),
+  reportsToUserId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v !== "" ? v : undefined)),
   employmentType: z
     .string()
     .trim()

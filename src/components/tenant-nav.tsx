@@ -27,6 +27,7 @@ import {
   MapPin,
   Megaphone,
   MessageCircle,
+  Network,
   Package,
   Radio,
   Receipt,
@@ -446,6 +447,7 @@ export function TenantSidebar({
     ? canManageHr
       ? [
           { id: "people", label: "People", href: `${hrItem.href}/people`, icon: Users },
+          { id: "org", label: "Org chart", href: `${hrItem.href}/org`, icon: Network },
           { id: "leave", label: "Leave tracker", href: `${hrItem.href}/leave`, icon: CalendarDays },
           { id: "payslips", label: "Payslips", href: `${hrItem.href}/payslips`, icon: Banknote },
           { id: "remittances", label: "Remittances", href: `${hrItem.href}/remittances`, icon: Landmark },
@@ -459,6 +461,7 @@ export function TenantSidebar({
         ]
       : [
           { id: "my", label: "My HR", href: `${hrItem.href}/dashboard`, icon: UserCircle },
+          { id: "org", label: "Org chart", href: `${hrItem.href}/org`, icon: Network },
         ]
     : [];
   const hasFinanceItems = financeSubItems.length > 0;

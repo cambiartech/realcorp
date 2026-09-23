@@ -26,6 +26,7 @@ export function mergeProfileDraftFromForm(draft: ProfileDetailRow, form: HTMLFor
     position: field(fd, "position") || draft.position,
     department: field(fd, "department") || draft.department,
     dateOfJoining: field(fd, "dateOfJoining") || draft.dateOfJoining,
+    reportsToUserId: field(fd, "reportsToUserId") || draft.reportsToUserId,
     reportingToLabel: field(fd, "reportingToLabel") || draft.reportingToLabel,
     employmentType: field(fd, "employmentType") || draft.employmentType,
     workSchedule: field(fd, "workSchedule") || draft.workSchedule,
