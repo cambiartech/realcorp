@@ -66,6 +66,7 @@ export type WorkTaskRow = {
   assigneeUserId: string | null;
   createdByUserId?: string | null;
   assigneeLabel: string;
+  createdByLabel: string;
   dueDateLabel: string | null;
   dueDateValue: string | null;
   completedAt?: string | null;
@@ -654,7 +655,8 @@ export function TasksWorkspace({
             <thead className="border-b border-foreground/10 bg-foreground/[0.03] text-[11px] uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-3 py-2.5 font-semibold">Task</th>
-                <th className="px-3 py-2.5 font-semibold">Assignee</th>
+                <th className="px-3 py-2.5 font-semibold">Assigned to</th>
+                <th className="px-3 py-2.5 font-semibold">Assigned by</th>
                 <th className="px-3 py-2.5 font-semibold">Project</th>
                 <th className="px-3 py-2.5 font-semibold">Priority</th>
                 <th className="px-3 py-2.5 font-semibold">Completed</th>
@@ -663,7 +665,7 @@ export function TasksWorkspace({
             <tbody>
               {filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-10 text-center text-xs text-muted">
+                  <td colSpan={6} className="px-3 py-10 text-center text-xs text-muted">
                     No completed tasks yet.
                   </td>
                 </tr>
@@ -686,6 +688,7 @@ export function TasksWorkspace({
                       ) : null}
                     </td>
                     <td className="px-3 py-2.5 text-muted">{task.assigneeLabel}</td>
+                    <td className="px-3 py-2.5 text-muted">{task.createdByLabel}</td>
                     <td className="px-3 py-2.5 text-muted">
                       {task.projectName
                         ? `${task.projectEmoji ? `${task.projectEmoji} ` : ""}${task.projectName}`
@@ -812,21 +815,23 @@ export function TasksWorkspace({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-bold text-foreground"
-                            title={task.assigneeLabel}
-                          >
-                            {initials(task.assigneeLabel)}
-                          </span>
-                          <span className="max-w-[90px] truncate text-[11px] text-muted">
-                            {task.assigneeLabel}
-                          </span>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-1.5" title={`Assigned to ${task.assigneeLabel}`}>
+                            <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-bold text-foreground">
+                              {initials(task.assigneeLabel)}
+                            </span>
+                            <span className="min-w-0 truncate text-[11px] text-muted">
+                              <span className="font-medium text-foreground/70">To</span> {task.assigneeLabel}
+                            </span>
+                          </div>
+                          {task.dueDateLabel ? (
+                            <span className="shrink-0 text-[10px] text-muted">{task.dueDateLabel}</span>
+                          ) : null}
                         </div>
-                        {task.dueDateLabel ? (
-                          <span className="text-[10px] text-muted">{task.dueDateLabel}</span>
-                        ) : null}
+                        <p className="truncate text-[11px] text-muted" title={`Assigned by ${task.createdByLabel}`}>
+                          <span className="font-medium text-foreground/70">By</span> {task.createdByLabel}
+                        </p>
                       </div>
                       <div className="mt-2">
                         <UiSelect
@@ -975,7 +980,12 @@ export function TasksWorkspace({
       {editingTask ? (
         <ModalOverlay open onClose={() => setEditingTask(null)} panelClassName={MODAL_PANEL_FORM}>
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Edit task</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Edit task</h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Assigned to {editingTask.assigneeLabel} · Assigned by {editingTask.createdByLabel}
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => setEditingTask(null)}

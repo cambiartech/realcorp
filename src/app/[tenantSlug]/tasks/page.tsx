@@ -115,6 +115,26 @@ export default async function TasksPage({
   const tasks = tasksResult.ok ? tasksResult.rows : [];
 
   const memberById = new Map(allMembers.map((m) => [m.id, m]));
+  const missingCreatorIds = [
+    ...new Set(
+      tasks
+        .map((t) => t.createdByUserId)
+        .filter((id): id is string => Boolean(id) && !memberById.has(id)),
+    ),
+  ];
+  const extraCreators =
+    missingCreatorIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: missingCreatorIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+  const creatorLabelById = new Map<string, string>(
+    allMembers.map((m) => [m.id, m.label]),
+  );
+  for (const user of extraCreators) {
+    creatorLabelById.set(user.id, user.name || user.email || "Assignor");
+  }
   const manageeUserIds = await loadManageeUserIds(tenant.id, session.user.id);
   const memberOptions = filterTaskAssigneeMembers(allMembers, {
     isPlatformAdmin,
@@ -180,6 +200,7 @@ export default async function TasksPage({
         assigneeLabel: t.assigneeUserId
           ? memberById.get(t.assigneeUserId)?.label || "Assigned"
           : "Unassigned",
+        createdByLabel: creatorLabelById.get(t.createdByUserId) || "Assignor",
         dueDateLabel: t.dueDate
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.dueDate)
           : null,
