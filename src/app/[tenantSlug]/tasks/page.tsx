@@ -8,9 +8,30 @@ import { canManageTasks, canViewAllOrgTasks, workTaskVisibilityWhere } from "@/l
 import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "@/lib/membership-departments";
 import { loadManageeUserIds } from "@/lib/employee-task-managers";
 import { profileFromMembershipRole, mapOrgDepartmentToAccess } from "@/lib/org-membership-profile";
+import { capturePlatformErrorEvent } from "@/lib/platform-error-capture";
 import { ensureDefaultTaskSpaces } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+function asDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function safeDateLabel(value: Date | string | null | undefined) {
+  const date = asDate(value);
+  if (!date) return null;
+  try {
+    return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+function safeDateValue(value: Date | string | null | undefined) {
+  return asDate(value)?.toISOString().slice(0, 10) ?? null;
+}
 
 export default async function TasksPage({
   params,
@@ -51,6 +72,7 @@ export default async function TasksPage({
 
   assertTenantNavAccess(session, membership, tenant.settings, "tasks");
 
+  try {
   await ensureDefaultTaskSpaces(tenant.id);
 
   const memberships = await prisma.membership.findMany({
@@ -122,13 +144,17 @@ export default async function TasksPage({
         .filter((id): id is string => Boolean(id) && !memberById.has(id)),
     ),
   ];
-  const extraCreators =
-    missingCreatorIds.length > 0
-      ? await prisma.user.findMany({
-          where: { id: { in: missingCreatorIds } },
-          select: { id: true, name: true, email: true },
-        })
-      : [];
+  let extraCreators: Array<{ id: string; name: string | null; email: string | null }> = [];
+  if (missingCreatorIds.length > 0) {
+    try {
+      extraCreators = await prisma.user.findMany({
+        where: { id: { in: missingCreatorIds } },
+        select: { id: true, name: true, email: true },
+      });
+    } catch (error) {
+      console.error("[tasks] assignor lookup failed", error);
+    }
+  }
   const creatorLabelById = new Map<string, string>(
     allMembers.map((m) => [m.id, m.label]),
   );
@@ -201,20 +227,14 @@ export default async function TasksPage({
           ? memberById.get(t.assigneeUserId)?.label || "Assigned"
           : "Unassigned",
         createdByLabel: creatorLabelById.get(t.createdByUserId) || "Assignor",
-        dueDateLabel: t.dueDate
-          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.dueDate)
-          : null,
-        dueDateValue: t.dueDate ? t.dueDate.toISOString().slice(0, 10) : null,
-        completedAt: t.completedAt ? t.completedAt.toISOString() : null,
-        completedAtLabel: t.completedAt
-          ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.completedAt)
-          : null,
+        dueDateLabel: safeDateLabel(t.dueDate),
+        dueDateValue: safeDateValue(t.dueDate),
+        completedAt: asDate(t.completedAt)?.toISOString() ?? null,
+        completedAtLabel: safeDateLabel(t.completedAt),
         linkedEntityType: t.linkedEntityType,
         recurrenceFrequency: t.recurrenceFrequency ?? null,
         recurrenceActive: Boolean(t.recurrenceActive),
-        recurrenceEndsAtValue: t.recurrenceEndsAt
-          ? t.recurrenceEndsAt.toISOString().slice(0, 10)
-          : null,
+        recurrenceEndsAtValue: safeDateValue(t.recurrenceEndsAt),
         recurrenceMaxOccurrences: t.recurrenceMaxOccurrences ?? null,
       }))}
       members={memberOptions}
@@ -222,4 +242,40 @@ export default async function TasksPage({
       initialView={initialView}
     />
   );
+  } catch (error) {
+    const digest = typeof error === "object" && error && "digest" in error ? String((error as { digest?: string }).digest || "") : "";
+    if (digest.startsWith("NEXT_REDIRECT") || digest.startsWith("NEXT_HTTP_ERROR_FALLBACK") || digest.includes("NEXT_NOT_FOUND")) {
+      throw error;
+    }
+    const reference = digest || `e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[tasks] page failed", reference, error);
+    try {
+      await capturePlatformErrorEvent({
+        digest: reference,
+        name: error instanceof Error ? error.name : "Error",
+        message,
+        stack: error instanceof Error ? error.stack : null,
+        routePath: `/${tenantSlug}/tasks`,
+        tenantSlug,
+        metadata: { source: "tasks-page" },
+      });
+    } catch (captureError) {
+      console.error("[tasks] error capture failed", captureError);
+    }
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <h1 className="text-lg font-semibold text-foreground">Tasks could not load</h1>
+        <p className="mt-2 text-sm text-muted">
+          Refresh the page. If this stays, send this reference to a platform admin.
+        </p>
+        <p className="mt-4 text-sm font-semibold text-foreground">
+          Error reference{" "}
+          <code className="rounded-md border border-foreground/20 bg-field px-2 py-1 font-mono text-base">
+            {reference}
+          </code>
+        </p>
+      </div>
+    );
+  }
 }

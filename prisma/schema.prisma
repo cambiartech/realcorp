@@ -1431,6 +1431,7 @@ model PlatformErrorEvent {
   @@index([digest, createdAt])
   @@index([tenantId, createdAt])
   @@index([tenantSlug, createdAt])
+  @@index([createdAt])
 }
 
 // ——— Human Resources (People management) ———

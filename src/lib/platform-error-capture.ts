@@ -48,17 +48,47 @@ export function cleanErrorMetadata(value: unknown): Prisma.InputJsonValue | unde
   }
 }
 
+const ERROR_LOG_RETENTION_DAYS = 21;
+
+export async function pruneOldPlatformErrorEvents(): Promise<void> {
+  const cutoff = new Date(Date.now() - ERROR_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  await prisma.platformErrorEvent.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+}
+
 export async function capturePlatformErrorEvent(input: PlatformErrorCaptureInput): Promise<void> {
   const digest = normalizeErrorDigest(input.digest);
   if (!digest) return;
+
+  try {
+    await recordPlatformErrorEvent(input, digest);
+  } finally {
+    try {
+      await pruneOldPlatformErrorEvents();
+    } catch (error) {
+      console.error("[platform-error] prune failed", error);
+    }
+  }
+}
+
+async function recordPlatformErrorEvent(
+  input: PlatformErrorCaptureInput,
+  digest: string,
+): Promise<void> {
 
   const meta = input.metadata as { source?: string } | null | undefined;
   const fromClientBoundary =
     meta?.source === "global-error-boundary" || meta?.source === "tenant-error-boundary";
 
-  // Client boundaries only receive Next.js sanitized messages in production — skip noise.
+  // The browser only gets Next's generic text. Keep the row when the server has not
+  // already stored this reference, so a screenshot can still be looked up.
   if (fromClientBoundary && isSanitizedProductionErrorMessage(input.message)) {
-    return;
+    const existing = await prisma.platformErrorEvent.findFirst({
+      where: { digest },
+      select: { id: true },
+    });
+    if (existing) return;
   }
 
   const routePath = cleanText(input.routePath, 512);

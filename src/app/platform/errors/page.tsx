@@ -11,7 +11,8 @@ export default function PlatformErrorsPage() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-bold text-foreground">Error reference lookup</h1>
       <p className="mt-1 text-sm text-muted">
-        Paste the number from a &quot;This page could not load&quot; screen. The lookup shows the{" "}
+        Paste the error reference from a failed page. Rows older than 21 days are removed automatically.
+        The lookup shows the{" "}
         <strong className="font-medium text-foreground">server-side</strong> message and stack when available
         — not the generic text users see in the browser.
       </p>

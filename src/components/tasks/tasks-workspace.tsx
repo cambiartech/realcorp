@@ -145,8 +145,8 @@ const PRIORITY_STYLE: Record<WorkTaskRow["priority"], string> = {
   URGENT: "border-[var(--danger-line)] text-[var(--danger)] ",
 };
 
-function initials(label: string) {
-  const parts = label.trim().split(/\s+/).filter(Boolean);
+function initials(label: string | null | undefined) {
+  const parts = (label || "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
@@ -829,8 +829,8 @@ export function TasksWorkspace({
                             <span className="shrink-0 text-[10px] text-muted">{task.dueDateLabel}</span>
                           ) : null}
                         </div>
-                        <p className="truncate text-[11px] text-muted" title={`Assigned by ${task.createdByLabel}`}>
-                          <span className="font-medium text-foreground/70">By</span> {task.createdByLabel}
+                          <p className="truncate text-[11px] text-muted" title={`Assigned by ${task.createdByLabel || "Assignor"}`}>
+                          <span className="font-medium text-foreground/70">By</span> {task.createdByLabel || "Assignor"}
                         </p>
                       </div>
                       <div className="mt-2">

@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+
+function errorReference(error: Error & { digest?: string }, fallback: string): string {
+  const digest = typeof error.digest === "string" ? error.digest.replace(/\s+/g, "") : "";
+  return digest || fallback;
+}
 
 /**
  * Recoverable error boundary for tenant pages. Keeps the app shell (sidebar,
@@ -13,16 +18,21 @@ export default function TenantError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const fallbackRef = useRef("");
+  if (!fallbackRef.current) {
+    fallbackRef.current = `e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  }
+  const reference = errorReference(error, fallbackRef.current);
+
   useEffect(() => {
     console.error("[tenant-error]", error);
-    const digest = typeof error.digest === "string" ? error.digest : null;
-    if (!digest || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
 
     void fetch("/api/platform/error-reports", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        digest,
+        digest: reference,
         name: error.name || null,
         message: error.message || null,
         stack: typeof error.stack === "string" ? error.stack : null,
@@ -35,7 +45,7 @@ export default function TenantError({
     }).catch(() => {
       // best-effort telemetry only
     });
-  }, [error]);
+  }, [error, reference]);
 
   return (
     <div className="flex w-full items-center justify-center px-4 py-16">
@@ -44,14 +54,15 @@ export default function TenantError({
         <p className="mt-2 text-sm text-muted">
           The rest of the app is fine — try again, or head back to your dashboard.
         </p>
-        {error.digest ? (
-          <p className="mt-3 text-xs text-muted">
-            Error reference:{" "}
-            <code className="rounded border border-foreground/15 bg-field px-1.5 py-0.5 font-mono">
-              {error.digest}
-            </code>
-          </p>
-        ) : null}
+        <p className="mt-4 text-xs text-muted">
+          Quote this reference if you send a screenshot.
+        </p>
+        <p className="mt-1 text-sm font-semibold tracking-wide text-foreground">
+          Error reference{" "}
+          <code className="rounded-md border border-foreground/20 bg-field px-2 py-1 font-mono text-base">
+            {reference}
+          </code>
+        </p>
         <div className="mt-5 flex justify-center gap-2">
           <button
             type="button"
