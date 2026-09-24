@@ -108,6 +108,7 @@ export async function sendTodayCelebrationEmails(tenantId: string, companyName: 
       workEmail: true,
       dateOfBirth: true,
       dateOfJoining: true,
+      department: true,
     },
     take: 800,
   });
@@ -155,7 +156,11 @@ export async function sendTodayCelebrationEmails(tenantId: string, companyName: 
       }
       const html =
         item.kind === "BIRTHDAY"
-          ? birthdayCampaignHtml({ companyName, firstName: firstName(name) })
+          ? birthdayCampaignHtml({
+              companyName,
+              firstName: firstName(name),
+              department: profile.department,
+            })
           : anniversaryCampaignHtml({
               companyName,
               firstName: firstName(name),
@@ -163,8 +168,8 @@ export async function sendTodayCelebrationEmails(tenantId: string, companyName: 
             });
       const subject =
         item.kind === "BIRTHDAY"
-          ? `Happy Birthday from ${companyName}`
-          : `Happy ${item.years}-year anniversary from ${companyName}`;
+          ? `Happy birthday, ${firstName(name)}`
+          : `Happy anniversary, ${firstName(name)}`;
       const result = await sendCelebrationEmail({
         to: email,
         subject,

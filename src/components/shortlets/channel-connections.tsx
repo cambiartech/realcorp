@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import {
@@ -30,22 +30,30 @@ type Props = {
   lastUsedLabel: string | null;
   feeds: Feed[];
   imports: ImportRow[];
+  inquiryCount: number;
+  inquiries: ReactNode;
 };
+
+type TabId = "pellows" | "calendars" | "inquiries";
 
 export function ChannelConnections({
   tenantSlug,
   tenantId,
   pellowsStatus,
-  tokenPrefix,
   lastUsedLabel,
   feeds,
   imports,
+  inquiryCount,
+  inquiries,
 }: Props) {
   const { showSnackbar } = useSnackbar();
   const [pending, startTransition] = useTransition();
-  const [consent, setConsent] = useState(false);
+  const [tab, setTab] = useState<TabId>("pellows");
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [copyUnitId, setCopyUnitId] = useState(feeds[0]?.unitId || "");
   const [form, setForm] = useState({ unitId: feeds[0]?.unitId || "", provider: "AIRBNB", icalUrl: "" });
+  const on = pellowsStatus === "ACTIVE";
 
   function run(fn: () => Promise<{ ok: boolean; error?: string; token?: string }>, success: string) {
     startTransition(async () => {
@@ -68,202 +76,238 @@ export function ChannelConnections({
     }
   }
 
+  const copyFeed = feeds.find((feed) => feed.unitId === copyUnitId) || feeds[0];
+
+  const tabs: Array<{ id: TabId; label: string }> = [
+    { id: "pellows", label: "Pellows" },
+    { id: "calendars", label: "Calendars" },
+    { id: "inquiries", label: inquiryCount > 0 ? `Inquiries ${inquiryCount}` : "Inquiries" },
+  ];
+
   return (
     <div className="space-y-4">
-      <section className="rounded-xl border border-foreground/10 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap gap-1 rounded-lg border border-foreground/10 p-0.5">
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={[
+              "rounded-md px-3 py-1.5 text-xs font-semibold",
+              tab === item.id ? "bg-foreground text-background" : "text-muted",
+            ].join(" ")}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "pellows" ? (
+      <section className="rounded-xl border border-foreground/10 p-5">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold">Pellows</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted">
-              Guests can find these apartments on Pellows. Pellows reads the unit, the nightly rate, photos, and busy dates.
-              It cannot change finance or HR. One room calendar is shared with Airbnb, Booking.com, and direct bookings, so a date cannot be sold twice.
+            <h2 className="text-base font-semibold">Pellows</h2>
+            <p className="mt-1 text-sm text-muted">
+              {on
+                ? lastUsedLabel
+                  ? `Connected. Last checked ${lastUsedLabel}.`
+                  : "Connected. Waiting for Pellows to check in."
+                : "Let guests book these apartments on Pellows."}
             </p>
           </div>
-          <span className="rounded-full border border-foreground/10 px-2 py-1 text-xs font-semibold text-muted">
-            {pellowsStatus === "ACTIVE" ? "On" : "Off"}
+          <span
+            className={[
+              "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
+              on ? "bg-foreground text-background" : "text-muted",
+            ].join(" ")}
+          >
+            {on ? "On" : "Off"}
           </span>
         </div>
 
-        {pellowsStatus !== "ACTIVE" ? (
-          <form
-            className="mt-4 space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              run(() => enablePellowsChannel(tenantSlug, consent), "Pellows is on. Copy the token now.");
-            }}
-          >
-            <label className="flex items-start gap-2 text-sm text-foreground">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={consent}
-                onChange={(event) => setConsent(event.target.checked)}
-              />
-              <span>
-                Pellows may read apartments, photos, nightly rates, and busy dates for this workspace only. It may not edit finance or HR.
-              </span>
-            </label>
-            <button
-              type="submit"
-              disabled={pending || !consent}
-              className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
-            >
-              Turn on Pellows
-            </button>
-          </form>
-        ) : (
-          <div className="mt-4 flex flex-wrap gap-2">
+        {revealedToken ? (
+          <div className="mt-4 rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
+            <p className="text-sm font-medium">Paste these into Pellows</p>
+            <p className="mt-1 text-xs text-muted">Copy the code now. It will not be shown again.</p>
+            <CopyLine label="Workspace" value={tenantId} onCopy={() => void copy(tenantId)} />
+            <CopyLine label="Code" value={revealedToken} onCopy={() => void copy(revealedToken)} />
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {on ? (
             <button
               type="button"
               disabled={pending}
-              onClick={() => run(() => rotatePellowsChannelToken(tenantSlug), "New token ready. Copy it now.")}
-              className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
-            >
-              Rotate token
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => run(() => revokePellowsChannel(tenantSlug), "Pellows is off. The old token no longer works.")}
-              className="rounded-md border border-[var(--danger-line)] px-3 py-2 text-xs font-semibold text-[var(--danger)]"
+              onClick={() => run(() => revokePellowsChannel(tenantSlug), "Pellows is off.")}
+              className="text-xs font-semibold text-muted underline disabled:opacity-50"
             >
               Turn off
             </button>
-          </div>
-        )}
-
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted">Tenant id</dt>
-            <dd className="mt-1 flex items-center gap-2">
-              <code className="rounded-md border border-foreground/15 bg-field px-2 py-1 font-mono text-xs">{tenantId}</code>
-              <button type="button" className="text-xs font-semibold underline" onClick={() => void copy(tenantId)}>
-                Copy
-              </button>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-muted">Connection token</dt>
-            <dd className="mt-1 text-xs text-muted">
-              {revealedToken ? (
-                <span className="flex flex-wrap items-center gap-2">
-                  <code className="break-all rounded-md border border-foreground/15 bg-field px-2 py-1 font-mono text-foreground">
-                    {revealedToken}
-                  </code>
-                  <button type="button" className="font-semibold underline" onClick={() => void copy(revealedToken)}>
-                    Copy
-                  </button>
-                </span>
-              ) : pellowsStatus === "ACTIVE" ? (
-                <span>Saved. Prefix {tokenPrefix}. Copy it only when you turn Pellows on or rotate it.</span>
-              ) : (
-                <span>Shown once, after you turn Pellows on.</span>
-              )}
-              {lastUsedLabel ? <span className="mt-1 block">Last sync {lastUsedLabel}.</span> : null}
-            </dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-xs text-muted">
-          Pellows calls <code className="font-mono">GET /v1/shortlets/units?tenantId=</code> with this token. Limit is 60 calls an hour.
-          Later changes are sent to them as they happen, and they can catch up with <code className="font-mono">updatedSince</code>.
-          A revoked token returns 401. A token used with another workspace id returns 403.
-        </p>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => run(() => enablePellowsChannel(tenantSlug, true), "Pellows is on. Copy the code now.")}
+              className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+            >
+              Turn on
+            </button>
+          )}
+          {!on ? (
+            <p className="text-xs text-muted">Pellows will see apartments, prices, photos, and busy dates.</p>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => run(() => rotatePellowsChannelToken(tenantSlug), "New code ready. Copy it now.")}
+              className="text-xs font-semibold text-muted underline disabled:opacity-50"
+            >
+              New code
+            </button>
+          )}
+        </div>
       </section>
+      ) : null}
 
-      <section className="rounded-xl border border-foreground/10 p-4">
-        <h2 className="text-lg font-semibold">Booking calendar</h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          Each apartment has one calendar. Paste it into Airbnb or Booking.com. Paste their calendar back here so their busy dates block the room in Realcorp and on Pellows.
-        </p>
+      {tab === "calendars" ? (
+          <div className="space-y-4 rounded-xl border border-foreground/10 px-5 py-4">
+            <p className="text-sm text-muted">Busy dates on these calendars block the same room everywhere.</p>
 
-        {feeds.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">Add an active apartment before connecting a calendar.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-foreground/10 text-sm">
-            {feeds.map((feed) => (
-              <li key={feed.unitId} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="font-medium">{feed.unitName}</span>
-                <button type="button" className="text-xs font-semibold underline" onClick={() => void copy(feed.icalUrl)}>
-                  Copy calendar link
+            {feeds.length > 0 ? (
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="min-w-[180px] flex-1 text-xs text-muted">
+                  Room calendar
+                  <UiSelect
+                    className="mt-1"
+                    value={copyFeed?.unitId || ""}
+                    onChange={(event) => setCopyUnitId(event.target.value)}
+                  >
+                    {feeds.map((feed) => (
+                      <option key={feed.unitId} value={feed.unitId}>
+                        {feed.unitName}
+                      </option>
+                    ))}
+                  </UiSelect>
+                </label>
+                <button
+                  type="button"
+                  disabled={!copyFeed}
+                  onClick={() => copyFeed && void copy(copyFeed.icalUrl)}
+                  className="rounded-md border border-foreground/15 px-3 py-2 text-xs font-semibold"
+                >
+                  Copy link
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Add an apartment first.</p>
+            )}
 
-        <form
-          className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            run(
-              () => saveChannelCalendarImport(tenantSlug, form),
-              "Calendar saved. Busy dates now block this apartment.",
-            );
-          }}
-        >
-          <UiSelect value={form.unitId} onChange={(event) => setForm((current) => ({ ...current, unitId: event.target.value }))}>
-            {feeds.map((feed) => (
-              <option key={feed.unitId} value={feed.unitId}>
-                {feed.unitName}
-              </option>
-            ))}
-          </UiSelect>
-          <UiSelect value={form.provider} onChange={(event) => setForm((current) => ({ ...current, provider: event.target.value }))}>
-            <option value="AIRBNB">Airbnb</option>
-            <option value="BOOKING_COM">Booking.com</option>
-            <option value="ICAL">Other calendar</option>
-          </UiSelect>
-          <input
-            value={form.icalUrl}
-            onChange={(event) => setForm((current) => ({ ...current, icalUrl: event.target.value }))}
-            placeholder="https:// calendar link"
-            className="rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm lg:col-span-1"
-          />
-          <button
-            type="submit"
-            disabled={pending || feeds.length === 0}
-            className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
-          >
-            Save and sync
-          </button>
-        </form>
+            {imports.length > 0 ? (
+              <ul className="divide-y divide-foreground/10 text-sm">
+                {imports.map((row) => (
+                  <li key={row.id} className="flex items-center justify-between gap-3 py-2">
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        {row.unitName} · {row.providerLabel}
+                      </p>
+                      <p className="truncate text-xs text-muted">
+                        {row.lastError || (row.lastSyncedLabel ? `Updated ${row.lastSyncedLabel}` : "Not updated yet")}
+                      </p>
+                    </div>
+                    <span className="flex shrink-0 gap-3 text-xs font-semibold">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        className="underline"
+                        onClick={() => run(() => syncChannelCalendarImport(tenantSlug, row.id), "Updated.")}
+                      >
+                        Update
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        className="text-muted underline"
+                        onClick={() => run(() => removeChannelCalendarImport(tenantSlug, row.id), "Removed.")}
+                      >
+                        Remove
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
-        {imports.length > 0 ? (
-          <ul className="mt-4 space-y-2">
-            {imports.map((row) => (
-              <li key={row.id} className="rounded-lg border border-foreground/10 px-3 py-2 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium">
-                    {row.unitName} · {row.providerLabel}
-                  </p>
-                  <span className="flex gap-3 text-xs font-semibold">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      className="underline"
-                      onClick={() => run(() => syncChannelCalendarImport(tenantSlug, row.id), "Calendar synced.")}
-                    >
-                      Sync
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      className="text-[var(--danger)] underline"
-                      onClick={() => run(() => removeChannelCalendarImport(tenantSlug, row.id), "Calendar removed.")}
-                    >
-                      Remove
-                    </button>
-                  </span>
+            {linkOpen ? (
+              <form
+                className="grid gap-2 sm:grid-cols-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  run(() => saveChannelCalendarImport(tenantSlug, form), "Calendar linked.");
+                  setForm((current) => ({ ...current, icalUrl: "" }));
+                }}
+              >
+                <UiSelect
+                  value={form.unitId}
+                  onChange={(event) => setForm((current) => ({ ...current, unitId: event.target.value }))}
+                >
+                  {feeds.map((feed) => (
+                    <option key={feed.unitId} value={feed.unitId}>
+                      {feed.unitName}
+                    </option>
+                  ))}
+                </UiSelect>
+                <UiSelect
+                  value={form.provider}
+                  onChange={(event) => setForm((current) => ({ ...current, provider: event.target.value }))}
+                >
+                  <option value="AIRBNB">Airbnb</option>
+                  <option value="BOOKING_COM">Booking.com</option>
+                  <option value="ICAL">Other</option>
+                </UiSelect>
+                <input
+                  value={form.icalUrl}
+                  onChange={(event) => setForm((current) => ({ ...current, icalUrl: event.target.value }))}
+                  placeholder="Paste the calendar link"
+                  className="rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm sm:col-span-2"
+                />
+                <div className="flex gap-3 sm:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={pending || feeds.length === 0}
+                    className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                  >
+                    Link calendar
+                  </button>
+                  <button type="button" className="text-xs font-semibold text-muted" onClick={() => setLinkOpen(false)}>
+                    Cancel
+                  </button>
                 </div>
-                <p className="mt-1 truncate text-xs text-muted">{row.icalUrl}</p>
-                <p className="mt-1 text-xs text-muted">
-                  {row.lastError || (row.lastSyncedLabel ? `Synced ${row.lastSyncedLabel}` : "Not synced yet")}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+              </form>
+            ) : (
+              <button type="button" className="text-xs font-semibold underline" onClick={() => setLinkOpen(true)}>
+                Link an Airbnb or Booking.com calendar
+              </button>
+            )}
+
+          </div>
+      ) : null}
+
+      {tab === "inquiries" ? inquiries : null}
+    </div>
+  );
+}
+
+function CopyLine({ label, value, onCopy }: { label: string; value: string; onCopy: () => void }) {
+  return (
+    <div className="mt-3">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted">{label}</p>
+      <div className="mt-1 flex items-start justify-between gap-3">
+        <code className="break-all font-mono text-xs text-foreground">{value}</code>
+        <button type="button" onClick={onCopy} className="shrink-0 text-xs font-semibold underline">
+          Copy
+        </button>
+      </div>
     </div>
   );
 }

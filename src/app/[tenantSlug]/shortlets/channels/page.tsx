@@ -84,21 +84,10 @@ export default async function ChannelsPage({ params }: { params: Promise<{ tenan
       pellowsStatus={pellows?.status === "ACTIVE" ? "ACTIVE" : pellows?.status === "REVOKED" ? "REVOKED" : "OFF"}
       tokenPrefix={pellows?.status === "ACTIVE" ? pellows.tokenPrefix : null}
       lastUsedLabel={pellows?.lastUsedAt ? fmt(pellows.lastUsedAt) : null}
-      feeds={feeds.map((feed) => ({
-        unitId: feed.unitId,
-        unitName: feed.unit.name,
-        icalUrl: unitIcalUrl(feed.feedToken),
-      }))}
-      imports={imports.map((row) => ({
-        id: row.id,
-        unitName: row.unit.name,
-        providerLabel: providerLabel[row.provider] || row.provider,
-        icalUrl: row.icalUrl,
-        lastSyncedLabel: row.lastSyncedAt ? fmt(row.lastSyncedAt) : null,
-        lastError: row.lastError,
-      }))}
-    />
+      inquiryCount={leads.length}
+      inquiries={
     <ChannelsWorkspace
+      bare
       tenantSlug={ctx.tenant.slug}
       defaultCheckInTime={ctx.pmsSettings.checkInTime}
       defaultCheckOutTime={ctx.pmsSettings.checkOutTime}
@@ -117,6 +106,21 @@ export default async function ChannelsPage({ params }: { params: Promise<{ tenan
         label: u.property ? `${u.property.name} · ${u.name}` : u.name,
       }))}
       propertyOptions={properties.map((p) => ({ id: p.id, label: p.name }))}
+    />
+      }
+      feeds={feeds.map((feed) => ({
+        unitId: feed.unitId,
+        unitName: feed.unit.name,
+        icalUrl: unitIcalUrl(feed.feedToken),
+      }))}
+      imports={imports.map((row) => ({
+        id: row.id,
+        unitName: row.unit.name,
+        providerLabel: providerLabel[row.provider] || row.provider,
+        icalUrl: row.icalUrl,
+        lastSyncedLabel: row.lastSyncedAt ? fmt(row.lastSyncedAt) : null,
+        lastError: row.lastError,
+      }))}
     />
     </div>
   );

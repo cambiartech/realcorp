@@ -25,6 +25,7 @@ type Props = {
   leads: LeadRow[];
   unitOptions: Array<{ id: string; label: string }>;
   propertyOptions: Array<{ id: string; label: string }>;
+  bare?: boolean;
 };
 
 export function ChannelsWorkspace({
@@ -34,6 +35,7 @@ export function ChannelsWorkspace({
   leads,
   unitOptions,
   propertyOptions,
+  bare = false,
 }: Props) {
   const { showSnackbar } = useSnackbar();
   const [isPending, startTransition] = useTransition();
@@ -62,12 +64,14 @@ export function ChannelsWorkspace({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Channel inquiries</h2>
-        <p className="mt-1 text-sm text-muted">
-          Explore, WhatsApp, and other inbound leads ready to convert into short-let reservations.
-        </p>
-      </div>
+      {bare ? null : (
+        <div>
+          <h2 className="text-lg font-semibold">Channel inquiries</h2>
+          <p className="mt-1 text-sm text-muted">
+            Explore, WhatsApp, and other inbound leads ready to convert into short-let reservations.
+          </p>
+        </div>
+      )}
 
       {leads.length === 0 ? (
         <p className="rounded-lg border border-foreground/10 p-6 text-sm text-muted">

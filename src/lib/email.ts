@@ -1,5 +1,16 @@
 import { Resend } from "resend";
-import { formatBankAccountsForHtml, parseBankAccounts } from "@/lib/finance-bank-accounts";
+import { BIRTHDAY_BALLOONS_PNG_BASE64 } from "@/lib/birthday-balloons-png";
+import { RECEIVED_MARK_PNG_BASE64 } from "@/lib/received-mark-png";
+import { TASK_MARK_PNG_BASE64 } from "@/lib/task-mark-png";
+import { WELCOME_MURAL_PNG_BASE64 } from "@/lib/welcome-mural-png";
+import {
+  hrProfileUpdateEmailContent,
+  inviteEmailContent,
+  invoiceEmailContent,
+  passwordResetEmailContent,
+  salesReceiptEmailContent,
+  taskAssignedEmailContent,
+} from "@/lib/email-templates";
 
 function getBaseUrl() {
   return (
@@ -31,6 +42,68 @@ export function isTransactionalEmailConfigured() {
   return Boolean(getResendClient());
 }
 
+function swapMailArt(
+  html: string,
+  label: string,
+  img: string,
+  file: { filename: string; content: string; contentId: string },
+) {
+  if (!html.includes(`aria-label="${label}"`)) return { html, file: null as typeof file | null };
+  return {
+    html: html.replace(new RegExp(`<svg[\\s\\S]*?aria-label="${label}"[\\s\\S]*?<\\/svg>`), img),
+    file,
+  };
+}
+
+const MAIL_ART = [
+  {
+    label: "Balloons",
+    img: '<img src="cid:birthday-balloons" width="240" alt="" style="display:block;margin:0 auto;border:0;background:transparent">',
+    file: {
+      filename: "birthday-balloons.png",
+      content: BIRTHDAY_BALLOONS_PNG_BASE64,
+      contentId: "birthday-balloons",
+    },
+  },
+  {
+    label: "Welcome",
+    img: '<img src="cid:welcome-mural" width="520" alt="" style="display:block;width:100%;max-width:520px;border:0;background:transparent">',
+    file: {
+      filename: "welcome-mural.png",
+      content: WELCOME_MURAL_PNG_BASE64,
+      contentId: "welcome-mural",
+    },
+  },
+  {
+    label: "Received",
+    img: '<img src="cid:received-mark" width="220" alt="" style="display:block;margin:0 auto;border:0;background:transparent">',
+    file: {
+      filename: "received-mark.png",
+      content: RECEIVED_MARK_PNG_BASE64,
+      contentId: "received-mark",
+    },
+  },
+  {
+    label: "Task",
+    img: '<img src="cid:task-mark" width="120" alt="" style="display:block;margin:0 auto;border:0;background:transparent">',
+    file: {
+      filename: "task-mark.png",
+      content: TASK_MARK_PNG_BASE64,
+      contentId: "task-mark",
+    },
+  },
+] as const;
+
+function withMailArt(html: string) {
+  const attachments: Array<{ filename: string; content: string; contentId: string }> = [];
+  for (const art of MAIL_ART) {
+    const swapped = swapMailArt(html, art.label, art.img, art.file);
+    html = swapped.html;
+    if (swapped.file) attachments.push(swapped.file);
+  }
+  return { html, attachments };
+}
+
 function parseResendSendResult(result: { data: unknown; error: unknown }) {
   if (result.error) {
     const err = result.error as { message?: string };
@@ -56,30 +129,17 @@ export async function sendInviteEmail(input: {
 
   const from = `${getFromName()} <${getFromAddress()}>`;
   const replyTo = getReplyToAddress();
-  const subject = `You are invited to join ${input.tenantName} on Realcorp`;
-
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111">
-      <h2 style="margin:0 0 12px;">Join ${input.tenantName} on Realcorp</h2>
-      <p style="margin:0 0 12px;">${input.inviterLabel} invited you as <strong>${input.roleLabel}</strong>.</p>
-      <p style="margin:0 0 16px;">
-        <a href="${input.inviteUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600;">
-          Accept invite
-        </a>
-      </p>
-      <p style="margin:0 0 8px;font-size:13px;color:#555;">Or copy this link into your browser:</p>
-      <p style="margin:0 0 12px;font-size:13px;word-break:break-all;color:#333;">${input.inviteUrl}</p>
-      <p style="margin:0;font-size:12px;color:#666;">This invite expires in 14 days.</p>
-    </div>
-  `;
+  const { subject, html } = inviteEmailContent(input);
+  const prepared = withMailArt(html);
 
   try {
     const result = await resend.emails.send({
       from,
       to: input.to,
       subject,
-      html,
+      html: prepared.html,
       ...(replyTo ? { replyTo } : {}),
+      ...(prepared.attachments.length ? { attachments: prepared.attachments } : {}),
     });
     return parseResendSendResult(result);
   } catch (error) {
@@ -103,23 +163,7 @@ export async function sendPasswordResetEmail(input: { to: string; resetUrl: stri
 
   const from = `${getFromName()} <${getFromAddress()}>`;
   const replyTo = getReplyToAddress();
-  const greeting = input.name ? `Hi ${input.name},` : "Hi,";
-  const subject = "Reset your Realcorp password";
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111">
-      <h2 style="margin:0 0 12px;">Reset your password</h2>
-      <p style="margin:0 0 12px;">${greeting}</p>
-      <p style="margin:0 0 16px;">Someone asked to reset the Realcorp password for this email. Use the button below to choose a new one. The link expires in 1 hour.</p>
-      <p style="margin:0 0 16px;">
-        <a href="${input.resetUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600;">
-          Set a new password
-        </a>
-      </p>
-      <p style="margin:0 0 8px;font-size:13px;color:#555;">Or copy this link into your browser:</p>
-      <p style="margin:0 0 12px;font-size:13px;word-break:break-all;color:#333;">${input.resetUrl}</p>
-      <p style="margin:0;font-size:12px;color:#666;">If you did not ask for this, you can ignore the email. Your password stays the same.</p>
-    </div>
-  `;
+  const { subject, html } = passwordResetEmailContent(input);
 
   try {
     const result = await resend.emails.send({
@@ -154,35 +198,18 @@ export async function sendSalesReceiptEmail(input: {
 
   const from = `${getFromName()} <${getFromAddress()}>`;
   const replyTo = getReplyToAddress();
-  const subject = `Receipt ${input.receiptNumber} from ${input.tenantName}`;
-
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111;max-width:560px">
-      <h2 style="margin:0 0 8px;font-size:18px">${input.tenantName}</h2>
-      <p style="margin:0 0 16px;color:#555">Payment receipt <strong>${input.receiptNumber}</strong></p>
-      <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;background:#f9fafb;margin-bottom:16px">
-        <p style="margin:0 0 4px;font-size:13px;color:#666">${input.title}</p>
-        ${input.customerName ? `<p style="margin:0 0 8px;font-size:14px">Customer: <strong>${input.customerName}</strong></p>` : ""}
-        <p style="margin:0;font-size:22px;font-weight:700;color:#111">${input.amountLabel}</p>
-      </div>
-      <p style="margin:0 0 12px;font-size:14px">Your receipt PDF is attached. You can also view it online:</p>
-      <p style="margin:0 0 16px">
-        <a href="${input.viewUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600">
-          View receipt
-        </a>
-      </p>
-      <p style="margin:0;font-size:12px;color:#888">Please keep this receipt for your records.</p>
-    </div>
-  `;
+  const { subject, html } = salesReceiptEmailContent(input);
+  const prepared = withMailArt(html);
 
   try {
     const result = await resend.emails.send({
       from,
       to: input.to,
       subject,
-      html,
+      html: prepared.html,
       ...(replyTo ? { replyTo } : {}),
       attachments: [
+        ...prepared.attachments,
         {
           filename: input.pdfFileName,
           content: Buffer.from(input.pdfBytes).toString("base64"),
@@ -194,17 +221,6 @@ export async function sendSalesReceiptEmail(input: {
     const msg = error instanceof Error ? error.message : "Failed to send email.";
     return { ok: false as const, error: msg };
   }
-}
-
-function paymentBlockHtml(input: { bankAccountLines: string[]; customPaymentInstructions?: string | null }) {
-  const banks = parseBankAccounts(input.bankAccountLines);
-  if (banks.length > 0) {
-    return `<div style="margin-top:12px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#333">Pay into:</p>${formatBankAccountsForHtml(banks)}</div>`;
-  }
-  if (input.customPaymentInstructions?.trim()) {
-    return `<div style="margin-top:12px;padding:12px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#333">Payment instructions</p><p style="margin:0;font-size:14px;color:#444">${input.customPaymentInstructions.trim()}</p></div>`;
-  }
-  return `<p style="margin:12px 0 0;font-size:13px;color:#666">Contact us for payment details.</p>`;
 }
 
 export async function sendInvoiceEmail(input: {
@@ -229,30 +245,7 @@ export async function sendInvoiceEmail(input: {
 
   const from = `${getFromName()} <${getFromAddress()}>`;
   const replyTo = getReplyToAddress();
-  const subject = input.isReminder
-    ? `Payment reminder: ${input.invoiceNumber} — ${input.tenantName}`
-    : `Invoice ${input.invoiceNumber} from ${input.tenantName}`;
-
-  const intro = input.isReminder
-    ? `<p style="margin:0 0 12px;font-size:14px;color:#444">This is a friendly reminder that the following invoice is outstanding.</p>`
-    : `<p style="margin:0 0 12px;font-size:14px;color:#444">Please find your invoice attached.</p>`;
-
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111;max-width:560px">
-      <h2 style="margin:0 0 8px;font-size:18px">${input.tenantName}</h2>
-      <p style="margin:0 0 4px;color:#555">${input.isReminder ? "Payment reminder" : "Invoice"} <strong>${input.invoiceNumber}</strong></p>
-      ${intro}
-      <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;background:#f9fafb;margin-bottom:8px">
-        <p style="margin:0 0 4px;font-size:13px;color:#666">${input.title}</p>
-        ${input.customerName ? `<p style="margin:0 0 8px;font-size:14px">Bill to: <strong>${input.customerName}</strong></p>` : ""}
-        <p style="margin:0 0 4px;font-size:14px">Total: <strong>${input.amountLabel}</strong></p>
-        <p style="margin:0 0 4px;font-size:14px">Balance due: <strong style="font-size:18px">${input.balanceLabel}</strong></p>
-        <p style="margin:0;font-size:13px;color:#666">Due: ${input.dueDateLabel}</p>
-      </div>
-      ${paymentBlockHtml(input)}
-      <p style="margin:16px 0 0;font-size:13px;color:#555">The PDF is attached for your records.</p>
-    </div>
-  `;
+  const { subject, html } = invoiceEmailContent(input);
 
   try {
     const result = await resend.emails.send({
@@ -288,25 +281,12 @@ export async function sendHrProfileUpdateEmail(input: {
   }
   const from = `${getFromName()} <${getFromAddress()}>`;
   const replyTo = getReplyToAddress();
-  const items = input.changeLines.map((line) => `<li>${line}</li>`).join("");
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111">
-      <h2 style="margin:0 0 12px;">Employee record update needs review</h2>
-      <p style="margin:0 0 12px;"><strong>${input.employeeName}</strong> updated personal details on My HR for ${input.tenantName}. Nothing is applied until you approve it.</p>
-      <ul style="margin:0 0 16px;padding-left:18px;">${items}</ul>
-      <p style="margin:0 0 16px;">
-        <a href="${input.reviewUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600;">
-          Review in People
-        </a>
-      </p>
-      <p style="margin:0;font-size:12px;color:#666;">Gross pay and job title were not included in this request.</p>
-    </div>
-  `;
+  const { subject, html } = hrProfileUpdateEmailContent(input);
   try {
     const result = await resend.emails.send({
       from,
       to: input.to,
-      subject: `${input.employeeName} updated their HR record — review needed`,
+      subject,
       html,
       ...(replyTo ? { replyTo } : {}),
     });
@@ -334,35 +314,16 @@ export async function sendTaskAssignedEmail(input: {
   }
   const from = `${getFromName()} <${getFromAddress()}>`;
   const replyTo = getReplyToAddress();
-  const details: string[] = [];
-  if (input.priority) details.push(`<li><strong>Priority:</strong> ${input.priority}</li>`);
-  if (input.dueDateLabel) details.push(`<li><strong>Due:</strong> ${input.dueDateLabel}</li>`);
-  const descriptionBlock = input.taskDescription
-    ? `<p style="margin:0 0 16px;padding:12px;background:#f6f6f6;border-radius:8px;white-space:pre-wrap;">${input.taskDescription}</p>`
-    : "";
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.5;color:#111">
-      <h2 style="margin:0 0 12px;">New task assigned to you</h2>
-      <p style="margin:0 0 12px;">Hi ${input.assigneeName},</p>
-      <p style="margin:0 0 12px;"><strong>${input.assignerLabel}</strong> assigned you a task in ${input.tenantName}:</p>
-      <p style="margin:0 0 12px;font-size:16px;font-weight:600;">${input.taskTitle}</p>
-      ${descriptionBlock}
-      ${details.length ? `<ul style="margin:0 0 16px;padding-left:18px;">${details.join("")}</ul>` : ""}
-      <p style="margin:0 0 16px;">
-        <a href="${input.taskUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600;">
-          Open task
-        </a>
-      </p>
-      <p style="margin:0;font-size:12px;color:#666;">You can review and update this task in Realcorp.</p>
-    </div>
-  `;
+  const { subject, html } = taskAssignedEmailContent(input);
+  const prepared = withMailArt(html);
   try {
     const result = await resend.emails.send({
       from,
       to: input.to,
-      subject: `New task: ${input.taskTitle}`,
-      html,
+      subject,
+      html: prepared.html,
       ...(replyTo ? { replyTo } : {}),
+      ...(prepared.attachments.length ? { attachments: prepared.attachments } : {}),
     });
     return parseResendSendResult(result);
   } catch (error) {
@@ -383,13 +344,15 @@ export async function sendCelebrationEmail(input: {
   }
   const from = `${input.fromName || getFromName()} <${getFromAddress()}>`;
   const replyTo = getReplyToAddress();
+  const prepared = withMailArt(input.html);
   try {
     const result = await resend.emails.send({
       from,
       to: input.to,
       subject: input.subject,
-      html: input.html,
+      html: prepared.html,
       ...(replyTo ? { replyTo } : {}),
+      ...(prepared.attachments.length ? { attachments: prepared.attachments } : {}),
     });
     return parseResendSendResult(result);
   } catch (error) {
