@@ -305,37 +305,6 @@ table th {
   font-weight: 550;
 }
 
-/* Short Lets: dark tab track so the module chrome reads as one ops surface */
-.rc-tabs.rc-tabs--inverse {
-  background: #0a0a0a;
-  border-color: #0a0a0a;
-  gap: 0.2rem;
-  padding: 0.3rem;
-}
-.rc-tabs.rc-tabs--inverse .rc-tab {
-  color: rgba(255, 255, 255, 0.62);
-}
-.rc-tabs.rc-tabs--inverse .rc-tab:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-}
-.rc-tabs.rc-tabs--inverse .rc-tab[aria-selected="true"],
-.rc-tabs.rc-tabs--inverse .rc-tab[data-active="true"] {
-  background: #fff;
-  color: #0a0a0a;
-  box-shadow: none;
-  font-weight: 600;
-}
-html.dark .rc-tabs.rc-tabs--inverse {
-  background: #111;
-  border-color: #111;
-}
-html.dark .rc-tabs.rc-tabs--inverse .rc-tab[aria-selected="true"],
-html.dark .rc-tabs.rc-tabs--inverse .rc-tab[data-active="true"] {
-  background: #f4f4f5;
-  color: #0a0a0a;
-}
-
 /* ── Section heading ───────────────────────────────────────────────── */
 .rc-section-title {
   font-size: 13px;

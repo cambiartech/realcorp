@@ -22,6 +22,7 @@ import {
   type ShortletsAccessContext,
 } from "@/lib/shortlets-access";
 import { syncDayPaymentsToFinance, syncShortletPaymentToFinance } from "@/lib/shortlets-finance-bridge";
+import { conflictMessage, unitIdsBlockedByChannels, unitStayConflict } from "@/lib/channels/conflicts";
 import { nextShortletBookingNumber } from "@/lib/shortlets-booking-number";
 import { findOrCreateShortletGuest } from "@/lib/shortlets-guests";
 import {
@@ -489,6 +490,13 @@ export async function listAvailableShortletApartments(
     select: { unitId: true },
   });
   const blockedIds = new Set(blocked.map((b) => b.unitId).filter(Boolean));
+  const channelBlocked = await unitIdsBlockedByChannels({
+    tenantId: tenant.id,
+    unitIds: units.map((u) => u.id),
+    checkIn,
+    checkOut,
+  });
+  for (const id of channelBlocked) blockedIds.add(id);
 
   const apartments = units
     .filter((u) => !blockedIds.has(u.id))
@@ -613,18 +621,13 @@ export async function createShortletReservation(
       return { ok: false, error: "Walk-in check-in requires a clean vacant apartment." };
     }
 
-    const overlap = await prisma.shortletReservation.findFirst({
-      where: {
-        tenantId: tenant.id,
-        unitId: unit.id,
-        status: { in: BLOCKING_SHORTLET_STATUSES },
-        checkIn: { lt: checkOut },
-        checkOut: { gt: checkIn },
-      },
-      select: { id: true },
+    const overlap = await unitStayConflict({
+      tenantId: tenant.id,
+      unitId: unit.id,
+      checkIn,
+      checkOut,
     });
-    if (overlap)
-      return { ok: false, error: "Selected dates overlap an existing reservation on this apartment." };
+    if (overlap) return { ok: false, error: conflictMessage(overlap) };
   }
 
   if (propertyId && !unit) {
@@ -847,17 +850,13 @@ export async function createShortletBookings(
       if (isWalkIn && unit.housekeepingStatus !== ShortletHousekeepingStatus.VACANT_CLEAN) {
         return { ok: false, error: `Walk-in requires a clean vacant apartment (${unit.name}).` };
       }
-      const overlap = await prisma.shortletReservation.findFirst({
-        where: {
-          tenantId: tenant.id,
-          unitId: unit.id,
-          status: { in: BLOCKING_SHORTLET_STATUSES },
-          checkIn: { lt: checkOut },
-          checkOut: { gt: checkIn },
-        },
-        select: { id: true },
+      const overlap = await unitStayConflict({
+        tenantId: tenant.id,
+        unitId: unit.id,
+        checkIn,
+        checkOut,
       });
-      if (overlap) return { ok: false, error: `Dates overlap an existing booking on ${unit.name}.` };
+      if (overlap) return { ok: false, error: conflictMessage(overlap, unit.name) };
     } else if (propertyId) {
       const property = await prisma.shortletProperty.findFirst({
         where: { id: propertyId, tenantId: tenant.id, isActive: true },
@@ -1045,18 +1044,14 @@ export async function assignShortletReservationApartment(
   });
   if (!unit) return { ok: false, error: "Apartment not found." };
 
-  const overlap = await prisma.shortletReservation.findFirst({
-    where: {
-      tenantId: tenant.id,
-      unitId: unit.id,
-      id: { not: reservation.id },
-      status: { in: BLOCKING_SHORTLET_STATUSES },
-      checkIn: { lt: reservation.checkOut },
-      checkOut: { gt: reservation.checkIn },
-    },
-    select: { id: true },
+  const overlap = await unitStayConflict({
+    tenantId: tenant.id,
+    unitId: unit.id,
+    checkIn: reservation.checkIn,
+    checkOut: reservation.checkOut,
+    ignoreReservationId: reservation.id,
   });
-  if (overlap) return { ok: false, error: "Selected apartment is not available for these dates." };
+  if (overlap) return { ok: false, error: conflictMessage(overlap, unit.name) };
 
   const totalAmount = unitStayTotal(unit, reservation.nights, tenantDefaultServiceCharge(tenant));
   const amountPaid = Number(reservation.amountPaid);
@@ -2011,18 +2006,13 @@ export async function importChannelLeadAsReservation(
     });
     if (!unit) return { ok: false, error: "Apartment not found." };
 
-    const overlap = await prisma.shortletReservation.findFirst({
-      where: {
-        tenantId: tenant.id,
-        unitId: unit.id,
-        status: { in: BLOCKING_SHORTLET_STATUSES },
-        checkIn: { lt: checkOut },
-        checkOut: { gt: checkIn },
-      },
-      select: { id: true },
+    const overlap = await unitStayConflict({
+      tenantId: tenant.id,
+      unitId: unit.id,
+      checkIn,
+      checkOut,
     });
-    if (overlap)
-      return { ok: false, error: "Selected dates overlap an existing reservation on this apartment." };
+    if (overlap) return { ok: false, error: conflictMessage(overlap) };
   }
 
   if (propertyId && !unit) {

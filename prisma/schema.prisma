@@ -165,6 +165,10 @@ model Tenant {
   leadCaptureSessions         LeadCaptureFormSession[]
   leadCaptureEvents           LeadCaptureFormEvent[]
   platformErrorEvents         PlatformErrorEvent[]
+  channelConnections          ChannelConnection[]
+  channelCalendarFeeds        ChannelCalendarFeed[]
+  channelCalendarImports      ChannelCalendarImport[]
+  channelExternalBlocks       ChannelExternalBlock[]
   payrollFundingReceipts      PayrollFundingReceipt[]
   payrollLedgerEntries        PayrollLedgerEntry[]
   payrollTenantBalance        PayrollTenantBalance?
@@ -1188,6 +1192,9 @@ model ShortletUnit {
   reservations        ShortletReservation[]
   checkoutInspections ShortletCheckoutInspection[]
   clientLinks         ClientShortletLink[]
+  calendarFeed        ChannelCalendarFeed?
+  calendarImports     ChannelCalendarImport[]
+  externalBlocks      ChannelExternalBlock[]
 
   @@index([tenantId, housekeepingStatus])
   @@index([tenantId, propertyId])
@@ -1388,6 +1395,92 @@ model ShortletBusinessDay {
   @@unique([tenantId, businessDate])
   @@index([tenantId, closedAt])
   @@index([financeReceiptId])
+}
+
+enum ChannelProvider {
+  PELLOWS
+  AIRBNB
+  BOOKING_COM
+  ICAL
+}
+
+enum ChannelConnectionStatus {
+  ACTIVE
+  REVOKED
+}
+
+/// One opt-in per workspace per channel. The token is stored hashed.
+/// Pellows uses it to read shortlets. Later channels reuse the same row.
+model ChannelConnection {
+  id              String                  @id @default(cuid())
+  tenantId        String
+  provider        ChannelProvider
+  status          ChannelConnectionStatus @default(ACTIVE)
+  tokenHash       String                  @unique
+  tokenPrefix     String
+  scopes          String                  @default("shortlets.read")
+  createdByUserId String?
+  createdAt       DateTime                @default(now())
+  revokedAt       DateTime?
+  lastUsedAt      DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, status])
+}
+
+/// Unguessable public iCal for one apartment. Every channel subscribes to this.
+model ChannelCalendarFeed {
+  id        String   @id @default(cuid())
+  tenantId  String
+  unitId    String   @unique
+  feedToken String   @unique
+  createdAt DateTime @default(now())
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unit   ShortletUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+/// Inbound calendar URL (Airbnb, Booking.com, any iCal). Busy dates land in ChannelExternalBlock.
+model ChannelCalendarImport {
+  id           String          @id @default(cuid())
+  tenantId     String
+  unitId       String
+  provider     ChannelProvider
+  icalUrl      String
+  lastSyncedAt DateTime?
+  lastError    String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unit   ShortletUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, provider])
+  @@index([tenantId])
+}
+
+/// Busy dates that did not start as a Realcorp reservation. They block the room the same way.
+model ChannelExternalBlock {
+  id          String          @id @default(cuid())
+  tenantId    String
+  unitId      String
+  provider    ChannelProvider
+  externalUid String
+  startDate   DateTime        @db.Date
+  endDate     DateTime        @db.Date
+  summary     String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unit   ShortletUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, provider, externalUid])
+  @@index([tenantId, unitId, startDate])
 }
 
 model AuditLog {

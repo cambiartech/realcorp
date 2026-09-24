@@ -21,5 +21,8 @@
 [functions."org-calendar-cron"]
   schedule = "0 7 * * *"
 
+[functions."channel-calendars-cron"]
+  schedule = "15 */6 * * *"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

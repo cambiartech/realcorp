@@ -140,6 +140,8 @@ export function HrAppraisalsWorkspace({
   );
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [criterionError, setCriterionError] = useState<string | null>(null);
+  const [periodError, setPeriodError] = useState<string | null>(null);
 
   const selectedCycle = useMemo(
     () => monthlyCycles.find((c) => c.id === selectedCycleId) ?? monthlyCycles[0] ?? null,
@@ -235,14 +237,21 @@ export function HrAppraisalsWorkspace({
       {tab === "criteria" ? (
         <div className="space-y-4">
           <form
+            noValidate
             className="grid gap-3 rounded-xl border border-foreground/10 p-4 sm:grid-cols-2 lg:grid-cols-4"
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
+              const title = String(fd.get("title") || "").trim();
+              if (!title) {
+                setCriterionError("Enter a criterion name.");
+                return;
+              }
+              setCriterionError(null);
               void runAction(
                 () =>
                   createAppraisalActionItem(tenantSlug, {
-                    title: String(fd.get("title") || ""),
+                    title,
                     description: String(fd.get("description") || ""),
                     cycleType: (fd.get("cycleType") as "MONTHLY" | "YEARLY") || "MONTHLY",
                   }),
@@ -254,9 +263,16 @@ export function HrAppraisalsWorkspace({
             <input
               name="title"
               placeholder="e.g. Meets deadlines"
-              required
-              className="rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm sm:col-span-2"
+              aria-invalid={criterionError ? true : undefined}
+              onChange={() => setCriterionError(null)}
+              className={[
+                "rounded-md border bg-field px-3 py-2 text-sm sm:col-span-2",
+                criterionError ? "border-[var(--danger-line)]" : "border-foreground/15",
+              ].join(" ")}
             />
+            {criterionError ? (
+              <p className="text-xs text-[var(--danger)] sm:col-span-2 lg:col-span-4">{criterionError}</p>
+            ) : null}
             <input
               name="description"
               placeholder="Optional detail"
@@ -308,15 +324,22 @@ export function HrAppraisalsWorkspace({
       {tab === "cycles" ? (
         <div className="space-y-4">
           <form
+            noValidate
             className="flex flex-wrap items-end gap-3 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-4"
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
+              const periodLabel = String(fd.get("periodLabel") || "").trim();
+              if (!periodLabel) {
+                setPeriodError("Enter a period label.");
+                return;
+              }
+              setPeriodError(null);
               void runAction(
                 () =>
                   createAppraisalCycle(tenantSlug, {
                     cycleType: (fd.get("cycleType") as "MONTHLY" | "YEARLY") || "MONTHLY",
-                    periodLabel: String(fd.get("periodLabel") || ""),
+                    periodLabel,
                     dueDate: String(fd.get("dueDate") || ""),
                   }),
                 "Appraisal period opened for all active staff.",
@@ -335,9 +358,14 @@ export function HrAppraisalsWorkspace({
               <input
                 name="periodLabel"
                 placeholder="e.g. March 2026 or Annual 2026"
-                required
-                className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+                aria-invalid={periodError ? true : undefined}
+                onChange={() => setPeriodError(null)}
+                className={[
+                  "w-full rounded-md border bg-field px-3 py-2 text-sm",
+                  periodError ? "border-[var(--danger-line)]" : "border-foreground/15",
+                ].join(" ")}
               />
+              {periodError ? <p className="mt-1 text-xs text-[var(--danger)]">{periodError}</p> : null}
             </div>
             <div>
               <label className="mb-1 block text-[10px] font-medium uppercase text-muted">Due date</label>
