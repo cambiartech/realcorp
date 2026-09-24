@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Realcorp — brochure direction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,560&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #fafaf9;
+      --ink: #16150f;
+      --muted: #6b6862;
+      --faint: #9c988f;
+      --copper: #a8663c;
+      --sand: #c4a484;
+      --line: rgba(22, 21, 15, 0.09);
+      --serif: "Fraunces", "Iowan Old Style", Palatino, Georgia, serif;
+      --sans: "Source Sans 3", "Avenir Next", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: #e7e2d8; color: var(--ink); font-family: var(--sans); }
+    body { padding: 36px 16px 80px; }
+    .intro {
+      max-width: 820px;
+      margin: 0 auto 22px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .intro strong { color: var(--ink); font-weight: 600; }
+    .sheet {
+      max-width: 820px;
+      min-height: 1040px;
+      margin: 0 auto 28px;
+      background: var(--paper);
+      border-radius: 18px;
+      box-shadow: 0 18px 50px rgba(22, 21, 15, 0.08);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .sheet-body { padding: 48px 56px 36px; flex: 1; }
+    .folio {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 56px 22px;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: var(--faint);
+    }
+    .kicker {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--copper);
+    }
+    h1, h2 { font-family: var(--serif); font-weight: 500; letter-spacing: -0.03em; margin: 0; }
+    h1 { font-size: 76px; line-height: 0.96; }
+    h2 { font-size: 46px; line-height: 1.02; }
+    .lede { margin: 18px 0 0; max-width: 36em; font-size: 19px; line-height: 1.45; color: #3f3d38; }
+    .small { margin: 14px 0 0; max-width: 38em; font-size: 16px; line-height: 1.55; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; margin-top: 26px; }
+    .desk { padding: 14px 0; border-top: 1px solid var(--line); }
+    .desk h3 { margin: 0; font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+    .desk p { margin: 6px 0 0; font-size: 15px; line-height: 1.5; color: var(--muted); }
+    .index { margin: 22px 0 0; padding: 0; list-style: none; }
+    .index li {
+      display: grid;
+      grid-template-columns: 42px 168px 1fr;
+      gap: 12px;
+      padding: 9px 0;
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--muted);
+      align-items: baseline;
+    }
+    .index i { font-style: normal; color: var(--copper); font-weight: 600; font-size: 12px; letter-spacing: 0.04em; }
+    .index b { font-family: var(--serif); font-size: 18px; font-weight: 500; color: var(--ink); }
+    .note {
+      margin-top: 20px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .path {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 22px;
+    }
+    .path span {
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #fff;
+    }
+    .quote {
+      margin-top: 16px;
+      padding: 22px 22px 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    .quote .mark {
+      font-family: var(--serif);
+      font-size: 42px;
+      line-height: 0.8;
+      color: var(--copper);
+    }
+    .quote .lines {
+      margin: 8px 0 0;
+      min-height: 72px;
+      border-bottom: 1px solid var(--line);
+    }
+    .quote .who {
+      margin: 12px 0 0;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: var(--faint);
+    }
+    .swatches { display: flex; gap: 14px; margin-top: 28px; }
+    .swatch { width: 92px; }
+    .chip { height: 64px; border-radius: 10px; border: 1px solid var(--line); }
+    .swatch p { margin: 8px 0 0; font-size: 12px; line-height: 1.35; color: var(--muted); }
+    .swatch strong { display: block; color: var(--ink); font-weight: 600; }
+    .rules { margin: 28px 0 0; padding: 0; list-style: none; }
+    .rules li { padding: 12px 0; border-top: 1px solid var(--line); font-size: 16px; line-height: 1.45; }
+    .rules strong { font-weight: 600; }
+    .index.plain li { grid-template-columns: 168px 1fr; }
+    .shot { margin: 22px 0 0; }
+    .shot-frame {
+      height: 176px;
+      border-radius: 12px;
+      border: 1px dashed rgba(168, 102, 60, 0.55);
+      background: linear-gradient(180deg, rgba(168, 102, 60, 0.06), transparent 42%), #fff;
+      display: flex;
+      align-items: flex-end;
+      padding: 14px 16px;
+      color: var(--copper);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .shot figcaption { margin: 8px 2px 0; font-size: 13px; line-height: 1.45; color: var(--faint); }
+    .mural { display: block; width: 100%; height: auto; }
+    .cover-row { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 8px; align-items: center; margin-top: 12px; }
+    .globe { width: 100%; height: auto; display: block; }
+    @media (max-width: 720px) {
+      h1 { font-size: 48px; }
+      h2 { font-size: 34px; }
+      .sheet-body, .folio { padding-left: 24px; padding-right: 24px; }
+      .grid { grid-template-columns: 1fr; }
+      .index li { grid-template-columns: 36px 1fr; }
+      .index li span { grid-column: 2; }
+      .index.plain li { grid-template-columns: 1fr; }
+      .cover-row { grid-template-columns: 1fr; }
+      .sheet { min-height: 0; }
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      .intro { display: none; }
+      .sheet { box-shadow: none; border-radius: 0; margin: 0; break-after: page; min-height: 100vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <article class="sheet">
+    <svg class="mural" viewBox="0 0 820 168" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Welcome">
+      <path d="M0 26 H820" stroke="#c9c2b6" stroke-width="1.2"/>
+      <path d="M28 26h26l-13 22z" fill="#a8663c"/>
+      <path d="M78 26h26l-13 22z" fill="#16150f" stroke="#efe8df"/>
+      <path d="M128 26h26l-13 22z" fill="#c4a484"/>
+      <path d="M178 26h26l-13 22z" fill="#a8663c"/>
+      <path d="M228 26h26l-13 22z" fill="#e6d3bc"/>
+      <path d="M278 26h26l-13 22z" fill="#16150f" stroke="#efe8df"/>
+      <path d="M328 26h26l-13 22z" fill="#c4a484"/>
+      <path d="M378 26h26l-13 22z" fill="#a8663c"/>
+      <path d="M428 26h26l-13 22z" fill="#16150f" stroke="#efe8df"/>
+      <path d="M478 26h26l-13 22z" fill="#e6d3bc"/>
+      <path d="M528 26h26l-13 22z" fill="#c4a484"/>
+      <path d="M578 26h26l-13 22z" fill="#a8663c"/>
+      <path d="M628 26h26l-13 22z" fill="#16150f" stroke="#efe8df"/>
+      <path d="M678 26h26l-13 22z" fill="#c4a484"/>
+      <path d="M728 26h26l-13 22z" fill="#a8663c"/>
+      <circle cx="150" cy="118" r="34" fill="#a8663c"/>
+      <circle cx="138" cy="106" r="9" fill="#fff" opacity="0.22"/>
+      <path d="M360 156 V96 C360 58 470 58 470 96 V156" fill="none" stroke="#a8663c" stroke-width="2.6"/>
+      <path d="M404 156 V108 C404 92 444 92 444 108 V156 Z" fill="#a8663c"/>
+      <circle cx="436" cy="128" r="2.2" fill="#16150f"/>
+      <rect x="348" y="152" width="136" height="6" rx="2" fill="#a8663c"/>
+    </svg>
+    <div class="sheet-body">
+      <div class="cover-row">
+        <div>
+          <p class="kicker">Realcorp</p>
+          <h1 style="margin-top:28px">Build the<br>corporation.</h1>
+          <p class="lede">Spend your best time on the buyer, the guest, and the work. We keep the record so the corporation can stand.</p>
+          <p class="small">One workspace. The desks you actually use. A property company and a company in another line of work can both sit here, and they will not be set up the same way. We meet you where you are.</p>
+        </div>
+        <svg class="globe" viewBox="0 0 360 360" role="img" aria-label="A globe">
+          <defs>
+            <clipPath id="globe-clip"><circle cx="180" cy="180" r="148"/></clipPath>
+          </defs>
+          <circle cx="180" cy="180" r="148" fill="#f4f0e8"/>
+          <g clip-path="url(#globe-clip)" fill="#c4a484" stroke="none">
+            <path d="M70 92c18-16 42-10 52 6 8 12 4 28-8 36-18 12-36 4-44-12-6-14-8-22 0-30z"/>
+            <path d="M118 78c22-8 48 2 54 18 4 12-2 22-16 26-20 6-40-4-46-18-4-10 0-22 8-26z"/>
+            <path d="M168 70c28-6 62 8 70 28 6 16-4 30-22 34-24 6-48-6-54-24-4-12-2-32 6-38z"/>
+            <path d="M196 118c16 4 28 22 24 42-4 22-8 48 2 70 8 16 4 28-10 30-16 2-28-16-32-36-6-28-2-70 16-106z"/>
+            <path d="M214 168c22 2 36 16 34 32-2 18-8 40 4 58 6 8-2 16-14 14-16-2-22-20-24-40-2-22 0-48 0-64z"/>
+            <path d="M250 150c18-2 34 10 36 26 2 14-6 24-18 26-14 2-26-8-28-22-2-12 2-28 10-30z"/>
+            <path d="M262 196c20 4 28 20 22 36-6 14-4 28 6 36 8 6 2 14-10 12-18-4-28-22-26-42 2-16 4-36 8-42z"/>
+          </g>
+          <g fill="none" stroke="#e4d9cc" stroke-width="1">
+            <ellipse cx="180" cy="180" rx="148" ry="46"/>
+            <ellipse cx="180" cy="180" rx="148" ry="96"/>
+            <path d="M32 180h296"/>
+            <ellipse cx="180" cy="180" rx="52" ry="148"/>
+            <ellipse cx="180" cy="180" rx="104" ry="148"/>
+          </g>
+          <circle cx="180" cy="180" r="148" fill="none" stroke="#c9c2b6" stroke-width="1.4"/>
+          <g fill="#a8663c">
+            <circle cx="214" cy="168" r="5"/>
+            <circle cx="168" cy="132" r="4"/>
+            <circle cx="132" cy="118" r="3.5"/>
+            <circle cx="248" cy="188" r="3.5"/>
+            <circle cx="196" cy="214" r="3.5"/>
+          </g>
+          <g fill="#fafaf9">
+            <circle cx="214" cy="168" r="2"/>
+            <circle cx="168" cy="132" r="1.6"/>
+            <circle cx="132" cy="118" r="1.4"/>
+            <circle cx="248" cy="188" r="1.4"/>
+            <circle cx="196" cy="214" r="1.4"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <footer class="folio"><span>Cover</span><span>01</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">What is inside</p>
+      <h2 style="margin-top:18px">The desks.</h2>
+      <p class="lede">A company takes the desks it uses. Each one writes into the same record, from the first enquiry to the person who did the work.</p>
+      <ul class="index plain">
+        <li><b>Projects</b><span>The development, the unit, the price, and who it belongs to.</span></li>
+        <li><b>Leads and deals</b><span>A stage, an owner, and a close that finance has seen.</span></li>
+        <li><b>Lead forms</b><span>They fill it on a phone. It arrives as a lead, with the project and the budget they named.</span></li>
+        <li><b>Marketing</b><span>Campaigns, ads, WhatsApp, and a public listings page. Every enquiry has a parent.</span></li>
+        <li><b>Short Lets</b><span>Apartments, the room board, front desk, guests, and the night that must not be sold twice.</span></li>
+        <li><b>Finance</b><span>Invoices, receipts, banking, expenses, and what each project or stay actually earned.</span></li>
+        <li><b>Investors</b><span>A login of their own: the stake, the short lets, and the documents that belong to them.</span></li>
+        <li><b>Tasks</b><span>Who is doing the work, when it is due, and the jobs that repeat until they stop.</span></li>
+        <li><b>Facility</b><span>Stores, materials used on site, plant service dates, damages, suppliers, and artisans.</span></li>
+        <li><b>People</b><span>The offer, the org chart, leave, appraisals, pay, tax, and the birthday the company sends.</span></li>
+        <li><b>Community</b><span>The partners who bring buyers, the leads they brought, and what they are owed.</span></li>
+      </ul>
+      <p class="note">Pellows follows these desks. A guest books a flat from WhatsApp, from the rooms the company already keeps. It is the first product set beside Realcorp, and more will follow it.</p>
+    </div>
+    <footer class="folio"><span>The desks</span><span>02</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Projects</p>
+      <h2 style="margin-top:18px">The thing you sell has one home.</h2>
+      <p class="lede">A development is a list of units. Each unit has a price, a status, and a person it belongs to once it is sold. That is the stock. Everything else in the company hangs off it.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>The project</h3>
+          <p>The estate or the building, with the units under it. One place to open when someone asks what you have.</p>
+        </div>
+        <div class="desk">
+          <h3>The unit</h3>
+          <p>Available, reserved, or sold. The price agreed. The client on the file. You can see which doors are still open without calling the site.</p>
+        </div>
+        <div class="desk">
+          <h3>The client</h3>
+          <p>The buyer’s record: who they are, which unit, and the papers that belong to that sale. Import a list you already have, then stop keeping a second one.</p>
+        </div>
+        <div class="desk">
+          <h3>What they still owe</h3>
+          <p>A deposit, a milestone, a service charge. The contract value minus what has been collected is the balance. It updates when finance receipts the money.</p>
+        </div>
+        <div class="desk">
+          <h3>Shown in public</h3>
+          <p>What you mark for the public page is what a buyer can see. The internal status stays on the project.</p>
+        </div>
+        <div class="desk">
+          <h3>The same unit, let</h3>
+          <p>A unit you let short-stay is still that unit. The sale record and the stay record do not invent two apartments.</p>
+        </div>
+      </div>
+      <p class="note">If your work is not a building or a unit, this desk can stay quiet. The leads, the money, and the people still have a place.</p>
+    </div>
+    <footer class="folio"><span>Projects</span><span>03</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Leads and deals</p>
+      <h2 style="margin-top:18px">Someone owns the buyer.</h2>
+      <p class="lede">A name in a group chat is not a pipeline. A lead has an owner, a source, a temperature, and a next step. When it is real, it becomes a deal on a unit, and it cannot be called won until finance has looked.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="path" aria-label="Deal stages">
+        <span>New</span>
+        <span>Contacted</span>
+        <span>Qualified</span>
+        <span>Inspection booked</span>
+        <span>Inspection done</span>
+        <span>Negotiation</span>
+        <span>Reservation</span>
+        <span>Won</span>
+        <span>Lost</span>
+      </div>
+      <div class="grid">
+        <div class="desk">
+          <h3>Where they came from</h3>
+          <p>A form, a campaign, an ad, WhatsApp, or a partner. The source stays on the lead, so the month’s numbers have a parent.</p>
+        </div>
+        <div class="desk">
+          <h3>Warm, and a score</h3>
+          <p>Quality and a score, so the desk knows who to call first. The score moves when the deal moves.</p>
+        </div>
+        <div class="desk">
+          <h3>An owner</h3>
+          <p>The lead is assigned. The activity log shows who spoke to them and when. A buyer does not sit with everybody and therefore with nobody.</p>
+        </div>
+        <div class="desk">
+          <h3>The deal is the unit</h3>
+          <p>A deal can sit on a specific unit. The value is the value. Invoices and sales receipts hang off that deal, so the close and the money are the same story.</p>
+        </div>
+        <div class="desk">
+          <h3>Finance sees the close</h3>
+          <p>A deal can wait on finance. They approve it or they send it back. Won means the company agreed, not that a salesperson typed the word.</p>
+        </div>
+        <div class="desk">
+          <h3>Lost is still a record</h3>
+          <p>A lost deal stays, with the stage it died on. You can see what you are losing, and you do not delete the month to make the board look clean.</p>
+        </div>
+      </div>
+    </div>
+    <footer class="folio"><span>Leads and deals</span><span>04</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Lead forms</p>
+      <h2 style="margin-top:18px">They fill it at night. You have a lead by morning.</h2>
+      <p class="lede">Put a form on your site, in a bio, or on a flyer. The person gives you a name, a phone, the project they want, and a budget. That submission is a lead. Nobody copies it out of an email.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>Start from a shape that already works</h3>
+          <p>A lead form with name, email, phone, project, and budget. A short contact form. An event list with who they are. Or a blank form you build field by field.</p>
+        </div>
+        <div class="desk">
+          <h3>The fields a sale actually needs</h3>
+          <p>Name, email, phone or WhatsApp, a dropdown, a number, the project they are asking about, the budget they named. You choose what is required.</p>
+        </div>
+        <div class="desk">
+          <h3>A link, a page, a QR</h3>
+          <p>Each form has a public link. Drop it in Instagram, WhatsApp, or a signature. Embed it on a site you already have. Print the QR on a banner at the gate.</p>
+        </div>
+        <div class="desk">
+          <h3>You know which post sent them</h3>
+          <p>The link can carry the campaign, the ad, and the partner. When the lead arrives, that trail is already on it. You can see which flyer, which realtor, which post.</p>
+        </div>
+        <div class="desk">
+          <h3>Marketing holds it, then releases it</h3>
+          <p>An entry can sit with marketing while you check it. When you let it through, sales sees a lead with the answers in the notes. Sales is not drinking from a raw spreadsheet.</p>
+        </div>
+        <div class="desk">
+          <h3>You can see if the form is working</h3>
+          <p>Who opened it, who finished it, on a phone or a laptop, and what hour they came. A form that nobody completes is a form you can fix.</p>
+        </div>
+      </div>
+      <p class="note">A finished form can also open a WhatsApp chat with the answers already written, so the first reply is a reply, not a hunt for the message.</p>
+    </div>
+    <footer class="folio"><span>Lead forms</span><span>05</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Marketing</p>
+      <h2 style="margin-top:18px">Every enquiry has a parent.</h2>
+      <p class="lede">A campaign, an ad, a WhatsApp chat, a public listing. They should all arrive as leads you can count. Marketing is the desk that makes that true.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>Campaigns</h3>
+          <p>Name the push: the launch, the open house, the month on radio. Leads from that push stay tied to it, so you can say what the spend brought back.</p>
+        </div>
+        <div class="desk">
+          <h3>Facebook and Instagram</h3>
+          <p>Lead ads come in on their own. The name and the number are already a lead, with the campaign on them. You stop downloading a file from the ads manager to find out who raised a hand.</p>
+        </div>
+        <div class="desk">
+          <h3>WhatsApp, on the lead</h3>
+          <p>The conversation sits on the person, both ways. Your team replies from the lead. A listings bot can answer the first questions: what you have, where it is, what it costs.</p>
+        </div>
+        <div class="desk">
+          <h3>A public page in your name</h3>
+          <p>Explore is your listings page. Share it, or embed it on a site you already own. What a stranger sees is what you published from the project. An enquiry from that page is a lead, ready to become a stay or a sale.</p>
+        </div>
+        <div class="desk">
+          <h3>Entries, before they are leads</h3>
+          <p>Form fills land in marketing first. You can see the raw entries, then release the ones sales should work. The rest do not clutter the pipeline.</p>
+        </div>
+        <div class="desk">
+          <h3>One source of “where from”</h3>
+          <p>Campaign, form, ad, partner, WhatsApp, Explore. The lead carries one of those. The Monday meeting stops being a debate about whose buyer it was.</p>
+        </div>
+      </div>
+    </div>
+    <footer class="folio"><span>Marketing</span><span>06</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Short Lets</p>
+      <h2 style="margin-top:18px">Sell the night once.</h2>
+      <p class="lede">If you let apartments, this is the hotel desk inside the company. The building, the flat, the guest, the dates, and the bill are one stay. A night that is taken cannot be taken again.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>Locations and apartments</h3>
+          <p>The estate, the flat, the photos, the nightly rate, the beds, the baths, how many guests. This is the inventory the channels will read.</p>
+        </div>
+        <div class="desk">
+          <h3>The room board</h3>
+          <p>Today: who is in, who is due out, which rooms are still dirty. Housekeeping and the desk look at the same board.</p>
+        </div>
+        <div class="desk">
+          <h3>Front desk</h3>
+          <p>Check a guest in. Check them out. The day is visible from the desk, not reconstructed from chats at 6pm.</p>
+        </div>
+        <div class="desk">
+          <h3>Reservations and guests</h3>
+          <p>The booking, the name, the dates. A guest who has stayed before is the same guest, with a history, not a new row every Friday.</p>
+        </div>
+        <div class="desk">
+          <h3>Inspections</h3>
+          <p>Walk the apartment before they arrive and after they leave. The condition is written down while you are standing in the room.</p>
+        </div>
+        <div class="desk">
+          <h3>The guest bill</h3>
+          <p>Nights and extras, posted on the stay. What they paid goes to Finance as short-let income, on that apartment, in that period.</p>
+        </div>
+        <div class="desk">
+          <h3>Calendars from the other sites</h3>
+          <p>Airbnb and Booking.com busy dates come in. Realcorp blocks those nights. You do not discover a double booking when two guests arrive with bags.</p>
+        </div>
+        <div class="desk">
+          <h3>Close the day</h3>
+          <p>The night audit shuts the business day. Reports say what the rooms earned. The number is the number finance will see.</p>
+        </div>
+      </div>
+      <p class="note">Companies that do not let rooms leave this desk off. It does not have to be in the setup.</p>
+    </div>
+    <footer class="folio"><span>Short Lets</span><span>07</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Finance</p>
+      <h2 style="margin-top:18px">If it was sold, it can be receipted. If it was receipted, it is in the books.</h2>
+      <p class="lede">The deal, the stay, and the bank should not each have their own version of the truth. Finance is where the company agrees on a figure, and keeps the paper that proves it.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>What you are owed</h3>
+          <p>Receivables from the agreements on file. A client deposit and a milestone installment count toward the sale. You can see what is still open on that unit.</p>
+        </div>
+        <div class="desk">
+          <h3>What you owe</h3>
+          <p>Payables, in the same workspace, so money out is not a different company from money in.</p>
+        </div>
+        <div class="desk">
+          <h3>Invoices</h3>
+          <p>Draft, sent, part-paid, paid, or void. A payment lands on the invoice. The balance is what is left, not what someone believes is left.</p>
+        </div>
+        <div class="desk">
+          <h3>Sales receipts</h3>
+          <p>The buyer gets a receipt tied to the payment and the deal. It can go out by email, with the mark of something received, and the PDF is the same payment finance recorded.</p>
+        </div>
+        <div class="desk">
+          <h3>Short-let income, apart from the sale</h3>
+          <p>Money from a stay is earnings on that apartment. It is not treated as a buyer paying down a purchase. Service charges sit in their own line too.</p>
+        </div>
+        <div class="desk">
+          <h3>Expenses, banking, remittances</h3>
+          <p>What you spent, which account it moved through, and the tax and pension amounts finance has to file. Reports can split income by project and by short let.</p>
+        </div>
+        <div class="desk">
+          <h3>VAT the way the invoice needs it</h3>
+          <p>None, on top, inside the price, or exempt. The document matches the treatment you chose.</p>
+        </div>
+        <div class="desk">
+          <h3>Who touched the figure</h3>
+          <p>Documents live on the file. An audit log says who changed what. A close that finance rejected stays rejected until someone deals with it.</p>
+        </div>
+      </div>
+    </div>
+    <footer class="folio"><span>Finance</span><span>08</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Investors</p>
+      <h2 style="margin-top:18px">Give them a login that shows their stake, and nothing past it.</h2>
+      <p class="lede">People who put money in, or who own a listing you operate, should not have to call you for a PDF. They sign in. They see what is theirs. Your pipeline, your payroll, and everyone else’s balance stay with you.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>My portfolio</h3>
+          <p>The projects they are in, what they put in, and how collections on that project sit against their share.</p>
+        </div>
+        <div class="desk">
+          <h3>My short lets</h3>
+          <p>Apartments they own and you let. The stays, without handing them the front desk, the other owners, or the night audit.</p>
+        </div>
+        <div class="desk">
+          <h3>My documents</h3>
+          <p>The papers that belong to them, opened by them, when they want them.</p>
+        </div>
+        <div class="desk">
+          <h3>Stakeholders, on your side</h3>
+          <p>You record who holds what on a project. The portal is filled from that record. You are not assembling a personal report the night before a meeting.</p>
+        </div>
+      </div>
+      <p class="note">One person can hold a stake in more than one organization. They choose the company, then they see that company’s share of their record.</p>
+    </div>
+    <footer class="folio"><span>Investors</span><span>09</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Tasks</p>
+      <h2 style="margin-top:18px">The work has a name on it and a day it is due.</h2>
+      <p class="lede">Follow-ups, inspections, site jobs, the thing someone promised in a meeting. If it lives in a chat, it dies in a chat. A task has an owner, a space, and a due date, and it can sit on the deal or the stay it belongs to.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>Spaces</h3>
+          <p>A board for the company, and boards for the teams that do the work. People land in the space that matches their desk, and they can still see what is theirs.</p>
+        </div>
+        <div class="desk">
+          <h3>Assigned, not announced</h3>
+          <p>A task goes to a person. They get the mail. The title is the title. It is not a message that fifty people were copied on.</p>
+        </div>
+        <div class="desk">
+          <h3>It repeats until you stop it</h3>
+          <p>Weekly inspections, monthly follow-ups, the jobs that are the job. Mark one done and the next one is already there. End the series when the work is over, or stop it early.</p>
+        </div>
+        <div class="desk">
+          <h3>On the thing it is about</h3>
+          <p>A task can belong to a deal, a project, a stay. Open the work and the context is there. You are not asking “which flat was this again?”</p>
+        </div>
+        <div class="desk">
+          <h3>My work</h3>
+          <p>Each person can see what is on them. A manager who is allowed to can see the company’s board. Front desk sees the work they were given.</p>
+        </div>
+        <div class="desk">
+          <h3>Done means the next one can start</h3>
+          <p>Closing a repeating task creates the next due date. Deleting one occurrence is not the same as killing the series. You choose.</p>
+        </div>
+      </div>
+    </div>
+    <footer class="folio"><span>Tasks</span><span>10</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Facility</p>
+      <h2 style="margin-top:18px">Know where the cement went.</h2>
+      <p class="lede">Sites consume materials, machines break, and somebody has to say what was used on which unit. Facility is the yard: stock, usage, plant, and damage, with the suppliers and artisans you actually buy from.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>The catalog</h3>
+          <p>What you keep: materials, with a name and a class. One list for the company, not a different list per foreman.</p>
+        </div>
+        <div class="desk">
+          <h3>Stock, by place</h3>
+          <p>What is on hand, and at which site. Receive a delivery and the balance moves. You can see a week of movement when something does not add up.</p>
+        </div>
+        <div class="desk">
+          <h3>Usage</h3>
+          <p>Drawn for a project or a unit. The material left the store and landed on the job, so the cost of that job is not a guess at the end.</p>
+        </div>
+        <div class="desk">
+          <h3>Plant</h3>
+          <p>The machines, and the next date they are due for service. The reminder exists before the machine stops in the middle of a pour.</p>
+        </div>
+        <div class="desk">
+          <h3>Damages</h3>
+          <p>What broke, where, and when it was written. A crack found on inspection has a place to live besides a photo on someone’s phone.</p>
+        </div>
+        <div class="desk">
+          <h3>Suppliers, artisans, prices</h3>
+          <p>Who you buy from, who you hire on site, and what the price was last time. The next order starts from the last price, not from memory.</p>
+        </div>
+      </div>
+      <p class="note">No yard, no store, no site: leave Facility off. The rest of the company does not require it.</p>
+    </div>
+    <footer class="folio"><span>Facility</span><span>11</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">People</p>
+      <h2 style="margin-top:18px">The corporation is the people who keep it.</h2>
+      <p class="lede">Hire them properly. Know who they report to. Pay them from the same record finance trusts. And on the morning of their birthday, let the company be the one that remembers.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>The offer</h3>
+          <p>Send an offer they can open and accept. The letter is the start of the file, not a PDF that never meets the payroll.</p>
+        </div>
+        <div class="desk">
+          <h3>The first week</h3>
+          <p>The forms a new hire has to finish, on a link, in their own time. What they submit lands on their record. HR is not chasing scans in a chat.</p>
+        </div>
+        <div class="desk">
+          <h3>The org chart</h3>
+          <p>Who reports to whom, drawn from the line on each person. Move someone, and the chart moves. You do not redraw a slide.</p>
+        </div>
+        <div class="desk">
+          <h3>Leave</h3>
+          <p>A request, an approval, a balance. The dashboard can show who is away. The work of the week is planned with that in view.</p>
+        </div>
+        <div class="desk">
+          <h3>Appraisals</h3>
+          <p>The review happens on their record. The form checks itself before it submits. A review is not a Word file named “final final”.</p>
+        </div>
+        <div class="desk">
+          <h3>Pay, tax, and pension</h3>
+          <p>Payslips from the person file. Earnings, deductions, and what is pensionable. Tax and pension schedules finance can file, from that same run. Lagos PAYE is the path the product knows.</p>
+        </div>
+        <div class="desk">
+          <h3>Their own door</h3>
+          <p>My HR: the person sees their leave, their documents, their payslip. They do not need the HR manager’s login to know what they were paid.</p>
+        </div>
+        <div class="desk">
+          <h3>The morning it is their day</h3>
+          <p>A birthday, and a work anniversary, sent in the company’s voice, and shown on the dashboard the same morning. The company that wants to last should not depend on someone remembering.</p>
+        </div>
+      </div>
+    </div>
+    <footer class="folio"><span>People</span><span>12</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Community</p>
+      <h2 style="margin-top:18px">Pay the person who brought the buyer.</h2>
+      <p class="lede">Agents, realtors, and referrers are how a lot of companies actually sell. Give them a roster, put their name on the lead, and let the closed deal remember them when it is time to pay.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <div class="grid">
+        <div class="desk">
+          <h3>A roster, not a contact list</h3>
+          <p>Each partner is a record: who they are, and how many leads they have sent. You can see the bench.</p>
+        </div>
+        <div class="desk">
+          <h3>Their name rides the lead</h3>
+          <p>A form link can belong to a partner. A lead can name them. When that lead becomes a deal and the deal is won, the partner is still on it.</p>
+        </div>
+        <div class="desk">
+          <h3>Payout from the close</h3>
+          <p>What they are owed follows the deals they closed. The month-end argument starts from the record, not from a WhatsApp voice note.</p>
+        </div>
+        <div class="desk">
+          <h3>A door of their own</h3>
+          <p>A partner gets a link and a portal. They see the work they brought. The company’s other buyers, books, and staff stay on your side of the door.</p>
+        </div>
+        <div class="desk">
+          <h3>Who actually produced this month</h3>
+          <p>A board of partners, counted from leads and from deals that closed. The loudest person in the meeting is not automatically the top of the list.</p>
+        </div>
+        <div class="desk">
+          <h3>Same buyers as sales</h3>
+          <p>Community does not keep a private list. The lead sales is working is the lead the partner sent.</p>
+        </div>
+      </div>
+    </div>
+    <footer class="folio"><span>Community</span><span>13</span></footer>
+  </article>
+
+  <article class="sheet" id="pellows">
+    <div class="sheet-body">
+      <p class="kicker">Pellows</p>
+      <h2 style="margin-top:18px">She booked the flat from the chat.</h2>
+      <p class="lede">On a Friday evening, someone needs a place for the weekend. She does not install another app. She opens WhatsApp and asks. What comes back is the flat: the photos, the nightly rate, and the nights that are still open. She holds the dates and pays, still in that conversation.</p>
+      <p class="small">Nothing she saw was typed in a second time. The apartment, the pictures, and the price were already on the short-let desk in Realcorp, where the front desk already knows who is in the room. Pellows is the product that carries that room out to her.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <p class="small">The rooms stay yours until you turn Pellows on. When you do, it may read the apartments, the photos, the rates, and the nights already taken. Your books stay closed. Your people stay closed. A night sold on Airbnb or Booking.com stays sold, so the chat cannot give that bed to someone else.</p>
+      <p class="small">She can be shown the rate you already charge. Or you can add a percentage, and that percentage stays on each time the room changes in Realcorp, so a new price does not wipe what you added. When you turn Pellows off, her search loses the rooms. The board your desk works from does not move.</p>
+      <p class="small">Pellows is the first product we are setting beside Realcorp. The corporation remains the corporation. More products will come out of it, and this is the one that starts that line.</p>
+    </div>
+    <footer class="folio"><span>Pellows · the first product beside Realcorp</span><span>14</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">BO Properties</p>
+      <h2 style="margin-top:18px">A company, running.</h2>
+      <p class="lede">BO Properties sells and lets. The buyers, the apartments, the money, and the people who do the work are on Realcorp. This is what that looks like on an ordinary week.</p>
+      <figure class="shot">
+        <div class="shot-frame"></div>
+      </figure>
+      <p class="small">A lead comes in from a form, an ad, or WhatsApp. It has an owner. If it is a sale, it moves through inspection, negotiation, and a reservation, and finance sees it before anyone calls it won. The unit on that deal is a real unit, with a price and a balance.</p>
+      <p class="small">If it is a stay, the apartment is on the room board. The guest has a name and a bill. A night already sold on another calendar cannot be sold again. When they want those same rooms bookable from a WhatsApp chat, they turn Pellows on. The photos and the rate are already there.</p>
+      <p class="small">The receipt is the receipt in the books. Income from a stay is not mixed up with a buyer paying for a unit. The person who closed the deal, kept the desk, or ran the books has a file: who they report to, the leave they took, the payslip, and a note from the company on the morning of their birthday.</p>
+      <p class="small">They spend their time on the buyers and the guests. The record is what lets the company still be standing when that week is over.</p>
+      <div class="quote">
+        <div class="mark">“</div>
+        <div class="lines"></div>
+      </div>
+    </div>
+    <footer class="folio"><span>BO Properties</span><span>15</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">In their words</p>
+      <h2 style="margin-top:18px">From the people who run it.</h2>
+      <div class="quote">
+        <div class="mark">“</div>
+        <div class="lines"></div>
+      </div>
+      <div class="quote">
+        <div class="mark">“</div>
+        <div class="lines"></div>
+      </div>
+      <div class="quote">
+        <div class="mark">“</div>
+        <div class="lines"></div>
+      </div>
+      <div class="quote">
+        <div class="mark">“</div>
+        <div class="lines"></div>
+      </div>
+    </div>
+    <footer class="folio"><span>Testimonials</span><span>16</span></footer>
+  </article>
+
+  <article class="sheet">
+    <div class="sheet-body">
+      <p class="kicker">Price</p>
+      <h2 style="margin-top:18px">After the demo.</h2>
+      <p class="lede">See it on your own work first. The price follows the desks that end up in the setup, and Pellows is priced apart from them, as the first product beside Realcorp.</p>
+      <p class="small">A company on three desks is not priced like a company on all of them.</p>
+      <p class="note">We set the workspace up around the work you already do. Bring the forms, the units, the rooms, and the people you have. We meet you there.</p>
+    </div>
+    <footer class="folio"><span>Price</span><span>17</span></footer>
+  </article>
+
+  <article class="sheet" id="book">
+    <div class="sheet-body">
+      <p class="kicker">The next step</p>
+      <h2 style="margin-top:18px">See it on your work.</h2>
+      <p class="lede">Bring a form you already send, a unit you are selling, or a week of stays. We sit with that, and turn on only the desks the work is asking for.</p>
+      <p class="small">That sitting is the demo. The price comes after it, from how much of the product is in the setup.</p>
+      <div class="quote" style="margin-top:28px">
+        <p class="kicker">Book the demo</p>
+        <p class="lede" style="font-size:22px">Write to the person below. Tell them what the company does this week.</p>
+        <p class="who" style="margin-top:22px;color:var(--ink);letter-spacing:0;font-size:16px">Godsfavour Ahamisi</p>
+        <p class="who">Chief Builder, Realcorp</p>
+      </div>
+    </div>
+    <footer class="folio"><span>Book the demo</span><span>18</span></footer>
+  </article>
+
+</body>
+</html>
