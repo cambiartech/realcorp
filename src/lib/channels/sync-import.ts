@@ -2,6 +2,7 @@ import { ChannelProvider } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { parseIcalEvents } from "@/lib/channels/ical";
 import { todayInZone, utcDate } from "@/lib/channels/calendar";
+import { notifyPellowsUnit } from "@/lib/channels/pellows-notify";
 import { publicHttpsUrl } from "@/lib/channels/public-url";
 
 const MAX_BYTES = 1_000_000;
@@ -70,6 +71,7 @@ export async function syncCalendarImport(importId: string): Promise<{ ok: true; 
       data: { lastSyncedAt: new Date(), lastError: null },
     }),
   ]);
+  await notifyPellowsUnit({ tenantId: row.tenantId, unitId: row.unitId, event: "block.changed" });
   return { ok: true, blocks: events.length };
 }
 

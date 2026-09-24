@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import { CHANNEL_PULL_LIMIT_PER_HOUR } from "@/lib/channels/calendar";
 import { loadChannelUnits } from "@/lib/channels/load-units";
-import { authorizeChannelPull } from "@/lib/channels/pull-auth";
+import { parseUpdatedSince } from "@/lib/channels/pellows-feed";
+import { authorizeChannelPull, channelError } from "@/lib/channels/pull-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const tenantId = new URL(request.url).searchParams.get("tenantId")?.trim() || null;
+  const url = new URL(request.url);
+  const tenantId = url.searchParams.get("tenantId")?.trim() || null;
+  const updatedSince = parseUpdatedSince(url.searchParams.get("updatedSince"));
+  if (updatedSince === "invalid") return channelError(400, "invalid_updated_since");
+
   const auth = await authorizeChannelPull(request, tenantId);
   if ("response" in auth) return auth.response;
 
-  const units = await loadChannelUnits(auth.tenantId, auth.timeZone);
+  const units = await loadChannelUnits(auth.tenantId, auth.timeZone, { updatedSince });
   return NextResponse.json(
     { units },
     {

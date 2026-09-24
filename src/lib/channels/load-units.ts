@@ -33,6 +33,12 @@ export type ChannelUnitPayload = {
   photoUrls: string[];
   icalUrl: string;
   blocks: CalendarBlock[];
+  archived?: true;
+};
+
+type LoadChannelUnitsOptions = {
+  updatedSince?: Date | null;
+  unitId?: string;
 };
 
 function asStringList(value: unknown): string[] {
@@ -62,9 +68,12 @@ function httpsUrls(values: Array<string | null | undefined>): string[] {
   return urls;
 }
 
-export async function ensureUnitCalendarFeeds(tenantId: string): Promise<void> {
+export async function ensureUnitCalendarFeeds(tenantId: string, unitId?: string): Promise<void> {
   const units = await prisma.shortletUnit.findMany({
-    where: { tenantId, isActive: true },
+    where: {
+      tenantId,
+      OR: [{ isActive: true }, ...(unitId ? [{ id: unitId }] : [])],
+    },
     select: { id: true, calendarFeed: { select: { id: true } } },
   });
   const missing = units.filter((unit) => !unit.calendarFeed);
@@ -79,11 +88,29 @@ export async function ensureUnitCalendarFeeds(tenantId: string): Promise<void> {
   });
 }
 
-export async function loadChannelUnits(tenantId: string, timeZone = "Africa/Lagos"): Promise<ChannelUnitPayload[]> {
-  await ensureUnitCalendarFeeds(tenantId);
+export async function loadChannelUnits(
+  tenantId: string,
+  timeZone = "Africa/Lagos",
+  options: LoadChannelUnitsOptions = {},
+): Promise<ChannelUnitPayload[]> {
+  await ensureUnitCalendarFeeds(tenantId, options.unitId);
   const today = todayInZone(timeZone);
+  const since = options.updatedSince ?? null;
   const units = await prisma.shortletUnit.findMany({
-    where: { tenantId, isActive: true, listingStatus: "AVAILABLE" },
+    where: {
+      tenantId,
+      ...(options.unitId ? { id: options.unitId } : {}),
+      ...(!since && !options.unitId ? { isActive: true, listingStatus: "AVAILABLE" } : {}),
+      ...(since
+        ? {
+            OR: [
+              { updatedAt: { gt: since } },
+              { reservations: { some: { updatedAt: { gt: since } } } },
+              { externalBlocks: { some: { updatedAt: { gt: since } } } },
+            ],
+          }
+        : {}),
+    },
     orderBy: { name: "asc" },
     include: {
       property: { select: { name: true, city: true, state: true, country: true } },
@@ -131,6 +158,7 @@ export async function loadChannelUnits(tenantId: string, timeZone = "Africa/Lago
       ...asStringList(unit.projectUnit?.project?.amenities),
     ].map((item) => item.toLowerCase());
     const neighbourhood = unit.location || unit.property?.name || unit.property?.city || undefined;
+    const archived = !unit.isActive || unit.listingStatus !== "AVAILABLE";
     const nightlyPrice = Number(unit.nightlyRate);
     const bedrooms = bedroomsFromLayout(unit.roomLayout);
     const description = (unit.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -150,6 +178,7 @@ export async function loadChannelUnits(tenantId: string, timeZone = "Africa/Lago
       photoUrls: httpsUrls([unit.projectUnit?.project?.coverImageUrl, ...gallery]),
       icalUrl: unit.calendarFeed ? unitIcalUrl(unit.calendarFeed.feedToken) : "",
       blocks,
+      ...(archived ? { archived: true as const } : {}),
     };
   });
 }

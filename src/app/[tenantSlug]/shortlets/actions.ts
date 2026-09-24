@@ -23,6 +23,7 @@ import {
 } from "@/lib/shortlets-access";
 import { syncDayPaymentsToFinance, syncShortletPaymentToFinance } from "@/lib/shortlets-finance-bridge";
 import { conflictMessage, unitIdsBlockedByChannels, unitStayConflict } from "@/lib/channels/conflicts";
+import { notifyPellowsUnit } from "@/lib/channels/pellows-notify";
 import { nextShortletBookingNumber } from "@/lib/shortlets-booking-number";
 import { findOrCreateShortletGuest } from "@/lib/shortlets-guests";
 import {
@@ -196,7 +197,7 @@ export async function createShortletUnit(
       ? projectUnitMeta.projectName
       : parsed.data.location || null;
 
-  await prisma.shortletUnit.create({
+  const createdUnit = await prisma.shortletUnit.create({
     data: {
       tenantId: tenant.id,
       propertyId: parsed.data.propertyId || null,
@@ -218,6 +219,15 @@ export async function createShortletUnit(
       currency: parsed.data.currency.toUpperCase(),
       housekeepingStatus: ShortletHousekeepingStatus.VACANT_CLEAN,
     },
+    select: { id: true, isActive: true, listingStatus: true },
+  });
+  await notifyPellowsUnit({
+    tenantId: tenant.id,
+    unitId: createdUnit.id,
+    event:
+      createdUnit.isActive && createdUnit.listingStatus === ShortletListingStatus.AVAILABLE
+        ? "unit.upserted"
+        : "unit.archived",
   });
   await writeAuditLog({
     tenantId: tenant.id,
@@ -310,6 +320,14 @@ export async function saveShortletUnit(
     summary: `Updated apartment ${parsed.data.name}.`,
   });
 
+  await notifyPellowsUnit({
+    tenantId: tenant.id,
+    unitId: existing.id,
+    event:
+      (parsed.data.isActive ?? true) && parsed.data.listingStatus === "AVAILABLE"
+        ? "unit.upserted"
+        : "unit.archived",
+  });
   revalidateAll(tenantSlug);
   return { ok: true };
 }
@@ -771,6 +789,9 @@ export async function createShortletReservation(
     summary: `${isWalkIn ? "Walk-in check-in" : "Created reservation"} for ${guestName}${unit ? ` on ${unit.name}` : " (apartment to be assigned)"}.`,
   });
 
+  if (unit) {
+    await notifyPellowsUnit({ tenantId: tenant.id, unitId: unit.id, event: "block.changed" });
+  }
   revalidateAll(tenantSlug);
   return { ok: true, reservationId, guestId: resolvedGuestId || undefined };
 }
@@ -987,6 +1008,10 @@ export async function createShortletBookings(
     summary: `${isWalkIn ? "Walk-in" : "Booking"} for ${guest.fullName} — ${stayCalcs.length} stay(s).`,
   });
 
+  const bookedUnitIds = [...new Set(stayCalcs.map((stay) => stay.unit?.id).filter((id): id is string => Boolean(id)))];
+  for (const unitId of bookedUnitIds) {
+    await notifyPellowsUnit({ tenantId: tenant.id, unitId, event: "block.changed" });
+  }
   revalidateAll(tenantSlug);
   return { ok: true, reservationIds, guestId: guest.id, reservationId: reservationIds[0] };
 }
@@ -1085,6 +1110,7 @@ export async function assignShortletReservationApartment(
     summary: `Assigned ${unit.name} to reservation for ${reservation.guestName}.`,
   });
 
+  await notifyPellowsUnit({ tenantId: tenant.id, unitId: unit.id, event: "block.changed" });
   revalidateAll(tenantSlug);
   return { ok: true };
 }
@@ -1220,6 +1246,9 @@ export async function updateShortletReservationStatus(
     summary: `Marked reservation for ${reservation.guestName} as ${nextStatus}.`,
   });
 
+  if (reservation.unitId) {
+    await notifyPellowsUnit({ tenantId: tenant.id, unitId: reservation.unitId, event: "block.changed" });
+  }
   revalidateAll(tenantSlug);
   return { ok: true };
 }
@@ -1306,6 +1335,9 @@ export async function completeShortletCheckoutInspection(
     summary: `Checkout inspection ${parsed.data.status.toLowerCase()} for ${inspection.reservation.guestName} · ${inspection.unit.name}.`,
   });
 
+  if (parsed.data.status === "FAILED") {
+    await notifyPellowsUnit({ tenantId: tenant.id, unitId: inspection.unitId, event: "block.changed" });
+  }
   revalidateAll(tenantSlug);
   return { ok: true };
 }
@@ -1398,6 +1430,12 @@ export async function updateHousekeepingStatus(
     summary: `Updated ${unit.name} to ${next}.`,
   });
 
+  if (
+    (next === ShortletHousekeepingStatus.OUT_OF_ORDER) !==
+    (unit.housekeepingStatus === ShortletHousekeepingStatus.OUT_OF_ORDER)
+  ) {
+    await notifyPellowsUnit({ tenantId: tenant.id, unitId: unit.id, event: "block.changed" });
+  }
   revalidateAll(tenantSlug);
   return { ok: true };
 }
@@ -2078,6 +2116,9 @@ export async function importChannelLeadAsReservation(
     metadata: { leadId: lead.id },
   });
 
+  if (unit) {
+    await notifyPellowsUnit({ tenantId: tenant.id, unitId: unit.id, event: "block.changed" });
+  }
   revalidateAll(tenantSlug);
   return { ok: true };
 }

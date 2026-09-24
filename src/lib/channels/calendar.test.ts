@@ -12,6 +12,7 @@ import {
 } from "./calendar";
 import { parseIcalEvents, buildIcalCalendar } from "./ical";
 import { publicHttpsUrl } from "./public-url";
+import { parseUpdatedSince, signPellowsBody } from "./pellows-feed";
 
 test("stay of 20–27 Dec is exclusive on the checkout date", () => {
   const block = stayToBlock(new Date("2026-12-20T14:00:00+01:00"), new Date("2026-12-27T11:00:00+01:00"));
@@ -65,6 +66,16 @@ END:VCALENDAR`);
   assert.equal(events[0].end, "2026-12-27");
   const ics = buildIcalCalendar({ calendarName: "Room 1", events, now: new Date("2026-09-24T08:00:00Z") });
   assert.match(ics, /DTEND;VALUE=DATE:20261227/);
+});
+
+test("catch-up cursor and webhook signature", () => {
+  assert.equal(parseUpdatedSince(null), null);
+  assert.equal(parseUpdatedSince("not-a-date"), "invalid");
+  assert.equal(parseUpdatedSince("2026-09-24T08:00:00Z") instanceof Date, true);
+  const body = JSON.stringify({ eventId: "evt_01", tenantId: "ten", event: "unit.upserted", unit: {} });
+  const signature = signPellowsBody(body, "secret");
+  assert.match(signature, /^sha256=[0-9a-f]{64}$/);
+  assert.equal(signPellowsBody(body, "secret"), signature);
 });
 
 test("calendar links must be public https", () => {

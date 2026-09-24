@@ -165,6 +165,7 @@ export function ChannelConnections({
         </dl>
         <p className="mt-3 text-xs text-muted">
           Pellows calls <code className="font-mono">GET /v1/shortlets/units?tenantId=</code> with this token. Limit is 60 calls an hour.
+          Later changes are sent to them as they happen, and they can catch up with <code className="font-mono">updatedSince</code>.
           A revoked token returns 401. A token used with another workspace id returns 403.
         </p>
       </section>
