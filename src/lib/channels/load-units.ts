@@ -1,6 +1,7 @@
 import prisma from "@/lib/db";
 import { BLOCKING_SHORTLET_STATUSES } from "@/lib/shortlets-reservation-status";
 import {
+  bathroomsFromLayout,
   bedroomsFromLayout,
   blockSummary,
   countryCode,
@@ -28,11 +29,13 @@ export type ChannelUnitPayload = {
   nightlyMinor: number;
   nightlyPrice: number;
   bedrooms?: number;
+  bathrooms?: number;
   maxGuests: number;
   amenities: string[];
   photoUrls: string[];
   icalUrl: string;
   blocks: CalendarBlock[];
+  addressLine?: string;
   archived?: true;
 };
 
@@ -47,6 +50,11 @@ function asStringList(value: unknown): string[] {
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function clip(value: string | null | undefined, max: number) {
+  const text = value?.replace(/\s+/g, " ").trim();
+  return text ? text.slice(0, max) : undefined;
 }
 
 function httpsUrls(values: Array<string | null | undefined>): string[] {
@@ -113,7 +121,7 @@ export async function loadChannelUnits(
     },
     orderBy: { name: "asc" },
     include: {
-      property: { select: { name: true, city: true, state: true, country: true } },
+      property: { select: { name: true, address: true, city: true, state: true, country: true } },
       calendarFeed: { select: { feedToken: true } },
       projectUnit: {
         select: {
@@ -161,7 +169,9 @@ export async function loadChannelUnits(
     const archived = !unit.isActive || unit.listingStatus !== "AVAILABLE";
     const nightlyPrice = Number(unit.nightlyRate);
     const bedrooms = bedroomsFromLayout(unit.roomLayout);
+    const bathrooms = bathroomsFromLayout(unit.roomLayout);
     const description = (unit.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const addressLine = clip(unit.property?.address, 200);
     return {
       id: unit.id,
       title: unit.name,
@@ -169,10 +179,12 @@ export async function loadChannelUnits(
       city: unit.property?.city || unit.projectUnit?.project?.locationCity || "Lagos",
       country: countryCode(unit.property?.country),
       ...(neighbourhood ? { neighbourhood } : {}),
+      ...(addressLine ? { addressLine } : {}),
       currency: (unit.currency || "NGN").toUpperCase(),
       nightlyMinor: nightlyMinor(nightlyPrice),
       nightlyPrice,
       ...(bedrooms != null ? { bedrooms } : {}),
+      ...(bathrooms != null ? { bathrooms } : {}),
       maxGuests: unit.maxOccupancy && unit.maxOccupancy > 0 ? unit.maxOccupancy : 2,
       amenities: [...new Set(amenities)],
       photoUrls: httpsUrls([unit.projectUnit?.project?.coverImageUrl, ...gallery]),

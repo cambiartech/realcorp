@@ -1,6 +1,7 @@
 import { ChannelProvider } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { loadChannelUnits } from "@/lib/channels/load-units";
+import { loadChannelOrganization } from "@/lib/channels/organization";
 import {
   newPellowsEventId,
   pellowsWebhookUrl,
@@ -21,13 +22,15 @@ export async function notifyPellowsUnit(input: {
   try {
     const connection = await prisma.channelConnection.findUnique({
       where: { tenantId_provider: { tenantId: input.tenantId, provider: ChannelProvider.PELLOWS } },
-      select: { status: true, tenant: { select: { defaultTimezone: true } } },
+      select: { status: true, tenant: { select: { name: true, defaultTimezone: true } } },
     });
     if (connection?.status !== "ACTIVE") return;
 
-    const units = await loadChannelUnits(input.tenantId, connection.tenant.defaultTimezone || "Africa/Lagos", {
-      unitId: input.unitId,
-    });
+    const timeZone = connection.tenant.defaultTimezone || "Africa/Lagos";
+    const [units, organization] = await Promise.all([
+      loadChannelUnits(input.tenantId, timeZone, { unitId: input.unitId }),
+      loadChannelOrganization(input.tenantId),
+    ]);
     const unit = units[0];
     if (!unit) return;
 
@@ -35,6 +38,9 @@ export async function notifyPellowsUnit(input: {
     const body = JSON.stringify({
       eventId: newPellowsEventId(),
       tenantId: input.tenantId,
+      tenantName: organization?.name || connection.tenant.name,
+      logoUrl: organization?.logoUrl ?? null,
+      organization,
       event,
       unit,
     });

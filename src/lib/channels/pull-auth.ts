@@ -57,7 +57,7 @@ export async function authorizeChannelPull(request: Request, tenantId: string | 
       status: true,
       revokedAt: true,
       scopes: true,
-      tenant: { select: { id: true, defaultTimezone: true } },
+      tenant: { select: { id: true, name: true, defaultTimezone: true } },
     },
   });
   if (!connection || connection.status !== "ACTIVE" || connection.revokedAt || !connection.scopes.includes("shortlets.read")) {
@@ -74,6 +74,7 @@ export async function authorizeChannelPull(request: Request, tenantId: string | 
 
   return {
     tenantId: connection.tenantId,
+    tenantName: connection.tenant.name,
     timeZone: connection.tenant.defaultTimezone || "Africa/Lagos",
   };
 }

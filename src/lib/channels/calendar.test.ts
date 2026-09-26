@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addDays,
+  bathroomsFromLayout,
   bedroomsFromLayout,
   blockSummary,
   countryCode,
@@ -41,6 +42,8 @@ test("nightly rate is kobo and neighbourhood helpers stay stable", () => {
   assert.equal(nightlyMinor(150000), 15000000);
   assert.equal(countryCode("Nigeria"), "NG");
   assert.equal(bedroomsFromLayout("2 Bedroom"), 2);
+  assert.equal(bathroomsFromLayout("2 bed 1 bath"), 1);
+  assert.equal(bathroomsFromLayout("2 Bedroom"), undefined);
   assert.equal(blockSummary("OTA", "Ada Okonkwo"), "OTA · Ada Okonkwo");
   assert.equal(addDays("2026-12-20", 7), "2026-12-27");
 });

@@ -1,7 +1,8 @@
 # Pellows × Realcorp — shortlet sync
 
 **For:** Realcorp engineering  
-**From:** Pellows
+**From:** Pellows  
+**Operators:** read [INTEGRATIONS.md](./INTEGRATIONS.md), or Admin → Integrations. This file is the build contract.
 
 ---
 
@@ -14,6 +15,18 @@ Realcorp already holds the rooms: the unit, the rate, the photos, and who is alr
 Many Realcorp tenants run shortlets. Only some of them will want those rooms on Pellows. Listing is opt-in, one workspace at a time. A tenant who never turns Pellows on stays invisible. We never receive a key that can open every workspace.
 
 When a tenant does turn us on, their rooms can appear in guest search without anyone retyping titles, prices, or photos into Pellows.
+
+---
+
+## How a tenant is filed
+
+The workspace is the company. Each shortlet is its own apartment. Two apartments in one company can have two managers. Neighbourhood is only how a guest searches.
+
+Pellows files the people. Realcorp does not have to add columns for this. After connect, the operator types the company name, logo, and a default person. Each apartment then has its own list: role, name, phone, WhatsApp. An apartment with no one on it uses the company default. A sheet upload files many apartments at once (`unitId, role, name, phone, whatsapp, checkInMethod, address`).
+
+A later units pull updates title, price, photos, area, and busy dates. It does not replace a name, logo, address, check-in note, or person we already saved. If you do send people, and that apartment has none yet, we keep them. Recognized shapes, all optional: `organization.office`, `organization.contacts`, `manager`, `backup`, `onsite`, `contacts`, or a bare `phone` on the unit. A missing key does not fail the pull.
+
+The guest sees photos, price, and area before they pay. Address, door code, and phone numbers are shown only after the booking is confirmed: on the pay confirmation, on the booking page, and in the chat when they ask who to call.
 
 ---
 
@@ -64,19 +77,37 @@ Do not ship one platform key that accepts any `tenantId`. If the token and the `
 
 ### Connect flow we want
 
-The tenant steps are in **What the tenant sets** above. For the first sandbox, copy-paste of the tenant id and token is enough.
+Each tenant connects themselves. Pellows does not paste a code for them, and one workspace does not grant the next one.
 
-A redirect is better once that works: after they turn Pellows on, send them back to Pellows with an authorization code and we exchange it for the tenant token. They should not have to paste a secret in the long run.
+After the tenant turns Pellows on, open our page in a popup (about 480×640). Put the workspace id and the one-time code in the query. Do not ask them to copy either value.
 
-Pellows stores the tenant token on that agency’s link. We never log it and we never return it to the browser after it is saved.
+```text
+https://pellows.stay/connect/realcorp?workspace={workspace id}&code={one-time code}
+```
+
+Locally that host is `http://127.0.0.1:3000`. The page reads the query, strips the code out of the address bar, and calls the units GET itself. On success it tells the opener:
+
+```js
+{ type: "pellows:realcorp", ok: true, count: 19 }
+```
+
+Close the popup. Show Connected on the Channels screen. A second tenant is the same popup with a different workspace and a different code. Their rooms are added. The first tenant’s rooms stay.
+
+Copy-paste into Admin → Inventory is only a fallback when the popup cannot open. Pellows stores the code on that workspace’s link. We never log it and we never return it to the browser after it is saved. Rooms from that connect go straight into guest search.
+
+This is the only check-in call. Pellows already sends it this way. Do not POST the workspace and the code to this URL. That path has no POST, so the reply is empty, and a page that then reads the body as JSON crashes with “Unexpected end of JSON input.”
 
 ```http
-GET {REALCORP_API_BASE}/v1/shortlets/units?tenantId={tenantId}
-Authorization: Bearer {tenant access token}
+GET https://realcoerp.com/v1/shortlets/units?tenantId={workspace id}
+Authorization: Bearer {the code from Channels → Pellows}
 Accept: application/json
 ```
 
-The bearer token is the tenant token, not the app client secret.
+`tenantId` is the workspace id from that same screen. The code is the bearer token, not a field in a JSON body.
+
+Read the JSON body on every status, including when it is not 200. A wrong code is `{ "error": "unauthorized" }` with status 401. A wrong workspace is `{ "error": "forbidden" }` or `{ "error": "tenant_not_found" }`. Those are real answers. An empty body is not.
+
+The bearer token is the tenant code, not the app client secret.
 
 On a full pull, return every bookable shortlet. Skip units that are archived or not for sale. On a catch-up (`updatedSince`), include a unit that was just archived and set `"archived": true`, so we can drop it from search. If you leave it out, we will not guess.
 
@@ -91,14 +122,36 @@ Query:
 
 ```json
 {
+  "organization": {
+    "name": "BO Properties",
+    "logoUrl": "https://cdn.realcoerp.com/tenants/bo-properties.png",
+    "email": "hello@boproperties.example",
+    "legalName": "BO Properties Ltd",
+    "answersAtNight": true,
+    "office": {
+      "name": "Ada Okonkwo",
+      "role": "Operations",
+      "phone": "+2348010000001",
+      "whatsapp": "+2348010000001",
+      "email": "ada@boproperties.example"
+    },
+    "backup": {
+      "name": "Seyi Bankole",
+      "role": "Duty manager",
+      "phone": "+2348010000002",
+      "whatsapp": "+2348010000002",
+      "email": "seyi@boproperties.example"
+    }
+  },
   "units": [
     {
-      "id": "rc_unit_8f3a",
-      "title": "Two-bed with pool, Lekki Phase 1",
+      "id": "rc_unit_akoka",
+      "title": "Room 1",
       "description": "Entire flat. Generator, security, parking.",
       "city": "Lagos",
       "country": "NG",
-      "neighbourhood": "Lekki",
+      "neighbourhood": "Akoka",
+      "addressLine": "14 Example Close, Akoka",
       "currency": "NGN",
       "nightlyMinor": 15000000,
       "bedrooms": 2,
@@ -106,9 +159,38 @@ Query:
       "maxGuests": 4,
       "amenities": ["pool", "wifi", "generator", "parking"],
       "photoUrls": [
-        "https://cdn.realcoerp.com/units/rc_unit_8f3a/1.jpg"
+        "https://cdn.realcoerp.com/units/rc_unit_akoka/1.jpg"
       ],
-      "icalUrl": "https://realcoerp.com/ical/rc_unit_8f3a.ics",
+      "manager": {
+        "name": "Tunde Adeyemi",
+        "role": "Apartment manager",
+        "phone": "+2348020000001",
+        "whatsapp": "+2348020000001",
+        "email": "tunde@boproperties.example"
+      },
+      "backup": {
+        "name": "Kunle Obi",
+        "role": "Backup",
+        "phone": "+2348020000002",
+        "whatsapp": "+2348020000002"
+      },
+      "onsite": {
+        "name": "Estate security",
+        "role": "Building staff",
+        "phone": "+2348020000003"
+      },
+      "checkIn": {
+        "method": "lockbox",
+        "time": "14:00",
+        "instructions": "Lockbox is on the right gate. Code is issued with the booking.",
+        "backupEntry": "Call the onsite number. They hold a spare key."
+      },
+      "checkout": {
+        "time": "11:00",
+        "instructions": "Leave the key in the lockbox."
+      },
+      "houseNotes": "Wi-Fi: BO-Akoka. Generator runs 7pm–7am.",
+      "icalUrl": "https://realcoerp.com/ical/rc_unit_akoka.ics",
       "blocks": [
         {
           "start": "2026-12-20",
@@ -116,12 +198,44 @@ Query:
           "summary": "Airbnb · Ada Okonkwo"
         }
       ]
+    },
+    {
+      "id": "rc_unit_ikeja",
+      "title": "Room 14",
+      "city": "Lagos",
+      "country": "NG",
+      "neighbourhood": "Ikeja",
+      "addressLine": "3 Sample Road, Ikeja",
+      "currency": "NGN",
+      "nightlyMinor": 12000000,
+      "maxGuests": 2,
+      "photoUrls": [],
+      "manager": {
+        "name": "Chioma Eze",
+        "role": "Apartment manager",
+        "phone": "+2348030000001",
+        "whatsapp": "+2348030000001",
+        "email": "chioma@boproperties.example"
+      },
+      "checkIn": {
+        "method": "in_person",
+        "time": "15:00",
+        "instructions": "Chioma meets the guest at the gate."
+      }
     }
   ]
 }
 ```
 
-`units` may also be returned as a bare array, or under `data`. We accept all three.
+`units` may also be returned as a bare array, or under `data`. We accept all three. Prefer the object above so the company travels with the rooms.
+
+`organization.name` is the company name on Inventory. Also accepted at the root as `tenantName`, `organizationName`, or `orgName`. Without a name we can only show the workspace id. Send it on every units response, including catch-up.
+
+`organization.logoUrl` is the company mark, HTTPS. Also accepted at the root as `logoUrl` or `logo`.
+
+`organization.office` is the default person. A unit’s own `manager` replaces them for that apartment only. Room 1 above rings Tunde. Room 14 rings Chioma. Ada is used only when a unit omits `manager`.
+
+A person object is `{ name, role, phone, whatsapp, email }`. `name` and `phone` are required on anyone you expect us to call. Use E.164 (`+234…`). WhatsApp may be the same number.
 
 ### Field rules
 
@@ -143,6 +257,37 @@ Query:
 | `photoUrls` | no | HTTPS URLs, public, no login. `photos` is accepted as an alias. First URL is the chat thumbnail. |
 | `icalUrl` | no | Per-unit iCal if you already export one. We sync busy dates from it. |
 | `blocks` | no | Busy ranges already on your board (OTA bookings, owner stays, out of order). |
+| `addressLine` | no | Exact address. We also type this in Inventory. Shown to the guest only after they pay. `address` is an alias. A pull will not overwrite an address we already saved. |
+| `manager` | no | Person object. Filled in only when that apartment has no people yet. |
+| `backup` | no | Second person. Same rule. |
+| `onsite` | no | Person at the gate. Same rule. |
+| `contacts` | no | Array of person objects. `people` is an alias. |
+| `checkIn` | no | See below. Filled in only when that apartment’s check-in is still empty. |
+| `checkout` | no | `{ time, instructions }`. `time` is `HH:MM` in the company timezone. |
+| `houseNotes` | no | Wifi, power, water. Shown after booking. Do not put the door code only here and nowhere in `checkIn`. |
+
+### Company fields
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `organization.name` | no | Company name. Root `tenantName` still works. We also type this on connect. A pull will not replace a name we saved. |
+| `organization.logoUrl` | no | HTTPS. Root `logoUrl` still works. Same rule as the name. |
+| `organization.email` | no | Company inbox. |
+| `organization.legalName` | no | Who we pay. Bank details stay in Realcorp. |
+| `organization.answersAtNight` | no | `true` when a person answers overnight. |
+| `organization.office` | no | Default person. Used only when we have not filed one. |
+| `organization.backup` | no | Default backup. |
+| `organization.timezone` | no | IANA. Default `Africa/Lagos`. |
+| `organization.currency` | no | ISO code. Default `NGN`. |
+
+### Check-in
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `checkIn.method` | no | One of `smart_lock`, `keypad`, `lockbox`, `building_staff`, `in_person`, `other`. |
+| `checkIn.time` | no | `HH:MM`, 24-hour, company timezone. |
+| `checkIn.instructions` | no | Steps for this flat. May include the code. We show this only after the guest has paid. |
+| `checkIn.backupEntry` | no | What to do when the code or the lock fails. |
 
 ### Blocks
 
@@ -206,7 +351,7 @@ X-Realcorp-Signature: sha256=<hmac of the raw body>
 }
 ```
 
-`event` is `unit.upserted`, `unit.archived`, or `block.changed`. `unit` is the same object as in the GET. `block.changed` may send the unit with its current `blocks` only.
+`event` is `unit.upserted`, `unit.archived`, or `block.changed`. `unit` is the same object as in the GET, including `manager`, `backup`, `onsite`, `addressLine`, and `checkIn`. `block.changed` may send the unit with its current `blocks` only. When the company name, logo, or office changes, send `organization` on the next units GET. A catch-up with `updatedSince` must still include `organization`.
 
 We check the signature, write our row, and return `200` immediately. Send the same `eventId` again if you retry. We treat a repeat as already done. One tenant’s failure does not delay another tenant.
 
@@ -237,7 +382,9 @@ The first sync saves rooms as **drafts**. The agency presses Go LIVE once. After
    - **Use their nightly rate** — guests see your `nightlyMinor` / `nightlyPrice`.
    - **Markup** — the agency turns that off and sets a percent (for example 10). Guests see your rate plus that percent. We keep your original rate and reapply the markup on every sync. You do not send the markup.
 7. `blocks` become busy dates. Those dates drop out of search.
-8. Photos and amenities are what the guest sees in chat.
+8. Photos and amenities are what the guest sees in chat before they pay.
+9. `organization` is the company row: name, logo, and the default office.
+10. Each unit’s `manager` is who we call for that apartment. Units without one use `organization.office`. Address and check-in steps stay off the public card until the booking is confirmed.
 
 We do not write back into Realcorp in v1.
 
@@ -270,13 +417,18 @@ That POST is a manual import for an agency that is already logged into Pellows. 
 
 ## Errors we need
 
+Every response has a JSON body, including 401, 403, 404, and 5xx. Never reply with an empty body. We read that JSON when the status is not 200.
+
+There is no POST on `/v1/shortlets/units`. Check-in is the GET above.
+
 | HTTP | Body | We do |
 |------|------|--------|
-| 200 | `{ "units": [ ... ] }` | Write our local copy |
-| 401 | `{ "error": "unauthorized" }` | Stop. Show the agency the sync failed. |
-| 404 | `{ "error": "tenant_not_found" }` | Stop. Ask them to check the tenant id. |
-| 429 | `Retry-After` header | Back off. |
-| 5xx | short message | Retry later. We store the error on the link. |
+| 200 | `{ "organization": { }, "units": [ ... ] }` | Write the company and each apartment |
+| 401 | `{ "error": "unauthorized" }` | Stop. The code is wrong, expired, or revoked. |
+| 403 | `{ "error": "forbidden" }` | Stop. The code does not belong to that workspace. |
+| 404 | `{ "error": "tenant_not_found" }` | Stop. Ask them to check the workspace id. |
+| 429 | `Retry-After` header, plus a JSON body | Back off. |
+| 5xx | `{ "error": "..." }` | Retry later. We store the error on the link. |
 
 ---
 
@@ -287,7 +439,7 @@ Please give us:
 - A sandbox base URL
 - App `client_id` and `client_secret` for Pellows
 - **Two** sandbox tenants:
-  - Tenant A opted in, with a token, and 3–5 units: one free, one blocked across Detty (20–27 Dec), one with no photos, one priced in kobo (`nightlyMinor`), one priced in naira (`nightlyPrice`)
+  - Tenant A opted in, with a token, and 3–5 units: one free, one blocked across Detty (20–27 Dec), one with no photos, one priced in kobo (`nightlyMinor`), one priced in naira (`nightlyPrice`). People and check-in are optional on this payload.
   - Tenant B **not** opted in. A call with Tenant A’s token and Tenant B’s id must return `403`. A call with no token must return `401`.
 - Photo URLs that resolve without a cookie
 
@@ -307,7 +459,9 @@ Do not build these for the first cut:
 Nice in v2, after the feed is live:
 
 - `POST` from Pellows when a stay is confirmed, so your room board blocks those dates
-- Cleaning fee, minimum nights, check-in time
+- Cleaning fee and minimum nights
+
+Company office, per-apartment manager, address, and check-in are filed in Pellows. Send them on the units response only when you already store them.
 
 ---
 
@@ -323,6 +477,8 @@ Nice in v2, after the feed is live:
 - [ ] Stable `id` per unit
 - [ ] Nightly price as `nightlyMinor` (kobo) or `nightlyPrice` (naira)
 - [ ] `neighbourhood` set to a real area name
+- [ ] Optional `organization` and per-unit `manager` when you already have them. A missing person does not fail the pull
+- [ ] Door code only inside `checkIn.instructions`, not in the title, if you send one
 - [ ] Public `photoUrls`
 - [ ] `blocks` with exclusive `end`, plus guest name in `summary` when you have it
 - [ ] Sandbox tenant A (opted in) and tenant B (not opted in), plus one sample response

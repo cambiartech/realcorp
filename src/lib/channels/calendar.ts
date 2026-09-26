@@ -78,6 +78,14 @@ export function bedroomsFromLayout(layout: string | null | undefined): number | 
   return Number.isInteger(count) && count > 0 && count < 30 ? count : undefined;
 }
 
+export function bathroomsFromLayout(layout: string | null | undefined): number | undefined {
+  if (!layout) return undefined;
+  const match = layout.match(/(\d+(?:\.\d+)?)\s*(?:bath|bathroom)/i);
+  if (!match) return undefined;
+  const count = Number(match[1]);
+  return Number.isFinite(count) && count > 0 && count < 30 ? count : undefined;
+}
+
 const SOURCE_LABEL: Record<string, string> = {
   DIRECT: "Direct",
   WALK_IN: "Walk-in",

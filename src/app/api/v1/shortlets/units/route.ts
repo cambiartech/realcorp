@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { CHANNEL_PULL_LIMIT_PER_HOUR } from "@/lib/channels/calendar";
 import { loadChannelUnits } from "@/lib/channels/load-units";
+import { loadChannelOrganization } from "@/lib/channels/organization";
 import { parseUpdatedSince } from "@/lib/channels/pellows-feed";
 import { authorizeChannelPull, channelError } from "@/lib/channels/pull-auth";
 
@@ -15,9 +16,17 @@ export async function GET(request: Request) {
   const auth = await authorizeChannelPull(request, tenantId);
   if ("response" in auth) return auth.response;
 
-  const units = await loadChannelUnits(auth.tenantId, auth.timeZone, { updatedSince });
+  const [units, organization] = await Promise.all([
+    loadChannelUnits(auth.tenantId, auth.timeZone, { updatedSince }),
+    loadChannelOrganization(auth.tenantId),
+  ]);
   return NextResponse.json(
-    { units },
+    {
+      tenantName: organization?.name || auth.tenantName,
+      logoUrl: organization?.logoUrl ?? null,
+      organization,
+      units,
+    },
     {
       headers: {
         "Cache-Control": "no-store",
