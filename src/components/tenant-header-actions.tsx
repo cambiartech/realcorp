@@ -2,6 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-photo-upload";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 function loginCallbackUrl() {
@@ -11,9 +12,29 @@ function loginCallbackUrl() {
   return "/login";
 }
 
-export function TenantHeaderActions({ tenantSlug, userLabel }: { tenantSlug: string; userLabel: string }) {
+export function TenantHeaderActions({
+  tenantSlug,
+  userLabel,
+  userId = null,
+  userPhotoUrl = null,
+}: {
+  tenantSlug: string;
+  userLabel: string;
+  userId?: string | null;
+  userPhotoUrl?: string | null;
+}) {
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
+      {userId ? (
+        <EmployeePassportPhotoUpload
+          variant="avatar"
+          size="sm"
+          tenantSlug={tenantSlug}
+          userId={userId}
+          fullName={userLabel}
+          photoUrl={userPhotoUrl}
+        />
+      ) : null}
       <span className="hidden max-w-[160px] truncate text-xs text-muted lg:inline" title={userLabel}>
         {userLabel}
       </span>

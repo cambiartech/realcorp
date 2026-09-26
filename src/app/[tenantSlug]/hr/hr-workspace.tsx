@@ -424,7 +424,7 @@ export function HrWorkspace(props: {
       title: "Insights",
       subtitle: "Headcount, joiners, appraisal backlog, and employee register export.",
     },
-    my: { title: "My HR", subtitle: "Review your leave days, payslips, salary bank account, and HR record." },
+    my: { title: "My HR", subtitle: "Your photo, leave, pay, documents, and the record HR keeps for you." },
   };
 
   const heading = headings[activeTab];

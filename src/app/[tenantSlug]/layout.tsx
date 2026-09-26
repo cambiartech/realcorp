@@ -16,7 +16,7 @@ import { cache } from "react";
 const getHrProfileId = cache(async (tenantId: string, userId: string) =>
   prisma.employeeProfile.findUnique({
     where: { tenantId_userId: { tenantId, userId } },
-    select: { id: true },
+    select: { id: true, photoUrl: true },
   }),
 );
 
@@ -54,7 +54,7 @@ export default async function TenantLayout({
 
   const userLabel = session.user.name || session.user.email || "Signed in";
   const manageHr = canManageHr(Boolean(session.user.isPlatformAdmin), membership);
-  const hrEmployeeProfile = manageHr ? await getHrProfileId(tenant.id, session.user.id) : null;
+  const hrEmployeeProfile = await getHrProfileId(tenant.id, session.user.id);
 
   const orgSetup = await loadOrgSetupForUser(
     tenant.id,
@@ -88,6 +88,8 @@ export default async function TenantLayout({
     moduleWhatsApp: tenant.settings?.moduleWhatsApp !== false,
     userName: session.user.name ?? null,
     userEmail: session.user.email ?? null,
+    userId: hrEmployeeProfile ? session.user.id : null,
+    userPhotoUrl: hrEmployeeProfile?.photoUrl ?? null,
     shortletsAccess,
   };
 
@@ -97,7 +99,12 @@ export default async function TenantLayout({
         <div className="flex w-full items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           <TenantAppHeaderBrand tenantSlug={tenant.slug} tenantName={tenant.name} />
           <div className="flex items-center gap-2">
-            <TenantHeaderActions tenantSlug={tenant.slug} userLabel={userLabel} />
+            <TenantHeaderActions
+              tenantSlug={tenant.slug}
+              userLabel={userLabel}
+              userId={hrEmployeeProfile ? session.user.id : null}
+              userPhotoUrl={hrEmployeeProfile?.photoUrl ?? null}
+            />
           </div>
         </div>
       </header>

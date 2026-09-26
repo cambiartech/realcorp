@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncAllAirbnbLinks } from "@/lib/channels/airbnb/sync";
 import { syncAllCalendarImports } from "@/lib/channels/sync-import";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const summary = await syncAllCalendarImports();
-  return NextResponse.json({ ok: true, ...summary });
+  const airbnb = await syncAllAirbnbLinks();
+  return NextResponse.json({ ok: true, ...summary, airbnb });
 }
 
 export async function POST(request: Request) {

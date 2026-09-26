@@ -46,6 +46,7 @@ import {
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
+import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-photo-upload";
 import type { TenantNavKey } from "@/lib/tenant-nav-access";
 import type { ShortletsNavAccess } from "@/lib/shortlets-nav-items";
 import { buildShortletsNavItems } from "@/lib/shortlets-nav-items";
@@ -63,6 +64,8 @@ export type TenantNavProps = {
   moduleWhatsApp?: boolean;
   userName: string | null;
   userEmail: string | null;
+  userId?: string | null;
+  userPhotoUrl?: string | null;
   shortletsAccess?: ShortletsNavAccess | null;
 };
 
@@ -211,6 +214,8 @@ export function TenantSidebar({
   moduleWhatsApp = true,
   userName,
   userEmail,
+  userId = null,
+  userPhotoUrl = null,
   shortletsAccess = null,
 }: TenantNavProps) {
   const pathname = usePathname();
@@ -982,9 +987,13 @@ export function TenantSidebar({
 
       <SidebarProfileFooter
         collapsed={collapsed}
+        tenantSlug={tenantSlug}
+        userId={userId}
+        photoUrl={userPhotoUrl}
         displayName={displayName}
         emailDisplay={emailDisplay}
         initial={initial}
+        profileHref={hasHrEmployeeProfile ? `/${tenantSlug}/hr/dashboard` : null}
       />
     </aside>
   );
@@ -1031,27 +1040,48 @@ export function TenantMobileDock({
 
 function SidebarProfileFooter({
   collapsed,
+  tenantSlug,
+  userId,
+  photoUrl,
   displayName,
   emailDisplay,
   initial,
+  profileHref,
 }: {
   collapsed: boolean;
+  tenantSlug: string;
+  userId: string | null;
+  photoUrl: string | null;
   displayName: string;
   emailDisplay: string;
   initial: string;
+  profileHref: string | null;
 }) {
-  const title = [displayName, emailDisplay].filter(Boolean).join(" · ");
+  const avatar = userId ? (
+    <EmployeePassportPhotoUpload
+      variant="avatar"
+      size={collapsed ? "md" : "sm"}
+      tenantSlug={tenantSlug}
+      userId={userId}
+      fullName={displayName}
+      photoUrl={photoUrl}
+    />
+  ) : (
+    <div
+      className={[
+        "flex shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-xs font-semibold text-foreground",
+        collapsed ? "h-10 w-10" : "h-8 w-8",
+      ].join(" ")}
+      aria-hidden
+    >
+      {initial}
+    </div>
+  );
 
   if (collapsed) {
     return (
       <div className="flex shrink-0 justify-center border-t border-foreground/10 bg-foreground/[0.04] py-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground/10 text-sm font-semibold text-foreground"
-          title={title}
-          aria-label={emailDisplay ? `${displayName}, ${emailDisplay}` : displayName}
-        >
-          {initial}
-        </div>
+        {avatar}
       </div>
     );
   }
@@ -1059,16 +1089,18 @@ function SidebarProfileFooter({
   return (
     <div className="shrink-0 border-t border-foreground/[0.08] px-3 py-3">
       <div className="flex items-center gap-2.5 px-1">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-xs font-semibold text-foreground"
-          aria-hidden
-        >
-          {initial}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-foreground">{displayName}</p>
-          {emailDisplay ? <p className="truncate text-[11px] text-muted">{emailDisplay}</p> : null}
-        </div>
+        {avatar}
+        {profileHref ? (
+          <Link href={profileHref} className="min-w-0 flex-1 rounded-md hover:opacity-80">
+            <p className="truncate text-[13px] font-medium text-foreground">{displayName}</p>
+            {emailDisplay ? <p className="truncate text-[11px] text-muted">{emailDisplay}</p> : null}
+          </Link>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium text-foreground">{displayName}</p>
+            {emailDisplay ? <p className="truncate text-[11px] text-muted">{emailDisplay}</p> : null}
+          </div>
+        )}
       </div>
     </div>
   );

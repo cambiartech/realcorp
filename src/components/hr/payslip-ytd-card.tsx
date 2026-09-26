@@ -17,7 +17,7 @@ export function PayslipYtdCard({
         className={
           compact
             ? "text-xs text-muted"
-            : "rounded-lg border border-dashed border-foreground/15 p-4 text-sm text-muted"
+            : "rounded-2xl border border-foreground/10 bg-background px-5 py-4 text-sm text-muted"
         }
       >
         No finalized payslips for {new Date().getFullYear()} yet.

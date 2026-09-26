@@ -166,6 +166,7 @@ model Tenant {
   leadCaptureEvents           LeadCaptureFormEvent[]
   platformErrorEvents         PlatformErrorEvent[]
   channelConnections          ChannelConnection[]
+  airbnbHostLink              AirbnbHostLink?
   channelCalendarFeeds        ChannelCalendarFeed[]
   channelCalendarImports      ChannelCalendarImport[]
   channelExternalBlocks       ChannelExternalBlock[]
@@ -1171,6 +1172,9 @@ model ShortletUnit {
   maxOccupancy        Int?
   description         String?                    @db.Text
   amenities           Json?
+  photoUrls           Json?
+  /// Airbnb listing id once this apartment was imported from a connected host.
+  airbnbListingId     String?                    @unique
   listingStatus       ShortletListingStatus      @default(AVAILABLE)
   isActive            Boolean                    @default(true)
   nightlyRate         Decimal                    @db.Decimal(18, 2)
@@ -1407,6 +1411,26 @@ enum ChannelProvider {
 enum ChannelConnectionStatus {
   ACTIVE
   REVOKED
+}
+
+/// Host authorized Realcorp to read their Airbnb listings. Tokens are encrypted.
+model AirbnbHostLink {
+  id                 String                  @id @default(cuid())
+  tenantId           String                  @unique
+  airbnbUserId       String?
+  accessTokenCipher  String
+  refreshTokenCipher String?
+  expiresAt          DateTime?
+  status             ChannelConnectionStatus @default(ACTIVE)
+  lastSyncedAt       DateTime?
+  lastError          String?
+  createdByUserId    String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }
 
 /// One opt-in per workspace per channel. The token is stored hashed.

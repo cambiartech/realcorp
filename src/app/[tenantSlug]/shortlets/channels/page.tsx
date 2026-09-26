@@ -1,3 +1,4 @@
+import { airbnbAppConfigured } from "@/lib/channels/airbnb/client";
 import { ChannelProvider } from "@/generated/prisma";
 import { ChannelConnections } from "@/components/shortlets/channel-connections";
 import { ensureUnitCalendarFeeds } from "@/lib/channels/load-units";
@@ -9,14 +10,31 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChannelsPage({ params }: { params: Promise<{ tenantSlug: string }> }) {
+const AIRBNB_NOTICE: Record<string, string> = {
+  connected: "Airbnb is connected. Those apartments are on the board and go out to Pellows with the next change.",
+  sync: "Airbnb approved the connection. The first read did not finish. Use Sync now.",
+  failed: "Airbnb did not finish the connection.",
+  denied: "The host did not approve Realcorp.",
+  unconfigured: "The Airbnb app id and secret are not on this server yet.",
+  forbidden: "You cannot connect channels for this organization.",
+  signin: "Sign in, then connect Airbnb.",
+};
+
+export default async function ChannelsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tenantSlug: string }>;
+  searchParams: Promise<{ airbnb?: string }>;
+}) {
   const { tenantSlug } = await params;
+  const query = await searchParams;
   const ctx = await loadShortletsContext(tenantSlug);
   if (!ctx.access.canManage) notFound();
 
   await ensureUnitCalendarFeeds(ctx.tenant.id);
 
-  const [leads, units, properties, pellows, feeds, imports] = await Promise.all([
+  const [leads, units, properties, pellows, feeds, imports, airbnb, airbnbListings] = await Promise.all([
     prisma.lead.findMany({
       where: {
         tenantId: ctx.tenant.id,
@@ -64,6 +82,13 @@ export default async function ChannelsPage({ params }: { params: Promise<{ tenan
       },
       orderBy: { updatedAt: "desc" },
     }),
+    prisma.airbnbHostLink.findUnique({
+      where: { tenantId: ctx.tenant.id },
+      select: { status: true, airbnbUserId: true, lastSyncedAt: true, lastError: true },
+    }),
+    prisma.shortletUnit.count({
+      where: { tenantId: ctx.tenant.id, airbnbListingId: { not: null } },
+    }),
   ]);
 
   const providerLabel: Record<string, string> = {
@@ -108,6 +133,13 @@ export default async function ChannelsPage({ params }: { params: Promise<{ tenan
       propertyOptions={properties.map((p) => ({ id: p.id, label: p.name }))}
     />
       }
+      airbnbStatus={airbnb?.status === "ACTIVE" ? "ACTIVE" : airbnb?.status === "REVOKED" ? "REVOKED" : "OFF"}
+      airbnbUserId={airbnb?.status === "ACTIVE" ? airbnb.airbnbUserId : null}
+      airbnbLastSyncedLabel={airbnb?.lastSyncedAt ? fmt(airbnb.lastSyncedAt) : null}
+      airbnbLastError={airbnb?.lastError || null}
+      airbnbListingCount={airbnbListings}
+      airbnbConfigured={airbnbAppConfigured()}
+      airbnbNotice={query.airbnb ? AIRBNB_NOTICE[query.airbnb] || null : null}
       feeds={feeds.map((feed) => ({
         unitId: feed.unitId,
         unitName: feed.unit.name,

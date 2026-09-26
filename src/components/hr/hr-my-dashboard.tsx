@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
 import { PdfDownloadButton } from "@/components/pdf-download-button";
+import { MonthlyPayCard } from "@/components/hr/monthly-pay-card";
 import { PayslipYtdCard } from "@/components/hr/payslip-ytd-card";
 import { UiSelect } from "@/components/ui-select";
 import type { PayslipYtdSummary } from "@/lib/hr-payslip-ytd";
@@ -578,26 +579,40 @@ export function HrMyDashboard({
           </Link>
         </div>
       ) : null}
-      <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4">
-        <p className="text-lg font-semibold text-foreground">{p.fullName}</p>
-        <p className="text-sm text-muted">
-          {p.position || "Team member"}
-          {p.department ? ` · ${p.department}` : ""}
-        </p>
-        {p.employeeNumber ? <p className="mt-1 text-xs text-muted">Employee ID: {p.employeeNumber}</p> : null}
+      <div className="flex items-center gap-5 rounded-2xl border border-foreground/10 bg-background px-5 py-5">
+        <EmployeePassportPhotoUpload
+          variant="avatar"
+          size="lg"
+          tenantSlug={tenantSlug}
+          userId={previewAs ? previewAs.userId : p.userId}
+          fullName={p.fullName}
+          photoUrl={p.photoUrl}
+          readOnly={Boolean(previewAs)}
+        />
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Your record</p>
+          <p className="mt-1 truncate text-2xl font-semibold tracking-tight text-foreground">{p.fullName}</p>
+          <p className="mt-1 text-sm text-muted">
+            {p.position || "Team member"}
+            {p.department ? ` · ${p.department}` : ""}
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            {[p.employeeNumber ? `Employee ID ${p.employeeNumber}` : null, p.workEmail || null]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-foreground/10 pb-1">
+      <div className="flex flex-wrap gap-1 rounded-xl border border-foreground/10 p-1">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
             className={[
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              tab === t.id
-                ? "bg-foreground text-background"
-                : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+              tab === t.id ? "bg-foreground text-background" : "text-muted hover:text-foreground",
             ].join(" ")}
           >
             {t.label}
@@ -617,6 +632,7 @@ export function HrMyDashboard({
 
       {tab === "overview" ? (
         <div className="space-y-3">
+          <MonthlyPayCard profile={p} currency={currency} />
           {onboardingComplete ? (
             <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4">
               <p className="text-sm font-semibold text-[var(--success)]">Onboarding forms complete</p>
@@ -659,75 +675,93 @@ export function HrMyDashboard({
               </button>
             )
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 lg:grid-cols-3">
             <button
               type="button"
               onClick={() => setTab("leave")}
-              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+              className="rounded-2xl border border-foreground/10 bg-background p-5 text-left hover:bg-foreground/[0.02]"
             >
-              <CalendarDays className="h-5 w-5 text-muted" />
-              <p className="mt-2 text-2xl font-bold text-foreground">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Leave</p>
+              <p className="mt-3 text-4xl font-semibold tabular-nums tracking-tight text-foreground">
                 {annualLeave?.unlimited
                   ? "Unlimited"
                   : annualLeave?.available != null
                     ? annualLeave.available
                     : "—"}
               </p>
-              <p className="text-xs text-muted">
-                {annualLeave
-                  ? `${annualLeave.name} remaining`
-                  : "Leave days — request time away"}
-                {pendingLeaveCount ? ` · ${pendingLeaveCount} pending` : ""}
+              <p className="mt-1 text-sm text-muted">
+                {annualLeave ? `${annualLeave.name} remaining` : "Ask HR to set your leave"}
               </p>
+              {pendingLeaveCount ? (
+                <p className="mt-3 text-xs font-semibold text-foreground">{pendingLeaveCount} request pending</p>
+              ) : null}
             </button>
-            <button
-              type="button"
-              onClick={() => setTab("payslips")}
-              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
-            >
-              <p className="text-2xl font-bold text-foreground">{myView.payslips.length}</p>
-              <p className="text-xs text-muted">Payslips to review</p>
-            </button>
+            <div className="grid gap-3 sm:grid-cols-3 lg:col-span-2">
+              {(
+                [
+                  {
+                    label: "Payslips",
+                    value: String(myView.payslips.length),
+                    hint: myView.payslips.length ? "Ready to open" : "None published yet",
+                    onClick: () => setTab("payslips"),
+                  },
+                  {
+                    label: "Documents",
+                    value: String(myView.documents.length),
+                    hint: myView.documents.length ? "On your file" : "None on file",
+                    onClick: () => setTab("documents"),
+                  },
+                  {
+                    label: "Appraisals",
+                    value: String(openAppraisals.length),
+                    hint: openAppraisals.length ? "Waiting for you" : "None open",
+                    onClick: () => setTab("appraisals"),
+                  },
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={item.onClick}
+                  className="rounded-2xl border border-foreground/10 bg-background p-4 text-left hover:bg-foreground/[0.02]"
+                >
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{item.label}</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{item.value}</p>
+                  <p className="mt-1 text-xs text-muted">{item.hint}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => {
                 setRecordSection("bank");
                 setTab("record");
               }}
-              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+              className="rounded-2xl border border-foreground/10 bg-background px-5 py-4 text-left hover:bg-foreground/[0.02]"
             >
-              <p className="text-sm font-semibold text-foreground">
-                {salaryBankListed ? p.bankName : "Not listed"}
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Salary account</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
+                {salaryBankListed ? p.bankName : "Not listed yet"}
               </p>
               <p className="mt-1 font-mono text-sm text-foreground">
-                {p.bankAccountNumber?.trim() ? p.bankAccountNumber : "No salary account on file"}
+                {p.bankAccountNumber?.trim() || "HR has not added an account"}
               </p>
-              <p className="mt-1 text-xs text-muted">Salary bank account</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("documents")}
-              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
-            >
-              <p className="text-2xl font-bold text-foreground">{myView.documents.length}</p>
-              <p className="text-xs text-muted">HR documents</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("appraisals")}
-              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
-            >
-              <p className="text-2xl font-bold text-foreground">{openAppraisals.length}</p>
-              <p className="text-xs text-muted">Appraisals to complete</p>
             </button>
             <button
               type="button"
               onClick={() => setTab("record")}
-              className="rounded-lg border border-foreground/10 p-4 text-left hover:bg-foreground/[0.03]"
+              className="rounded-2xl border border-foreground/10 bg-background px-5 py-4 text-left hover:bg-foreground/[0.02]"
             >
-              <p className="text-2xl font-bold text-foreground">{missingOnFile.length ? missingOnFile.length : "✓"}</p>
-              <p className="text-xs text-muted">
-                {missingOnFile.length ? "Items not listed on your record" : "View my record"}
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Record</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
+                {missingOnFile.length
+                  ? `${missingOnFile.length} item${missingOnFile.length === 1 ? "" : "s"} still missing`
+                  : "Your record is filled in"}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {p.phoneMobile?.trim() || "Add a mobile number"} · open the full record
               </p>
             </button>
           </div>
@@ -1095,10 +1129,9 @@ export function HrMyDashboard({
                   <ReadRow label="Job title" value={p.position} />
                   <ReadRow label="Department" value={p.department} />
                   <ReadRow label="Date of joining" value={p.dateOfJoining} />
-                  <ReadRow
-                    label="Monthly gross pay"
-                    value={p.grossMonthly ? `${currency} ${Number(p.grossMonthly).toLocaleString()}` : null}
-                  />
+                  <div className="py-3">
+                    <MonthlyPayCard profile={p} currency={currency} />
+                  </div>
                 </>
               ) : (
                 <div className="grid gap-3 py-3">
@@ -1113,11 +1146,7 @@ export function HrMyDashboard({
                       className={inputClass}
                     />
                   </label>
-                  <ReadRow
-                    label="Monthly gross pay"
-                    value={p.grossMonthly ? `${currency} ${Number(p.grossMonthly).toLocaleString()}` : null}
-                  />
-                  <p className="text-[11px] text-muted">Ask HR if your salary is wrong. You cannot change it here.</p>
+                  <MonthlyPayCard profile={p} currency={currency} />
                 </div>
               )
             ) : null}

@@ -13,6 +13,15 @@ export async function syncCalendarImport(importId: string): Promise<{ ok: true; 
     select: { id: true, tenantId: true, unitId: true, provider: true, icalUrl: true },
   });
   if (!row) return { ok: false, error: "Calendar link not found." };
+  if (row.provider === ChannelProvider.AIRBNB) {
+    const linked = await prisma.shortletUnit.findUnique({
+      where: { id: row.unitId },
+      select: { airbnbListingId: true },
+    });
+    if (linked?.airbnbListingId) {
+      return { ok: true, blocks: 0 };
+    }
+  }
   const url = publicHttpsUrl(row.icalUrl);
   if (!url) return { ok: false, error: "Calendar link must be a public https URL." };
 

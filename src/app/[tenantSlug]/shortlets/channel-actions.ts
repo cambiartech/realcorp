@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { ChannelProvider, MembershipRole, MembershipStatus } from "@/generated/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
+import { syncAirbnbTenant } from "@/lib/channels/airbnb/sync";
 import { INBOUND_CALENDAR_PROVIDERS, syncCalendarImport } from "@/lib/channels/sync-import";
 import { generateChannelToken } from "@/lib/channels/tokens";
 import { publicHttpsUrl } from "@/lib/channels/public-url";
@@ -145,6 +146,40 @@ export async function revokePellowsChannel(tenantSlug: string): Promise<ActionRe
     entityId: existing.id,
     action: "REVOKE",
     summary: "Turned off Pellows. The previous token no longer works.",
+  });
+  refresh(tenantSlug);
+  return { ok: true };
+}
+
+export async function syncAirbnbChannel(tenantSlug: string): Promise<ActionResult> {
+  const actor = await requireManager(tenantSlug);
+  if (!actor.ok) return actor;
+  const result = await syncAirbnbTenant(actor.tenantId);
+  refresh(tenantSlug);
+  if (!result.ok) return result;
+  return { ok: true };
+}
+
+export async function disconnectAirbnbChannel(tenantSlug: string): Promise<ActionResult> {
+  const actor = await requireManager(tenantSlug);
+  if (!actor.ok) return actor;
+  const link = await prisma.airbnbHostLink.findUnique({
+    where: { tenantId: actor.tenantId },
+    select: { id: true, status: true },
+  });
+  if (!link || link.status !== "ACTIVE") return { ok: false, error: "Airbnb is already off." };
+  await prisma.airbnbHostLink.update({
+    where: { id: link.id },
+    data: { status: "REVOKED", accessTokenCipher: "revoked", refreshTokenCipher: null },
+  });
+  await writeAuditLog({
+    tenantId: actor.tenantId,
+    actorUserId: actor.userId,
+    actorLabel: actor.actorLabel,
+    module: "SHORTLETS",
+    entityType: "AIRBNB_HOST_LINK",
+    action: "REVOKE",
+    summary: "Disconnected Airbnb. Imported apartments stay on the board.",
   });
   refresh(tenantSlug);
   return { ok: true };

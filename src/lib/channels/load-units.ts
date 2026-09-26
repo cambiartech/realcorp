@@ -187,7 +187,7 @@ export async function loadChannelUnits(
       ...(bathrooms != null ? { bathrooms } : {}),
       maxGuests: unit.maxOccupancy && unit.maxOccupancy > 0 ? unit.maxOccupancy : 2,
       amenities: [...new Set(amenities)],
-      photoUrls: httpsUrls([unit.projectUnit?.project?.coverImageUrl, ...gallery]),
+      photoUrls: httpsUrls([...asStringList(unit.photoUrls), unit.projectUnit?.project?.coverImageUrl, ...gallery]),
       icalUrl: unit.calendarFeed ? unitIcalUrl(unit.calendarFeed.feedToken) : "",
       blocks,
       ...(archived ? { archived: true as const } : {}),

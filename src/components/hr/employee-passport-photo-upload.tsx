@@ -18,6 +18,9 @@ type Props = {
   readOnly?: boolean;
   /** Compact for forms; default is a fuller card. */
   compact?: boolean;
+  /** Circle only. A click opens the photo picker. */
+  variant?: "card" | "avatar";
+  size?: "sm" | "md" | "lg";
 };
 
 export function EmployeePassportPhotoUpload({
@@ -27,6 +30,8 @@ export function EmployeePassportPhotoUpload({
   photoUrl,
   readOnly = false,
   compact = false,
+  variant = "card",
+  size = "md",
 }: Props) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -107,6 +112,53 @@ export function EmployeePassportPhotoUpload({
     .map((part) => part[0]?.toUpperCase() || "")
     .join("");
 
+  const sizeClass = size === "sm" ? "h-8 w-8" : size === "lg" ? "h-20 w-20" : "h-10 w-10";
+
+  if (variant === "avatar") {
+    return (
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          disabled={readOnly || busy}
+          title={readOnly ? fullName || "Passport photo" : "Upload passport photo"}
+          aria-label={readOnly ? fullName || "Passport photo" : "Upload passport photo"}
+          onClick={() => inputRef.current?.click()}
+          className={[
+            "overflow-hidden rounded-full border border-foreground/15 bg-foreground/[0.06] text-xs font-semibold text-foreground",
+            sizeClass,
+            readOnly ? "cursor-default" : "cursor-pointer hover:opacity-90",
+          ].join(" ")}
+        >
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center">{initials || "?"}</span>
+          )}
+        </button>
+        {busy ? (
+          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-background/70">
+            <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+          </div>
+        ) : null}
+        {!readOnly ? (
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void uploadFile(file);
+            }}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className={[
@@ -140,9 +192,6 @@ export function EmployeePassportPhotoUpload({
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">Passport photo</p>
-          <p className="mt-0.5 text-xs text-muted">
-            Clear head-and-shoulders photo. HR can upload it, or the employee can add it from My HR.
-          </p>
 
           {!readOnly ? (
             <div
