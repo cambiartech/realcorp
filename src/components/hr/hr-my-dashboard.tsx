@@ -632,25 +632,6 @@ export function HrMyDashboard({
 
       {tab === "overview" ? (
         <div className="space-y-3">
-          <MonthlyPayCard profile={p} currency={currency} />
-          {onboardingComplete ? (
-            <div className="rounded-lg border border-[var(--success-line)] bg-[var(--success-wash)] p-4">
-              <p className="text-sm font-semibold text-[var(--success)]">Onboarding forms complete</p>
-              <p className="mt-1 text-sm text-[var(--success)]">
-                You submitted {onboarding.submittedCount} section{onboarding.submittedCount === 1 ? "" : "s"}.
-                HR will review your information
-                {onboarding.submittedAtLabel !== "—" ? ` (last update ${onboarding.submittedAtLabel})` : ""}.
-              </p>
-              {onboarding.viewUrl ? (
-                <a
-                  href={onboarding.viewUrl}
-                  className="mt-2 inline-block text-xs font-semibold text-[var(--success)] underline"
-                >
-                  View submitted forms
-                </a>
-              ) : null}
-            </div>
-          ) : null}
           {pendingActionCount > 0 ? (
             onboardingPending && onboarding.masterUrl ? (
               <a
@@ -675,6 +656,7 @@ export function HrMyDashboard({
               </button>
             )
           ) : null}
+          <MonthlyPayCard profile={p} currency={currency} />
           <div className="grid gap-3 lg:grid-cols-3">
             <button
               type="button"
@@ -749,21 +731,24 @@ export function HrMyDashboard({
                 {p.bankAccountNumber?.trim() || "HR has not added an account"}
               </p>
             </button>
-            <button
-              type="button"
-              onClick={() => setTab("record")}
-              className="rounded-2xl border border-foreground/10 bg-background px-5 py-4 text-left hover:bg-foreground/[0.02]"
-            >
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Record</p>
-              <p className="mt-2 text-sm font-semibold text-foreground">
-                {missingOnFile.length
-                  ? `${missingOnFile.length} item${missingOnFile.length === 1 ? "" : "s"} still missing`
-                  : "Your record is filled in"}
-              </p>
-              <p className="mt-1 text-xs text-muted">
-                {p.phoneMobile?.trim() || "Add a mobile number"} · open the full record
-              </p>
-            </button>
+            <div className="rounded-2xl border border-foreground/10 bg-background px-5 py-4 text-left">
+              <button type="button" onClick={() => setTab("record")} className="w-full text-left">
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Record</p>
+                <p className="mt-2 text-sm font-semibold text-foreground">
+                  {missingOnFile.length
+                    ? `${missingOnFile.length} item${missingOnFile.length === 1 ? "" : "s"} still missing`
+                    : "Your record is filled in"}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  {p.phoneMobile?.trim() || "Add a mobile number"} · open the full record
+                </p>
+              </button>
+              {onboardingComplete && onboarding.viewUrl ? (
+                <a href={onboarding.viewUrl} className="mt-2 inline-block text-xs font-semibold text-foreground underline">
+                  Submitted forms
+                </a>
+              ) : null}
+            </div>
           </div>
           {missingBanner}
         </div>

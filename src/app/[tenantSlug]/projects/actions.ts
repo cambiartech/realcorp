@@ -720,6 +720,60 @@ export async function updateUnit(
   return { ok: true };
 }
 
+/** Sets this listing's own service charge. Zero is stored. Null uses the project charge. */
+export async function updateUnitServiceFee(
+  tenantSlug: string,
+  projectId: string,
+  unitId: string,
+  serviceFee: number | null,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  if (serviceFee != null && (!Number.isFinite(serviceFee) || serviceFee < 0)) {
+    return { ok: false, error: "Service charge must be zero or more." };
+  }
+
+  const { tenant, canManage } = await getTenantAndAccess(
+    tenantSlug,
+    session.user.id,
+    session.user.isPlatformAdmin,
+  );
+  if (!tenant) return { ok: false, error: "Tenant not found." };
+  if (!canManage) return { ok: false, error: "Only org admins and sales managers can edit units." };
+
+  const unit = await prisma.unit.findFirst({
+    where: { id: unitId, tenantId: tenant.id, projectId },
+    select: { id: true, label: true },
+  });
+  if (!unit) return { ok: false, error: "Unit not found." };
+
+  try {
+    await prisma.unit.update({
+      where: { id: unit.id },
+      data: { serviceFee },
+    });
+    await writeAuditLog({
+      tenantId: tenant.id,
+      actorUserId: session.user.id,
+      actorLabel: session.user.name || session.user.email || "Unknown",
+      module: "PROJECTS",
+      entityType: "UNIT",
+      entityId: unit.id,
+      action: "UPDATE",
+      summary:
+        serviceFee == null
+          ? `Cleared the service charge on ${unit.label}.`
+          : `Set the service charge on ${unit.label} to ${serviceFee}.`,
+    });
+  } catch (error) {
+    logProjectActionError("updateUnitServiceFee", tenantSlug, error);
+    return { ok: false, error: "Could not save the service charge." };
+  }
+
+  revalidatePath(`/${tenantSlug}/projects/${projectId}`);
+  return { ok: true };
+}
+
 export async function deleteUnit(
   tenantSlug: string,
   projectId: string,

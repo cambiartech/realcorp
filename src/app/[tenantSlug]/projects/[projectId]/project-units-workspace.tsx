@@ -31,6 +31,7 @@ import {
   updateUnit,
 } from "../actions";
 import { AddUnitsModal } from "./add-units-modal";
+import { ServiceChargeBoard } from "./service-charge-board";
 import { ImportClientsFromUnitsModal } from "@/components/clients/import-clients-from-units-modal";
 import { TableSearch, filterTableRows } from "@/components/table-search";
 import { SortTh, useTableSort } from "@/components/sort-th";
@@ -92,7 +93,7 @@ export function ProjectUnitsWorkspace({
   currencies: string[];
   defaultCurrency: string;
 }) {
-  const [activeTab, setActiveTab] = useState<"units" | "pricing">("units");
+  const [activeTab, setActiveTab] = useState<"units" | "pricing" | "service">("units");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<UnitRow | null>(null);
   const [deletingUnit, setDeletingUnit] = useState<UnitRow | null>(null);
@@ -367,10 +368,35 @@ export function ProjectUnitsWorkspace({
               ].join(" ")}
             />
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("service")}
+            className={[
+              "relative py-2 text-sm font-medium",
+              activeTab === "service" ? "text-foreground" : "text-muted",
+            ].join(" ")}
+          >
+            Service charge
+            <span
+              className={[
+                "absolute -bottom-px left-0 h-0.5 w-full",
+                activeTab === "service" ? "bg-foreground" : "bg-transparent",
+              ].join(" ")}
+            />
+          </button>
         </div>
       </div>
 
-      {activeTab === "pricing" ? (
+      {activeTab === "service" ? (
+        <ServiceChargeBoard
+          tenantSlug={tenantSlug}
+          projectId={projectId}
+          currency={projectCurrency || defaultCurrency}
+          projectCharge={serviceCharge ?? null}
+          units={units}
+          canManage={canManage}
+        />
+      ) : activeTab === "pricing" ? (
         <section className="mt-5">
           <div className="mb-3">
             <TableSearch
@@ -493,11 +519,9 @@ export function ProjectUnitsWorkspace({
                     <td className="px-4 py-3 text-muted">{unit.unitType}</td>
                     <td className="px-4 py-3 text-muted">{unit.pricingPlanName}</td>
                     <td className="px-4 py-3 text-muted">
-                      {unit.resolvedServiceFee > 0
-                        ? `${projectCurrency || defaultCurrency} ${unit.resolvedServiceFee.toLocaleString()}`
-                        : "—"}
-                      {unit.serviceFee == null && serviceCharge != null && serviceCharge > 0 ? (
-                        <span className="block text-[11px] text-muted">Project default</span>
+                      {`${projectCurrency || defaultCurrency} ${unit.resolvedServiceFee.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      {unit.serviceFee == null && serviceCharge != null ? (
+                        <span className="block text-[11px] text-muted">Project charge</span>
                       ) : null}
                     </td>
                     <td className="px-4 py-3 text-foreground/90">{unit.status}</td>
