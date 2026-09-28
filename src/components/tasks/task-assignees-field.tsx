@@ -5,9 +5,11 @@ import { useMemo, useState } from "react";
 export function TaskAssigneesField({
   options,
   defaultIds,
+  onSelectionChange,
 }: {
   options: Array<{ value: string; label: string }>;
   defaultIds: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }) {
   const [selected, setSelected] = useState(defaultIds);
   const [query, setQuery] = useState("");
@@ -18,9 +20,11 @@ export function TaskAssigneesField({
   }, [options, query]);
 
   function toggle(id: string) {
-    setSelected((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
+    setSelected((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      onSelectionChange?.(next);
+      return next;
+    });
   }
 
   return (

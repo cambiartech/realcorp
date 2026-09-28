@@ -3,13 +3,17 @@ import {
   applyPaystackTransferWebhook,
   verifyPaystackWebhookSignature,
 } from "@/lib/payroll/disbursement";
+import { applyPaystackDedicatedAccountWebhook } from "@/lib/payroll/disbursement/dedicated-account-post";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Paystack Transfers webhook.
+ * Paystack webhook.
  * Dashboard → Settings → API Keys & Webhooks → webhook URL:
  *   https://<host>/api/webhooks/paystack
+ * transfer.* finalizes salary payouts.
+ * charge.success on a dedicated NUBAN credits the org float when that account
+ * is saved on the tenant in platform admin.
  */
 export async function POST(req: Request) {
   const rawBody = await req.text();
@@ -29,6 +33,17 @@ export async function POST(req: Request) {
   }
 
   const event = payload.event || "";
+  if (event === "charge.success") {
+    const credited = await applyPaystackDedicatedAccountWebhook({
+      event,
+      data: payload.data,
+    });
+    if (!credited.ok) {
+      return NextResponse.json({ error: credited.error }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, handled: credited.handled, ignored: !credited.handled });
+  }
+
   if (!event.startsWith("transfer.")) {
     return NextResponse.json({ ok: true, ignored: true });
   }

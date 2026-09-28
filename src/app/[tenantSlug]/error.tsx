@@ -23,6 +23,10 @@ export default function TenantError({
     fallbackRef.current = `e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   }
   const reference = errorReference(error, fallbackRef.current);
+  const stalePage =
+    error.name === "UnrecognizedActionError" ||
+    /was not found on the server/i.test(error.message || "") ||
+    /failed-to-find-server-action/i.test(error.message || "");
 
   useEffect(() => {
     console.error("[tenant-error]", error);
@@ -52,7 +56,9 @@ export default function TenantError({
       <div className="w-full max-w-md rounded-xl border border-foreground/10 bg-foreground/[0.02] p-5 text-center shadow-sm">
         <h1 className="text-lg font-semibold text-foreground">Something went wrong on this page</h1>
         <p className="mt-2 text-sm text-muted">
-          The rest of the app is fine — try again, or head back to your dashboard.
+          {stalePage
+            ? "This page is out of date. Reload it and continue — what you already typed on Tasks stays on this browser."
+            : "The rest of the app is fine — try again, or head back to your dashboard."}
         </p>
         <p className="mt-4 text-xs text-muted">
           Quote this reference if you send a screenshot.
@@ -66,10 +72,10 @@ export default function TenantError({
         <div className="mt-5 flex justify-center gap-2">
           <button
             type="button"
-            onClick={() => reset()}
+            onClick={() => (stalePage ? window.location.reload() : reset())}
             className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90"
           >
-            Try again
+            {stalePage ? "Reload page" : "Try again"}
           </button>
           <button
             type="button"

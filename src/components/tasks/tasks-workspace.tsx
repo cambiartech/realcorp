@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -33,6 +33,13 @@ import {
   TASK_COMPLETED_SHELF_DAYS,
 } from "@/lib/task-completed-shelf";
 import { recurrenceFrequencyLabel } from "@/lib/work-task-recurrence";
+import {
+  clearTaskCreateDraft,
+  draftFromFormData,
+  readTaskCreateDraft,
+  writeTaskCreateDraft,
+  type TaskCreateDraft,
+} from "@/lib/task-create-draft";
 
 export type TaskSpaceRow = {
   id: string;
@@ -191,6 +198,8 @@ export function TasksWorkspace({
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createDefaults, setCreateDefaults] = useState<TaskCreateDraft | null>(null);
+  const restoredFormRef = useRef(false);
   const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
   const preferredSpaceId = defaultSpaceIdForDepartment(spaces, department);
   const [createSpaceId, setCreateSpaceId] = useState(preferredSpaceId);
@@ -206,6 +215,57 @@ export function TasksWorkspace({
   const [deleteScope, setDeleteScope] = useState<"THIS" | "SERIES">("THIS");
   const [editingTask, setEditingTask] = useState<WorkTaskRow | null>(null);
   const [editSpaceId, setEditSpaceId] = useState(spaces[0]?.id || "");
+
+  useEffect(() => {
+    if (restoredFormRef.current) return;
+    const stored = readTaskCreateDraft(tenantSlug, currentUserId);
+    if (!stored) return;
+    restoredFormRef.current = true;
+    if (stored.taskId) {
+      const task = tasks.find((row) => row.id === stored.taskId);
+      if (task) {
+        const frequency = (stored.recurrenceFrequency || "") as "" | WorkTaskRecurrenceFrequency;
+        const priority = (["LOW", "MEDIUM", "HIGH", "URGENT"] as const).includes(
+          stored.priority as WorkTaskRow["priority"],
+        )
+          ? (stored.priority as WorkTaskRow["priority"])
+          : task.priority;
+        setEditSpaceId(stored.spaceId || task.spaceId || spaces[0]?.id || "");
+        setEditRecurrenceFrequency(frequency || task.recurrenceFrequency || "");
+        setEditRecurrenceEndMode(
+          (stored.recurrenceEndMode as "NEVER" | "UNTIL_DATE" | "AFTER_COUNT") || "NEVER",
+        );
+        setEditingTask({
+          ...task,
+          title: stored.title || task.title,
+          description: stored.description || task.description,
+          priority,
+          spaceId: stored.spaceId || task.spaceId,
+          projectId: stored.projectId || task.projectId,
+          assigneeUserIds: stored.assigneeUserIds.length ? stored.assigneeUserIds : task.assigneeUserIds,
+          dueDateValue: stored.dueDate || task.dueDateValue,
+          sprintLabel: stored.sprintLabel || task.sprintLabel,
+          recurrenceFrequency: frequency || task.recurrenceFrequency,
+          recurrenceEndsAtValue: stored.recurrenceEndsAt || task.recurrenceEndsAtValue,
+          recurrenceMaxOccurrences: stored.recurrenceMaxOccurrences
+            ? Number(stored.recurrenceMaxOccurrences)
+            : task.recurrenceMaxOccurrences,
+        });
+        showSnackbar("Restored the task you were editing.", "success");
+        return;
+      }
+    }
+    if (stored.spaceId) setCreateSpaceId(stored.spaceId);
+    if (stored.recurrenceFrequency) {
+      setCreateRecurrenceFrequency(stored.recurrenceFrequency as WorkTaskRecurrenceFrequency);
+    }
+    if (stored.recurrenceEndMode === "UNTIL_DATE" || stored.recurrenceEndMode === "AFTER_COUNT") {
+      setCreateRecurrenceEndMode(stored.recurrenceEndMode);
+    }
+    setCreateDefaults(stored);
+    setIsCreateOpen(true);
+    showSnackbar("Restored the task you were filling in.", "success");
+  }, [currentUserId, showSnackbar, spaces, tasks, tenantSlug]);
 
   function openCreateModal() {
     setCreateSpaceId(preferredSpaceId);
@@ -298,6 +358,7 @@ export function TasksWorkspace({
         | "UNTIL_DATE"
         | "AFTER_COUNT";
       const maxRaw = String(formData.get("recurrenceMaxOccurrences") || "").trim();
+      writeTaskCreateDraft(tenantSlug, currentUserId, draftFromFormData(formData));
       const result = await createWorkTask(tenantSlug, {
         title: String(formData.get("title") || ""),
         description: String(formData.get("description") || "") || undefined,
@@ -322,6 +383,8 @@ export function TasksWorkspace({
         frequencyRaw ? "Recurring task created." : "Task created.",
         "success",
       );
+      clearTaskCreateDraft(tenantSlug, currentUserId);
+      setCreateDefaults(null);
       setIsCreateOpen(false);
       router.refresh();
     });
@@ -389,6 +452,10 @@ export function TasksWorkspace({
         | "UNTIL_DATE"
         | "AFTER_COUNT";
       const maxRaw = String(formData.get("recurrenceMaxOccurrences") || "").trim();
+      writeTaskCreateDraft(tenantSlug, currentUserId, {
+        ...draftFromFormData(formData),
+        taskId: editingTask.id,
+      });
       const result = await updateWorkTask(tenantSlug, {
         taskId: editingTask.id,
         title: String(formData.get("title") || ""),
@@ -412,6 +479,7 @@ export function TasksWorkspace({
         return;
       }
       showSnackbar("Task updated.", "success");
+      clearTaskCreateDraft(tenantSlug, currentUserId);
       setEditingTask(null);
       router.refresh();
     });
@@ -997,7 +1065,17 @@ export function TasksWorkspace({
               ×
             </button>
           </div>
-          <form action={handleEdit} className="mt-4 space-y-3">
+          <form
+            id={`edit-task-${editingTask.id}`}
+            action={handleEdit}
+            className="mt-4 space-y-3"
+            onInput={(event) => {
+              writeTaskCreateDraft(tenantSlug, currentUserId, {
+                ...draftFromFormData(new FormData(event.currentTarget)),
+                taskId: editingTask.id,
+              });
+            }}
+          >
             <div>
               <label className="mb-1 block text-sm text-muted">Title</label>
               <input
@@ -1068,6 +1146,16 @@ export function TasksWorkspace({
                 key={editingTask.id}
                 options={assigneeOptions}
                 defaultIds={editingTask.assigneeUserIds}
+                onSelectionChange={(ids) => {
+                  const form = document.getElementById(`edit-task-${editingTask.id}`) as HTMLFormElement | null;
+                  const draft = form ? draftFromFormData(new FormData(form)) : draftFromFormData(new FormData());
+                  writeTaskCreateDraft(tenantSlug, currentUserId, {
+                    ...draft,
+                    assigneeUserIds: ids,
+                    taskId: editingTask.id,
+                    title: draft.title || editingTask.title,
+                  });
+                }}
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1213,12 +1301,20 @@ export function TasksWorkspace({
             ×
           </button>
         </div>
-        <form action={handleCreate} className="mt-5 space-y-4">
+        <form
+          id="create-task-form"
+          action={handleCreate}
+          className="mt-5 space-y-4"
+          onInput={(event) => {
+            writeTaskCreateDraft(tenantSlug, currentUserId, draftFromFormData(new FormData(event.currentTarget)));
+          }}
+        >
           <div>
             <label className="mb-1 block text-sm text-muted">Title</label>
             <input
               name="title"
               required
+              defaultValue={createDefaults?.title || ""}
               className="w-full border border-foreground/15 bg-field px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
@@ -1227,6 +1323,7 @@ export function TasksWorkspace({
             <textarea
               name="description"
               rows={4}
+              defaultValue={createDefaults?.description || ""}
               className="w-full border border-foreground/15 bg-field px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
@@ -1250,7 +1347,7 @@ export function TasksWorkspace({
               <SearchableSelect
                 key={createSpaceId || "no-create-space"}
                 name="projectId"
-                defaultValue=""
+                defaultValue={createDefaults?.projectId || ""}
                 allowEmpty
                 emptyLabel="None"
                 emptyText={projectEmptyText}
@@ -1270,13 +1367,25 @@ export function TasksWorkspace({
             <div>
               <label className="mb-1 block text-sm text-muted">Assignees</label>
               <TaskAssigneesField
+                key={(createDefaults?.assigneeUserIds || [currentUserId]).join(",")}
                 options={assigneeOptions}
-                defaultIds={currentUserId ? [currentUserId] : []}
+                defaultIds={
+                  createDefaults?.assigneeUserIds.length
+                    ? createDefaults.assigneeUserIds
+                    : currentUserId
+                      ? [currentUserId]
+                      : []
+                }
+                onSelectionChange={(ids) => {
+                  const form = document.getElementById("create-task-form") as HTMLFormElement | null;
+                  const draft = form ? draftFromFormData(new FormData(form)) : draftFromFormData(new FormData());
+                  writeTaskCreateDraft(tenantSlug, currentUserId, { ...draft, assigneeUserIds: ids });
+                }}
               />
             </div>
             <div>
               <label className="mb-1 block text-sm text-muted">Priority</label>
-              <UiSelect name="priority" defaultValue="MEDIUM">
+              <UiSelect name="priority" defaultValue={createDefaults?.priority || "MEDIUM"}>
                 <option value="LOW">Low</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>
@@ -1291,6 +1400,7 @@ export function TasksWorkspace({
                 name="dueDate"
                 type="date"
                 required={Boolean(createRecurrenceFrequency)}
+                defaultValue={createDefaults?.dueDate || ""}
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
@@ -1299,6 +1409,7 @@ export function TasksWorkspace({
               <input
                 name="sprintLabel"
                 placeholder="Sprint 12"
+                defaultValue={createDefaults?.sprintLabel || ""}
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
@@ -1347,6 +1458,7 @@ export function TasksWorkspace({
                 name="recurrenceEndsAt"
                 type="date"
                 required
+                defaultValue={createDefaults?.recurrenceEndsAt || ""}
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
@@ -1360,7 +1472,7 @@ export function TasksWorkspace({
                 min={1}
                 max={999}
                 required
-                defaultValue={12}
+                defaultValue={createDefaults?.recurrenceMaxOccurrences || 12}
                 className="w-full border border-foreground/15 bg-field px-3 py-2 text-foreground"
               />
             </div>
