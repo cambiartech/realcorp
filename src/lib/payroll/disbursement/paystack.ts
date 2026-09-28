@@ -59,6 +59,32 @@ export type ResolvedAccount = {
   bank_id?: number;
 };
 
+export type PaystackBank = {
+  name: string;
+  code: string;
+  slug?: string;
+};
+
+export async function paystackListBanks(): Promise<PaystackResult<PaystackBank[]>> {
+  const banks: PaystackBank[] = [];
+  for (let page = 1; page <= 8; page += 1) {
+    const listed = await paystackFetch<PaystackBank[]>(
+      `/bank?country=nigeria&perPage=100&page=${page}`,
+    );
+    if (!listed.ok) {
+      if (page === 1) return listed;
+      break;
+    }
+    const batch = Array.isArray(listed.data) ? listed.data : [];
+    for (const bank of batch) {
+      if (!bank?.name || !bank.code) continue;
+      banks.push({ name: bank.name, code: String(bank.code), slug: bank.slug });
+    }
+    if (batch.length < 100) break;
+  }
+  return { ok: true, data: banks };
+}
+
 export async function paystackResolveAccount(
   accountNumber: string,
   bankCode: string,

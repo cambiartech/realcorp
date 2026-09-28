@@ -7,7 +7,8 @@ import {
   type Prisma,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { parseSalaryBankAccount } from "./bank-account";
+import { parseSalaryBankAccount, salaryBankAccountToJson } from "./bank-account";
+import { completeSalaryBank } from "./bank-match";
 import {
   getAvailableBalanceKobo,
   PayrollLedgerError,
@@ -24,6 +25,7 @@ import {
   isPaystackConfigured,
   paystackCreateRecipient,
   paystackInitiateTransfer,
+  paystackListBanks,
   paystackResolveAccount,
 } from "./paystack";
 import { estimatePaystackTransferFeeKobo } from "./provider-fees";
@@ -104,14 +106,43 @@ export async function createDisbursementBatchFromRun(
   let totalProviderFeeKobo = 0;
   let skipped = 0;
 
+  const needsBankList = run.payslips.some((slip) => {
+    const parsed = parseSalaryBankAccount(slip.profile.bankAccount);
+    return parsed.ok && !parsed.disbursementReady && parsed.account.bankName;
+  });
+  const bankList = needsBankList ? await paystackListBanks() : null;
+  if (bankList && !bankList.ok) {
+    return { ok: false, error: bankList.error };
+  }
+
   for (const slip of run.payslips) {
     const net = decimalLikeToKobo(slip.netPay);
     if (net <= 0) {
       skipped += 1;
       continue;
     }
-    const bank = parseSalaryBankAccount(slip.profile.bankAccount);
+    let bank = parseSalaryBankAccount(slip.profile.bankAccount);
     const ref = `rcpay_${run.id.slice(-8)}_${slip.id.slice(-10)}_${Date.now().toString(36)}`.slice(0, 50);
+
+    if (bank.ok && !bank.disbursementReady && bankList?.ok) {
+      const completed = completeSalaryBank(bank.account, bankList.data, slip.profile.fullName || "");
+      if (completed.ok) {
+        if (completed.changed) {
+          await prisma.employeeProfile.update({
+            where: { id: slip.profile.id },
+            data: { bankAccount: salaryBankAccountToJson(completed.account) },
+          });
+        }
+        bank = {
+          ok: true,
+          account: completed.account,
+          disbursementReady: true,
+          warnings: [],
+        };
+      } else if (!bank.account.bankCode) {
+        bank = { ok: false, error: completed.error };
+      }
+    }
 
     if (!bank.ok || !bank.disbursementReady) {
       lines.push({
@@ -125,9 +156,9 @@ export async function createDisbursementBatchFromRun(
         accountName: bank.ok ? bank.account.accountHolderName : slip.profile.fullName || "Employee",
         providerReference: ref,
         status: PayrollDisbursementLineStatus.SKIPPED,
-        failureReason: bank.ok
-          ? bank.warnings.join(" ") || "Bank details incomplete."
-          : bank.error,
+        failureReason: `${slip.profile.fullName || "Employee"}: ${
+          bank.ok ? bank.warnings.join(" ") || "Bank details incomplete." : bank.error
+        }`,
       });
       skipped += 1;
       continue;
@@ -155,10 +186,10 @@ export async function createDisbursementBatchFromRun(
 
   const sendable = lines.filter((l) => l.status === PayrollDisbursementLineStatus.PENDING);
   if (sendable.length === 0) {
+    const reason = lines.find((line) => line.failureReason)?.failureReason;
     return {
       ok: false,
-      error:
-        "No payslips are ready to disburse. Every unpaid slip needs a 10-digit NUBAN, bank code, and receive-payments = yes.",
+      error: reason || "No unpaid salary has a complete bank account.",
     };
   }
 

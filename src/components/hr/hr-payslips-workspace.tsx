@@ -31,7 +31,7 @@ import {
   savePayrollAdjustment,
   disbursePayslipRunViaPaystack,
 } from "@/app/[tenantSlug]/hr/actions";
-import { MODAL_PANEL_FORM } from "@/lib/modal-panel";
+import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
 
 const MONTHS = [
   "January",
@@ -150,6 +150,7 @@ export function HrPayslipsWorkspace({
   const [selectedRunId, setSelectedRunId] = useState<string | null>(payslipRuns[0]?.id ?? null);
   const [viewPayslipId, setViewPayslipId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [payConfirmOpen, setPayConfirmOpen] = useState(false);
   const [paymentRef, setPaymentRef] = useState("");
   const [pending, setPending] = useState(false);
   const [adjustmentTargetId, setAdjustmentTargetId] = useState<string | null>(null);
@@ -576,27 +577,12 @@ export function HrPayslipsWorkspace({
                     <button
                       type="button"
                       disabled={pending || filteredPaymentStats.pending === 0}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            `Send ${filteredPaymentStats.pending} unpaid slip(s) via Paystack?\n\nThis debits Available float and pays staff bank accounts.`,
-                          )
-                        ) {
-                          return;
-                        }
-                        void runAction(
-                          () => disbursePayslipRunViaPaystack(tenantSlug, selectedRun.id),
-                          () => "Paystack disbursement started. Webhooks will mark slips paid.",
-                        );
-                      }}
+                      onClick={() => setPayConfirmOpen(true)}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
                     >
                       <Banknote className="h-3.5 w-3.5" />
                       Pay {filteredPaymentStats.pending} via Paystack
                     </button>
-                    <p className="text-[11px] text-muted">
-                      Needs float balance + staff NUBAN & bank codes. Or mark paid manually after your own transfer.
-                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <input
@@ -836,6 +822,46 @@ export function HrPayslipsWorkspace({
           )}
         </div>
       </div>
+
+      <ModalOverlay
+        open={payConfirmOpen}
+        onClose={() => {
+          if (!pending) setPayConfirmOpen(false);
+        }}
+        panelClassName={MODAL_PANEL_XS}
+        aria-labelledby="pay-salaries-title"
+      >
+        <h2 id="pay-salaries-title" className="text-lg font-semibold text-foreground">
+          Pay {filteredPaymentStats.pending} {filteredPaymentStats.pending === 1 ? "salary" : "salaries"}
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          Paystack sends the net pay to the bank account on each person. The amount leaves the float.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setPayConfirmOpen(false)}
+            className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground hover:bg-foreground/[0.06] disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={pending || !selectedRun}
+            onClick={() => {
+              if (!selectedRun) return;
+              void runAction(
+                () => disbursePayslipRunViaPaystack(tenantSlug, selectedRun.id),
+                () => "Paystack disbursement started. Webhooks will mark slips paid.",
+              ).then(() => setPayConfirmOpen(false));
+            }}
+            className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+          >
+            Pay
+          </button>
+        </div>
+      </ModalOverlay>
 
       <ModalOverlay
         open={Boolean(adjustmentTarget && selectedRun?.statusValue === "DRAFT")}
