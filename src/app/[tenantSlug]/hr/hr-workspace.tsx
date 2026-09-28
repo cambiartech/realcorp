@@ -32,11 +32,9 @@ export function HrWorkspace(props: {
   fundingBankName: string;
   fundingAccountNumber: string;
   fundingAccountName: string;
-  fundingAccountLabel: string;
   dvaAccountNumber?: string;
   dvaBankName?: string;
   dvaAccountName?: string;
-  dvaPurpose?: string;
   aiEnabled: boolean;
   currentUserId: string;
   teamMembers: Array<{ userId: string; name: string; email: string; role: string; hasProfile: boolean }>;
@@ -356,11 +354,9 @@ export function HrWorkspace(props: {
     fundingBankName,
     fundingAccountNumber,
     fundingAccountName,
-    fundingAccountLabel,
     dvaAccountNumber,
     dvaBankName,
     dvaAccountName,
-    dvaPurpose,
     aiEnabled,
     teamMembers,
     profiles,
@@ -502,11 +498,9 @@ export function HrWorkspace(props: {
             fundingBankName={fundingBankName}
             fundingAccountNumber={fundingAccountNumber}
             fundingAccountName={fundingAccountName}
-            fundingAccountLabel={fundingAccountLabel}
             dvaAccountNumber={dvaAccountNumber}
             dvaBankName={dvaBankName}
             dvaAccountName={dvaAccountName}
-            dvaPurpose={dvaPurpose}
           />
         ) : null}
 

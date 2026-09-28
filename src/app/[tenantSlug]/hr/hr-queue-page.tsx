@@ -905,11 +905,9 @@ export default async function HrQueuePage({
       fundingBankName={disbursementSettings.fundingBankName || ""}
       fundingAccountNumber={disbursementSettings.fundingAccountNumber || ""}
       fundingAccountName={disbursementSettings.fundingAccountName || ""}
-      fundingAccountLabel={disbursementSettings.fundingAccountLabel || ""}
       dvaAccountNumber={disbursementSettings.dvaAccountNumber || ""}
       dvaBankName={disbursementSettings.dvaBankName || ""}
       dvaAccountName={disbursementSettings.dvaAccountName || ""}
-      dvaPurpose={disbursementSettings.dvaPurpose || ""}
       ytdByUserId={profiles.map((p) => ({
         userId: p.userId,
         ytd: ytdByProfileId.get(p.id) ?? {

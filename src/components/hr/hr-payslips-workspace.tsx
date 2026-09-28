@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { ModalOverlay } from "@/components/modal-overlay";
 import { PdfDownloadButton } from "@/components/pdf-download-button";
-import { PayrollWorkflowGuide } from "@/components/hr/payroll-workflow-guide";
 import { PayrollFloatPanel } from "@/components/hr/payroll-float-panel";
 import { PayslipPrintView } from "@/components/hr/payslip-print-view";
 import { useSnackbar } from "@/components/snackbar";
@@ -30,7 +29,6 @@ import {
   markPayslipPayments,
   deletePayrollAdjustment,
   savePayrollAdjustment,
-  submitPayrollFundingClaim,
   disbursePayslipRunViaPaystack,
 } from "@/app/[tenantSlug]/hr/actions";
 import { MODAL_PANEL_FORM } from "@/lib/modal-panel";
@@ -119,11 +117,9 @@ export function HrPayslipsWorkspace({
   fundingBankName,
   fundingAccountNumber,
   fundingAccountName,
-  fundingAccountLabel,
   dvaAccountNumber = "",
   dvaBankName = "",
   dvaAccountName = "",
-  dvaPurpose = "",
 }: {
   tenantSlug: string;
   companyName: string;
@@ -140,15 +136,12 @@ export function HrPayslipsWorkspace({
   fundingBankName: string;
   fundingAccountNumber: string;
   fundingAccountName: string;
-  fundingAccountLabel: string;
   dvaAccountNumber?: string;
   dvaBankName?: string;
   dvaAccountName?: string;
-  dvaPurpose?: string;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
-  const [fundingOpen, setFundingOpen] = useState(false);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -289,103 +282,15 @@ export function HrPayslipsWorkspace({
 
   return (
     <div className="space-y-5">
-      <PayrollWorkflowGuide
-        tenantSlug={tenantSlug}
-        payrollReadyCount={payrollReadyCount}
-        periodLabel={`${MONTHS[month - 1]} ${year}`}
-        periodSlipCount={generatePeriodRun?.payslipCount ?? 0}
-        periodStatus={periodStatus}
-        periodPaidCount={periodPaidCount}
-      />
-
       <PayrollFloatPanel
         currency={currency}
         availableBalanceLabel={payrollAvailableBalanceLabel}
-        fundingOpen={fundingOpen}
-        onToggleFunding={() => setFundingOpen((v) => !v)}
         dvaAccountNumber={dvaAccountNumber}
         dvaBankName={dvaBankName}
         dvaAccountName={dvaAccountName}
-        dvaPurpose={dvaPurpose}
         fundingBankName={fundingBankName}
         fundingAccountNumber={fundingAccountNumber}
         fundingAccountName={fundingAccountName}
-        fundingAccountLabel={fundingAccountLabel}
-        fundingForm={
-          <form
-            className="grid gap-3 sm:grid-cols-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              void runAction(
-                () =>
-                  submitPayrollFundingClaim(tenantSlug, {
-                    amount: String(fd.get("amount") || ""),
-                    paymentReference: String(fd.get("paymentReference") || ""),
-                    senderName: String(fd.get("senderName") || ""),
-                    senderBank: String(fd.get("senderBank") || ""),
-                    notes: String(fd.get("notes") || ""),
-                  }),
-                "Funding claim submitted. Waiting for Realcorp verification.",
-              ).then((ok) => {
-                if (ok) {
-                  setFundingOpen(false);
-                  e.currentTarget.reset();
-                }
-              });
-            }}
-          >
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium">Amount transferred</span>
-              <input
-                name="amount"
-                required
-                inputMode="decimal"
-                placeholder="2500000.00"
-                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 font-mono text-sm"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium">Payment reference</span>
-              <input
-                name="paymentReference"
-                required
-                placeholder="Bank narration / reference"
-                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium">Sender name</span>
-              <input
-                name="senderName"
-                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium">Sender bank</span>
-              <input
-                name="senderBank"
-                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
-              />
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              <span className="mb-1 block text-xs font-medium">Notes</span>
-              <input
-                name="notes"
-                className="w-full rounded-lg border border-foreground/15 bg-field px-3 py-2.5 text-sm"
-              />
-            </label>
-            <div className="sm:col-span-2">
-              <button
-                type="submit"
-                disabled={pending}
-                className="rounded-lg bg-foreground px-4 py-2.5 text-xs font-semibold text-background disabled:opacity-50"
-              >
-                Submit claim for verification
-              </button>
-            </div>
-          </form>
-        }
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
