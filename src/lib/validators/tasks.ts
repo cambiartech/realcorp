@@ -17,6 +17,7 @@ const workTaskFieldsSchema = z.object({
   spaceId: z.string().trim().optional(),
   projectId: z.string().trim().optional(),
   assigneeUserId: z.string().trim().optional(),
+  assigneeUserIds: z.array(z.string().trim().min(1)).max(12).optional(),
   dueDate: z.string().trim().optional(),
   sprintLabel: z
     .string()

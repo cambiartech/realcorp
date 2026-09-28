@@ -4,6 +4,7 @@ import { assertTenantNavAccess } from "@/lib/guard-tenant-nav";
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import { TasksWorkspace } from "@/components/tasks/tasks-workspace";
+import { assigneeSummary, normalizeAssigneeIds } from "@/lib/task-assignees";
 import { canManageTasks, canViewAllOrgTasks, workTaskVisibilityWhere } from "@/lib/tasks-access";
 import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "@/lib/membership-departments";
 import { loadManageeUserIds } from "@/lib/employee-task-managers";
@@ -117,6 +118,7 @@ export default async function TasksPage({
         include: {
           space: { select: { name: true, color: true } },
           project: { select: { name: true, iconEmoji: true } },
+          assignees: { select: { userId: true } },
         },
         take: 500,
       })
@@ -208,7 +210,13 @@ export default async function TasksPage({
         sprintLabel: p.sprintLabel,
         iconEmoji: p.iconEmoji,
       }))}
-      tasks={tasks.map((t) => ({
+      tasks={tasks.map((t) => {
+        const assigneeUserIds = normalizeAssigneeIds([
+          t.assigneeUserId,
+          ...(t.assignees?.map((row) => row.userId) ?? []),
+        ]);
+        const assigneeLabels = assigneeUserIds.map((id) => memberById.get(id)?.label || "Assigned");
+        return {
         id: t.id,
         title: t.title,
         description: t.description,
@@ -221,11 +229,10 @@ export default async function TasksPage({
         projectName: t.project?.name || null,
         projectEmoji: t.project?.iconEmoji || null,
         sprintLabel: t.sprintLabel,
-        assigneeUserId: t.assigneeUserId,
+        assigneeUserId: assigneeUserIds[0] ?? null,
+        assigneeUserIds,
         createdByUserId: t.createdByUserId,
-        assigneeLabel: t.assigneeUserId
-          ? memberById.get(t.assigneeUserId)?.label || "Assigned"
-          : "Unassigned",
+        assigneeLabel: assigneeSummary(assigneeLabels),
         createdByLabel: creatorLabelById.get(t.createdByUserId) || "Assignor",
         dueDateLabel: safeDateLabel(t.dueDate),
         dueDateValue: safeDateValue(t.dueDate),
@@ -236,7 +243,8 @@ export default async function TasksPage({
         recurrenceActive: Boolean(t.recurrenceActive),
         recurrenceEndsAtValue: safeDateValue(t.recurrenceEndsAt),
         recurrenceMaxOccurrences: t.recurrenceMaxOccurrences ?? null,
-      }))}
+      };
+      })}
       members={memberOptions}
       canManageSpaces={canManageTasks(isPlatformAdmin, membership)}
       initialView={initialView}

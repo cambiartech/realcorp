@@ -2487,9 +2487,10 @@ model WorkTask {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  space   TaskSpace?   @relation(fields: [spaceId], references: [id], onDelete: SetNull)
-  project TaskProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  space     TaskSpace?         @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  project   TaskProject?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assignees WorkTaskAssignee[]
 
   @@index([tenantId, status])
   @@index([tenantId, assigneeUserId])
@@ -2497,6 +2498,20 @@ model WorkTask {
   @@index([tenantId, projectId])
   @@index([tenantId, linkedEntityType, linkedEntityId])
   @@index([tenantId, recurrenceSeriesId])
+}
+
+/// Extra people on a task. assigneeUserId remains the first person for existing lists.
+model WorkTaskAssignee {
+  id        String   @id @default(cuid())
+  tenantId  String
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task WorkTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([tenantId, userId])
 }
 
 // ——— Clients (property owners / investors) ———

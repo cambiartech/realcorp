@@ -31,6 +31,7 @@ export function mergeProfileDraftFromForm(draft: ProfileDetailRow, form: HTMLFor
     employmentType: field(fd, "employmentType") || draft.employmentType,
     workSchedule: field(fd, "workSchedule") || draft.workSchedule,
     paygroupName: field(fd, "paygroupName") || draft.paygroupName,
+    payTemplateId: field(fd, "payTemplateId") || draft.payTemplateId,
     grossMonthly: gross || draft.grossMonthly,
     payeeTaxMonthly: payee || draft.payeeTaxMonthly,
     taxId: field(fd, "taxId") || draft.taxId,
@@ -49,6 +50,99 @@ export function mergeProfileDraftFromForm(draft: ProfileDetailRow, form: HTMLFor
     emergencyEmail: field(fd, "emergencyEmail") || draft.emergencyEmail,
     status: field(fd, "status") || draft.status,
   };
+}
+
+const DRAFT_KEYS = [
+  "fullName",
+  "employeeNumber",
+  "gender",
+  "dateOfBirth",
+  "maritalStatus",
+  "nationality",
+  "phoneMobile",
+  "workEmail",
+  "addressStreet",
+  "addressCity",
+  "addressState",
+  "addressCountry",
+  "position",
+  "department",
+  "dateOfJoining",
+  "employmentType",
+  "workSchedule",
+  "paygroupName",
+  "payTemplateId",
+  "grossMonthly",
+  "payeeTaxMonthly",
+  "taxId",
+  "rsaPin",
+  "pensionAdministrator",
+  "nhfMembershipNumber",
+  "bankAccountHolderName",
+  "bankName",
+  "bankAccountNumber",
+  "bankCode",
+  "bankAccountType",
+  "emergencyName",
+  "emergencyRelationship",
+  "emergencyPhone",
+  "emergencyEmail",
+] as const satisfies readonly (keyof ProfileDetailRow)[];
+
+export type OnboardingDraftPatch = Partial<Pick<ProfileDetailRow, (typeof DRAFT_KEYS)[number]>>;
+
+function draftStorageKey(tenantSlug: string, userId: string) {
+  return `boerp-hr-onboard-draft:${tenantSlug}:${userId}`;
+}
+
+export function readStoredOnboardingDraft(tenantSlug: string, userId: string): OnboardingDraftPatch | null {
+  if (typeof window === "undefined" || !userId) return null;
+  try {
+    const raw = localStorage.getItem(draftStorageKey(tenantSlug, userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed as OnboardingDraftPatch;
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredOnboardingDraft(tenantSlug: string, userId: string, draft: ProfileDetailRow) {
+  if (typeof window === "undefined" || !userId) return;
+  const patch: OnboardingDraftPatch = {};
+  for (const key of DRAFT_KEYS) {
+    const value = draft[key];
+    if (typeof value === "string" && value.trim()) patch[key] = value;
+  }
+  try {
+    localStorage.setItem(draftStorageKey(tenantSlug, userId), JSON.stringify(patch));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearStoredOnboardingDraft(tenantSlug: string, userId: string) {
+  if (typeof window === "undefined" || !userId) return;
+  try {
+    localStorage.removeItem(draftStorageKey(tenantSlug, userId));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Typed draft fields win. Blank draft fields leave the saved record as it is. */
+export function applyStoredOnboardingDraft(
+  record: ProfileDetailRow,
+  stored: OnboardingDraftPatch | null,
+): ProfileDetailRow {
+  if (!stored) return record;
+  const next = { ...record };
+  for (const key of DRAFT_KEYS) {
+    const value = stored[key];
+    if (typeof value === "string" && value.trim()) next[key] = value;
+  }
+  return next;
 }
 
 export function profileDraftFingerprint(draft: ProfileDetailRow): string {

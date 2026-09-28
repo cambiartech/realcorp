@@ -24,6 +24,7 @@ import {
   updateWorkTaskInputSchema,
   updateWorkTaskStatusInputSchema,
 } from "@/lib/validators/tasks";
+import { normalizeAssigneeIds } from "@/lib/task-assignees";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -36,6 +37,7 @@ const SPAWN_SELECT = {
   spaceId: true,
   projectId: true,
   assigneeUserId: true,
+  assignees: { select: { userId: true } },
   createdByUserId: true,
   dueDate: true,
   sprintLabel: true,
@@ -88,6 +90,24 @@ async function loadAssigneeMembers(tenantId: string): Promise<TaskAssigneeMember
   }));
 }
 
+function assigneeIdsFromTask(task: {
+  assigneeUserId: string | null;
+  assignees?: Array<{ userId: string }>;
+}) {
+  return normalizeAssigneeIds([
+    task.assigneeUserId,
+    ...(task.assignees?.map((row) => row.userId) ?? []),
+  ]);
+}
+
+async function replaceTaskAssignees(tenantId: string, taskId: string, userIds: string[]) {
+  await prisma.workTaskAssignee.deleteMany({ where: { taskId } });
+  if (userIds.length === 0) return;
+  await prisma.workTaskAssignee.createMany({
+    data: userIds.map((userId) => ({ tenantId, taskId, userId })),
+  });
+}
+
 async function assertAssigneeAllowed(
   ctx: NonNullable<Awaited<ReturnType<typeof getTenantContext>>>,
   assigneeUserId: string | null | undefined,
@@ -112,16 +132,27 @@ async function assertAssigneeAllowed(
   return null;
 }
 
+async function assertAssigneesAllowed(
+  ctx: NonNullable<Awaited<ReturnType<typeof getTenantContext>>>,
+  userIds: string[],
+): Promise<ActionResult | null> {
+  for (const userId of userIds) {
+    const error = await assertAssigneeAllowed(ctx, userId);
+    if (error) return error;
+  }
+  return null;
+}
+
 async function assertCanAccessTask(
   ctx: NonNullable<Awaited<ReturnType<typeof getTenantContext>>>,
-  task: { createdByUserId: string; assigneeUserId: string | null },
+  task: { createdByUserId: string; assigneeUserId: string | null; assignees?: Array<{ userId: string }> },
 ): Promise<ActionResult | null> {
   const members = await loadAssigneeMembers(ctx.tenant.id);
   const allowed = canAccessWorkTask({
     isPlatformAdmin: Boolean(ctx.session.user.isPlatformAdmin),
     actorUserId: ctx.session.user.id,
     membership: ctx.membership,
-    task,
+    task: { ...task, assigneeUserIds: assigneeIdsFromTask(task) },
     members,
   });
   if (!allowed) return { ok: false, error: "You do not have access to this task." };
@@ -178,7 +209,11 @@ function resolveRecurrenceFields(input: {
 
 async function spawnNextIfNeeded(
   tenantId: string,
-  task: SpawnableWorkTask & { id: string; status: WorkTaskStatus },
+  task: SpawnableWorkTask & {
+    id: string;
+    status: WorkTaskStatus;
+    assignees?: Array<{ userId: string }>;
+  },
 ) {
   const next = buildNextWorkTaskOccurrence(task);
   if (!next) return null;
@@ -196,7 +231,7 @@ async function spawnNextIfNeeded(
   });
   if (existingActive) return null;
 
-  return prisma.workTask.create({
+  const created = await prisma.workTask.create({
     data: {
       tenantId,
       title: next.title,
@@ -220,6 +255,9 @@ async function spawnNextIfNeeded(
       completedAt: null,
     },
   });
+  const assigneeIds = assigneeIdsFromTask(task);
+  if (assigneeIds.length) await replaceTaskAssignees(tenantId, created.id, assigneeIds);
+  return created;
 }
 
 async function notifyTaskAssignee(input: {
@@ -266,6 +304,7 @@ export async function createWorkTask(
     spaceId?: string;
     projectId?: string;
     assigneeUserId?: string;
+    assigneeUserIds?: string[];
     dueDate?: string;
     sprintLabel?: string;
     recurrenceFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | null;
@@ -280,7 +319,11 @@ export async function createWorkTask(
   const parsed = createWorkTaskInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
 
-  const assigneeError = await assertAssigneeAllowed(ctx, parsed.data.assigneeUserId);
+  const assigneeIds = normalizeAssigneeIds([
+    ...(parsed.data.assigneeUserIds ?? []),
+    parsed.data.assigneeUserId,
+  ]);
+  const assigneeError = await assertAssigneesAllowed(ctx, assigneeIds);
   if (assigneeError) return assigneeError;
 
   const status = parsed.data.status ?? WorkTaskStatus.TODO;
@@ -299,7 +342,7 @@ export async function createWorkTask(
         priority: parsed.data.priority ?? "MEDIUM",
         spaceId: parsed.data.spaceId || null,
         projectId: parsed.data.projectId || null,
-        assigneeUserId: parsed.data.assigneeUserId || null,
+        assigneeUserId: assigneeIds[0] ?? null,
         dueDate: parsed.data.dueDate ? parseOptionalDate(parsed.data.dueDate) : null,
         sprintLabel: parsed.data.sprintLabel || null,
         completedAt,
@@ -325,17 +368,20 @@ export async function createWorkTask(
     return { ok: false, error: "Could not create the task. Please try again." };
   }
 
-  await notifyTaskAssignee({
-    tenantSlug,
-    tenantName: ctx.tenant.name,
-    assignerLabel: ctx.session.user.name || ctx.session.user.email || "A teammate",
-    assignerUserId: ctx.session.user.id,
-    assigneeUserId: parsed.data.assigneeUserId,
-    taskTitle: parsed.data.title,
-    taskDescription: parsed.data.description,
-    dueDate: parsed.data.dueDate,
-    priority: parsed.data.priority ?? "MEDIUM",
-  });
+  await replaceTaskAssignees(ctx.tenant.id, created.id, assigneeIds);
+  for (const assigneeUserId of assigneeIds) {
+    await notifyTaskAssignee({
+      tenantSlug,
+      tenantName: ctx.tenant.name,
+      assignerLabel: ctx.session.user.name || ctx.session.user.email || "A teammate",
+      assignerUserId: ctx.session.user.id,
+      assigneeUserId,
+      taskTitle: parsed.data.title,
+      taskDescription: parsed.data.description,
+      dueDate: parsed.data.dueDate,
+      priority: parsed.data.priority ?? "MEDIUM",
+    });
+  }
 
   revalidatePath(`/${tenantSlug}/tasks`);
   return { ok: true, taskId: created.id };
@@ -404,6 +450,7 @@ export async function updateWorkTask(
     spaceId?: string;
     projectId?: string;
     assigneeUserId?: string;
+    assigneeUserIds?: string[];
     dueDate?: string;
     sprintLabel?: string;
     recurrenceFrequency?: "DAILY" | "WEEKLY" | "MONTHLY" | null;
@@ -418,7 +465,11 @@ export async function updateWorkTask(
   const parsed = updateWorkTaskInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join(" ") };
 
-  const assigneeError = await assertAssigneeAllowed(ctx, parsed.data.assigneeUserId);
+  const nextAssigneeIds = normalizeAssigneeIds([
+    ...(parsed.data.assigneeUserIds ?? []),
+    parsed.data.assigneeUserId,
+  ]);
+  const assigneeError = await assertAssigneesAllowed(ctx, nextAssigneeIds);
   if (assigneeError) return assigneeError;
 
   const existing = await prisma.workTask.findFirst({
@@ -430,8 +481,9 @@ export async function updateWorkTask(
   if (accessError) return accessError;
 
   const nextStatus = parsed.data.status ?? existing.status;
-  const nextAssigneeUserId = parsed.data.assigneeUserId || null;
-  const assigneeChanged = nextAssigneeUserId !== existing.assigneeUserId;
+  const previousAssigneeIds = assigneeIdsFromTask(existing);
+  const nextAssigneeUserId = nextAssigneeIds[0] ?? null;
+  const addedAssigneeIds = nextAssigneeIds.filter((id) => !previousAssigneeIds.includes(id));
   const becomingDone = nextStatus === WorkTaskStatus.DONE && existing.status !== WorkTaskStatus.DONE;
   const becomingCancelled =
     nextStatus === WorkTaskStatus.CANCELLED && existing.status !== WorkTaskStatus.CANCELLED;
@@ -540,18 +592,19 @@ export async function updateWorkTask(
       ...recurrencePatch,
     },
   });
+  await replaceTaskAssignees(ctx.tenant.id, parsed.data.taskId, nextAssigneeIds);
 
   if (spawnFrom) {
-    await spawnNextIfNeeded(ctx.tenant.id, spawnFrom);
+    await spawnNextIfNeeded(ctx.tenant.id, { ...spawnFrom, assignees: nextAssigneeIds.map((userId) => ({ userId })) });
   }
 
-  if (assigneeChanged) {
+  for (const assigneeUserId of addedAssigneeIds) {
     await notifyTaskAssignee({
       tenantSlug,
       tenantName: ctx.tenant.name,
       assignerLabel: ctx.session.user.name || ctx.session.user.email || "A teammate",
       assignerUserId: ctx.session.user.id,
-      assigneeUserId: nextAssigneeUserId,
+      assigneeUserId,
       taskTitle: parsed.data.title,
       taskDescription: parsed.data.description,
       dueDate: parsed.data.dueDate,
@@ -579,6 +632,7 @@ export async function stopWorkTaskRecurrence(
       id: true,
       createdByUserId: true,
       assigneeUserId: true,
+      assignees: { select: { userId: true } },
       recurrenceActive: true,
       recurrenceFrequency: true,
     },
@@ -617,6 +671,7 @@ export async function deleteWorkTask(
       id: true,
       createdByUserId: true,
       assigneeUserId: true,
+      assignees: { select: { userId: true } },
       recurrenceSeriesId: true,
       recurrenceActive: true,
       status: true,

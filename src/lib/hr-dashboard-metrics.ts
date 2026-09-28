@@ -106,6 +106,7 @@ export async function loadHrDashboardMetrics(
       where: { tenantId },
       select: {
         assigneeUserId: true,
+        assignees: { select: { userId: true } },
         status: true,
         dueDate: true,
         completedAt: true,

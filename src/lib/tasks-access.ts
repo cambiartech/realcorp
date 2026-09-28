@@ -89,6 +89,7 @@ export function workTaskVisibilityWhere(input: {
 
   const ownOrCreated: Prisma.WorkTaskWhereInput[] = [
     { assigneeUserId: input.actorUserId },
+    { assignees: { some: { userId: input.actorUserId } } },
     { createdByUserId: input.actorUserId },
   ];
 
@@ -107,6 +108,7 @@ export function workTaskVisibilityWhere(input: {
           OR: [
             ...ownOrCreated,
             { assigneeUserId: { in: teammateIds } },
+            { assignees: { some: { userId: { in: teammateIds } } } },
             {
               AND: [{ assigneeUserId: null }, { createdByUserId: { in: teammateIds } }],
             },
@@ -128,7 +130,7 @@ export function canAccessWorkTask(input: {
     department?: string | null;
     isDepartmentLead?: boolean | null;
   } | null;
-  task: { createdByUserId: string; assigneeUserId: string | null };
+  task: { createdByUserId: string; assigneeUserId: string | null; assigneeUserIds?: string[] };
   members: Array<{
     id: string;
     role: MembershipRole;
@@ -136,7 +138,12 @@ export function canAccessWorkTask(input: {
   }>;
 }) {
   if (canViewAllOrgTasks(input.isPlatformAdmin, input.membership)) return true;
-  if (input.task.assigneeUserId === input.actorUserId) return true;
+  const assigneeIds = input.task.assigneeUserIds?.length
+    ? input.task.assigneeUserIds
+    : input.task.assigneeUserId
+      ? [input.task.assigneeUserId]
+      : [];
+  if (assigneeIds.includes(input.actorUserId)) return true;
   if (input.task.createdByUserId === input.actorUserId) return true;
 
   const membership = input.membership;
@@ -148,11 +155,12 @@ export function canAccessWorkTask(input: {
     profileFromMembershipRole(membership.role).department;
   if (!actorDept) return false;
 
-  const assigneeId = input.task.assigneeUserId;
-  if (!assigneeId) {
+  if (assigneeIds.length === 0) {
     const creator = input.members.find((m) => m.id === input.task.createdByUserId);
     return creator ? memberDepartmentKey(creator.role, creator.department) === actorDept : false;
   }
-  const assignee = input.members.find((m) => m.id === assigneeId);
-  return assignee ? memberDepartmentKey(assignee.role, assignee.department) === actorDept : false;
+  return assigneeIds.some((assigneeId) => {
+    const assignee = input.members.find((m) => m.id === assigneeId);
+    return assignee ? memberDepartmentKey(assignee.role, assignee.department) === actorDept : false;
+  });
 }

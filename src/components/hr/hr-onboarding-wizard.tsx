@@ -1,13 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ProfileComplianceChecklist } from "@/components/hr/profile-compliance-checklist";
 import type { ProfileChecklistItem } from "@/lib/hr-profile-checklist";
 import { formDataToEmployeeProfilePayload, type ProfileDetailRow } from "@/lib/hr-profile-form";
-import { type OnboardingStepId, writeStoredOnboardingStep } from "@/lib/hr-onboarding-step";
-import { mergeProfileDraftFromForm, profileDraftFingerprint } from "@/lib/hr-onboarding-draft";
+import {
+  clearStoredOnboardingStep,
+  readStoredOnboardingStep,
+  type OnboardingStepId,
+  writeStoredOnboardingStep,
+} from "@/lib/hr-onboarding-step";
+import {
+  applyStoredOnboardingDraft,
+  clearStoredOnboardingDraft,
+  mergeProfileDraftFromForm,
+  profileDraftFingerprint,
+  readStoredOnboardingDraft,
+  writeStoredOnboardingDraft,
+} from "@/lib/hr-onboarding-draft";
 import { OnboardingProfileHiddenFields } from "@/components/hr/onboarding-profile-hidden-fields";
 import { upsertEmployeeProfile } from "@/app/[tenantSlug]/hr/actions";
 import { UiSelect } from "@/components/ui-select";
@@ -84,32 +96,74 @@ export function HrOnboardingWizard({
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<ProfileDetailRow>(record);
   const [step, setStep] = useState<OnboardingStepId>(initialStep);
+  const [hydrated, setHydrated] = useState(false);
   const [pending, setPending] = useState(false);
   const [prefillPending, setPrefillPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prefillNote, setPrefillNote] = useState<string | null>(null);
+  const draftRef = useRef(draft);
+  const stepRef = useRef(step);
+  const recordRef = useRef(record);
+  const rememberTimer = useRef<number | null>(null);
+  draftRef.current = draft;
+  stepRef.current = step;
+  recordRef.current = record;
 
   useEffect(() => {
-    setDraft(record);
-  }, [record]);
-
-  useEffect(() => {
-    setStep(initialStep);
-  }, [initialStep, record.userId]);
+    const current = recordRef.current;
+    const storedStep = readStoredOnboardingStep(tenantSlug, current.userId);
+    setDraft(applyStoredOnboardingDraft(current, readStoredOnboardingDraft(tenantSlug, current.userId)));
+    if (storedStep) setStep(storedStep);
+    setHydrated(true);
+  }, [record.userId, tenantSlug]);
 
   const formKey = profileDraftFingerprint(draft);
 
+  function captureDraft() {
+    const root = rootRef.current;
+    let next = draftRef.current;
+    if (!root) return next;
+    root.querySelectorAll("form").forEach((form) => {
+      next = mergeProfileDraftFromForm(next, form);
+    });
+    return next;
+  }
+
+  function remember(nextStep?: OnboardingStepId) {
+    const next = captureDraft();
+    const stepToStore = nextStep ?? stepRef.current;
+    draftRef.current = next;
+    writeStoredOnboardingDraft(tenantSlug, record.userId, next);
+    writeStoredOnboardingStep(tenantSlug, record.userId, stepToStore);
+    return next;
+  }
+
   useEffect(() => {
-    writeStoredOnboardingStep(tenantSlug, record.userId, step);
-  }, [step, tenantSlug, record.userId]);
+    if (!hydrated) return;
+    const onLeave = () => {
+      remember();
+    };
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      if (rememberTimer.current) window.clearTimeout(rememberTimer.current);
+      remember();
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, [hydrated, tenantSlug, record.userId]);
 
   const stepIndex = STEPS.findIndex((s) => s.id === step);
 
   function goToStep(next: OnboardingStepId) {
+    setDraft(remember(next));
     setStep(next);
-    writeStoredOnboardingStep(tenantSlug, record.userId, next);
+  }
+
+  function exitWizard() {
+    setDraft(remember());
+    onCancel();
   }
 
   function openDocumentsForEmployee() {
@@ -159,7 +213,14 @@ export function HrOnboardingWizard({
         setError(result.error || "Could not save.");
         return false;
       }
-      setDraft((prev) => mergeProfileDraftFromForm(prev, form));
+      const next = mergeProfileDraftFromForm(draftRef.current, form);
+      setDraft(next);
+      if (status === "ACTIVE") {
+        clearStoredOnboardingDraft(tenantSlug, record.userId);
+        clearStoredOnboardingStep(tenantSlug, record.userId);
+      } else {
+        writeStoredOnboardingDraft(tenantSlug, record.userId, next);
+      }
       router.refresh();
       return true;
     } catch (err) {
@@ -170,7 +231,14 @@ export function HrOnboardingWizard({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--accent-line)] bg-[var(--accent)]/[0.03] p-4 sm:p-5">
+    <div
+      ref={rootRef}
+      onInput={() => {
+        if (rememberTimer.current) window.clearTimeout(rememberTimer.current);
+        rememberTimer.current = window.setTimeout(() => remember(), 300);
+      }}
+      className="rounded-xl border border-[var(--accent-line)] bg-[var(--accent)]/[0.03] p-4 sm:p-5"
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-foreground">Onboarding wizard</p>
@@ -178,7 +246,7 @@ export function HrOnboardingWizard({
             {memberName} · {memberEmail}
           </p>
         </div>
-        <button type="button" onClick={onCancel} className="text-xs text-muted underline">
+        <button type="button" onClick={exitWizard} className="text-xs text-muted underline">
           Exit wizard
         </button>
       </div>
@@ -449,8 +517,7 @@ export function HrOnboardingWizard({
       ) : null}
 
       {step === "compliance" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
+        <div className="space-y-4">
             <form
               key={`onboard-compliance-${formKey}`}
               id="onboard-compliance"
@@ -498,18 +565,6 @@ export function HrOnboardingWizard({
               onPrefillFromDocs={() => void prefillFromUploadedDocs()}
               prefillPending={prefillPending}
             />
-          </div>
-          <div className="text-sm text-muted">
-            <p className="font-medium text-foreground">What to do now</p>
-            <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs">
-              <li>If documents are already uploaded, use Prefill with AI — including TIN and RSA PIN.</li>
-              <li>Or type statutory IDs in the fields on this step (also on Personal & job).</li>
-              <li>Generate and print the offer letter for signature.</li>
-              <li>Send biodata, bank, and guarantor forms only if a file is missing or unreadable.</li>
-              <li>When forms are submitted, approve them under Form requests.</li>
-              <li>Upload signed NDA and offer letter under Documents.</li>
-            </ol>
-          </div>
         </div>
       ) : null}
 

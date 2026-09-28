@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
 import { SearchableSelect } from "@/components/searchable-select";
+import { TaskAssigneesField } from "@/components/tasks/task-assignees-field";
 import { TenantPageShell } from "@/components/tenant-page-shell";
 import { PageHeader } from "@/components/page-header";
 import { ButtonSpinner } from "@/components/button-spinner";
@@ -64,6 +65,7 @@ export type WorkTaskRow = {
   projectEmoji: string | null;
   sprintLabel: string | null;
   assigneeUserId: string | null;
+  assigneeUserIds: string[];
   createdByUserId?: string | null;
   assigneeLabel: string;
   createdByLabel: string;
@@ -217,15 +219,15 @@ export function TasksWorkspace({
     if (viewTab === "history") {
       rows = rows.filter((t) => t.status === "DONE");
     } else {
-      if (viewTab === "my") rows = rows.filter((t) => t.assigneeUserId === currentUserId);
+      if (viewTab === "my") rows = rows.filter((t) => t.assigneeUserIds.includes(currentUserId));
       if (viewTab === "sprint") rows = rows.filter((t) => Boolean(t.sprintLabel));
       // Keep Done column tidy: older completions live in Completed history.
       rows = rows.filter((t) => isCompletedTaskOnActiveShelf(t));
     }
     if (spaceFilter !== "all") rows = rows.filter((t) => t.spaceId === spaceFilter);
-    if (assigneeFilter === "unassigned") rows = rows.filter((t) => !t.assigneeUserId);
-    else if (assigneeFilter === "me") rows = rows.filter((t) => t.assigneeUserId === currentUserId);
-    else if (assigneeFilter !== "all") rows = rows.filter((t) => t.assigneeUserId === assigneeFilter);
+    if (assigneeFilter === "unassigned") rows = rows.filter((t) => t.assigneeUserIds.length === 0);
+    else if (assigneeFilter === "me") rows = rows.filter((t) => t.assigneeUserIds.includes(currentUserId));
+    else if (assigneeFilter !== "all") rows = rows.filter((t) => t.assigneeUserIds.includes(assigneeFilter));
     if (viewTab !== "history" && statusFilter !== "all") {
       rows = rows.filter((t) => t.status === statusFilter);
     }
@@ -301,7 +303,7 @@ export function TasksWorkspace({
         description: String(formData.get("description") || "") || undefined,
         spaceId: String(formData.get("spaceId") || "") || undefined,
         projectId: String(formData.get("projectId") || "") || undefined,
-        assigneeUserId: String(formData.get("assigneeUserId") || "") || undefined,
+        assigneeUserIds: formData.getAll("assigneeUserIds").map(String).filter(Boolean),
         dueDate: String(formData.get("dueDate") || "") || undefined,
         sprintLabel: String(formData.get("sprintLabel") || "") || undefined,
         priority: (String(formData.get("priority") || "MEDIUM") as WorkTaskRow["priority"]) || "MEDIUM",
@@ -394,7 +396,7 @@ export function TasksWorkspace({
         status: String(formData.get("status") || editingTask.status) as WorkTaskRow["status"],
         spaceId: String(formData.get("spaceId") || "") || undefined,
         projectId: String(formData.get("projectId") || "") || undefined,
-        assigneeUserId: String(formData.get("assigneeUserId") || "") || undefined,
+        assigneeUserIds: formData.getAll("assigneeUserIds").map(String).filter(Boolean),
         dueDate: String(formData.get("dueDate") || "") || undefined,
         sprintLabel: String(formData.get("sprintLabel") || "") || undefined,
         priority: (String(formData.get("priority") || "MEDIUM") as WorkTaskRow["priority"]) || "MEDIUM",
@@ -1061,14 +1063,11 @@ export function TasksWorkspace({
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Assignee</label>
-              <SearchableSelect
-                name="assigneeUserId"
-                defaultValue={editingTask.assigneeUserId || ""}
-                allowEmpty
-                emptyLabel="Unassigned"
-                searchPlaceholder="Search people…"
+              <label className="mb-1 block text-sm text-muted">Assignees</label>
+              <TaskAssigneesField
+                key={editingTask.id}
                 options={assigneeOptions}
+                defaultIds={editingTask.assigneeUserIds}
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1269,14 +1268,10 @@ export function TasksWorkspace({
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-muted">Assignee</label>
-              <SearchableSelect
-                name="assigneeUserId"
-                defaultValue={currentUserId}
-                allowEmpty
-                emptyLabel="Unassigned"
-                searchPlaceholder="Search people…"
+              <label className="mb-1 block text-sm text-muted">Assignees</label>
+              <TaskAssigneesField
                 options={assigneeOptions}
+                defaultIds={currentUserId ? [currentUserId] : []}
               />
             </div>
             <div>

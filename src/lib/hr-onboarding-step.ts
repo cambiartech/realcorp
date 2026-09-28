@@ -22,7 +22,8 @@ export function onboardingStorageKey(tenantSlug: string, userId: string) {
 export function readStoredOnboardingStep(tenantSlug: string, userId: string): OnboardingStepId | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(onboardingStorageKey(tenantSlug, userId));
+    const key = onboardingStorageKey(tenantSlug, userId);
+    const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
     if (raw && ONBOARDING_STEPS.includes(raw as OnboardingStepId)) return raw as OnboardingStepId;
   } catch {
     /* ignore */
@@ -33,7 +34,18 @@ export function readStoredOnboardingStep(tenantSlug: string, userId: string): On
 export function writeStoredOnboardingStep(tenantSlug: string, userId: string, step: OnboardingStepId) {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(onboardingStorageKey(tenantSlug, userId), step);
+    localStorage.setItem(onboardingStorageKey(tenantSlug, userId), step);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearStoredOnboardingStep(tenantSlug: string, userId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = onboardingStorageKey(tenantSlug, userId);
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
   } catch {
     /* ignore */
   }

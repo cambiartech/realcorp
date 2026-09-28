@@ -16,7 +16,7 @@ import type { HrFormDeliveryMode, HrFormType } from "@/generated/prisma";
 import { formDataToEmployeeProfilePayload, type ProfileDetailRow } from "@/lib/hr-profile-form";
 import { OfferLetterEditor } from "@/components/hr/offer-letter-editor";
 import { HrOnboardingWizard } from "@/components/hr/hr-onboarding-wizard";
-import { inferOnboardingStep, resolveOnboardingStep, type OnboardingStepId } from "@/lib/hr-onboarding-step";
+import { resolveOnboardingStep, type OnboardingStepId } from "@/lib/hr-onboarding-step";
 import { ProfileComplianceChecklist } from "@/components/hr/profile-compliance-checklist";
 import { EmployeeLeaveSidePanel } from "@/components/hr/employee-leave-side-panel";
 import { PayslipYtdCard } from "@/components/hr/payslip-ytd-card";
@@ -940,10 +940,7 @@ export function HrPeopleWorkspace({
                             onClick={() =>
                               prof?.statusValue === "ACTIVE" || isContingentEmployment(detail?.employmentType)
                                 ? openRecord(m.userId)
-                                : startOnboarding(
-                                    m.userId,
-                                    prof ? inferOnboardingStep(onboard?.items ?? []) : undefined,
-                                  )
+                                : startOnboarding(m.userId)
                             }
                             className="text-xs font-semibold underline"
                           >

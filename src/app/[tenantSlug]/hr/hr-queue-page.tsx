@@ -373,6 +373,7 @@ export default async function HrQueuePage({
           },
           select: {
             assigneeUserId: true,
+            assignees: { select: { userId: true } },
             status: true,
             dueDate: true,
             completedAt: true,

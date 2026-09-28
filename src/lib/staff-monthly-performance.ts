@@ -1,4 +1,5 @@
 import { averageConfirmedRatings, averageSelfRatings, parseActionScores } from "@/lib/appraisal-scores";
+import { normalizeAssigneeIds } from "@/lib/task-assignees";
 
 export type StaffMonthlyPerformancePeriod = {
   year: number;
@@ -149,6 +150,8 @@ export function buildStaffMonthlyPerformance(input: {
   }>;
   tasks: Array<{
     assigneeUserId: string | null;
+    assigneeUserIds?: string[];
+    assignees?: Array<{ userId: string }>;
     status: string;
     dueDate: Date | string | null;
     completedAt: Date | string | null;
@@ -215,22 +218,28 @@ export function buildStaffMonthlyPerformance(input: {
   }
 
   for (const task of input.tasks) {
-    const uid = task.assigneeUserId;
-    if (!uid || !raw.has(uid)) continue;
-    const row = raw.get(uid)!;
+    const ids = normalizeAssigneeIds([
+      ...(task.assigneeUserIds ?? []),
+      ...(task.assignees?.map((row) => row.userId) ?? []),
+      task.assigneeUserId,
+    ]);
     const relevant =
       inPeriod(task.createdAt, input.period) ||
       (task.completedAt && inPeriod(task.completedAt, input.period)) ||
       (task.dueDate && inPeriod(task.dueDate, input.period));
     if (!relevant) continue;
 
-    row.tasksAssigned += 1;
-    if (task.status === "DONE" && task.completedAt && inPeriod(task.completedAt, input.period)) {
-      row.tasksCompleted += 1;
-      const completedAt = asDate(task.completedAt);
-      const dueDate = task.dueDate ? asDate(task.dueDate) : null;
-      if (!dueDate || completedAt <= dueDate) {
-        row.tasksOnTime += 1;
+    for (const uid of ids) {
+      if (!raw.has(uid)) continue;
+      const row = raw.get(uid)!;
+      row.tasksAssigned += 1;
+      if (task.status === "DONE" && task.completedAt && inPeriod(task.completedAt, input.period)) {
+        row.tasksCompleted += 1;
+        const completedAt = asDate(task.completedAt);
+        const dueDate = task.dueDate ? asDate(task.dueDate) : null;
+        if (!dueDate || completedAt <= dueDate) {
+          row.tasksOnTime += 1;
+        }
       }
     }
   }

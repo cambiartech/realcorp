@@ -278,10 +278,14 @@ export default async function TenantHomePage({
           where: {
             tenantId: tenant.id,
             status: { in: ["TODO", "IN_PROGRESS", "IN_REVIEW"] },
-            OR: [{ assigneeUserId: session.user.id }, { createdByUserId: session.user.id }],
+            OR: [
+              { assigneeUserId: session.user.id },
+              { assignees: { some: { userId: session.user.id } } },
+              { createdByUserId: session.user.id },
+            ],
           },
           orderBy: [{ dueDate: "asc" }, { updatedAt: "desc" }],
-          include: { space: { select: { name: true } } },
+          include: { space: { select: { name: true } }, assignees: { select: { userId: true } } },
           take: 8,
         })
       : Promise.resolve([]),
@@ -379,7 +383,9 @@ export default async function TenantHomePage({
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium" }).format(t.dueDate)
           : null,
         spaceName: t.space?.name || null,
-        isAssignee: t.assigneeUserId === session.user.id,
+        isAssignee:
+          t.assigneeUserId === session.user.id ||
+          t.assignees.some((row) => row.userId === session.user.id),
         isOwner: t.createdByUserId === session.user.id,
       }))
     : [];
