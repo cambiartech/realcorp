@@ -34,6 +34,7 @@ import { mergeOrgDepartments } from "@/lib/org-departments";
 import { mergeOrgJobRoles } from "@/lib/org-job-roles";
 import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
 import { getAvailableBalanceNaira, parsePayrollDisbursementSettings } from "@/lib/payroll/disbursement";
+import { syncTenantDedicatedAccountCredits } from "@/lib/payroll/disbursement/dedicated-account-post";
 import { loadTenantRequest } from "@/lib/tenant-request";
 import { redirect } from "next/navigation";
 import { formatEnumLabel } from "@/lib/ui-format";
@@ -519,6 +520,12 @@ export default async function HrQueuePage({
   const disbursementSettings = parsePayrollDisbursementSettings(
     tenant.settings?.payrollDisbursementSettings,
   );
+  if (
+    tab === "payslips" &&
+    (disbursementSettings.dvaAccountNumber || disbursementSettings.dvaCustomerCode)
+  ) {
+    await syncTenantDedicatedAccountCredits(tenant.id);
+  }
   const availableBalanceRaw = await getAvailableBalanceNaira(prisma, tenant.id);
   const payrollAvailableBalanceLabel = Number(availableBalanceRaw).toLocaleString("en-NG", {
     minimumFractionDigits: 2,

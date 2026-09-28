@@ -266,6 +266,39 @@ export function hrProfileUpdateEmailContent(input: {
   };
 }
 
+export function fundingReceivedEmailContent(input: {
+  tenantName: string;
+  amountLabel: string;
+  balanceLabel: string;
+  senderName?: string | null;
+  senderBank?: string | null;
+  accountNumber?: string | null;
+  reference: string;
+  floatUrl: string;
+}) {
+  const from = [input.senderName?.trim(), input.senderBank?.trim()].filter(Boolean).join(" · ");
+  const rows = [
+    moneyRow("Amount", input.amountLabel, true),
+    moneyRow("Available float", input.balanceLabel),
+    from ? moneyRow("From", from) : "",
+    input.accountNumber?.trim() ? moneyRow("Account", input.accountNumber.trim()) : "",
+    moneyRow("Reference", input.reference),
+  ].join("");
+  const html = mailDocument(
+    mailCard({
+      eyebrow: input.tenantName,
+      heading: "Money received",
+      ornament: RECEIVED_MARK,
+      bodyHtml: [
+        mailParagraph("A transfer landed on the dedicated account and is now on the available float.", true),
+        detailTable(rows),
+        mailButton(input.floatUrl, "Open payroll float"),
+      ].join(""),
+    }),
+  );
+  return { subject: `${input.amountLabel} received — ${input.tenantName}`, html };
+}
+
 export function taskAssignedEmailContent(input: {
   tenantName: string;
   assigneeName: string;

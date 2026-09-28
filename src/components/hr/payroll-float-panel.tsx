@@ -88,17 +88,17 @@ export function PayrollFloatPanel({
                 {availableBalanceLabel}
               </p>
               <p className="mt-2 max-w-md text-sm leading-relaxed text-background/75">
-                Transfer into the account on the right, then tell us the reference. Balance updates after
-                Realcorp verifies — not when you submit the claim.
+                {hasDva
+                  ? "Transfer into the account on the right. The balance updates when the money arrives."
+                  : "Transfer into the account on the right, then tell us the reference. Balance updates after Realcorp verifies — not when you submit the claim."}
               </p>
             </div>
           </div>
           <ol className="relative mt-6 grid gap-2 text-[12px] text-background/80 sm:grid-cols-3">
-            {[
-              "1 · Copy account",
-              "2 · Transfer funds",
-              "3 · Submit reference",
-            ].map((step) => (
+            {(hasDva
+              ? ["1 · Copy account", "2 · Transfer funds", "3 · Balance updates"]
+              : ["1 · Copy account", "2 · Transfer funds", "3 · Submit reference"]
+            ).map((step) => (
               <li
                 key={step}
                 className="rounded-lg border border-background/15 bg-background/10 px-3 py-2 font-medium backdrop-blur-sm"

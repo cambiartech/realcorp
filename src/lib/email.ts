@@ -9,6 +9,7 @@ import {
   invoiceEmailContent,
   passwordResetEmailContent,
   salesReceiptEmailContent,
+  fundingReceivedEmailContent,
   taskAssignedEmailContent,
 } from "@/lib/email-templates";
 
@@ -289,6 +290,41 @@ export async function sendHrProfileUpdateEmail(input: {
       subject,
       html,
       ...(replyTo ? { replyTo } : {}),
+    });
+    return parseResendSendResult(result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Failed to send email.";
+    return { ok: false as const, error: msg };
+  }
+}
+
+export async function sendFundingReceivedEmail(input: {
+  to: string;
+  tenantName: string;
+  amountLabel: string;
+  balanceLabel: string;
+  senderName?: string | null;
+  senderBank?: string | null;
+  accountNumber?: string | null;
+  reference: string;
+  floatUrl: string;
+}) {
+  const resend = getResendClient();
+  if (!resend) {
+    return { ok: false as const, error: "Email is not configured (RESEND_API_KEY)." };
+  }
+  const from = `${getFromName()} <${getFromAddress()}>`;
+  const replyTo = getReplyToAddress();
+  const { subject, html } = fundingReceivedEmailContent(input);
+  const prepared = withMailArt(html);
+  try {
+    const result = await resend.emails.send({
+      from,
+      to: input.to,
+      subject,
+      html: prepared.html,
+      ...(replyTo ? { replyTo } : {}),
+      ...(prepared.attachments.length ? { attachments: prepared.attachments } : {}),
     });
     return parseResendSendResult(result);
   } catch (error) {

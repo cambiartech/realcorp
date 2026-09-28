@@ -6,6 +6,7 @@ import { MembershipRole, MembershipStatus, PayrollFundingStatus } from "@/genera
 import { buildInviteUrl, classifyInvite, inviteStatusLabel } from "@/lib/invitation-utils";
 import { normalizeTenantModuleFlags, tenantModuleSummary } from "@/lib/tenant-module-definitions";
 import { getAvailableBalanceNaira, parsePayrollDisbursementSettings } from "@/lib/payroll/disbursement";
+import { syncTenantDedicatedAccountCredits } from "@/lib/payroll/disbursement/dedicated-account-post";
 import { PlatformModulesForm } from "../../modules-form";
 import { TenantInvitesWorkspace, type PlatformInviteRow } from "./tenant-invites-workspace";
 import { TenantMembersWorkspace, type PlatformMemberRow } from "./tenant-members-workspace";
@@ -113,8 +114,11 @@ export default async function PlatformTenantInvitesPage({
     };
   });
 
-  const availableBalanceLabel = moneyLabel(await getAvailableBalanceNaira(prisma, tenant.id));
   const disbursement = parsePayrollDisbursementSettings(tenant.settings?.payrollDisbursementSettings);
+  if (disbursement.dvaAccountNumber || disbursement.dvaCustomerCode) {
+    await syncTenantDedicatedAccountCredits(tenant.id);
+  }
+  const availableBalanceLabel = moneyLabel(await getAvailableBalanceNaira(prisma, tenant.id));
 
   const pendingFunding: PlatformFundingRow[] = tenant.payrollFundingReceipts.map((r) => ({
     id: r.id,

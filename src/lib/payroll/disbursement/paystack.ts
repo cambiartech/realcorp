@@ -127,6 +127,24 @@ export async function paystackGetBalances(): Promise<PaystackResult<PaystackBala
   return paystackFetch<PaystackBalanceRow[]>("/balance");
 }
 
+export async function paystackListSuccessfulTransactions(input?: {
+  page?: number;
+  perPage?: number;
+  customerId?: number;
+}): Promise<PaystackResult<Record<string, unknown>[]>> {
+  const q = new URLSearchParams({
+    status: "success",
+    perPage: String(input?.perPage ?? 50),
+    page: String(input?.page ?? 1),
+  });
+  if (input?.customerId) q.set("customer", String(input.customerId));
+  return paystackFetch<Record<string, unknown>[]>(`/transaction?${q.toString()}`);
+}
+
+export async function paystackCustomerId(customerCode: string): Promise<PaystackResult<{ id: number }>> {
+  return paystackFetch<{ id: number }>(`/customer/${encodeURIComponent(customerCode)}`);
+}
+
 /** Verify Paystack webhook signature (HMAC SHA512 of raw body). */
 export function verifyPaystackWebhookSignature(
   rawBody: string,

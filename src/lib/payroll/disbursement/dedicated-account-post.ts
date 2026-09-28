@@ -1,12 +1,16 @@
-import { PayrollFundingStatus } from "@/generated/prisma";
+import { MembershipRole, PayrollFundingStatus } from "@/generated/prisma";
+import { absoluteAppUrl } from "@/lib/app-url";
 import prisma from "@/lib/db";
+import { sendFundingReceivedEmail } from "@/lib/email";
+import { isFinanceAlertRecipient } from "@/lib/membership-departments";
+import { paystackCustomerId, paystackListSuccessfulTransactions } from "./paystack";
 import {
   matchDedicatedAccountTenant,
   parseDedicatedAccountCredit,
   type DedicatedAccountCredit,
 } from "./dedicated-account-credit";
 import { submitFundingReceipt, verifyFundingReceipt } from "./funding";
-import { PayrollLedgerError, type LedgerTx } from "./ledger";
+import { getAvailableBalanceNaira, PayrollLedgerError, type LedgerTx } from "./ledger";
 import { koboToNairaString } from "./money";
 import { parsePayrollDisbursementSettings } from "./settings";
 
@@ -42,13 +46,124 @@ async function creditTenantFloat(tx: LedgerTx, tenantId: string, credit: Dedicat
   }
 
   if (!receipt) throw new PayrollLedgerError("Funding receipt was not created.");
-  if (receipt.status === PayrollFundingStatus.VERIFIED) return;
+  if (receipt.status === PayrollFundingStatus.VERIFIED) return { created: false as const };
 
   await verifyFundingReceipt(tx, {
     tenantId,
     receiptId: receipt.id,
     actor: PAYSTACK_ACTOR,
   });
+  return { created: true as const };
+}
+
+function moneyLabel(currency: string, naira: string) {
+  const [whole, frac = "00"] = naira.split(".");
+  const grouped = Number(whole).toLocaleString("en-NG");
+  return currency === "NGN" ? `₦${grouped}.${frac}` : `${currency} ${grouped}.${frac}`;
+}
+
+async function alertFinanceTeam(tenantId: string, credit: DedicatedAccountCredit) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { name: true, slug: true },
+  });
+  if (!tenant) return;
+
+  const memberships = await prisma.membership.findMany({
+    where: { tenantId, status: "ACTIVE" },
+    select: {
+      role: true,
+      department: true,
+      user: { select: { email: true } },
+    },
+  });
+  const emailsFor = (pick: (member: (typeof memberships)[number]) => boolean) => [
+    ...new Set(
+      memberships
+        .filter(pick)
+        .map((member) => member.user.email?.trim().toLowerCase())
+        .filter((email): email is string => Boolean(email)),
+    ),
+  ];
+  const financeRecipients = emailsFor((member) => isFinanceAlertRecipient(member));
+  const recipients =
+    financeRecipients.length > 0
+      ? financeRecipients
+      : emailsFor((member) => member.role === MembershipRole.ORG_ADMIN);
+  if (recipients.length === 0) return;
+
+  const balance = await getAvailableBalanceNaira(prisma, tenantId);
+  const currency = credit.currency || "NGN";
+  const payload = {
+    tenantName: tenant.name,
+    amountLabel: moneyLabel(currency, koboToNairaString(credit.amountKobo)),
+    balanceLabel: moneyLabel(currency, balance),
+    senderName: credit.senderName,
+    senderBank: credit.senderBank,
+    accountNumber: credit.accountNumber,
+    reference: credit.reference,
+    floatUrl: absoluteAppUrl(`/${tenant.slug}/hr/payslips`),
+  };
+
+  await Promise.all(
+    recipients.map(async (to) => {
+      const sent = await sendFundingReceivedEmail({ to, ...payload });
+      if (!sent.ok) console.error("[paystack-funding-mail]", to, sent.error);
+    }),
+  );
+}
+
+async function postDedicatedCredit(tenantId: string, credit: DedicatedAccountCredit) {
+  const posted = await prisma.$transaction((tx) => creditTenantFloat(tx, tenantId, credit));
+  if (posted.created) {
+    try {
+      await alertFinanceTeam(tenantId, credit);
+    } catch (err) {
+      console.error("[paystack-funding-mail]", err);
+    }
+  }
+  return posted;
+}
+
+/** Pull recent dedicated-account payments so money already in Paystack shows on the float. */
+export async function syncTenantDedicatedAccountCredits(tenantId: string) {
+  const row = await prisma.tenantSettings.findUnique({
+    where: { tenantId },
+    select: { payrollDisbursementSettings: true },
+  });
+  const settings = parsePayrollDisbursementSettings(row?.payrollDisbursementSettings);
+  if (!settings.dvaAccountNumber && !settings.dvaCustomerCode) {
+    return { ok: true as const, credited: 0 };
+  }
+
+  let customerId: number | undefined;
+  if (settings.dvaCustomerCode) {
+    const customer = await paystackCustomerId(settings.dvaCustomerCode);
+    if (customer.ok) customerId = customer.data.id;
+  }
+
+  const collected: Record<string, unknown>[] = [];
+  for (let page = 1; page <= 3; page += 1) {
+    const listed = await paystackListSuccessfulTransactions({ page, perPage: 50, customerId });
+    if (!listed.ok) {
+      console.error("[paystack-dva-sync]", listed.error);
+      return { ok: false as const, error: listed.error, credited: 0 };
+    }
+    const batch = Array.isArray(listed.data) ? listed.data : [];
+    collected.push(...batch);
+    if (customerId || batch.length < 50) break;
+  }
+
+  let credited = 0;
+  for (const item of collected) {
+    const credit = parseDedicatedAccountCredit("charge.success", item);
+    if (!credit) continue;
+    const match = matchDedicatedAccountTenant(credit, [{ tenantId, settings }]);
+    if (!match.ok) continue;
+    const posted = await postDedicatedCredit(tenantId, credit);
+    if (posted.created) credited += 1;
+  }
+  return { ok: true as const, credited };
 }
 
 export async function applyPaystackDedicatedAccountWebhook(input: {
@@ -71,7 +186,7 @@ export async function applyPaystackDedicatedAccountWebhook(input: {
   if (!match.ok) return { ok: true, handled: false };
 
   try {
-    await prisma.$transaction((tx) => creditTenantFloat(tx, match.tenantId, credit));
+    await postDedicatedCredit(match.tenantId, credit);
     return { ok: true, handled: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not credit dedicated account payment.";

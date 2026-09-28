@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MembershipRole } from "@/generated/prisma";
-import { filterTaskAssigneeMembers, type TaskAssigneeMember } from "./membership-departments";
+import {
+  filterTaskAssigneeMembers,
+  isFinanceAlertRecipient,
+  type TaskAssigneeMember,
+} from "./membership-departments";
 
 const members: TaskAssigneeMember[] = [
   { id: "sales-1", label: "Sales Kid", role: MembershipRole.SALES_EXECUTIVE, department: "Sales" },
@@ -61,4 +65,20 @@ test("org admin still sees everyone", () => {
     actorUserId: "admin-1",
   });
   assert.equal(allowed.length, members.length);
+});
+
+test("finance alerts go to finance, not sales or org admin", () => {
+  assert.equal(
+    isFinanceAlertRecipient({ role: MembershipRole.FINANCE_MANAGER, department: "Finance" }),
+    true,
+  );
+  assert.equal(
+    isFinanceAlertRecipient({ role: MembershipRole.SALES_EXECUTIVE, department: "Accounts" }),
+    true,
+  );
+  assert.equal(isFinanceAlertRecipient({ role: MembershipRole.ORG_ADMIN, department: null }), false);
+  assert.equal(
+    isFinanceAlertRecipient({ role: MembershipRole.SALES_MANAGER, department: "Sales" }),
+    false,
+  );
 });

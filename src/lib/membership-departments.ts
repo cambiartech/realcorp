@@ -107,6 +107,16 @@ export function isTaskAssigneeAllowed(
  * Org admin, Subadmin, HR, platform, department leads, and named manager roles
  * may assign tasks across departments (Sales → Front Desk, etc.).
  */
+/** Finance mail goes to the finance lead and anyone whose department is Finance. */
+export function isFinanceAlertRecipient(input: {
+  role: MembershipRole;
+  department?: string | null;
+}): boolean {
+  if (input.role === MembershipRole.FINANCE_MANAGER) return true;
+  if (input.department && mapOrgDepartmentToAccess(input.department) === "finance") return true;
+  return profileFromMembershipRole(input.role).department === "finance";
+}
+
 export function canAssignTasksAcrossDepartments(
   isPlatformAdmin: boolean,
   role: MembershipRole | null | undefined,
