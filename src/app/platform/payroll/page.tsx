@@ -2,12 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { HrPayslipPaymentStatus, HrPayslipRunStatus, PayrollFundingStatus } from "@/generated/prisma";
+import { HrPayslipPaymentStatus, HrPayslipRunStatus, PayrollDisbursementBatchStatus, PayrollFundingStatus } from "@/generated/prisma";
 import { getAvailableBalanceNaira } from "@/lib/payroll/disbursement";
 import {
   PlatformPayrollTestLab,
   type PlatformDisburseRunOption,
 } from "./payroll-test-lab";
+import {
+  PlatformPayrollApprovals,
+  type PlatformPayrollApprovalRow,
+} from "./platform-payroll-approvals";
 
 export const dynamic = "force-dynamic";
 
@@ -92,12 +96,50 @@ export default async function PlatformPayrollPage() {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+  const awaitingApprovalRaw = await prisma.payrollDisbursementBatch.findMany({
+    where: {
+      status: PayrollDisbursementBatchStatus.DRAFT,
+      startedAt: null,
+    },
+    orderBy: { createdAt: "asc" },
+    take: 40,
+    include: {
+      tenant: { select: { name: true, slug: true, defaultCurrency: true } },
+      run: { select: { label: true, year: true, month: true } },
+    },
+  });
+  const approvalRows: PlatformPayrollApprovalRow[] = awaitingApprovalRaw
+    .filter((batch) => {
+      const settings = parsePayrollDisbursementSettings(
+        tenants.find((t) => t.id === batch.tenantId)?.settings?.payrollDisbursementSettings,
+      );
+      return settings.requirePlatformApproval === true;
+    })
+    .map((batch) => ({
+      batchId: batch.id,
+      tenantName: batch.tenant.name,
+      tenantSlug: batch.tenant.slug,
+      periodLabel:
+        batch.run?.label ||
+        `${batch.run?.year ?? ""}-${String(batch.run?.month ?? "").padStart(2, "0")}`,
+      staffCount: batch.lineCount,
+      amountLabel: Number(batch.totalNet).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      currency: batch.tenant.defaultCurrency || batch.currency || "NGN",
+      createdAtLabel: new Intl.DateTimeFormat("en-NG", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(batch.createdAt),
+    }));
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="text-2xl font-bold text-foreground">Payroll float</h1>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Fund → verify → Available on the ledger. Phase 1 Paystack payouts debit that balance and
-        send salaries. Use the test lab below as Super Admin.
+        Fund → verify → Available on the ledger. Orgs pay themselves by default. Turn on Wait for
+        approval per organization when Realcorp must vet before Paystack sends.
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3 text-sm">
@@ -178,6 +220,8 @@ export default async function PlatformPayrollPage() {
           </tbody>
         </table>
       </div>
+
+      <PlatformPayrollApprovals rows={approvalRows} />
 
       <PlatformPayrollTestLab appUrl={appUrl} runs={disburseRuns} />
     </div>

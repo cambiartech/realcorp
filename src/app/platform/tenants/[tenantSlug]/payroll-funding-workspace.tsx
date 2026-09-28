@@ -52,6 +52,7 @@ type Props = {
   dvaCustomerCode: string;
   dvaPurpose: string;
   dvaNotes: string;
+  requirePlatformApproval: boolean;
 };
 
 export function PlatformPayrollFundingWorkspace(props: Props) {
@@ -296,6 +297,7 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
               dvaCustomerCode: String(fd.get("dvaCustomerCode") || ""),
               dvaPurpose: String(fd.get("dvaPurpose") || "PAYROLL_FLOAT"),
               dvaNotes: String(fd.get("dvaNotes") || ""),
+              requirePlatformApproval: String(fd.get("requirePlatformApproval") || "") === "yes",
             }),
           );
         }}
@@ -303,6 +305,20 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
         <h3 className="sm:col-span-2 text-sm font-semibold text-foreground">
           Fee schedule &amp; funding instructions
         </h3>
+        <label className="block text-sm sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium">Wait for Realcorp approval before Paystack send</span>
+          <select
+            name="requirePlatformApproval"
+            defaultValue={props.requirePlatformApproval ? "yes" : "no"}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+          >
+            <option value="no">No — org pays itself (default)</option>
+            <option value="yes">Yes — queue for platform admin, then email Realcorp</option>
+          </select>
+          <span className="mt-1 block text-xs text-muted">
+            Leave No for most organizations. Turn Yes on only when this org must be vetted before money moves.
+          </span>
+        </label>
         <label className="block text-sm">
           <span className="mb-1 block text-xs font-medium">Flat fee (₦ per payout)</span>
           <input

@@ -85,6 +85,7 @@ async function getTenantAndMembership(tenantSlug: string, userId: string) {
     where: { slug: tenantSlug },
     select: {
       id: true,
+      name: true,
       slug: true,
       defaultCurrency: true,
       settings: { select: { payrollCountryCode: true, payrollSettings: true } },
@@ -2986,7 +2987,14 @@ export async function previewPayslipDisbursement(
 export async function disbursePayslipRunViaPaystack(
   tenantSlug: string,
   payslipRunId: string,
-): Promise<ActionResult & { batchId?: string; success?: number; failed?: number }> {
+): Promise<
+  ActionResult & {
+    batchId?: string;
+    success?: number;
+    failed?: number;
+    awaitingApproval?: boolean;
+  }
+> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
 
@@ -3001,12 +3009,51 @@ export async function disbursePayslipRunViaPaystack(
     label: session.user.name || session.user.email || "HR",
   };
 
-  const { createDisbursementBatchFromRun, executeDisbursementBatch } = await import(
-    "@/lib/payroll/disbursement"
-  );
+  const {
+    createDisbursementBatchFromRun,
+    executeDisbursementBatch,
+    parsePayrollDisbursementSettings,
+  } = await import("@/lib/payroll/disbursement");
+
+  const settingsRow = await prisma.tenantSettings.findUnique({
+    where: { tenantId: tenant.id },
+    select: { payrollDisbursementSettings: true },
+  });
+  const disbursement = parsePayrollDisbursementSettings(settingsRow?.payrollDisbursementSettings);
+  const needsApproval = Boolean(disbursement.requirePlatformApproval);
 
   const created = await createDisbursementBatchFromRun(tenant.id, payslipRunId, actor);
   if (!created.ok) return { ok: false, error: created.error };
+
+  if (needsApproval) {
+    if (created.created) {
+      try {
+        await notifyPlatformAdminsOfPayrollApproval(tenant.id, tenant.name, tenant.slug, created.batchId);
+      } catch (err) {
+        console.error("[payroll-approval-mail]", err);
+      }
+      await writeAuditLog({
+        tenantId: tenant.id,
+        actorUserId: actor.userId,
+        actorLabel: actor.label,
+        module: "HR",
+        entityType: "PAYROLL_DISBURSEMENT",
+        entityId: created.batchId,
+        action: "REQUEST_APPROVAL",
+        summary: "Payroll queued for Realcorp approval before Paystack send.",
+        metadata: { payslipRunId, batchId: created.batchId },
+      });
+    }
+    revalidateHr(tenantSlug);
+    revalidatePath("/platform/payroll");
+    return {
+      ok: true,
+      batchId: created.batchId,
+      awaitingApproval: true,
+      success: 0,
+      failed: 0,
+    };
+  }
 
   const executed = await executeDisbursementBatch(tenant.id, created.batchId, actor);
   if (!executed.ok) return { ok: false, error: executed.error, batchId: created.batchId };
@@ -3035,5 +3082,53 @@ export async function disbursePayslipRunViaPaystack(
     success: executed.success,
     failed: executed.failed,
   };
+}
+
+async function notifyPlatformAdminsOfPayrollApproval(
+  tenantId: string,
+  tenantName: string,
+  tenantSlug: string,
+  batchId: string,
+) {
+  const { absoluteAppUrl } = await import("@/lib/app-url");
+  const { sendPayrollApprovalEmail } = await import("@/lib/email");
+  const batch = await prisma.payrollDisbursementBatch.findFirst({
+    where: { id: batchId, tenantId },
+    include: { run: { select: { label: true, year: true, month: true } } },
+  });
+  if (!batch) return;
+
+  const admins = await prisma.user.findMany({
+    where: { isPlatformAdmin: true, email: { not: null } },
+    select: { email: true },
+    take: 20,
+  });
+  const recipients = [
+    ...new Set(admins.map((admin) => admin.email?.trim().toLowerCase()).filter(Boolean) as string[]),
+  ];
+  if (recipients.length === 0) return;
+
+  const periodLabel =
+    batch.run?.label ||
+    `${batch.run?.year ?? ""}-${String(batch.run?.month ?? "").padStart(2, "0")}`;
+  const amountLabel = `₦${Number(batch.totalNet).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+  const approveUrl = absoluteAppUrl("/platform/payroll");
+
+  await Promise.all(
+    recipients.map(async (to) => {
+      const sent = await sendPayrollApprovalEmail({
+        to,
+        tenantName,
+        periodLabel,
+        amountLabel,
+        staffCount: batch.lineCount,
+        approveUrl,
+      });
+      if (!sent.ok) console.error("[payroll-approval-mail]", to, sent.error);
+    }),
+  );
 }
 

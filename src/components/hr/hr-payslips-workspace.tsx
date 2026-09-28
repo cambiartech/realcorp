@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -49,6 +49,26 @@ const MONTHS = [
   "December",
 ];
 
+export type PayAttemptLineView = {
+  id: string;
+  payslipId: string;
+  name: string;
+  accountNumber: string;
+  amount: number;
+  status: string;
+  failureReason: string;
+  paidAtLabel: string | null;
+};
+
+export type PayAttemptView = {
+  id: string;
+  status: string;
+  successCount: number;
+  failedCount: number;
+  lineCount: number;
+  lines: PayAttemptLineView[];
+};
+
 export type PayslipRunView = {
   id: string;
   label: string;
@@ -57,6 +77,7 @@ export type PayslipRunView = {
   status: string;
   statusValue: string;
   payslipCount: number;
+  payAttempt?: PayAttemptView | null;
   adjustments: Array<{
     id: string;
     employeeProfileId: string;
@@ -219,6 +240,16 @@ export function HrPayslipsWorkspace({
   const periodPaidCount = generatePeriodRun
     ? generatePeriodRun.payslips.filter((p) => p.paymentStatusValue === "PAID").length
     : 0;
+
+  const payAttempt = selectedRun?.payAttempt ?? null;
+
+  useEffect(() => {
+    if (!payAttempt || payAttempt.status !== "SENDING") return;
+    const timer = window.setInterval(() => {
+      router.refresh();
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [payAttempt, router]);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -638,6 +669,79 @@ export function HrPayslipsWorkspace({
                 </div>
               ) : null}
 
+              {payAttempt ? (
+                <div className="border-b border-foreground/10 px-4 py-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+                        Pay progress
+                      </p>
+                      <p className="mt-0.5 text-sm text-foreground">
+                        {payAttempt.status === "SENDING"
+                          ? "Sending…"
+                          : payAttempt.status === "COMPLETED"
+                            ? "Finished"
+                            : payAttempt.status === "PARTIAL"
+                              ? "Some paid · some failed"
+                              : payAttempt.status === "FAILED"
+                                ? "Stopped — pay again for unpaid staff"
+                                : payAttempt.status === "DRAFT"
+                                  ? "Waiting for Realcorp approval"
+                                  : payAttempt.status}
+                        {" · "}
+                        {payAttempt.successCount} paid
+                        {payAttempt.failedCount > 0 ? ` · ${payAttempt.failedCount} failed` : ""}
+                      </p>
+                    </div>
+                    {payAttempt.status === "SENDING" ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        Updating
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="max-h-56 overflow-y-auto rounded-lg border border-foreground/10">
+                    {payAttempt.lines.map((line) => (
+                      <div
+                        key={line.id}
+                        className="flex items-start justify-between gap-3 border-b border-foreground/10 px-3 py-2 last:border-b-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{line.name}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted">
+                            {line.accountNumber}
+                            {line.failureReason ? ` · ${line.failureReason}` : ""}
+                            {line.paidAtLabel ? ` · ${line.paidAtLabel}` : ""}
+                          </p>
+                        </div>
+                        <p
+                          className={[
+                            "shrink-0 text-xs font-semibold",
+                            line.status === "SUCCESS"
+                              ? "text-[var(--success)]"
+                              : line.status === "FAILED" || line.status === "REVERSED"
+                                ? "text-[var(--danger)]"
+                                : "text-muted",
+                          ].join(" ")}
+                        >
+                          {line.status === "SUCCESS"
+                            ? "Paid"
+                            : line.status === "SENDING"
+                              ? "Sending"
+                              : line.status === "PENDING"
+                                ? "Queued"
+                                : line.status === "FAILED"
+                                  ? "Failed"
+                                  : line.status === "SKIPPED"
+                                    ? "Skipped"
+                                    : line.status}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {filteredPayslips.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-muted">
                   {selectedRun.payslipCount === 0 ? (
@@ -897,10 +1001,32 @@ export function HrPayslipsWorkspace({
             }
             onClick={() => {
               if (!selectedRun) return;
-              void runAction(
-                () => disbursePayslipRunViaPaystack(tenantSlug, selectedRun.id),
-                () => "Paystack disbursement started. Webhooks will mark slips paid.",
-              ).then(() => setPayConfirmOpen(false));
+              setPending(true);
+              void disbursePayslipRunViaPaystack(tenantSlug, selectedRun.id)
+                .then((result) => {
+                  if (!result.ok) {
+                    showSnackbar(result.error || "Paystack could not start.", "error");
+                    return;
+                  }
+                  const sent = result.success ?? 0;
+                  const failed = result.failed ?? 0;
+                  if (result.awaitingApproval) {
+                    showSnackbar(
+                      "Queued for Realcorp approval. Paystack will not send until a platform admin approves.",
+                      "success",
+                    );
+                  } else {
+                    showSnackbar(
+                      failed > 0
+                        ? `${sent} sent · ${failed} failed. See Pay progress below.`
+                        : `${sent} sent to Paystack. See Pay progress below.`,
+                      failed > 0 && sent === 0 ? "error" : "success",
+                    );
+                  }
+                  setPayConfirmOpen(false);
+                  router.refresh();
+                })
+                .finally(() => setPending(false));
             }}
             className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
           >

@@ -299,6 +299,33 @@ export function fundingReceivedEmailContent(input: {
   return { subject: `${input.amountLabel} received — ${input.tenantName}`, html };
 }
 
+export function payrollApprovalEmailContent(input: {
+  tenantName: string;
+  periodLabel: string;
+  amountLabel: string;
+  staffCount: number;
+  approveUrl: string;
+}) {
+  const html = mailDocument(
+    mailCard({
+      eyebrow: input.tenantName,
+      heading: "Payroll needs approval",
+      ornament: RECEIVED_MARK,
+      bodyHtml: [
+        mailParagraph(
+          `${escapeHtml(input.periodLabel)} is ready to pay ${input.staffCount} ${
+            input.staffCount === 1 ? "person" : "people"
+          }. Approve it before Paystack sends money.`,
+          true,
+        ),
+        detailTable(moneyRow("Net to send", input.amountLabel, true)),
+        mailButton(input.approveUrl, "Open payroll approvals"),
+      ].join(""),
+    }),
+  );
+  return { subject: `Approve payroll — ${input.tenantName} · ${input.periodLabel}`, html };
+}
+
 export function taskAssignedEmailContent(input: {
   tenantName: string;
   assigneeName: string;

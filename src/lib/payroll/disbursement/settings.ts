@@ -25,6 +25,11 @@ export type PayrollDisbursementSettings = {
   dvaCustomerCode?: string;
   dvaPurpose?: string;
   dvaNotes?: string;
+  /**
+   * When true, HR Pay queues a draft and Realcorp must approve before Paystack sends.
+   * Default false — orgs pay themselves so the platform can scale.
+   */
+  requirePlatformApproval?: boolean;
 };
 
 function asString(v: unknown): string {
@@ -63,6 +68,7 @@ export function parsePayrollDisbursementSettings(raw: unknown): PayrollDisbursem
     dvaCustomerCode: asString(obj.dvaCustomerCode),
     dvaPurpose: asString(obj.dvaPurpose) || "PAYROLL_FLOAT",
     dvaNotes: asString(obj.dvaNotes),
+    requirePlatformApproval: obj.requirePlatformApproval === true,
   };
 }
 
@@ -88,4 +94,5 @@ export const payrollDisbursementSettingsSchema = z.object({
   dvaCustomerCode: z.string().max(80).optional(),
   dvaPurpose: z.string().max(60).optional(),
   dvaNotes: z.string().max(500).optional(),
+  requirePlatformApproval: z.boolean().optional(),
 });

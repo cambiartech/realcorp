@@ -115,7 +115,7 @@ export async function createDisbursementBatchFromRun(
   tenantId: string,
   payslipRunId: string,
   actor: DisburseActor,
-): Promise<{ ok: true; batchId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; batchId: string; created: boolean } | { ok: false; error: string }> {
   if (!isPaystackConfigured()) {
     return {
       ok: false,
@@ -148,6 +148,49 @@ export async function createDisbursementBatchFromRun(
     return { ok: false, error: "No unpaid payslips in this run." };
   }
 
+  const existingBatches = await prisma.payrollDisbursementBatch.findMany({
+    where: { tenantId, payslipRunId },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    include: { lines: { select: { payslipId: true, status: true } } },
+  });
+
+  const alreadyPaidSlipIds = new Set(
+    existingBatches.flatMap((batch) =>
+      batch.lines
+        .filter((line) => line.status === PayrollDisbursementLineStatus.SUCCESS)
+        .map((line) => line.payslipId),
+    ),
+  );
+
+  for (const existing of existingBatches) {
+    if (
+      existing.status === PayrollDisbursementBatchStatus.DRAFT ||
+      existing.status === PayrollDisbursementBatchStatus.SENDING
+    ) {
+      return { ok: true, batchId: existing.id, created: false };
+    }
+  }
+
+  const slipsToPay = run.payslips.filter((slip) => !alreadyPaidSlipIds.has(slip.id));
+  if (slipsToPay.length === 0) {
+    return { ok: false, error: "Everyone for this month was already paid. You cannot pay the same slips twice." };
+  }
+
+  const attempt = existingBatches.length + 1;
+  const idempotencyKey = `disburse:${run.id}:${monthKey(run.year, run.month)}:v${attempt}`;
+
+  const colliding = await prisma.payrollDisbursementBatch.findUnique({
+    where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
+  });
+  if (
+    colliding &&
+    (colliding.status === PayrollDisbursementBatchStatus.DRAFT ||
+      colliding.status === PayrollDisbursementBatchStatus.SENDING)
+  ) {
+    return { ok: true, batchId: colliding.id, created: false };
+  }
+
   const settings = await prisma.tenantSettings.findUnique({
     where: { tenantId },
     select: { payrollDisbursementSettings: true },
@@ -173,14 +216,14 @@ export async function createDisbursementBatchFromRun(
   let totalProviderFeeKobo = 0;
   let skipped = 0;
 
-  const needsBankList = run.payslips.some((slip) => {
+  const needsBankList = slipsToPay.some((slip) => {
     const parsed = parseSalaryBankAccount(slip.profile.bankAccount);
     return parsed.ok && !parsed.disbursementReady && parsed.account.bankName;
   });
   const bankList = needsBankList ? await paystackListBanks() : { ok: true as const, data: [] };
   const banks = bankList.ok ? bankList.data : [];
 
-  for (const slip of run.payslips) {
+  for (const slip of slipsToPay) {
     const net = decimalLikeToKobo(slip.netPay);
     if (net <= 0) {
       skipped += 1;
@@ -258,15 +301,6 @@ export async function createDisbursementBatchFromRun(
     };
   }
 
-  const idempotencyKey = `disburse:${run.id}:${monthKey(run.year, run.month)}:v1`;
-
-  const existing = await prisma.payrollDisbursementBatch.findUnique({
-    where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
-  });
-  if (existing && existing.status !== PayrollDisbursementBatchStatus.CANCELLED) {
-    return { ok: true, batchId: existing.id };
-  }
-
   const batch = await prisma.payrollDisbursementBatch.create({
     data: {
       tenantId,
@@ -302,7 +336,7 @@ export async function createDisbursementBatchFromRun(
     },
   });
 
-  return { ok: true, batchId: batch.id };
+  return { ok: true, batchId: batch.id, created: true };
 }
 
 async function reserveBatchFunds(tx: LedgerTx, batchId: string, actor: DisburseActor) {
@@ -377,17 +411,35 @@ export async function executeDisbursementBatch(
     return { ok: false, error: "PAYSTACK_SECRET_KEY is not set." };
   }
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const batch = await tx.payrollDisbursementBatch.findFirst({
-        where: { id: batchId, tenantId },
+  const batch = await prisma.payrollDisbursementBatch.findFirst({
+    where: { id: batchId, tenantId },
+  });
+  if (!batch) return { ok: false, error: "Batch not found." };
+
+  if (
+    batch.status === PayrollDisbursementBatchStatus.FAILED ||
+    batch.status === PayrollDisbursementBatchStatus.PARTIAL ||
+    batch.status === PayrollDisbursementBatchStatus.COMPLETED ||
+    batch.status === PayrollDisbursementBatchStatus.CANCELLED
+  ) {
+    return {
+      ok: false,
+      error:
+        batch.status === PayrollDisbursementBatchStatus.COMPLETED
+          ? "This pay attempt already finished."
+          : "This pay attempt stopped. Click Pay again to start a new attempt for unpaid staff.",
+    };
+  }
+
+  if (batch.status === PayrollDisbursementBatchStatus.DRAFT) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await reserveBatchFunds(tx, batchId, actor);
       });
-      if (!batch) throw new PayrollLedgerError("Batch not found.");
-      await reserveBatchFunds(tx, batchId, actor);
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not reserve funds.";
-    return { ok: false, error: message };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not reserve funds.";
+      return { ok: false, error: message };
+    }
   }
 
   const lines = await prisma.payrollDisbursementLine.findMany({

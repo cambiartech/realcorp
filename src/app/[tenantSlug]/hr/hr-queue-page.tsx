@@ -207,6 +207,26 @@ export default async function HrQueuePage({
           take: 24,
           include: {
             adjustments: { orderBy: { createdAt: "asc" } },
+            disbursementBatches: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              include: {
+                lines: {
+                  orderBy: { createdAt: "asc" },
+                  select: {
+                    id: true,
+                    payslipId: true,
+                    accountName: true,
+                    accountNumber: true,
+                    bankCode: true,
+                    amount: true,
+                    status: true,
+                    failureReason: true,
+                    paidAt: true,
+                  },
+                },
+              },
+            },
             payslips: {
               include: {
                 profile: {
@@ -938,6 +958,30 @@ export default async function HrQueuePage({
           pensionable: adjustment.pensionable,
           preTax: adjustment.preTax,
         })),
+        payAttempt: r.disbursementBatches[0]
+          ? {
+              id: r.disbursementBatches[0].id,
+              status: r.disbursementBatches[0].status,
+              successCount: r.disbursementBatches[0].successCount,
+              failedCount: r.disbursementBatches[0].failedCount,
+              lineCount: r.disbursementBatches[0].lineCount,
+              lines: r.disbursementBatches[0].lines.map((line) => ({
+                id: line.id,
+                payslipId: line.payslipId,
+                name: line.accountName,
+                accountNumber: line.accountNumber,
+                amount: Number(line.amount),
+                status: line.status,
+                failureReason: line.failureReason || "",
+                paidAtLabel: line.paidAt
+                  ? new Intl.DateTimeFormat("en-NG", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(line.paidAt)
+                  : null,
+              })),
+            }
+          : null,
         payslips: r.payslips.map((s) => {
           return {
             id: s.id,

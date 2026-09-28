@@ -618,6 +618,7 @@ export async function platformSavePayrollDisbursementSettings(input: {
   dvaCustomerCode?: string;
   dvaPurpose?: string;
   dvaNotes?: string;
+  requirePlatformApproval?: boolean;
 }): Promise<MoneyActionResult> {
   const gate = await requirePlatformAdmin();
   if (!gate.ok) return gate;
@@ -653,6 +654,7 @@ export async function platformSavePayrollDisbursementSettings(input: {
     dvaCustomerCode: input.dvaCustomerCode ?? "",
     dvaPurpose: input.dvaPurpose || "PAYROLL_FLOAT",
     dvaNotes: input.dvaNotes ?? "",
+    requirePlatformApproval: input.requirePlatformApproval === true,
   });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message || "Invalid settings." };
@@ -751,6 +753,45 @@ export async function platformResolveSalaryAccount(input: {
     ok: true,
     accountNumber: res.data.account_number,
     accountName: res.data.account_name,
+  };
+}
+
+export async function platformApprovePayrollBatch(input: {
+  batchId: string;
+}): Promise<
+  | { ok: true; success: number; failed: number; message: string }
+  | { ok: false; error: string }
+> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const batch = await prisma.payrollDisbursementBatch.findUnique({
+    where: { id: input.batchId },
+    include: { tenant: { select: { id: true, slug: true, name: true } } },
+  });
+  if (!batch) return { ok: false, error: "Batch not found." };
+  if (batch.status !== "DRAFT") {
+    return { ok: false, error: `Batch is ${batch.status} — only drafts waiting for approval can be sent.` };
+  }
+
+  const actor = {
+    userId: gate.session.user!.id!,
+    label: gate.session.user!.name || gate.session.user!.email || "Platform admin",
+  };
+
+  const { executeDisbursementBatch } = await import("@/lib/payroll/disbursement");
+  const executed = await executeDisbursementBatch(batch.tenantId, batch.id, actor);
+  if (!executed.ok) return { ok: false, error: executed.error };
+
+  revalidatePath("/platform/payroll");
+  revalidatePath(`/platform/tenants/${batch.tenant.slug}`);
+  revalidatePath(`/${batch.tenant.slug}/hr/payslips`);
+
+  return {
+    ok: true,
+    success: executed.success,
+    failed: executed.failed,
+    message: `${batch.tenant.name}: ${executed.success} paid, ${executed.failed} failed.`,
   };
 }
 

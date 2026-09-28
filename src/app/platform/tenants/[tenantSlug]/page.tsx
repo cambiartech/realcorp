@@ -200,6 +200,7 @@ export default async function PlatformTenantInvitesPage({
           dvaCustomerCode={disbursement.dvaCustomerCode || ""}
           dvaPurpose={disbursement.dvaPurpose || "PAYROLL_FLOAT"}
           dvaNotes={disbursement.dvaNotes || ""}
+          requirePlatformApproval={Boolean(disbursement.requirePlatformApproval)}
         />
         <InviteTokenLookup />
         <TenantMembersWorkspace tenantSlug={tenant.slug} tenantName={tenant.name} members={members} />
