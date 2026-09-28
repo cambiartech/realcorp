@@ -70,6 +70,7 @@ export async function downloadRemittanceSchedulesXlsx(input: {
   const generatedAtLabel = new Date().toLocaleString("en-NG");
   const stamp = new Date().toISOString().slice(0, 10);
 
+  
   const summary = workbook.addWorksheet("Summary");
   addReportBanner(
     summary,
