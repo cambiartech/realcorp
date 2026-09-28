@@ -37,6 +37,12 @@ test("parseDedicatedAccountCredit reads a dedicated NUBAN charge", () => {
   assert.equal(credit.senderName, "Ahamisi Godsfavour");
 });
 
+test("parseDedicatedAccountCredit accepts amount sent as a string of kobo", () => {
+  const credit = parseDedicatedAccountCredit("charge.success", { ...charge, amount: "20000" });
+  assert.ok(credit);
+  assert.equal(credit.amountKobo, 20000);
+});
+
 test("parseDedicatedAccountCredit ignores salary transfers and other channels", () => {
   assert.equal(parseDedicatedAccountCredit("transfer.success", charge), null);
   assert.equal(

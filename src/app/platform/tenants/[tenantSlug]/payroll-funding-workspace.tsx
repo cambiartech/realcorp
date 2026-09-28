@@ -375,9 +375,9 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
             Dedicated Virtual Account (per tenant)
           </h3>
           <p className="mt-1 text-xs text-muted">
-            Create the virtual account in Paystack, then paste the account number or customer code
-            here. A transfer to that account credits this org’s available float on its own. The
-            Paystack webhook must be https://realcoerp.com/api/webhooks/paystack.
+            Paste the account number from Paystack. That is enough. Customer code and dedicated
+            account id can stay blank. A transfer to that account credits this org’s available float.
+            Webhook: https://realcoerp.com/api/webhooks/paystack.
           </p>
         </div>
         <label className="block text-sm">

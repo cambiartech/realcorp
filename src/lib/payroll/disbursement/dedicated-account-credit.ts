@@ -43,8 +43,8 @@ export function parseDedicatedAccountCredit(
   const channel = asString(row.channel) || asString(authorization?.channel);
   if (channel !== "dedicated_nuban") return null;
 
-  const amount = row.amount;
-  if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0) return null;
+  const amount = typeof row.amount === "number" ? row.amount : Number(row.amount);
+  if (!Number.isSafeInteger(amount) || amount <= 0) return null;
 
   const reference = asString(row.reference) || (typeof row.id === "number" ? `paystack-${row.id}` : "");
   if (reference.length < 4) return null;

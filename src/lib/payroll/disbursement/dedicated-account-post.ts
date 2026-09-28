@@ -3,7 +3,13 @@ import { absoluteAppUrl } from "@/lib/app-url";
 import prisma from "@/lib/db";
 import { sendFundingReceivedEmail } from "@/lib/email";
 import { isFinanceAlertRecipient } from "@/lib/membership-departments";
-import { paystackCustomerId, paystackListSuccessfulTransactions } from "./paystack";
+import { normalizeNuban } from "./bank-account";
+import {
+  paystackCustomerId,
+  paystackFetchTransaction,
+  paystackListDedicatedAccounts,
+  paystackListSuccessfulTransactions,
+} from "./paystack";
 import {
   matchDedicatedAccountTenant,
   parseDedicatedAccountCredit,
@@ -125,6 +131,48 @@ async function postDedicatedCredit(tenantId: string, credit: DedicatedAccountCre
   return posted;
 }
 
+function accountDigits(raw: string) {
+  const parsed = normalizeNuban(raw);
+  return parsed.ok ? parsed.accountNumber : "";
+}
+
+/** Paystack's payment list often omits the receiving account. The saved NUBAN is enough to find it. */
+async function findCustomerForDedicatedAccount(accountNumber: string) {
+  const target = accountDigits(accountNumber);
+  if (!target) return null;
+  for (let page = 1; page <= 5; page += 1) {
+    const listed = await paystackListDedicatedAccounts(page);
+    if (!listed.ok) return null;
+    const batch = Array.isArray(listed.data) ? listed.data : [];
+    for (const row of batch) {
+      if (accountDigits(String(row.account_number || "")) !== target) continue;
+      const customer =
+        row.customer && typeof row.customer === "object"
+          ? (row.customer as Record<string, unknown>)
+          : null;
+      const id = typeof customer?.id === "number" ? customer.id : Number(customer?.id);
+      const customerCode = typeof customer?.customer_code === "string" ? customer.customer_code.trim() : "";
+      if (!Number.isFinite(id)) continue;
+      return { id, customerCode };
+    }
+    if (batch.length < 50) break;
+  }
+  return null;
+}
+
+async function readDedicatedCredit(item: Record<string, unknown>) {
+  const parsed = parseDedicatedAccountCredit("charge.success", item);
+  if (parsed?.accountNumber) return parsed;
+  const id = typeof item.id === "number" ? item.id : Number(item.id);
+  if (!Number.isFinite(id)) return parsed;
+  const channel = typeof item.channel === "string" ? item.channel : "";
+  if (parsed || channel === "dedicated_nuban") {
+    const full = await paystackFetchTransaction(id);
+    if (full.ok) return parseDedicatedAccountCredit("charge.success", full.data) || parsed;
+  }
+  return parsed;
+}
+
 /** Pull recent dedicated-account payments so money already in Paystack shows on the float. */
 export async function syncTenantDedicatedAccountCredits(tenantId: string) {
   const row = await prisma.tenantSettings.findUnique({
@@ -137,10 +185,23 @@ export async function syncTenantDedicatedAccountCredits(tenantId: string) {
   }
 
   let customerId: number | undefined;
+  let resolvedCustomerCode = settings.dvaCustomerCode || "";
   if (settings.dvaCustomerCode) {
     const customer = await paystackCustomerId(settings.dvaCustomerCode);
     if (customer.ok) customerId = customer.data.id;
   }
+  if (!customerId && settings.dvaAccountNumber) {
+    const found = await findCustomerForDedicatedAccount(settings.dvaAccountNumber);
+    if (found) {
+      customerId = found.id;
+      resolvedCustomerCode = found.customerCode || resolvedCustomerCode;
+    }
+  }
+
+  const matchSettings = resolvedCustomerCode
+    ? { ...settings, dvaCustomerCode: resolvedCustomerCode }
+    : settings;
+  const savedAccount = accountDigits(settings.dvaAccountNumber || "");
 
   const collected: Record<string, unknown>[] = [];
   for (let page = 1; page <= 3; page += 1) {
@@ -156,9 +217,14 @@ export async function syncTenantDedicatedAccountCredits(tenantId: string) {
 
   let credited = 0;
   for (const item of collected) {
-    const credit = parseDedicatedAccountCredit("charge.success", item);
-    if (!credit) continue;
-    const match = matchDedicatedAccountTenant(credit, [{ tenantId, settings }]);
+    const parsed = await readDedicatedCredit(item);
+    if (!parsed) continue;
+    const credit = {
+      ...parsed,
+      customerCode: parsed.customerCode || resolvedCustomerCode,
+      accountNumber: parsed.accountNumber || (customerId ? savedAccount : ""),
+    };
+    const match = matchDedicatedAccountTenant(credit, [{ tenantId, settings: matchSettings }]);
     if (!match.ok) continue;
     const posted = await postDedicatedCredit(tenantId, credit);
     if (posted.created) credited += 1;

@@ -145,6 +145,19 @@ export async function paystackCustomerId(customerCode: string): Promise<Paystack
   return paystackFetch<{ id: number }>(`/customer/${encodeURIComponent(customerCode)}`);
 }
 
+export async function paystackListDedicatedAccounts(
+  page = 1,
+): Promise<PaystackResult<Record<string, unknown>[]>> {
+  const q = new URLSearchParams({ perPage: "50", page: String(page) });
+  return paystackFetch<Record<string, unknown>[]>(`/dedicated_account?${q.toString()}`);
+}
+
+export async function paystackFetchTransaction(
+  id: number,
+): Promise<PaystackResult<Record<string, unknown>>> {
+  return paystackFetch<Record<string, unknown>>(`/transaction/${id}`);
+}
+
 /** Verify Paystack webhook signature (HMAC SHA512 of raw body). */
 export function verifyPaystackWebhookSignature(
   rawBody: string,
