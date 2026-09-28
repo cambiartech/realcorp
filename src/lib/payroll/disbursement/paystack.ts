@@ -19,7 +19,7 @@ export function isPaystackConfigured(): boolean {
 async function paystackFetch<T>(
   path: string,
   init?: RequestInit,
-): Promise<PaystackResult<T>> {
+): Promise<PaystackFetchResult<T>> {
   const key = secretKey();
   if (!key) {
     return { ok: false, error: "PAYSTACK_SECRET_KEY is not set." };
@@ -35,7 +35,7 @@ async function paystackFetch<T>(
     cache: "no-store",
   });
 
-  let body: { status?: boolean; message?: string; data?: T } = {};
+  let body: { status?: boolean; message?: string; data?: T; meta?: { next?: string | null } } = {};
   try {
     body = (await res.json()) as typeof body;
   } catch {
@@ -50,8 +50,10 @@ async function paystackFetch<T>(
     };
   }
 
-  return { ok: true, data: body.data as T };
+  return { ok: true, data: body.data as T, next: body.meta?.next ?? null };
 }
+
+type PaystackFetchResult<T> = PaystackResult<T> & { next?: string | null };
 
 export type ResolvedAccount = {
   account_number: string;
@@ -67,12 +69,17 @@ export type PaystackBank = {
 
 export async function paystackListBanks(): Promise<PaystackResult<PaystackBank[]>> {
   const banks: PaystackBank[] = [];
-  for (let page = 1; page <= 8; page += 1) {
-    const listed = await paystackFetch<PaystackBank[]>(
-      `/bank?country=nigeria&perPage=100&page=${page}`,
-    );
+  let cursor: string | null = null;
+  for (let page = 0; page < 20; page += 1) {
+    const q = new URLSearchParams({
+      country: "nigeria",
+      perPage: "100",
+      use_cursor: "true",
+    });
+    if (cursor) q.set("next", cursor);
+    const listed = await paystackFetch<PaystackBank[]>(`/bank?${q.toString()}`);
     if (!listed.ok) {
-      if (page === 1) return listed;
+      if (page === 0) return listed;
       break;
     }
     const batch = Array.isArray(listed.data) ? listed.data : [];
@@ -80,7 +87,8 @@ export async function paystackListBanks(): Promise<PaystackResult<PaystackBank[]
       if (!bank?.name || !bank.code) continue;
       banks.push({ name: bank.name, code: String(bank.code), slug: bank.slug });
     }
-    if (batch.length < 100) break;
+    if (!listed.next || listed.next === cursor) break;
+    cursor = listed.next;
   }
   return { ok: true, data: banks };
 }

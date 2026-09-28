@@ -13,8 +13,9 @@ const banks: PaystackBankRow[] = [
 
 test("matchPaystackBankCode reads short names staff already saved", () => {
   assert.equal(matchPaystackBankCode(banks, "FCMB"), "214");
+  assert.equal(matchPaystackBankCode([], "FCMB"), "214");
+  assert.equal(matchPaystackBankCode(banks, "GTCO"), "058");
   assert.equal(matchPaystackBankCode(banks, "GTBank"), "058");
-  assert.equal(matchPaystackBankCode(banks, "GTB"), "058");
   assert.equal(matchPaystackBankCode(banks, "UBA"), "033");
   assert.equal(matchPaystackBankCode(banks, "Access Bank"), "044");
   assert.equal(matchPaystackBankCode(banks, "Zenith"), "057");
@@ -37,6 +38,7 @@ test("completeSalaryBank stores the code and marks the account payable", () => {
   if (!completed.ok) return;
   assert.equal(completed.changed, true);
   assert.equal(completed.account.bankCode, "214");
+  assert.equal(completed.account.bankName, "First City Monument Bank");
   assert.equal(completed.account.receivePayments, true);
   assert.equal(completed.account.accountHolderName, "Aceman Ahamisi");
 });

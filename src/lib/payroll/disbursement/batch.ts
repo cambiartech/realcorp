@@ -40,6 +40,73 @@ function monthKey(year: number, month: number) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
+export type SalaryPayPreviewRow = {
+  employeeName: string;
+  netPay: string;
+  bankName: string;
+  accountNumber: string;
+  ready: boolean;
+  reason?: string;
+};
+
+/** Resolve bank codes onto People records and return who would be paid. Does not move money. */
+export async function previewSalaryDisbursement(
+  tenantId: string,
+  payslipRunId: string,
+): Promise<{ ok: true; rows: SalaryPayPreviewRow[]; readyCount: number } | { ok: false; error: string }> {
+  const run = await prisma.hrPayslipRun.findFirst({
+    where: { id: payslipRunId, tenantId },
+    include: {
+      payslips: {
+        where: { paymentStatus: HrPayslipPaymentStatus.PENDING },
+        include: {
+          profile: { select: { id: true, fullName: true, bankAccount: true } },
+        },
+      },
+    },
+  });
+  if (!run) return { ok: false, error: "Payslip run not found." };
+  if (run.status !== HrPayslipRunStatus.FINALIZED) {
+    return { ok: false, error: "Publish the payroll month before paying." };
+  }
+
+  const listed = await paystackListBanks();
+  const banks = listed.ok ? listed.data : [];
+  const rows: SalaryPayPreviewRow[] = [];
+
+  for (const slip of run.payslips) {
+    const net = decimalLikeToKobo(slip.netPay);
+    if (net <= 0) continue;
+    let bank = parseSalaryBankAccount(slip.profile.bankAccount);
+    if (bank.ok && !bank.disbursementReady) {
+      const completed = completeSalaryBank(bank.account, banks, slip.profile.fullName || "");
+      if (completed.ok) {
+        if (completed.changed) {
+          await prisma.employeeProfile.update({
+            where: { id: slip.profile.id },
+            data: { bankAccount: salaryBankAccountToJson(completed.account) },
+          });
+        }
+        bank = { ok: true, account: completed.account, disbursementReady: true, warnings: [] };
+      } else if (!bank.account.bankCode) {
+        bank = { ok: false, error: completed.error };
+      }
+    }
+
+    const ready = bank.ok && bank.disbursementReady;
+    rows.push({
+      employeeName: slip.profile.fullName || "Employee",
+      netPay: koboToNairaString(net),
+      bankName: bank.ok ? bank.account.bankName : "",
+      accountNumber: bank.ok ? bank.account.accountNumber : "",
+      ready,
+      reason: ready ? undefined : bank.ok ? bank.warnings.join(" ") : bank.error,
+    });
+  }
+
+  return { ok: true, rows, readyCount: rows.filter((row) => row.ready).length };
+}
+
 /**
  * Build a DRAFT disbursement batch from a FINALIZED payslip run.
  * Does not move money — only validates bank data and totals.
@@ -110,10 +177,8 @@ export async function createDisbursementBatchFromRun(
     const parsed = parseSalaryBankAccount(slip.profile.bankAccount);
     return parsed.ok && !parsed.disbursementReady && parsed.account.bankName;
   });
-  const bankList = needsBankList ? await paystackListBanks() : null;
-  if (bankList && !bankList.ok) {
-    return { ok: false, error: bankList.error };
-  }
+  const bankList = needsBankList ? await paystackListBanks() : { ok: true as const, data: [] };
+  const banks = bankList.ok ? bankList.data : [];
 
   for (const slip of run.payslips) {
     const net = decimalLikeToKobo(slip.netPay);
@@ -124,8 +189,8 @@ export async function createDisbursementBatchFromRun(
     let bank = parseSalaryBankAccount(slip.profile.bankAccount);
     const ref = `rcpay_${run.id.slice(-8)}_${slip.id.slice(-10)}_${Date.now().toString(36)}`.slice(0, 50);
 
-    if (bank.ok && !bank.disbursementReady && bankList?.ok) {
-      const completed = completeSalaryBank(bank.account, bankList.data, slip.profile.fullName || "");
+    if (bank.ok && !bank.disbursementReady) {
+      const completed = completeSalaryBank(bank.account, banks, slip.profile.fullName || "");
       if (completed.ok) {
         if (completed.changed) {
           await prisma.employeeProfile.update({

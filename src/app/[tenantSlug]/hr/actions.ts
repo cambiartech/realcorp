@@ -2960,6 +2960,29 @@ export async function reviewEmployeeProfileUpdates(
  * Phase 1: create a Paystack disbursement batch from a finalized run and send transfers.
  * Requires Available ledger balance ≥ net salaries + platform fees, and PAYSTACK_SECRET_KEY.
  */
+export async function previewPayslipDisbursement(
+  tenantSlug: string,
+  payslipRunId: string,
+): Promise<
+  | { ok: true; rows: Array<{ employeeName: string; netPay: string; bankName: string; accountNumber: string; ready: boolean; reason?: string }>; readyCount: number }
+  | { ok: false; error: string }
+> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const { previewSalaryDisbursement } = await import("@/lib/payroll/disbursement");
+  const preview = await previewSalaryDisbursement(tenant.id, payslipRunId);
+  if (!preview.ok) return preview;
+  revalidateHr(tenantSlug);
+  return preview;
+}
+
 export async function disbursePayslipRunViaPaystack(
   tenantSlug: string,
   payslipRunId: string,

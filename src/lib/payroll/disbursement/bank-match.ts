@@ -8,34 +8,39 @@ export type PaystackBankRow = {
 
 const STOP = new Set(["plc", "limited", "ltd", "of", "the", "and", "mfb", "microfinance"]);
 
-/** Short names staff type, pointed at the words in Paystack's official bank name. */
-const SHORT_NAME: Record<string, string> = {
-  fcmb: "first city monument",
-  gtb: "guaranty trust",
-  gtbank: "guaranty trust",
-  gt: "guaranty trust",
-  uba: "united bank for africa",
-  fbn: "first bank",
-  firstbank: "first bank",
-  zenith: "zenith",
-  access: "access",
-  kuda: "kuda",
-  opay: "opay",
-  palmpay: "palmpay",
-  moniepoint: "moniepoint",
-  wema: "wema",
-  sterling: "sterling",
-  stanbic: "stanbic",
-  fidelity: "fidelity",
-  ecobank: "ecobank",
-  eco: "ecobank",
-  keystone: "keystone",
-  polaris: "polaris",
-  providus: "providus",
-  globus: "globus",
-  vfd: "vfd",
-  union: "union bank",
-};
+/**
+ * Names staff actually type, with the CBN code Paystack accepts.
+ * Used even when the live bank list is paged and the long name is not in the first page.
+ */
+const KNOWN_BANKS: Array<{ code: string; name: string; aliases: string[] }> = [
+  { code: "044", name: "Access Bank", aliases: ["access", "access bank", "diamond bank"] },
+  { code: "050", name: "Ecobank Nigeria", aliases: ["ecobank", "eco", "eco bank"] },
+  { code: "070", name: "Fidelity Bank", aliases: ["fidelity", "fidelity bank"] },
+  { code: "011", name: "First Bank of Nigeria", aliases: ["fbn", "firstbank", "first bank", "first bank of nigeria"] },
+  { code: "214", name: "First City Monument Bank", aliases: ["fcmb", "first city monument", "first city monument bank"] },
+  {
+    code: "058",
+    name: "Guaranty Trust Bank",
+    aliases: ["gtb", "gtbank", "gtco", "gt bank", "gt", "guaranty trust", "guaranty trust bank", "guaranty trust holding"],
+  },
+  { code: "030", name: "Heritage Bank", aliases: ["heritage", "heritage bank"] },
+  { code: "301", name: "Jaiz Bank", aliases: ["jaiz", "jaiz bank"] },
+  { code: "082", name: "Keystone Bank", aliases: ["keystone", "keystone bank"] },
+  { code: "502", name: "Kuda Bank", aliases: ["kuda", "kuda bank"] },
+  { code: "50515", name: "Moniepoint Microfinance Bank", aliases: ["moniepoint", "moniepoint mfb"] },
+  { code: "999992", name: "OPay", aliases: ["opay", "o pay"] },
+  { code: "999991", name: "PalmPay", aliases: ["palmpay", "palm pay"] },
+  { code: "076", name: "Polaris Bank", aliases: ["polaris", "polaris bank", "skye bank"] },
+  { code: "101", name: "Providus Bank", aliases: ["providus", "providus bank"] },
+  { code: "221", name: "Stanbic IBTC Bank", aliases: ["stanbic", "stanbic ibtc", "ibtc"] },
+  { code: "232", name: "Sterling Bank", aliases: ["sterling", "sterling bank"] },
+  { code: "032", name: "Union Bank of Nigeria", aliases: ["union", "union bank", "union bank of nigeria"] },
+  { code: "033", name: "United Bank For Africa", aliases: ["uba", "united bank for africa"] },
+  { code: "215", name: "Unity Bank", aliases: ["unity", "unity bank"] },
+  { code: "566", name: "VFD Microfinance Bank", aliases: ["vfd", "vfd mfb"] },
+  { code: "035", name: "Wema Bank", aliases: ["wema", "wema bank", "alat"] },
+  { code: "057", name: "Zenith Bank", aliases: ["zenith", "zenith bank"] },
+];
 
 function compact(value: string) {
   return value
@@ -65,35 +70,54 @@ function findByNeedle(banks: PaystackBankRow[], needle: string) {
   return starts.length === 1 ? starts[0] : null;
 }
 
-/** Match a saved bank name (FCMB, GTBank, Access Bank) to a Paystack bank code. */
-export function matchPaystackBankCode(banks: PaystackBankRow[], bankName: string): string | null {
+function knownBank(query: string) {
+  const key = query.replace(/ /g, "");
+  return KNOWN_BANKS.find((bank) => bank.aliases.some((alias) => alias.replace(/ /g, "") === key));
+}
+
+export type MatchedBank = { code: string; name: string };
+
+/** Match a saved bank name (FCMB, GTCO, Access Bank) to a Paystack bank. */
+export function matchPaystackBank(banks: PaystackBankRow[], bankName: string): MatchedBank | null {
   const query = compact(bankName);
   if (!query) return null;
 
-  const asCode = normalizeBankCode(bankName);
-  if (asCode.ok && banks.some((bank) => bank.code === asCode.bankCode)) return asCode.bankCode;
-
-  const exact = banks.find((bank) => compact(bank.name) === query || compact(bank.slug || "") === query.replace(/ /g, "-"));
-  if (exact) return exact.code;
-
-  const short = SHORT_NAME[query.replace(/ /g, "")];
-  if (short) {
-    const hit = findByNeedle(banks, short);
-    if (hit) return hit.code;
+  const known = knownBank(query);
+  if (known) {
+    const listed = banks.find((bank) => bank.code === known.code);
+    return { code: known.code, name: listed?.name || known.name };
   }
+
+  const asCode = normalizeBankCode(bankName);
+  if (asCode.ok) {
+    const listed = banks.find((bank) => bank.code === asCode.bankCode);
+    if (listed) return { code: listed.code, name: listed.name };
+  }
+
+  const exact = banks.find(
+    (bank) => compact(bank.name) === query || compact(bank.slug || "") === query.replace(/ /g, "-"),
+  );
+  if (exact) return { code: exact.code, name: exact.name };
 
   const letters = query.replace(/ /g, "");
   if (letters.length >= 3 && letters.length <= 6) {
-    const byAcronym = banks.filter((bank) => acronym(bank.name) === letters || acronym(`${bank.name} bank`) === letters);
-    if (byAcronym.length === 1) return byAcronym[0].code;
+    const byAcronym = banks.filter(
+      (bank) => acronym(bank.name) === letters || acronym(`${bank.name} bank`) === letters,
+    );
+    if (byAcronym.length === 1) return { code: byAcronym[0].code, name: byAcronym[0].name };
   }
 
   if (query.length >= 4) {
     const hit = findByNeedle(banks, query);
-    if (hit) return hit.code;
+    if (hit) return { code: hit.code, name: hit.name };
   }
 
   return null;
+}
+
+/** @deprecated use matchPaystackBank */
+export function matchPaystackBankCode(banks: PaystackBankRow[], bankName: string): string | null {
+  return matchPaystackBank(banks, bankName)?.code ?? null;
 }
 
 /**
@@ -107,18 +131,21 @@ export function completeSalaryBank(
 ): { ok: true; account: SalaryBankAccount; changed: boolean } | { ok: false; error: string } {
   const holder = account.accountHolderName || holderFallback.trim();
   let bankCode = account.bankCode;
+  let bankName = account.bankName;
   let changed = holder !== account.accountHolderName;
 
   if (!bankCode) {
-    const matched = matchPaystackBankCode(banks, account.bankName);
+    const matched = matchPaystackBank(banks, account.bankName);
     if (!matched) {
       return { ok: false, error: `Paystack has no bank named "${account.bankName}".` };
     }
-    bankCode = matched;
+    bankCode = matched.code;
+    bankName = matched.name;
     changed = true;
   }
 
   if (!account.receivePayments) changed = true;
+  if (bankName !== account.bankName) changed = true;
 
   return {
     ok: true,
@@ -126,6 +153,7 @@ export function completeSalaryBank(
     account: {
       ...account,
       accountHolderName: holder,
+      bankName,
       bankCode,
       receivePayments: true,
     },

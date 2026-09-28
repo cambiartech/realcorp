@@ -30,8 +30,9 @@ import {
   deletePayrollAdjustment,
   savePayrollAdjustment,
   disbursePayslipRunViaPaystack,
+  previewPayslipDisbursement,
 } from "@/app/[tenantSlug]/hr/actions";
-import { MODAL_PANEL_FORM, MODAL_PANEL_XS } from "@/lib/modal-panel";
+import { MODAL_PANEL_FORM, MODAL_PANEL_MD } from "@/lib/modal-panel";
 
 const MONTHS = [
   "January",
@@ -151,6 +152,9 @@ export function HrPayslipsWorkspace({
   const [viewPayslipId, setViewPayslipId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [payConfirmOpen, setPayConfirmOpen] = useState(false);
+  const [payPreview, setPayPreview] = useState<Awaited<ReturnType<typeof previewPayslipDisbursement>> | null>(
+    null,
+  );
   const [paymentRef, setPaymentRef] = useState("");
   const [pending, setPending] = useState(false);
   const [adjustmentTargetId, setAdjustmentTargetId] = useState<string | null>(null);
@@ -577,7 +581,15 @@ export function HrPayslipsWorkspace({
                     <button
                       type="button"
                       disabled={pending || filteredPaymentStats.pending === 0}
-                      onClick={() => setPayConfirmOpen(true)}
+                      onClick={() => {
+                        if (!selectedRun) return;
+                        setPayPreview(null);
+                        setPayConfirmOpen(true);
+                        void previewPayslipDisbursement(tenantSlug, selectedRun.id).then((result) => {
+                          setPayPreview(result);
+                          if (!result.ok) showSnackbar(result.error, "error");
+                        });
+                      }}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
                     >
                       <Banknote className="h-3.5 w-3.5" />
@@ -828,15 +840,43 @@ export function HrPayslipsWorkspace({
         onClose={() => {
           if (!pending) setPayConfirmOpen(false);
         }}
-        panelClassName={MODAL_PANEL_XS}
+        panelClassName={MODAL_PANEL_MD}
         aria-labelledby="pay-salaries-title"
       >
         <h2 id="pay-salaries-title" className="text-lg font-semibold text-foreground">
           Pay {filteredPaymentStats.pending} {filteredPaymentStats.pending === 1 ? "salary" : "salaries"}
         </h2>
-        <p className="mt-2 text-sm text-muted">
-          Paystack sends the net pay to the bank account on each person. The amount leaves the float.
-        </p>
+        {!payPreview ? (
+          <p className="mt-4 text-sm text-muted">Checking accounts…</p>
+        ) : !payPreview.ok ? (
+          <p className="mt-4 text-sm text-foreground">{payPreview.error}</p>
+        ) : (
+          <>
+            <div className="mt-4 max-h-[50vh] overflow-y-auto rounded-lg border border-foreground/10">
+              {payPreview.rows.map((row) => (
+                <div
+                  key={`${row.employeeName}-${row.accountNumber}-${row.netPay}`}
+                  className="flex items-start justify-between gap-4 border-b border-foreground/10 px-3 py-2.5 last:border-b-0"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">{row.employeeName}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted">
+                      {row.ready
+                        ? `${row.bankName} · ${row.accountNumber}`
+                        : row.reason || "Account cannot be paid"}
+                    </p>
+                  </div>
+                  <p className="shrink-0 font-mono text-sm text-foreground">
+                    {currency} {Number(row.netPay).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-muted">
+              {payPreview.readyCount} of {payPreview.rows.length} can be paid. Bank names are saved on Job &amp; pay.
+            </p>
+          </>
+        )}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -848,7 +888,13 @@ export function HrPayslipsWorkspace({
           </button>
           <button
             type="button"
-            disabled={pending || !selectedRun}
+            disabled={
+              pending ||
+              !selectedRun ||
+              !payPreview ||
+              !payPreview.ok ||
+              payPreview.readyCount === 0
+            }
             onClick={() => {
               if (!selectedRun) return;
               void runAction(

@@ -49,8 +49,10 @@ export {
   createDisbursementBatchFromRun,
   executeDisbursementBatch,
   applyPaystackTransferWebhook,
+  previewSalaryDisbursement,
   refreshBatchCounts,
   type DisburseActor,
+  type SalaryPayPreviewRow,
 } from "./batch";
 
 export {
