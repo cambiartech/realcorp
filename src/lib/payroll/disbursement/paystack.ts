@@ -168,7 +168,7 @@ export async function paystackResendTransferOtp(
 ): Promise<PaystackResult<{ message?: string }>> {
   return paystackFetch<{ message?: string }>("/transfer/resend_otp", {
     method: "POST",
-    body: JSON.stringify({ transfer_code: transferCode, reason: "resend_otp" }),
+    body: JSON.stringify({ transfer_code: transferCode, reason: "transfer" }),
   });
 }
 
