@@ -223,6 +223,9 @@ export default async function HrQueuePage({
                     status: true,
                     failureReason: true,
                     paidAt: true,
+                    providerReference: true,
+                    transferCode: true,
+                    providerTransferId: true,
                   },
                 },
               },
@@ -970,9 +973,13 @@ export default async function HrQueuePage({
                 payslipId: line.payslipId,
                 name: line.accountName,
                 accountNumber: line.accountNumber,
+                bankCode: line.bankCode,
                 amount: Number(line.amount),
                 status: line.status,
                 failureReason: line.failureReason || "",
+                providerReference: line.providerReference,
+                transferCode: line.transferCode || "",
+                providerTransferId: line.providerTransferId || "",
                 paidAtLabel: line.paidAt
                   ? new Intl.DateTimeFormat("en-NG", {
                       dateStyle: "medium",

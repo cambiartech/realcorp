@@ -152,6 +152,26 @@ export async function paystackInitiateTransfer(input: {
   });
 }
 
+/** Complete a transfer Paystack held at status `otp`. Code goes to the Paystack business phone. */
+export async function paystackFinalizeTransfer(
+  transferCode: string,
+  otp: string,
+): Promise<PaystackResult<InitiatedTransfer>> {
+  return paystackFetch<InitiatedTransfer>("/transfer/finalize_transfer", {
+    method: "POST",
+    body: JSON.stringify({ transfer_code: transferCode, otp }),
+  });
+}
+
+export async function paystackResendTransferOtp(
+  transferCode: string,
+): Promise<PaystackResult<{ message?: string }>> {
+  return paystackFetch<{ message?: string }>("/transfer/resend_otp", {
+    method: "POST",
+    body: JSON.stringify({ transfer_code: transferCode, reason: "resend_otp" }),
+  });
+}
+
 export type PaystackBalanceRow = {
   currency: string;
   balance: number;
@@ -159,6 +179,15 @@ export type PaystackBalanceRow = {
 
 export async function paystackGetBalances(): Promise<PaystackResult<PaystackBalanceRow[]>> {
   return paystackFetch<PaystackBalanceRow[]>("/balance");
+}
+
+export async function paystackGetNgnBalanceKobo(): Promise<
+  { ok: true; balanceKobo: number } | { ok: false; error: string }
+> {
+  const balances = await paystackGetBalances();
+  if (!balances.ok) return balances;
+  const ngn = (balances.data || []).find((row: PaystackBalanceRow) => row.currency === "NGN");
+  return { ok: true, balanceKobo: Math.max(0, Math.trunc(ngn?.balance ?? 0)) };
 }
 
 export async function paystackListSuccessfulTransactions(input?: {

@@ -54,9 +54,13 @@ export type PayAttemptLineView = {
   payslipId: string;
   name: string;
   accountNumber: string;
+  bankCode: string;
   amount: number;
   status: string;
   failureReason: string;
+  providerReference: string;
+  transferCode: string;
+  providerTransferId: string;
   paidAtLabel: string | null;
 };
 
@@ -242,6 +246,13 @@ export function HrPayslipsWorkspace({
     : 0;
 
   const payAttempt = selectedRun?.payAttempt ?? null;
+  const payLineByPayslipId = useMemo(() => {
+    const map = new Map<string, PayAttemptLineView>();
+    for (const line of payAttempt?.lines || []) {
+      map.set(line.payslipId, line);
+    }
+    return map;
+  }, [payAttempt]);
 
   useEffect(() => {
     if (!payAttempt || payAttempt.status !== "SENDING") return;
@@ -319,6 +330,7 @@ export function HrPayslipsWorkspace({
   return (
     <div className="space-y-5">
       <PayrollFloatPanel
+        tenantSlug={tenantSlug}
         currency={currency}
         availableBalanceLabel={payrollAvailableBalanceLabel}
         dvaAccountNumber={dvaAccountNumber}
@@ -678,7 +690,11 @@ export function HrPayslipsWorkspace({
                       </p>
                       <p className="mt-0.5 text-sm text-foreground">
                         {payAttempt.status === "SENDING"
-                          ? "Sending…"
+                          ? payAttempt.lines.some((line) =>
+                              line.failureReason.toLowerCase().includes("verification code"),
+                            )
+                            ? "Waiting for the Paystack code — Realcorp confirms it"
+                            : "Sending…"
                           : payAttempt.status === "COMPLETED"
                             ? "Finished"
                             : payAttempt.status === "PARTIAL"
@@ -700,41 +716,62 @@ export function HrPayslipsWorkspace({
                       </span>
                     ) : null}
                   </div>
-                  <div className="max-h-56 overflow-y-auto rounded-lg border border-foreground/10">
+                  <div className="max-h-72 overflow-y-auto rounded-lg border border-foreground/10">
                     {payAttempt.lines.map((line) => (
                       <div
                         key={line.id}
-                        className="flex items-start justify-between gap-3 border-b border-foreground/10 px-3 py-2 last:border-b-0"
+                        className="border-b border-foreground/10 px-3 py-2.5 last:border-b-0"
                       >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">{line.name}</p>
-                          <p className="mt-0.5 truncate text-xs text-muted">
-                            {line.accountNumber}
-                            {line.failureReason ? ` · ${line.failureReason}` : ""}
-                            {line.paidAtLabel ? ` · ${line.paidAtLabel}` : ""}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {line.name}
+                            </p>
+                            <p className="mt-0.5 text-xs tabular-nums text-muted">
+                              ₦
+                              {line.amount.toLocaleString("en-NG", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              · {line.accountNumber}
+                              {line.bankCode ? ` · bank ${line.bankCode}` : ""}
+                            </p>
+                          </div>
+                          <p
+                            className={[
+                              "shrink-0 text-xs font-semibold",
+                              line.status === "SUCCESS"
+                                ? "text-[var(--success)]"
+                                : line.status === "FAILED" || line.status === "REVERSED"
+                                  ? "text-[var(--danger)]"
+                                  : "text-muted",
+                            ].join(" ")}
+                          >
+                            {line.status === "SUCCESS"
+                              ? "Paid"
+                              : line.status === "SENDING"
+                                ? "Sending"
+                                : line.status === "PENDING"
+                                  ? "Queued"
+                                  : line.status === "FAILED"
+                                    ? "Failed"
+                                    : line.status === "REVERSED"
+                                      ? "Reversed"
+                                      : line.status === "SKIPPED"
+                                        ? "Skipped"
+                                        : line.status}
                           </p>
                         </div>
-                        <p
-                          className={[
-                            "shrink-0 text-xs font-semibold",
-                            line.status === "SUCCESS"
-                              ? "text-[var(--success)]"
-                              : line.status === "FAILED" || line.status === "REVERSED"
-                                ? "text-[var(--danger)]"
-                                : "text-muted",
-                          ].join(" ")}
-                        >
-                          {line.status === "SUCCESS"
-                            ? "Paid"
-                            : line.status === "SENDING"
-                              ? "Sending"
-                              : line.status === "PENDING"
-                                ? "Queued"
-                                : line.status === "FAILED"
-                                  ? "Failed"
-                                  : line.status === "SKIPPED"
-                                    ? "Skipped"
-                                    : line.status}
+                        {line.failureReason ? (
+                          <p className="mt-1 text-xs leading-snug text-[var(--danger)]">
+                            {line.failureReason}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 break-all font-mono text-[10px] text-muted">
+                          ref {line.providerReference}
+                          {line.transferCode ? ` · transfer ${line.transferCode}` : ""}
+                          {line.providerTransferId ? ` · id ${line.providerTransferId}` : ""}
+                          {line.paidAtLabel ? ` · ${line.paidAtLabel}` : ""}
                         </p>
                       </div>
                     ))}
@@ -844,12 +881,43 @@ export function HrPayslipsWorkspace({
                                     </span>
                                     <span className="text-[10px] text-muted">{p.paidAtLabel}</span>
                                   </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warn)]">
-                                    <CircleDashed className="h-3 w-3" />
-                                    Pending
-                                  </span>
-                                )
+                                ) : (() => {
+                                  const line = payLineByPayslipId.get(p.id);
+                                  if (
+                                    line &&
+                                    (line.status === "FAILED" || line.status === "REVERSED")
+                                  ) {
+                                    return (
+                                      <span className="inline-flex flex-col gap-0.5">
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--danger-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--danger)]">
+                                          Failed — retry
+                                        </span>
+                                        {line.failureReason ? (
+                                          <span
+                                            className="max-w-[11rem] truncate text-[10px] text-muted"
+                                            title={line.failureReason}
+                                          >
+                                            {line.failureReason}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    );
+                                  }
+                                  if (line && line.status === "SENDING") {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warn)]">
+                                        <RefreshCw className="h-3 w-3 animate-spin" />
+                                        Sending
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warn-wash)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warn)]">
+                                      <CircleDashed className="h-3 w-3" />
+                                      Unpaid
+                                    </span>
+                                  );
+                                })()
                               ) : (
                                 <span className="text-xs text-muted">—</span>
                               )}
@@ -956,7 +1024,42 @@ export function HrPayslipsWorkspace({
           <p className="mt-4 text-sm text-foreground">{payPreview.error}</p>
         ) : (
           <>
-            <div className="mt-4 max-h-[50vh] overflow-y-auto rounded-lg border border-foreground/10">
+            <ul className="mt-4 space-y-1.5 rounded-lg border border-foreground/10 px-3 py-3 text-sm">
+              <li className="flex justify-between gap-3">
+                <span className="text-muted">Org Available</span>
+                <span
+                  className={
+                    payPreview.floatOk
+                      ? "font-mono font-semibold text-[var(--success)]"
+                      : "font-mono font-semibold text-[var(--danger)]"
+                  }
+                >
+                  {currency} {payPreview.orgAvailableLabel}
+                  {payPreview.floatOk ? " · enough" : ` · need ${payPreview.needLabel}`}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span className="text-muted">Salaries to send</span>
+                <span className="font-mono text-foreground">
+                  {currency} {payPreview.totalNetLabel}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span className="text-muted">Paystack rail</span>
+                <span
+                  className={
+                    payPreview.paystackRailOk
+                      ? "font-semibold text-[var(--success)]"
+                      : "font-semibold text-[var(--danger)]"
+                  }
+                >
+                  {payPreview.paystackRailOk
+                    ? "Ready (Balance funded)"
+                    : "Not ready — DVA must settle to Paystack Balance"}
+                </span>
+              </li>
+            </ul>
+            <div className="mt-4 max-h-[40vh] overflow-y-auto rounded-lg border border-foreground/10">
               {payPreview.rows.map((row) => (
                 <div
                   key={`${row.employeeName}-${row.accountNumber}-${row.netPay}`}
@@ -977,7 +1080,8 @@ export function HrPayslipsWorkspace({
               ))}
             </div>
             <p className="mt-3 text-xs text-muted">
-              {payPreview.readyCount} of {payPreview.rows.length} can be paid. Bank names are saved on Job &amp; pay.
+              {payPreview.readyCount} of {payPreview.rows.length} can be paid. Flow: DVA deposit →
+              Available credit → Paystack Balance send → float debit.
             </p>
           </>
         )}
@@ -997,7 +1101,7 @@ export function HrPayslipsWorkspace({
               !selectedRun ||
               !payPreview ||
               !payPreview.ok ||
-              payPreview.readyCount === 0
+              !payPreview.canSend
             }
             onClick={() => {
               if (!selectedRun) return;

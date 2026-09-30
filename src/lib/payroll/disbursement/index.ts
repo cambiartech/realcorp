@@ -52,13 +52,17 @@ export {
   previewSalaryDisbursement,
   refreshBatchCounts,
   type DisburseActor,
+  type SalaryPayPreview,
   type SalaryPayPreviewRow,
 } from "./batch";
 
 export {
   isPaystackConfigured,
   paystackGetBalances,
+  paystackGetNgnBalanceKobo,
   verifyPaystackWebhookSignature,
 } from "./paystack";
+
+export { syncTenantDedicatedAccountCredits } from "./dedicated-account-post";
 
 export { estimatePaystackTransferFeeKobo } from "./provider-fees";

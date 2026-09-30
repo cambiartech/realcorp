@@ -32,6 +32,7 @@ export function PlatformPayrollTestLab({ appUrl, runs }: Props) {
   const [bankCode, setBankCode] = useState("");
   const [resolveResult, setResolveResult] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState(runs[0]?.runId || "");
+  const [confirmDisburse, setConfirmDisburse] = useState(false);
 
   function flash(ok: boolean, message: string) {
     setError(ok ? null : message);
@@ -43,8 +44,10 @@ export function PlatformPayrollTestLab({ appUrl, runs }: Props) {
       <div>
         <h2 className="text-lg font-semibold text-foreground">Paystack test lab</h2>
         <p className="mt-1 text-sm text-muted">
-          Super Admin only. Use test keys (`sk_test_…`) first. Real transfers debit Available float
-          and the Paystack balance.
+          Super Admin only. Org Available float ≠ Paystack transfer balance. Transfers always use
+          Paystack source <code className="font-mono text-[11px]">balance</code> (your merchant
+          balance). DVA funding credits the org ledger; money must also sit in Paystack Balance to
+          pay staff.
         </p>
       </div>
 
@@ -148,60 +151,85 @@ export function PlatformPayrollTestLab({ appUrl, runs }: Props) {
       <div className="rounded-lg border border-foreground/10 p-4">
         <p className="text-sm font-semibold text-foreground">3. Disburse a published payroll run</p>
         <p className="mt-0.5 text-xs text-muted">
-          Only FINALIZED runs with unpaid slips. Requires org Available float ≥ net + fees, staff
-          bank codes, and funded Paystack balance. This sends real (or test-mode) transfers.
+          Needs org Available ≥ net + platform fees AND Paystack Balance ≥ net + transfer fees
+          (min ₦50 per staff). NGN minimum is not your problem at ₦94.80 — empty Paystack balance is.
         </p>
         {runs.length === 0 ? (
           <p className="mt-3 text-sm text-muted">
             No ready runs. Publish a payslip month with unpaid slips and verify float funding first.
           </p>
         ) : (
-          <div className="mt-3 flex flex-wrap items-end gap-2">
-            <label className="min-w-[240px] flex-1 text-xs">
-              <span className="mb-1 block text-muted">Run</span>
-              <select
-                value={selectedRun}
-                onChange={(e) => setSelectedRun(e.target.value)}
-                className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
-              >
-                {runs.map((r) => (
-                  <option key={r.runId} value={r.runId}>
-                    {r.tenantName} · {r.label} · {r.pendingCount} unpaid · float {r.currency}{" "}
-                    {r.availableLabel}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              disabled={pending || !selectedRun}
-              onClick={() => {
-                const run = runs.find((r) => r.runId === selectedRun);
-                if (!run) return;
-                if (
-                  !window.confirm(
-                    `Send Paystack transfers for ${run.tenantName} — ${run.label}? This moves money.`,
-                  )
-                ) {
-                  return;
-                }
-                startTransition(async () => {
-                  const res = await platformDisbursePayslipRun({
-                    tenantSlug: run.tenantSlug,
-                    payslipRunId: run.runId,
-                  });
-                  if (!res.ok) {
-                    flash(false, res.error);
-                    return;
-                  }
-                  flash(true, res.message);
-                  router.refresh();
-                });
-              }}
-              className="rounded-md border border-[var(--danger-line)] bg-[var(--danger)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              Disburse via Paystack
-            </button>
+          <div className="mt-3 space-y-2">
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="min-w-[240px] flex-1 text-xs">
+                <span className="mb-1 block text-muted">Run</span>
+                <select
+                  value={selectedRun}
+                  onChange={(e) => {
+                    setSelectedRun(e.target.value);
+                    setConfirmDisburse(false);
+                  }}
+                  className="w-full rounded-md border border-foreground/15 bg-field px-3 py-2 text-sm"
+                >
+                  {runs.map((r) => (
+                    <option key={r.runId} value={r.runId}>
+                      {r.tenantName} · {r.label} · {r.pendingCount} unpaid · float {r.currency}{" "}
+                      {r.availableLabel}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!confirmDisburse ? (
+                <button
+                  type="button"
+                  disabled={pending || !selectedRun}
+                  onClick={() => setConfirmDisburse(true)}
+                  className="rounded-md border border-[var(--danger-line)] bg-[var(--danger)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  Disburse via Paystack
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setConfirmDisburse(false)}
+                    className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending || !selectedRun}
+                    onClick={() => {
+                      const run = runs.find((r) => r.runId === selectedRun);
+                      if (!run) return;
+                      startTransition(async () => {
+                        const res = await platformDisbursePayslipRun({
+                          tenantSlug: run.tenantSlug,
+                          payslipRunId: run.runId,
+                        });
+                        setConfirmDisburse(false);
+                        if (!res.ok) {
+                          flash(false, res.error);
+                          return;
+                        }
+                        flash(true, res.message);
+                        router.refresh();
+                      });
+                    }}
+                    className="rounded-md border border-[var(--danger-line)] bg-[var(--danger)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Confirm — send money
+                  </button>
+                </>
+              )}
+            </div>
+            {confirmDisburse ? (
+              <p className="text-xs text-[var(--danger)]">
+                This moves money from the Paystack merchant balance. Org float alone is not enough.
+              </p>
+            ) : null}
           </div>
         )}
       </div>

@@ -24,8 +24,11 @@ import {
 import {
   isPaystackConfigured,
   paystackCreateRecipient,
+  paystackFinalizeTransfer,
+  paystackGetNgnBalanceKobo,
   paystackInitiateTransfer,
   paystackListBanks,
+  paystackResendTransferOtp,
   paystackResolveAccount,
 } from "./paystack";
 import { estimatePaystackTransferFeeKobo } from "./provider-fees";
@@ -35,6 +38,54 @@ export type DisburseActor = {
   userId: string;
   label: string;
 };
+
+/** Paystack NGN minimum single transfer (docs: support article Transfers). */
+const PAYSTACK_MIN_TRANSFER_KOBO = 5_000; // ₦50
+
+/** Shown on a line Paystack will not send until the business phone confirms the SMS code. */
+export const PAYSTACK_OTP_HOLD =
+  "Paystack sent a verification code to the business phone. A Realcorp admin confirms it before money moves.";
+
+function explainPaystackTransferError(raw: string): string {
+  const msg = raw.trim();
+  if (/balance is not enough/i.test(msg)) {
+    return (
+      `${msg} — Paystack Transfers debit your merchant Paystack balance (Dashboard → Balance), ` +
+      `not the org Available float. Top up that balance (or wait for DVA deposits to settle there), then retry.`
+    );
+  }
+  return msg;
+}
+
+/**
+ * Transfers API source is always `balance` (merchant Paystack balance).
+ * Org Available float is our ledger only — it does not pull from a customer's DVA.
+ */
+async function assertPaystackBalanceForBatch(batch: {
+  totalNet: Prisma.Decimal | string;
+  totalProviderFeeEstimate: Prisma.Decimal | string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const needKobo =
+    decimalLikeToKobo(batch.totalNet) + decimalLikeToKobo(batch.totalProviderFeeEstimate);
+
+  const balances = await paystackGetNgnBalanceKobo();
+  if (!balances.ok) {
+    return {
+      ok: false,
+      error: `Could not read Paystack balance before sending: ${balances.error}`,
+    };
+  }
+  if (balances.balanceKobo < needKobo) {
+    return {
+      ok: false,
+      error:
+        `Paystack balance is ₦${koboToNairaString(balances.balanceKobo)}; this payout needs about ₦${koboToNairaString(needKobo)} ` +
+        `(net + Paystack transfer fees). Org Available float is separate — confirm DVA deposits settled to Paystack Balance ` +
+        `(Settled to Balance), then try again.`,
+    };
+  }
+  return { ok: true };
+}
 
 function monthKey(year: number, month: number) {
   return `${year}-${String(month).padStart(2, "0")}`;
@@ -49,11 +100,25 @@ export type SalaryPayPreviewRow = {
   reason?: string;
 };
 
+export type SalaryPayPreview = {
+  ok: true;
+  rows: SalaryPayPreviewRow[];
+  readyCount: number;
+  totalNetLabel: string;
+  estimatedProviderFeeLabel: string;
+  needLabel: string;
+  orgAvailableLabel: string;
+  floatOk: boolean;
+  /** Merchant Paystack Balance can cover net + transfer fees (not exposed as raw ₦ to orgs). */
+  paystackRailOk: boolean;
+  canSend: boolean;
+};
+
 /** Resolve bank codes onto People records and return who would be paid. Does not move money. */
 export async function previewSalaryDisbursement(
   tenantId: string,
   payslipRunId: string,
-): Promise<{ ok: true; rows: SalaryPayPreviewRow[]; readyCount: number } | { ok: false; error: string }> {
+): Promise<SalaryPayPreview | { ok: false; error: string }> {
   const run = await prisma.hrPayslipRun.findFirst({
     where: { id: payslipRunId, tenantId },
     include: {
@@ -73,6 +138,8 @@ export async function previewSalaryDisbursement(
   const listed = await paystackListBanks();
   const banks = listed.ok ? listed.data : [];
   const rows: SalaryPayPreviewRow[] = [];
+  let totalNetKobo = 0;
+  let providerFeeKobo = 0;
 
   for (const slip of run.payslips) {
     const net = decimalLikeToKobo(slip.netPay);
@@ -94,6 +161,10 @@ export async function previewSalaryDisbursement(
     }
 
     const ready = bank.ok && bank.disbursementReady;
+    if (ready) {
+      totalNetKobo += net;
+      providerFeeKobo += estimatePaystackTransferFeeKobo(net);
+    }
     rows.push({
       employeeName: slip.profile.fullName || "Employee",
       netPay: koboToNairaString(net),
@@ -104,7 +175,41 @@ export async function previewSalaryDisbursement(
     });
   }
 
-  return { ok: true, rows, readyCount: rows.filter((row) => row.ready).length };
+  const settings = await prisma.tenantSettings.findUnique({
+    where: { tenantId },
+    select: { payrollDisbursementSettings: true },
+  });
+  const feeSchedule = parseFeeSchedule(parsePayrollDisbursementSettings(settings?.payrollDisbursementSettings));
+  let platformFeeKobo = 0;
+  for (const row of rows) {
+    if (!row.ready) continue;
+    platformFeeKobo += calculatePayoutFeeKobo(decimalLikeToKobo(row.netPay), feeSchedule);
+  }
+
+  const orgAvailableKobo = await getAvailableBalanceKobo(prisma, tenantId);
+  const floatNeedKobo = totalNetKobo + platformFeeKobo;
+  const paystackNeedKobo = totalNetKobo + providerFeeKobo;
+  const floatOk = orgAvailableKobo >= floatNeedKobo && totalNetKobo > 0;
+
+  let paystackRailOk = false;
+  if (isPaystackConfigured() && paystackNeedKobo > 0) {
+    const rail = await paystackGetNgnBalanceKobo();
+    paystackRailOk = rail.ok && rail.balanceKobo >= paystackNeedKobo;
+  }
+
+  const readyCount = rows.filter((row) => row.ready).length;
+  return {
+    ok: true,
+    rows,
+    readyCount,
+    totalNetLabel: koboToNairaString(totalNetKobo),
+    estimatedProviderFeeLabel: koboToNairaString(providerFeeKobo),
+    needLabel: koboToNairaString(floatNeedKobo),
+    orgAvailableLabel: koboToNairaString(orgAvailableKobo),
+    floatOk,
+    paystackRailOk,
+    canSend: readyCount > 0 && floatOk && paystackRailOk,
+  };
 }
 
 /**
@@ -431,7 +536,11 @@ export async function executeDisbursementBatch(
     };
   }
 
+  // Check merchant Paystack balance before debiting org float (Transfers use source: balance).
   if (batch.status === PayrollDisbursementBatchStatus.DRAFT) {
+    const paystackReady = await assertPaystackBalanceForBatch(batch);
+    if (!paystackReady.ok) return paystackReady;
+
     try {
       await prisma.$transaction(async (tx) => {
         await reserveBatchFunds(tx, batchId, actor);
@@ -460,6 +569,17 @@ export async function executeDisbursementBatch(
       data: { status: PayrollDisbursementLineStatus.SENDING },
     });
 
+    const amountKobo = decimalLikeToKobo(line.amount);
+    if (amountKobo > 0 && amountKobo < PAYSTACK_MIN_TRANSFER_KOBO) {
+      await markLineFailed(
+        line.id,
+        `Amount ₦${koboToNairaString(amountKobo)} is below Paystack’s ₦50 minimum transfer.`,
+      );
+      await reverseLineOnLedger(tenantId, line, actor);
+      failed += 1;
+      continue;
+    }
+
     const resolve = await paystackResolveAccount(line.accountNumber, line.bankCode);
     if (!resolve.ok) {
       await markLineFailed(line.id, resolve.error);
@@ -480,7 +600,6 @@ export async function executeDisbursementBatch(
       continue;
     }
 
-    const amountKobo = decimalLikeToKobo(line.amount);
     const transfer = await paystackInitiateTransfer({
       amountKobo,
       recipientCode: recipient.data.recipient_code,
@@ -489,15 +608,26 @@ export async function executeDisbursementBatch(
     });
 
     if (!transfer.ok) {
-      await markLineFailed(line.id, transfer.error);
+      await markLineFailed(line.id, explainPaystackTransferError(transfer.error));
       await reverseLineOnLedger(tenantId, line, actor);
       failed += 1;
       continue;
     }
 
     const status = (transfer.data.status || "").toLowerCase();
-    if (status === "success" || status === "pending" || status === "otp" || !status) {
-      // pending/otp still in flight — webhook will confirm; treat pending as sent
+    if (status === "otp") {
+      await prisma.payrollDisbursementLine.update({
+        where: { id: line.id },
+        data: {
+          recipientCode: recipient.data.recipient_code,
+          accountNameResolved: resolve.data.account_name,
+          transferCode: transfer.data.transfer_code || null,
+          providerTransferId: transfer.data.id != null ? String(transfer.data.id) : null,
+          status: PayrollDisbursementLineStatus.SENDING,
+          failureReason: PAYSTACK_OTP_HOLD,
+        },
+      });
+    } else if (status === "success" || status === "pending" || !status) {
       if (status === "success") {
         await markLineSuccess(line, transfer.data.transfer_code, String(transfer.data.id || ""), actor.label);
         success += 1;
@@ -510,9 +640,9 @@ export async function executeDisbursementBatch(
             transferCode: transfer.data.transfer_code || null,
             providerTransferId: transfer.data.id != null ? String(transfer.data.id) : null,
             status: PayrollDisbursementLineStatus.SENDING,
+            failureReason: null,
           },
         });
-        // Count as in-flight; webhook finalizes. Don't reverse.
       }
     } else if (status === "failed" || status === "reversed") {
       await markLineFailed(line.id, `Paystack status: ${status}`);
@@ -614,6 +744,75 @@ async function reverseLineOnLedger(
       data: { status: PayrollDisbursementLineStatus.REVERSED },
     });
   });
+}
+
+/** Realcorp admin submits the SMS code Paystack sent to the business phone. */
+export async function finalizeDisbursementLineOtp(
+  lineId: string,
+  otp: string,
+  actor: DisburseActor,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const code = otp.replace(/\s+/g, "");
+  if (!/^\d{4,8}$/.test(code)) {
+    return { ok: false, error: "Enter the numeric code from the Paystack SMS." };
+  }
+
+  const line = await prisma.payrollDisbursementLine.findUnique({ where: { id: lineId } });
+  if (!line?.transferCode) {
+    return { ok: false, error: "This payout is not waiting on a Paystack code." };
+  }
+  if (line.status !== PayrollDisbursementLineStatus.SENDING) {
+    return { ok: false, error: `This line is ${line.status}.` };
+  }
+
+  const finalized = await paystackFinalizeTransfer(line.transferCode, code);
+  if (!finalized.ok) return { ok: false, error: finalized.error };
+
+  const status = (finalized.data.status || "").toLowerCase();
+  if (status === "success") {
+    await markLineSuccess(
+      line,
+      finalized.data.transfer_code || line.transferCode,
+      String(finalized.data.id || line.providerTransferId || ""),
+      actor.label,
+    );
+    await refreshBatchCounts(line.batchId);
+    return { ok: true, message: "Paystack accepted the code. This salary is paid." };
+  }
+  if (status === "pending" || status === "received" || status === "queued" || !status) {
+    await prisma.payrollDisbursementLine.update({
+      where: { id: line.id },
+      data: { failureReason: null, status: PayrollDisbursementLineStatus.SENDING },
+    });
+    await refreshBatchCounts(line.batchId);
+    return { ok: true, message: "Paystack queued the transfer. It will finish on the webhook." };
+  }
+  if (status === "otp") {
+    return {
+      ok: false,
+      error: "That code was not accepted. It expires in 30 minutes — resend a new one if needed.",
+    };
+  }
+  if (status === "failed" || status === "reversed" || status === "abandoned") {
+    await markLineFailed(line.id, `Paystack ${status} after verification.`);
+    await reverseLineOnLedger(line.tenantId, line, actor);
+    await refreshBatchCounts(line.batchId);
+    return { ok: false, error: `Paystack marked this ${status}. Float for this line was reversed.` };
+  }
+  await refreshBatchCounts(line.batchId);
+  return { ok: true, message: `Paystack status: ${status}.` };
+}
+
+export async function resendDisbursementLineOtp(
+  lineId: string,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const line = await prisma.payrollDisbursementLine.findUnique({ where: { id: lineId } });
+  if (!line?.transferCode || line.status !== PayrollDisbursementLineStatus.SENDING) {
+    return { ok: false, error: "This payout is not waiting on a Paystack code." };
+  }
+  const resent = await paystackResendTransferOtp(line.transferCode);
+  if (!resent.ok) return { ok: false, error: resent.error };
+  return { ok: true, message: "Paystack sent a new code to the business phone." };
 }
 
 export async function refreshBatchCounts(batchId: string) {

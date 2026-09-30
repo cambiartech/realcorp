@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { HrPayslipPaymentStatus, HrPayslipRunStatus, PayrollDisbursementBatchStatus, PayrollFundingStatus } from "@/generated/prisma";
+import { HrPayslipPaymentStatus, HrPayslipRunStatus, PayrollDisbursementBatchStatus, PayrollDisbursementLineStatus, PayrollFundingStatus } from "@/generated/prisma";
 import { getAvailableBalanceNaira } from "@/lib/payroll/disbursement";
 import {
   PlatformPayrollTestLab,
@@ -12,6 +12,10 @@ import {
   PlatformPayrollApprovals,
   type PlatformPayrollApprovalRow,
 } from "./platform-payroll-approvals";
+import {
+  PlatformPayrollOtp,
+  type PlatformPaystackOtpRow,
+} from "./platform-payroll-otp";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +138,36 @@ export default async function PlatformPayrollPage() {
       }).format(batch.createdAt),
     }));
 
+  const otpLines = await prisma.payrollDisbursementLine.findMany({
+    where: {
+      status: PayrollDisbursementLineStatus.SENDING,
+      transferCode: { not: null },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 40,
+    include: {
+      tenant: { select: { name: true, defaultCurrency: true } },
+      batch: { include: { run: { select: { label: true, year: true, month: true } } } },
+    },
+  });
+  const otpRows: PlatformPaystackOtpRow[] = otpLines
+    .filter((line) => line.transferCode)
+    .map((line) => ({
+      lineId: line.id,
+      tenantName: line.tenant.name,
+      periodLabel:
+        line.batch.run?.label ||
+        `${line.batch.run?.year ?? ""}-${String(line.batch.run?.month ?? "").padStart(2, "0")}`,
+      staffName: line.accountName,
+      amountLabel: Number(line.amount).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      currency: line.tenant.defaultCurrency || line.currency || "NGN",
+      transferCode: line.transferCode || "",
+      accountNumber: line.accountNumber,
+    }));
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="text-2xl font-bold text-foreground">Payroll float</h1>
@@ -222,6 +256,8 @@ export default async function PlatformPayrollPage() {
       </div>
 
       <PlatformPayrollApprovals rows={approvalRows} />
+
+      <PlatformPayrollOtp rows={otpRows} />
 
       <PlatformPayrollTestLab appUrl={appUrl} runs={disburseRuns} />
     </div>

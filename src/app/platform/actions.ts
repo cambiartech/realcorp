@@ -795,6 +795,34 @@ export async function platformApprovePayrollBatch(input: {
   };
 }
 
+export async function platformConfirmPaystackTransferOtp(input: {
+  lineId: string;
+  otp: string;
+}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const actor = {
+    userId: gate.session.user!.id!,
+    label: gate.session.user!.name || gate.session.user!.email || "Platform admin",
+  };
+  const { finalizeDisbursementLineOtp } = await import("@/lib/payroll/disbursement/batch");
+  const result = await finalizeDisbursementLineOtp(input.lineId, input.otp, actor);
+  if (result.ok) {
+    revalidatePath("/platform/payroll");
+  }
+  return result;
+}
+
+export async function platformResendPaystackTransferOtp(input: {
+  lineId: string;
+}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+  const { resendDisbursementLineOtp } = await import("@/lib/payroll/disbursement/batch");
+  return resendDisbursementLineOtp(input.lineId);
+}
+
 export async function platformDisbursePayslipRun(input: {
   tenantSlug: string;
   payslipRunId: string;

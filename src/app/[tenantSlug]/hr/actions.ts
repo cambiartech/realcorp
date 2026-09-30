@@ -2965,7 +2965,25 @@ export async function previewPayslipDisbursement(
   tenantSlug: string,
   payslipRunId: string,
 ): Promise<
-  | { ok: true; rows: Array<{ employeeName: string; netPay: string; bankName: string; accountNumber: string; ready: boolean; reason?: string }>; readyCount: number }
+  | {
+      ok: true;
+      rows: Array<{
+        employeeName: string;
+        netPay: string;
+        bankName: string;
+        accountNumber: string;
+        ready: boolean;
+        reason?: string;
+      }>;
+      readyCount: number;
+      totalNetLabel: string;
+      estimatedProviderFeeLabel: string;
+      needLabel: string;
+      orgAvailableLabel: string;
+      floatOk: boolean;
+      paystackRailOk: boolean;
+      canSend: boolean;
+    }
   | { ok: false; error: string }
 > {
   const session = await auth();
@@ -2982,6 +3000,31 @@ export async function previewPayslipDisbursement(
   if (!preview.ok) return preview;
   revalidateHr(tenantSlug);
   return preview;
+}
+
+export async function refreshPayrollFloat(tenantSlug: string): Promise<
+  ActionResult & { availableLabel?: string; credited?: number }
+> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const { syncTenantDedicatedAccountCredits, getAvailableBalanceNaira } = await import(
+    "@/lib/payroll/disbursement"
+  );
+  const synced = await syncTenantDedicatedAccountCredits(tenant.id);
+  if (!synced.ok) {
+    return { ok: false, error: synced.error || "Could not sync dedicated account deposits." };
+  }
+  const availableLabel = await getAvailableBalanceNaira(prisma, tenant.id);
+  revalidateHr(tenantSlug);
+  revalidatePath(`/${tenantSlug}/hr/payslips`);
+  return { ok: true, availableLabel, credited: synced.credited };
 }
 
 export async function disbursePayslipRunViaPaystack(
