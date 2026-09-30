@@ -919,7 +919,7 @@ export function HrPeopleWorkspace({
                       <td className="px-3 py-2">
                         {isContingentEmployment(detail?.employmentType) ? (
                           <span className="text-[11px] text-muted">
-                            {detail?.employmentType || "Contract"} · no forms
+                            {detail?.employmentType || "Contract"} · {onboard?.percent ?? 0}%
                           </span>
                         ) : (
                           <div className="flex items-center gap-2">
@@ -1582,7 +1582,7 @@ export function HrPeopleWorkspace({
                   </>
                 ) : (
                   <p className="self-center text-xs text-muted">
-                    Service / contract staff — no employee forms or offer letter required.
+                    Contract staff — bank account and an SLA. Guarantor and the rest stay optional. No onboarding link needed.
                   </p>
                 )}
               </div>
@@ -1599,7 +1599,7 @@ export function HrPeopleWorkspace({
                 tenantSlug={tenantSlug}
                 serviceProviderMode={recordIsServiceStaff}
                 onGenerateOffer={recordIsServiceStaff ? undefined : () => setShowOfferLetter(true)}
-                onSendForm={recordIsServiceStaff ? undefined : (ft) => openSendForm(ft)}
+                onSendForm={(ft) => openSendForm(ft)}
                 onSendAllForms={recordIsServiceStaff ? undefined : openSendAllForms}
                 onPrefillFromDocs={
                   recordIsServiceStaff

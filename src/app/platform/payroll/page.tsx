@@ -142,6 +142,7 @@ export default async function PlatformPayrollPage() {
     where: {
       status: PayrollDisbursementLineStatus.SENDING,
       transferCode: { not: null },
+      failureReason: { contains: "verification code" },
     },
     orderBy: { createdAt: "asc" },
     take: 40,

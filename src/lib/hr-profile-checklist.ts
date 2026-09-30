@@ -50,7 +50,7 @@ export const EMPTY_PROFILE_CHECKLIST_PROFILE: ProfileChecklistProfile = {
   grossMonthly: null,
 };
 
-/** Contract / adhoc / service-provider staff — paid via HR, no employee form pack. */
+/** Contract / adhoc / service-provider staff — SLA and bank are required; the employee pack is optional. */
 export function isContingentEmployment(employmentType?: string | null): boolean {
   const value = (employmentType || "").trim().toLowerCase();
   if (!value) return false;
@@ -81,12 +81,13 @@ export function buildProfileChecklist(
   const contingent = isContingentEmployment(profile.employmentType);
   if (contingent) {
     const gross = profile.grossMonthly != null && Number(profile.grossMonthly) > 0;
+    const docCats = new Set(documents.map((d) => d.category));
+    const suggested = "Useful if you have it. Not required for contract staff, and no onboarding link is needed.";
     return [
       {
         id: "basics",
         label: "Name & role on file",
         done: Boolean(profile.fullName),
-        hint: "No biodata / guarantor forms needed for service providers",
       },
       {
         id: "pay",
@@ -95,10 +96,77 @@ export function buildProfileChecklist(
         hint: "Set monthly gross so they appear on Payslips",
       },
       {
-        id: "payout",
-        label: "Where to pay (bank or company)",
+        id: "bank",
+        label: "Bank account",
         done: hasJson(profile.bankAccount),
-        hint: "Optional — bank details, or note the vendor company on the record",
+        hint: "The account we pay",
+      },
+      {
+        id: "sla",
+        label: "SLA on file",
+        done: docCats.has("CONTRACT"),
+        hint: "Upload the service agreement under Documents → SLA / contract",
+      },
+      {
+        id: "biodata",
+        label: "Biodata",
+        done: Boolean(profile.fullName && profile.phoneMobile && profile.position),
+        optional: true,
+        hint: suggested,
+      },
+      {
+        id: "photo",
+        label: "Passport photo",
+        done: Boolean(profile.photoUrl),
+        optional: true,
+        hint: suggested,
+      },
+      {
+        id: "statutory",
+        label: "Statutory IDs (TIN / pension)",
+        done: statutoryIdsSettled({
+          taxId: profile.taxId,
+          rsaPin: profile.rsaPin,
+          pensionAdministrator: profile.pensionAdministrator,
+          pensionEnabled: profile.pensionEnabled,
+        }),
+        optional: true,
+        hint: suggested,
+      },
+      {
+        id: "emergency",
+        label: "Emergency contact",
+        done: hasJson(profile.emergencyContact),
+        optional: true,
+        hint: suggested,
+      },
+      {
+        id: "nextOfKin",
+        label: "Next of kin",
+        done: hasJson(profile.nextOfKin),
+        optional: true,
+        hint: suggested,
+      },
+      {
+        id: "guarantor",
+        label: "Guarantor details",
+        done: hasJson(profile.guarantorInfo) || docCats.has("GUARANTOR"),
+        optional: true,
+        hint: suggested,
+      },
+      {
+        id: "nda",
+        label: "NDA on file",
+        done: docCats.has("NDA"),
+        optional: true,
+        hint: suggested,
+      },
+      {
+        id: "offer",
+        label: "Offer letter on file",
+        done: docCats.has("OFFER_LETTER"),
+        optional: true,
+        hint: "Contract staff usually use an SLA instead. Add an offer letter only if you want one.",
       },
     ];
   }

@@ -40,7 +40,7 @@ const DOC_CATEGORIES = [
   { value: "NDA", label: "NDAs" },
   { value: "GUARANTOR", label: "Guarantor" },
   { value: "JOB_DESCRIPTION", label: "Job descriptions" },
-  { value: "CONTRACT", label: "Contracts" },
+  { value: "CONTRACT", label: "SLA / contract" },
   { value: "PAYSLIP", label: "Payslips" },
   { value: "APPRAISAL", label: "Appraisals" },
   { value: "OTHER", label: "Other" },

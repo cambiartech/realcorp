@@ -24,6 +24,7 @@ import type { PayslipCalculation } from "@/lib/hr-payslip";
 import type { TenantBranding } from "@/lib/tenant-branding";
 import {
   finalizeAllDraftPayslipRuns,
+  discardDraftPayslipRun,
   finalizePayslipRun,
   generatePayslipRun,
   markPayslipPayments,
@@ -177,6 +178,9 @@ export function HrPayslipsWorkspace({
   const [viewPayslipId, setViewPayslipId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [payConfirmOpen, setPayConfirmOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishChecked, setPublishChecked] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [payPreview, setPayPreview] = useState<Awaited<ReturnType<typeof previewPayslipDisbursement>> | null>(
     null,
   );
@@ -524,6 +528,10 @@ export function HrPayslipsWorkspace({
               Generate / refresh
             </button>
           </form>
+          <p className="mt-3 text-xs text-muted">
+            You can start on any month. Only an earlier draft that is still open blocks a later one.
+            Months you never ran here do not have to be created.
+          </p>
         </div>
       </div>
 
@@ -595,20 +603,28 @@ export function HrPayslipsWorkspace({
                     <option value="__UNASSIGNED__">Unassigned</option>
                   </UiSelect>
                   {selectedRun.statusValue === "DRAFT" ? (
-                    <button
-                      type="button"
-                      disabled={pending || selectedRun.payslipCount === 0}
-                      onClick={() =>
-                        void runAction(
-                          () => finalizePayslipRun(tenantSlug, selectedRun.id),
-                          "Payslips published — employees can view in My HR. Mark Paid after bank transfer.",
-                        )
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-md border border-[var(--success-line)] bg-[var(--success)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Publish month
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => setDiscardOpen(true)}
+                        className="rounded-md border border-foreground/15 px-3 py-1.5 text-xs font-semibold text-muted hover:bg-foreground/[0.04] disabled:opacity-50"
+                      >
+                        Discard draft
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending || selectedRun.payslipCount === 0}
+                        onClick={() => {
+                          setPublishChecked(false);
+                          setPublishOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--success-line)] bg-[var(--success)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Publish month
+                      </button>
+                    </>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--success)]">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1006,6 +1022,140 @@ export function HrPayslipsWorkspace({
           )}
         </div>
       </div>
+
+      <ModalOverlay
+        open={publishOpen && selectedRun?.statusValue === "DRAFT"}
+        onClose={() => {
+          if (!pending) setPublishOpen(false);
+        }}
+        panelClassName={MODAL_PANEL_MD}
+        aria-labelledby="publish-month-title"
+      >
+        {selectedRun ? (
+          <>
+            <h2 id="publish-month-title" className="text-lg font-semibold text-foreground">
+              Publish {selectedRun.label}?
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Check every row before you continue. After publish, gross, PAYE, pension, and net are
+              locked. Staff can open their payslips. You can still pay them. A correction goes in a
+              later draft month.
+            </p>
+            <div className="mt-4 max-h-[40vh] overflow-y-auto rounded-lg border border-foreground/10">
+              {selectedRun.payslips.map((slip) => {
+                const gaps = [
+                  !slip.accountNumber ? "no bank account" : "",
+                  slip.calc.payeeTax > 0 && !slip.taxId ? "no tax ID" : "",
+                  slip.calc.pensionDeduction > 0 && !slip.rsaPin ? "no RSA PIN" : "",
+                ].filter(Boolean);
+                return (
+                  <div
+                    key={slip.id}
+                    className="flex items-start justify-between gap-3 border-b border-foreground/10 px-3 py-2.5 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">{slip.employeeName}</p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {slip.bankName || "Bank"} · {slip.accountNumber || "no account"}
+                        {gaps.length > 0 ? ` · ${gaps.join(", ")}` : ""}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-right font-mono text-xs text-foreground">
+                      Net {currency}{" "}
+                      {slip.netPay.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                      <span className="mt-0.5 block text-[10px] text-muted">
+                        PAYE {slip.calc.payeeTax.toLocaleString("en-NG")} · Pension{" "}
+                        {slip.calc.pensionDeduction.toLocaleString("en-NG")}
+                      </span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <label className="mt-4 flex items-start gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={publishChecked}
+                onChange={(e) => setPublishChecked(e.target.checked)}
+                className="mt-1"
+              />
+              <span>Names, banks, tax, and pension on this list are correct.</span>
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setPublishOpen(false)}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending || !publishChecked}
+                onClick={() => {
+                  void runAction(
+                    () => finalizePayslipRun(tenantSlug, selectedRun.id),
+                    "Month published. Amounts are locked. You can pay from here.",
+                  ).then((ok) => {
+                    if (ok) setPublishOpen(false);
+                  });
+                }}
+                className="rounded-md border border-[var(--success-line)] bg-[var(--success)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Publish
+              </button>
+            </div>
+          </>
+        ) : null}
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={discardOpen && selectedRun?.statusValue === "DRAFT"}
+        onClose={() => {
+          if (!pending) setDiscardOpen(false);
+        }}
+        panelClassName={MODAL_PANEL_MD}
+        aria-labelledby="discard-draft-title"
+      >
+        {selectedRun ? (
+          <>
+            <h2 id="discard-draft-title" className="text-lg font-semibold text-foreground">
+              Discard {selectedRun.label}?
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              This removes the draft figures for that month so a later month can be generated. Use
+              this when the month was opened by mistake, or when payroll for that month was not run
+              in Realcorp. A published month stays locked.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setDiscardOpen(false)}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  void runAction(
+                    () => discardDraftPayslipRun(tenantSlug, selectedRun.id),
+                    `${selectedRun.label} draft discarded.`,
+                  ).then((ok) => {
+                    if (ok) setDiscardOpen(false);
+                  });
+                }}
+                className="rounded-md border border-[var(--danger-line)] bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Discard draft
+              </button>
+            </div>
+          </>
+        ) : null}
+      </ModalOverlay>
 
       <ModalOverlay
         open={payConfirmOpen}

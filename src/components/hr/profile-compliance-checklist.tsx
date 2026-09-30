@@ -22,7 +22,7 @@ export function ProfileComplianceChecklist({
   percent: number;
   tenantSlug: string;
   inOnboardingWizard?: boolean;
-  /** Contract / adhoc / outsourced staff — no employee form pack. */
+  /** Contract staff — bank and SLA are required; the rest of the pack is optional. */
   serviceProviderMode?: boolean;
   onOpenDocuments?: () => void;
   onGenerateOffer?: () => void;
@@ -45,11 +45,13 @@ export function ProfileComplianceChecklist({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-foreground">
-              {serviceProviderMode ? "Payroll readiness" : "Onboarding"}
+              {serviceProviderMode ? "Contract setup" : "Onboarding"}
             </p>
             <p className="mt-0.5 text-[11px] text-muted">
               {serviceProviderMode
-                ? "Track pay setup only — no employee form pack."
+                ? requiredLeft > 0
+                  ? "Need a bank account and an SLA. Guarantor and the rest are optional."
+                  : "Bank and SLA are in. Anything else below is optional."
                 : requiredLeft > 0
                   ? `${requiredLeft} required step${requiredLeft === 1 ? "" : "s"} left`
                   : percent >= 100
@@ -89,11 +91,11 @@ export function ProfileComplianceChecklist({
       </div>
 
       <div className="px-4 py-3">
-        {serviceProviderMode ? null : (
-          <p className="mb-3 text-[10px] text-muted">
-            Progress counts required items only. TIN / pension stay optional.
-          </p>
-        )}
+        <p className="mb-3 text-[10px] text-muted">
+          {serviceProviderMode
+            ? "Progress counts the bank account and SLA. Fill the rest on the record if you have it — an onboarding link is not required."
+            : "Progress counts required items only. TIN / pension stay optional."}
+        </p>
 
         {remaining.length > 0 ? (
           <div className="mb-3">
@@ -153,10 +155,26 @@ export function ProfileComplianceChecklist({
       </div>
 
       {serviceProviderMode ? (
-        <div className="border-t border-foreground/10 px-4 py-3">
-          <Link href={`/${tenantSlug}/hr/payslips`} className="text-xs font-semibold text-foreground underline">
-            Open Payslips →
+        <div className="space-y-2 border-t border-foreground/10 px-4 py-3">
+          <Link href={`/${tenantSlug}/hr/documents`} className="text-xs font-semibold text-foreground underline">
+            Upload SLA →
           </Link>
+          {onSendForm ? (
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <button type="button" onClick={() => onSendForm("BANK_FORM")} className="text-xs font-semibold text-foreground underline">
+                Bank form
+              </button>
+              <button type="button" onClick={() => onSendForm("GUARANTOR")} className="text-xs font-semibold text-foreground underline">
+                Guarantor
+              </button>
+              <button type="button" onClick={() => onSendForm("BIODATA")} className="text-xs font-semibold text-foreground underline">
+                Biodata
+              </button>
+            </div>
+          ) : null}
+          <p className="text-[10px] text-muted">
+            Send a single form only if you want it. No master onboarding link.
+          </p>
         </div>
       ) : (
         <div className="space-y-2 border-t border-foreground/10 px-4 py-3">

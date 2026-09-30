@@ -261,6 +261,7 @@ export const savePeopleOrgSettingsSchema = z
     employerPensionRate: z.coerce.number().min(0).max(100),
     nsitfRate: z.coerce.number().min(0).max(100),
     itfRate: z.coerce.number().min(0).max(100),
+    celebrationAlertUserIds: z.array(z.string().trim().min(1).max(80)).max(80).optional(),
     applyStructureToEveryone: z
       .union([z.literal("on"), z.literal("true"), z.literal("1"), z.literal("")])
       .optional(),

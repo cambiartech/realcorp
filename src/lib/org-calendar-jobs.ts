@@ -1,8 +1,13 @@
 import { EmployeeProfileStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { celebratesOn, completedYears, sentOnKey } from "@/lib/celebration-dates";
-import { anniversaryCampaignHtml, birthdayCampaignHtml } from "@/lib/celebration-email-templates";
+import {
+  anniversaryCampaignHtml,
+  birthdayCampaignHtml,
+  celebrationDigestHtml,
+} from "@/lib/celebration-email-templates";
 import { sendCelebrationEmail } from "@/lib/email";
+import { parseOrgPayrollSettings } from "@/lib/payroll/org-payroll-settings";
 import { parseLeaveDate } from "@/lib/hr-leave";
 import { fetchPublicHolidaysForRange } from "@/lib/public-holidays";
 
@@ -194,6 +199,73 @@ export async function sendTodayCelebrationEmails(tenantId: string, companyName: 
   return { sent, skipped };
 }
 
+const TEAM_DIGEST_ID = "team-digest";
+
+async function sendCelebrationTeamDigest(tenantId: string, companyName: string, today: Date) {
+  const board = await loadTodayBoard(tenantId, today);
+  if (board.birthdays.length === 0 && board.anniversaries.length === 0) return 0;
+
+  const sentOn = sentOnKey(today);
+  const already = await prisma.celebrationSendLog.findUnique({
+    where: {
+      tenantId_employeeProfileId_kind_sentOn: {
+        tenantId,
+        employeeProfileId: TEAM_DIGEST_ID,
+        kind: "TEAM_DIGEST",
+        sentOn,
+      },
+    },
+    select: { id: true },
+  });
+  if (already) return 0;
+
+  const settings = await prisma.tenantSettings.findUnique({
+    where: { tenantId },
+    select: { payrollCountryCode: true, payrollSettings: true },
+  });
+  const userIds = parseOrgPayrollSettings(
+    settings?.payrollCountryCode,
+    settings?.payrollSettings,
+  ).celebrationAlertUserIds;
+  if (userIds.length === 0) return 0;
+
+  const members = await prisma.membership.findMany({
+    where: { tenantId, status: "ACTIVE", userId: { in: userIds } },
+    select: { user: { select: { email: true } } },
+  });
+  const emails = [
+    ...new Set(members.map((member) => member.user.email?.trim() || "").filter(Boolean)),
+  ];
+  if (emails.length === 0) return 0;
+
+  const html = celebrationDigestHtml({
+    companyName,
+    birthdays: board.birthdays.map((person) => person.name),
+    anniversaries: board.anniversaries.map((person) => ({ name: person.name, years: person.years })),
+  });
+  let sent = 0;
+  for (const to of emails) {
+    const result = await sendCelebrationEmail({
+      to,
+      subject: `Birthdays and anniversaries today — ${companyName}`,
+      html,
+      fromName: companyName,
+    });
+    if (result.ok) sent += 1;
+  }
+  if (sent === 0) return 0;
+
+  await prisma.celebrationSendLog.create({
+    data: {
+      tenantId,
+      employeeProfileId: TEAM_DIGEST_ID,
+      kind: "TEAM_DIGEST",
+      sentOn,
+    },
+  });
+  return sent;
+}
+
 export async function syncPublicHolidaysForTenant(input: {
   tenantId: string;
   countryCode: string;
@@ -280,6 +352,7 @@ export async function runOrgCalendarJobs(today = new Date()) {
     try {
       const mail = await sendTodayCelebrationEmails(tenant.id, tenant.name, today);
       summary.emailsSent += mail.sent;
+      summary.emailsSent += await sendCelebrationTeamDigest(tenant.id, tenant.name, today);
     } catch (error) {
       summary.errors.push(`${tenant.name}: ${error instanceof Error ? error.message : "email job failed"}`);
     }

@@ -9,6 +9,8 @@ export type OrgPayrollSettings = {
   employerPensionRate: number;
   nsitfRate: number;
   itfRate: number;
+  /** User ids emailed the birthday / anniversary list. Empty until People picks someone. */
+  celebrationAlertUserIds: string[];
 };
 
 export const DEFAULT_ORG_PAYROLL_SETTINGS: OrgPayrollSettings = {
@@ -22,6 +24,7 @@ export const DEFAULT_ORG_PAYROLL_SETTINGS: OrgPayrollSettings = {
   employerPensionRate: 10,
   nsitfRate: 1,
   itfRate: 0,
+  celebrationAlertUserIds: [],
 };
 
 export const PAYROLL_COUNTRY_OPTIONS = [
@@ -72,7 +75,14 @@ export function parseOrgPayrollSettings(
     employerPensionRate: num(raw.employerPensionRate, DEFAULT_ORG_PAYROLL_SETTINGS.employerPensionRate),
     nsitfRate: rateFromContributions(raw, "NSITF", DEFAULT_ORG_PAYROLL_SETTINGS.nsitfRate),
     itfRate: rateFromContributions(raw, "ITF", DEFAULT_ORG_PAYROLL_SETTINGS.itfRate),
+    celebrationAlertUserIds: parseCelebrationAlertUserIds(raw.celebrationAlertUserIds),
   };
+}
+
+export function parseCelebrationAlertUserIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const picked = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return [...new Set(picked.map((item) => item.trim()))];
 }
 
 export function orgPayrollSettingsPayload(settings: OrgPayrollSettings, current: unknown) {
@@ -95,5 +105,6 @@ export function orgPayrollSettingsPayload(settings: OrgPayrollSettings, current:
       { code: "NSITF", label: "Employee Compensation contribution", rate: settings.nsitfRate },
       { code: "ITF", label: "Industrial Training Fund", rate: settings.itfRate },
     ],
+    celebrationAlertUserIds: settings.celebrationAlertUserIds,
   };
 }

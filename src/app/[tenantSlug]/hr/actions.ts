@@ -900,6 +900,7 @@ export async function savePeopleOrgSettings(
     employerPensionRate: formData.get("employerPensionRate"),
     nsitfRate: formData.get("nsitfRate"),
     itfRate: formData.get("itfRate"),
+    celebrationAlertUserIds: formData.getAll("celebrationAlertUserIds").map(String),
     applyStructureToEveryone: formData.get("applyStructureToEveryone") ?? "",
   });
   if (!parsed.success) {
@@ -923,6 +924,11 @@ export async function savePeopleOrgSettings(
     employerPensionRate: parsed.data.employerPensionRate,
     nsitfRate: parsed.data.nsitfRate,
     itfRate: parsed.data.itfRate,
+    celebrationAlertUserIds:
+      formData.get("celebrationAlertsPresent") === "1"
+        ? (parsed.data.celebrationAlertUserIds ?? [])
+        : parseOrgPayrollSettings(tenant.settings?.payrollCountryCode, tenant.settings?.payrollSettings)
+            .celebrationAlertUserIds,
   };
 
   const payrollSettings = orgPayrollSettingsPayload(next, tenant.settings?.payrollSettings) as Prisma.InputJsonValue;
@@ -1006,6 +1012,7 @@ export async function savePeopleOrgSettings(
   });
   revalidateHr(tenantSlug);
   revalidatePath(`/${tenantSlug}/settings`);
+  revalidatePath(`/${tenantSlug}/hr/settings`);
   return { ok: true, appliedCount };
 }
 
@@ -1269,7 +1276,7 @@ export async function generatePayslipRun(
   if (earlierDraft) {
     return {
       ok: false,
-      error: `Finalize ${earlierDraft.label} first so cumulative tax is calculated in chronological order.`,
+      error: `${earlierDraft.label} is still a draft. Publish it, or discard it if you are not running that month here. Months you never opened in Realcorp do not need to be created.`,
     };
   }
 
@@ -1683,7 +1690,7 @@ export async function finalizePayslipRun(tenantSlug: string, runId: string): Pro
   if (earlierDraft) {
     return {
       ok: false,
-      error: `Finalize ${earlierDraft.label} first so cumulative tax remains chronologically correct.`,
+      error: `${earlierDraft.label} is still a draft. Publish or discard that month before this one. PAYE for the year adds up in month order.`,
     };
   }
 
@@ -1724,6 +1731,51 @@ export async function finalizePayslipRun(tenantSlug: string, runId: string): Pro
     action: "FINALIZE",
     summary: `Finalized ${run.label} payroll with ${run._count.payslips} payslip(s).`,
     metadata: { year: run.year, month: run.month, payslipCount: run._count.payslips },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true };
+}
+
+export async function discardDraftPayslipRun(tenantSlug: string, runId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const run = await prisma.hrPayslipRun.findFirst({
+    where: { id: runId, tenantId: tenant.id },
+  });
+  if (!run) return { ok: false, error: "Payroll run not found." };
+  if (run.status !== HrPayslipRunStatus.DRAFT) {
+    return { ok: false, error: "A published month cannot be discarded. Correct it in a later draft." };
+  }
+
+  const paid = await prisma.hrPayslip.count({
+    where: { runId: run.id, paymentStatus: HrPayslipPaymentStatus.PAID },
+  });
+  if (paid > 0) return { ok: false, error: "Someone is already marked paid on this draft." };
+
+  const payAttempts = await prisma.payrollDisbursementBatch.count({
+    where: { payslipRunId: run.id },
+  });
+  if (payAttempts > 0) {
+    return { ok: false, error: "This draft already has a pay attempt. Finish or leave it; do not discard it." };
+  }
+
+  await prisma.hrPayslipRun.delete({ where: { id: run.id } });
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel: session.user.name || session.user.email,
+    module: "HR",
+    entityType: "PAYROLL_RUN",
+    entityId: run.id,
+    action: "DELETE",
+    summary: `Discarded draft payroll ${run.label}.`,
+    metadata: { year: run.year, month: run.month },
   });
   revalidateHr(tenantSlug);
   return { ok: true };

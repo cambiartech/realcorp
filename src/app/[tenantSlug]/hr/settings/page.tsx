@@ -57,6 +57,12 @@ export default async function HrPeopleSettingsPage({
   assertTenantNavAccess(session, membership, tenant.settings, "hr");
   if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) notFound();
 
+  const members = await prisma.membership.findMany({
+    where: { tenantId: tenant.id, status: "ACTIVE" },
+    select: { user: { select: { id: true, name: true, email: true } } },
+    orderBy: { user: { name: "asc" } },
+  });
+
   return (
     <HrPeopleSettingsWorkspace
       tenantSlug={tenant.slug}
@@ -66,6 +72,11 @@ export default async function HrPeopleSettingsPage({
       )}
       orgDepartments={mergeOrgDepartments(tenant.settings?.orgDepartments as string[] | null | undefined)}
       pensionAdministrators={parsePensionAdministrators(tenant.settings?.pensionAdministrators)}
+      reminderPeople={members.map((member) => ({
+        userId: member.user.id,
+        name: member.user.name?.trim() || member.user.email || "Teammate",
+        email: member.user.email || "",
+      }))}
     />
   );
 }

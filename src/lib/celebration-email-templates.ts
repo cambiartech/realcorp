@@ -51,6 +51,28 @@ export function birthdayCampaignHtml(input: {
   );
 }
 
+export function celebrationDigestHtml(input: {
+  companyName: string;
+  birthdays: string[];
+  anniversaries: Array<{ name: string; years: number }>;
+}) {
+  const company = escapeHtml(input.companyName);
+  const lines = [
+    ...input.birthdays.map((name) => `<li>${escapeHtml(name)} — birthday</li>`),
+    ...input.anniversaries.map((person) => {
+      const years = `${person.years} year${person.years === 1 ? "" : "s"}`;
+      return `<li>${escapeHtml(person.name)} — ${years} with ${company}</li>`;
+    }),
+  ];
+  return mailDocument(
+    mailCard({
+      eyebrow: company,
+      heading: "Today’s people",
+      bodyHtml: `${mailParagraph("Birthdays and work anniversaries today.", true)}<ul>${lines.join("")}</ul>`,
+    }),
+  );
+}
+
 export function anniversaryCampaignHtml(input: { companyName: string; firstName: string; years: number }) {
   const company = escapeHtml(input.companyName);
   const name = escapeHtml(input.firstName);

@@ -26,6 +26,7 @@ const TABS = [
   { id: "pension", label: "Pension" },
   { id: "statutory", label: "NSITF & ITF" },
   { id: "departments", label: "Departments" },
+  { id: "reminders", label: "Reminders" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -78,11 +79,13 @@ export function HrPeopleSettingsWorkspace({
   payroll,
   orgDepartments,
   pensionAdministrators,
+  reminderPeople,
 }: {
   tenantSlug: string;
   payroll: OrgPayrollSettings;
   orgDepartments: string[];
   pensionAdministrators: string[];
+  reminderPeople: Array<{ userId: string; name: string; email: string }>;
 }) {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
@@ -96,6 +99,7 @@ export function HrPeopleSettingsWorkspace({
     orgDepartments.filter((name) => !isDefaultOrgDepartment(name)),
   );
   const [pfaList, setPfaList] = useState(pensionAdministrators);
+  const [reminderQuery, setReminderQuery] = useState("");
 
   useEffect(() => {
     setCustomDepartments(orgDepartments.filter((name) => !isDefaultOrgDepartment(name)));
@@ -131,7 +135,7 @@ export function HrPeopleSettingsWorkspace({
     router.refresh();
   }
 
-  const showPayrollSave = tab !== "departments";
+  const showPayrollSave = tab !== "departments" && tab !== "reminders";
 
   return (
     <div className="w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
@@ -261,6 +265,58 @@ export function HrPeopleSettingsWorkspace({
               />
               <PercentField label="ITF (%)" name="itfRate" defaultValue={payroll.itfRate} />
             </div>
+          </TabPanel>
+        </div>
+
+        <div className={tab === "reminders" ? "" : "hidden"} role="tabpanel">
+          <TabPanel
+            title="Birthday & anniversary reminders"
+            description="The person still gets their own note. Tick the individuals who should also get that morning’s list — someone in Marketing, someone in People, whoever you want."
+          >
+            <input type="hidden" name="celebrationAlertsPresent" value="1" />
+            <input
+              value={reminderQuery}
+              onChange={(event) => setReminderQuery(event.target.value)}
+              placeholder="Search by name or email"
+              className={`mb-3 ${inputClass}`}
+            />
+            {reminderPeople.length === 0 ? (
+              <p className="text-sm text-muted">No active people in this organization yet.</p>
+            ) : (
+              <ul className="max-h-72 space-y-2 overflow-y-auto">
+                {reminderPeople.map((person) => {
+                  const q = reminderQuery.trim().toLowerCase();
+                  const visible = !q || `${person.name} ${person.email}`.toLowerCase().includes(q);
+                  return (
+                    <li key={person.userId} className={visible ? "" : "hidden"}>
+                      <label className="flex items-start gap-2 text-sm text-foreground">
+                        <input
+                          type="checkbox"
+                          name="celebrationAlertUserIds"
+                          value={person.userId}
+                          defaultChecked={payroll.celebrationAlertUserIds.includes(person.userId)}
+                          className="mt-0.5 h-4 w-4"
+                        />
+                        <span>
+                          {person.name}
+                          {person.email ? (
+                            <span className="mt-0.5 block text-xs text-muted">{person.email}</span>
+                          ) : null}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <button
+              type="submit"
+              disabled={savePending}
+              className="mt-5 inline-flex items-center gap-2 rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+            >
+              {savePending ? <ButtonSpinner /> : null}
+              {savePending ? "Saving…" : "Save reminders"}
+            </button>
           </TabPanel>
         </div>
 
