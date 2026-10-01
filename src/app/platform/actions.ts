@@ -846,7 +846,10 @@ export async function platformRejectPayrollBatch(input: {
           to,
           tenantName: rejected.tenantName,
           periodLabel: rejected.periodLabel,
-          note: input.note.trim(),
+          note:
+            rejected.alreadyPaidNames.length > 0
+              ? `${input.note.trim()} Already paid and left as paid: ${rejected.alreadyPaidNames.join(", ")}. Pay the others again from this same month.`
+              : `${input.note.trim()} Pay again from this same month. Do not generate a new period.`,
           payslipsUrl,
         });
         if (!sent.ok) console.error("[payroll-reject-mail]", to, sent.error);
@@ -858,9 +861,13 @@ export async function platformRejectPayrollBatch(input: {
 
   revalidatePath("/platform/payroll");
   revalidatePath(`/${rejected.tenantSlug}/hr/payslips`);
+  const paid =
+    rejected.alreadyPaidNames.length > 0
+      ? ` Already paid and left as paid: ${rejected.alreadyPaidNames.join(", ")}.`
+      : " Nothing was paid.";
   return {
     ok: true,
-    message: `${rejected.tenantName} · ${rejected.periodLabel} rejected. HR has the note.`,
+    message: `${rejected.tenantName} · ${rejected.periodLabel} rejected.${paid} HR has the note. Do not generate the month again — they pay the unpaid people from the same period.`,
   };
 }
 

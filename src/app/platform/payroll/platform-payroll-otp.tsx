@@ -44,8 +44,8 @@ export function PlatformPayrollOtp({ rows }: { rows: PlatformPaystackOtpRow[] })
     <section className="mt-8 rounded-lg border border-foreground/10 bg-background p-5">
       <h2 className="text-lg font-semibold text-foreground">Paystack verification code</h2>
       <p className="mt-1 text-sm text-muted">
-        One code releases the whole payroll. Paystack texts it to the business phone. It expires in
-        30 minutes. New pays go out as one batch and do not ask for a code per person.
+        These pays were opened as one transfer per person, so one code cannot cover the payroll.
+        Reject them. Do not generate the month again. The next pay is one batch.
       </p>
       {error ? (
         <p className="mt-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -66,86 +66,95 @@ export function PlatformPayrollOtp({ rows }: { rows: PlatformPaystackOtpRow[] })
                 {first.tenantName} · {first.periodLabel}
               </p>
               <p className="mt-0.5 text-xs text-muted">
-                {people.length} {people.length === 1 ? "salary" : "salaries"} · {first.currency}{" "}
+                {people.length} still waiting · {first.currency}{" "}
                 {people.map((person) => person.staffName).join(", ")}
               </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={otpByBatch[batchId] || ""}
-                  onChange={(e) =>
-                    setOtpByBatch((current) => ({
-                      ...current,
-                      [batchId]: e.target.value.replace(/\D/g, "").slice(0, 8),
-                    }))
-                  }
-                  placeholder="SMS code"
-                  className="w-36 rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
-                />
-                <button
-                  type="button"
-                  disabled={pending || (otpByBatch[batchId] || "").length < 4}
-                  onClick={() => {
-                    setError(null);
-                    setMessage(null);
-                    startTransition(async () => {
-                      const res = await platformConfirmPaystackBatchOtp({
-                        batchId,
-                        otp: otpByBatch[batchId] || "",
+              {people.length === 1 ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <input
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={otpByBatch[batchId] || ""}
+                    onChange={(e) =>
+                      setOtpByBatch((current) => ({
+                        ...current,
+                        [batchId]: e.target.value.replace(/\D/g, "").slice(0, 8),
+                      }))
+                    }
+                    placeholder="SMS code"
+                    className="w-36 rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={pending || (otpByBatch[batchId] || "").length < 4}
+                    onClick={() => {
+                      setError(null);
+                      setMessage(null);
+                      startTransition(async () => {
+                        const res = await platformConfirmPaystackBatchOtp({
+                          batchId,
+                          otp: otpByBatch[batchId] || "",
+                        });
+                        if (!res.ok) {
+                          setError(res.error);
+                          return;
+                        }
+                        setMessage(res.message);
+                        router.refresh();
                       });
-                      if (!res.ok) {
-                        setError(res.error);
-                        return;
-                      }
-                      setMessage(res.message);
-                      router.refresh();
-                    });
-                  }}
-                  className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
-                >
-                  Confirm code
-                </button>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    setError(null);
-                    setMessage(null);
-                    startTransition(async () => {
-                      const res = await platformResendPaystackTransferOtp({ lineId: first.lineId });
-                      if (!res.ok) {
-                        setError(res.error);
-                        return;
-                      }
-                      setMessage("Paystack sent a new code. Use it once for this whole payroll.");
-                    });
-                  }}
-                  className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                >
-                  Resend code
-                </button>
-              </div>
+                    }}
+                    className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                  >
+                    Confirm code
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      setError(null);
+                      setMessage(null);
+                      startTransition(async () => {
+                        const res = await platformResendPaystackTransferOtp({ lineId: first.lineId });
+                        if (!res.ok) {
+                          setError(res.error);
+                          return;
+                        }
+                        setMessage("Paystack sent a new code for this one salary.");
+                      });
+                    }}
+                    className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  >
+                    Resend code
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted">
+                  One code cannot cover these people. Reject the payroll and pay again from the same month.
+                </p>
+              )}
               <textarea
                 value={noteByBatch[batchId] || ""}
                 onChange={(event) =>
                   setNoteByBatch((current) => ({ ...current, [batchId]: event.target.value }))
                 }
                 rows={2}
-                placeholder="What does not match? HR will see this if you reject."
+                placeholder="What does not match? Type this, then reject."
                 className="mt-3 w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
               />
               <button
                 type="button"
-                disabled={pending || (noteByBatch[batchId] || "").trim().length < 4}
+                disabled={pending}
                 onClick={() => {
+                  const note = (noteByBatch[batchId] || "").trim();
+                  if (note.length < 4) {
+                    setError("Type a short note for HR, then reject. You do not generate a new month.");
+                    setMessage(null);
+                    return;
+                  }
                   setError(null);
                   setMessage(null);
                   startTransition(async () => {
-                    const res = await platformRejectPayrollBatch({
-                      batchId,
-                      note: noteByBatch[batchId] || "",
-                    });
+                    const res = await platformRejectPayrollBatch({ batchId, note });
                     if (!res.ok) {
                       setError(res.error);
                       return;

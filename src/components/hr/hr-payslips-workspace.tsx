@@ -751,7 +751,7 @@ export function HrPayslipsWorkspace({
                       </span>
                     ) : null}
                   </div>
-                  {payAttempt.status === "CANCELLED" && payAttempt.rejectionNote ? (
+                  {payAttempt.rejectionNote ? (
                     <p className="mb-2 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-sm text-[var(--danger)]">
                       {payAttempt.rejectionNote}
                     </p>

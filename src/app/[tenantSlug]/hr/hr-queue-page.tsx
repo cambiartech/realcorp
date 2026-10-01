@@ -968,10 +968,7 @@ export default async function HrQueuePage({
               successCount: r.disbursementBatches[0].successCount,
               failedCount: r.disbursementBatches[0].failedCount,
               lineCount: r.disbursementBatches[0].lineCount,
-              rejectionNote:
-                r.disbursementBatches[0].status === "CANCELLED"
-                  ? r.disbursementBatches[0].lastError || ""
-                  : "",
+              rejectionNote: r.disbursementBatches[0].lastError || "",
               lines: r.disbursementBatches[0].lines.map((line) => ({
                 id: line.id,
                 payslipId: line.payslipId,

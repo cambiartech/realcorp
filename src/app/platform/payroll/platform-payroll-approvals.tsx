@@ -62,7 +62,7 @@ export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprov
                   setNoteByBatch((current) => ({ ...current, [row.batchId]: event.target.value }))
                 }
                 rows={2}
-                placeholder="What does not match? HR will see this if you reject."
+                placeholder="What does not match? Type this, then reject."
                 className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
               />
               <div className="flex flex-wrap gap-2">
@@ -88,14 +88,20 @@ export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprov
                 </button>
                 <button
                   type="button"
-                  disabled={pending || (noteByBatch[row.batchId] || "").trim().length < 4}
+                  disabled={pending}
                   onClick={() => {
+                    const note = (noteByBatch[row.batchId] || "").trim();
+                    if (note.length < 4) {
+                      setError("Type a short note for HR, then reject.");
+                      setMessage(null);
+                      return;
+                    }
                     setError(null);
                     setMessage(null);
                     startTransition(async () => {
                       const res = await platformRejectPayrollBatch({
                         batchId: row.batchId,
-                        note: noteByBatch[row.batchId] || "",
+                        note,
                       });
                       if (!res.ok) {
                         setError(res.error);

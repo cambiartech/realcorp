@@ -835,7 +835,7 @@ export async function finalizeDisbursementLineOtp(
   return { ok: true, message: `Paystack status: ${status}.` };
 }
 
-/** One SMS code releases every salary still waiting in this payroll. */
+/** One SMS code can release one transfer. A payroll split into several transfers is rejected instead. */
 export async function finalizeDisbursementBatchOtp(
   batchId: string,
   otp: string,
@@ -853,20 +853,14 @@ export async function finalizeDisbursementBatchOtp(
   if (lines.length === 0) {
     return { ok: false, error: "This payroll is not waiting on a Paystack code." };
   }
-
-  let released = 0;
-  const problems: string[] = [];
-  for (const line of lines) {
-    const result = await finalizeDisbursementLineOtp(line.id, otp, actor);
-    if (!result.ok) problems.push(`${line.accountName}: ${result.error}`);
-    else released += 1;
+  if (lines.length > 1) {
+    return {
+      ok: false,
+      error:
+        "This payroll was sent as a separate transfer per person, so one code cannot release all of them. Reject it. Do not generate the month again.",
+    };
   }
-  if (released === 0) {
-    return { ok: false, error: problems[0] || "Paystack did not accept that code." };
-  }
-  const summary = `One code released ${released} of ${lines.length} salaries.`;
-  if (problems.length === 0) return { ok: true, message: summary };
-  return { ok: true, message: `${summary} Still waiting: ${problems.slice(0, 2).join(" ")}` };
+  return finalizeDisbursementLineOtp(lines[0].id, otp, actor);
 }
 
 /**
@@ -885,6 +879,7 @@ export async function rejectDisbursementBatch(
       tenantName: string;
       periodLabel: string;
       payslipRunId: string;
+      alreadyPaidNames: string[];
     }
   | { ok: false; error: string }
 > {
@@ -901,9 +896,9 @@ export async function rejectDisbursementBatch(
     },
   });
   if (!batch) return { ok: false, error: "Batch not found." };
-  if (batch.lines.some((line) => line.status === PayrollDisbursementLineStatus.SUCCESS)) {
-    return { ok: false, error: "Someone in this payroll is already paid. It cannot be rejected." };
-  }
+  const alreadyPaidNames = batch.lines
+    .filter((line) => line.status === PayrollDisbursementLineStatus.SUCCESS)
+    .map((line) => line.accountName);
   const waitingForCode = batch.lines.some(
     (line) =>
       line.status === PayrollDisbursementLineStatus.SENDING &&
@@ -911,7 +906,11 @@ export async function rejectDisbursementBatch(
       (line.failureReason || "").toLowerCase().includes("verification code"),
   );
   const notStarted = batch.status === PayrollDisbursementBatchStatus.DRAFT && !batch.startedAt;
-  if (!notStarted && !(batch.status === PayrollDisbursementBatchStatus.SENDING && waitingForCode)) {
+  const canStopUnpaid =
+    (batch.status === PayrollDisbursementBatchStatus.SENDING ||
+      batch.status === PayrollDisbursementBatchStatus.PARTIAL) &&
+    waitingForCode;
+  if (!notStarted && !canStopUnpaid) {
     return {
       ok: false,
       error: "This payroll has already been sent to Paystack. Reject it only while it is waiting for approval or a confirmation code.",
@@ -949,9 +948,10 @@ export async function rejectDisbursementBatch(
   await prisma.payrollDisbursementBatch.update({
     where: { id: batch.id },
     data: {
-      status: PayrollDisbursementBatchStatus.CANCELLED,
+      ...(alreadyPaidNames.length === 0
+        ? { status: PayrollDisbursementBatchStatus.CANCELLED, completedAt: new Date() }
+        : {}),
       lastError: reason.slice(0, 500),
-      completedAt: new Date(),
     },
   });
 
@@ -964,6 +964,7 @@ export async function rejectDisbursementBatch(
       batch.run?.label ||
       `${batch.run?.year ?? ""}-${String(batch.run?.month ?? "").padStart(2, "0")}`,
     payslipRunId: batch.payslipRunId,
+    alreadyPaidNames,
   };
 }
 
