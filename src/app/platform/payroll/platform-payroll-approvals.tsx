@@ -12,6 +12,7 @@ export type PlatformPayrollApprovalRow = {
   staffCount: number;
   amountLabel: string;
   platformFeeLabel: string;
+  baseFeeLabel: string;
   providerFeeLabel: string;
   currency: string;
   createdAtLabel: string;
@@ -61,8 +62,9 @@ export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprov
               </p>
               <p className="mt-0.5 text-xs text-muted">
                 {row.staffCount} {row.staffCount === 1 ? "person" : "people"} · salaries {row.currency}{" "}
-                {row.amountLabel} · Realcorp fee {row.currency} {row.platformFeeLabel} · Paystack fee{" "}
-                {row.currency} {row.providerFeeLabel} · queued {row.createdAtLabel}
+                {row.amountLabel} · Realcorp {row.currency} {row.platformFeeLabel} · base {row.currency}{" "}
+                {row.baseFeeLabel} · Paystack {row.currency} {row.providerFeeLabel} · queued{" "}
+                {row.createdAtLabel}
               </p>
               <ul className="mt-2 space-y-1">
                 {row.lines.map((line) => (

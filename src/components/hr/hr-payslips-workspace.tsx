@@ -1332,6 +1332,12 @@ export function HrPayslipsWorkspace({
                 </span>
               </li>
               <li className="flex justify-between gap-3">
+                <span className="text-muted">Realcorp base fee</span>
+                <span className="font-mono text-foreground">
+                  {currency} {payPreview.baseFeeLabel}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
                 <span className="text-muted">Paystack transfer fee</span>
                 <span className="font-mono text-foreground">
                   {currency} {payPreview.estimatedProviderFeeLabel}
@@ -1390,9 +1396,9 @@ export function HrPayslipsWorkspace({
             </div>
             <p className="mt-3 text-xs text-muted">
               {payPreview.readyCount} of {payPreview.rows.length} can be paid. Available is charged the
-              salary plus the Realcorp fee. Paystack’s transfer fee comes off Paystack Balance. A
-              rejection returns both the salary and the Realcorp fee to Available, one line per person
-              on the float ledger.
+              salaries, the Realcorp fee on each person, the base fee once, and Paystack’s transfer fee.
+              Paystack’s charge does not reduce the Realcorp fee. If nobody is paid, all of it returns
+              to Available.
             </p>
           </>
         )}

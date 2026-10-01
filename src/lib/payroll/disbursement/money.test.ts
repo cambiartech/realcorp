@@ -80,6 +80,7 @@ test("fee schedule: flat + percent with optional cap on percent portion", () => 
 test("default fee schedule is zero when settings missing", () => {
   assert.deepEqual(parseFeeSchedule(null), {
     feeFlatNaira: 0,
+    feeBaseNaira: 0,
     feePercentBps: 0,
     feeCapNaira: undefined,
   });

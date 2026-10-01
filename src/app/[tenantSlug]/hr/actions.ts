@@ -3101,6 +3101,7 @@ export async function previewPayslipDisbursement(
       readyCount: number;
       totalNetLabel: string;
       platformFeeLabel: string;
+      baseFeeLabel: string;
       estimatedProviderFeeLabel: string;
       needLabel: string;
       orgAvailableLabel: string;

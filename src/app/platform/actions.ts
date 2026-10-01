@@ -603,6 +603,7 @@ export async function platformRejectPayrollFunding(input: {
 export async function platformSavePayrollDisbursementSettings(input: {
   tenantSlug: string;
   feeFlatNaira: number;
+  feeBaseNaira?: number;
   feePercentBps: number;
   feeCapNaira?: number;
   fundingBankName?: string;
@@ -638,6 +639,7 @@ export async function platformSavePayrollDisbursementSettings(input: {
 
   const parsed = payrollDisbursementSettingsSchema.safeParse({
     feeFlatNaira: input.feeFlatNaira,
+    feeBaseNaira: input.feeBaseNaira ?? current.feeBaseNaira ?? 0,
     feePercentBps: input.feePercentBps,
     feeCapNaira: input.feeCapNaira,
     activeProvider: current.activeProvider ?? null,

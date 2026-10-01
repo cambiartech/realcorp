@@ -3,6 +3,8 @@ import { z } from "zod";
 /** TenantSettings.payrollDisbursementSettings shape (Phase 0–1 + per-tenant DVA). */
 export type PayrollDisbursementSettings = {
   feeFlatNaira: number;
+  /** Charged once per payroll, on top of the per-person fee. */
+  feeBaseNaira: number;
   feePercentBps: number;
   feeCapNaira?: number;
   activeProvider?: "PAYSTACK" | "FLUTTERWAVE" | null;
@@ -39,6 +41,7 @@ function asString(v: unknown): string {
 export function parsePayrollDisbursementSettings(raw: unknown): PayrollDisbursementSettings {
   const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const feeFlatNaira = typeof obj.feeFlatNaira === "number" && obj.feeFlatNaira >= 0 ? obj.feeFlatNaira : 0;
+  const feeBaseNaira = typeof obj.feeBaseNaira === "number" && obj.feeBaseNaira >= 0 ? obj.feeBaseNaira : 0;
   const feePercentBps =
     typeof obj.feePercentBps === "number" && obj.feePercentBps >= 0 ? obj.feePercentBps : 0;
   const feeCapNaira =
@@ -52,6 +55,7 @@ export function parsePayrollDisbursementSettings(raw: unknown): PayrollDisbursem
 
   return {
     feeFlatNaira,
+    feeBaseNaira,
     feePercentBps,
     feeCapNaira,
     activeProvider: provider,
@@ -78,6 +82,7 @@ export function tenantHasDedicatedVirtualAccount(settings: PayrollDisbursementSe
 
 export const payrollDisbursementSettingsSchema = z.object({
   feeFlatNaira: z.number().min(0).max(1_000_000),
+  feeBaseNaira: z.number().min(0).max(100_000_000),
   feePercentBps: z.number().int().min(0).max(10_000),
   feeCapNaira: z.number().min(0).max(100_000_000).optional(),
   activeProvider: z.enum(["PAYSTACK", "FLUTTERWAVE"]).nullable().optional(),

@@ -30,10 +30,20 @@ function moneyLabel(value: { toString(): string } | string | number) {
     : "0.00";
 }
 
+const TENANT_TABS = [
+  { id: "settings", label: "Settings" },
+  { id: "payroll", label: "Payroll float" },
+  { id: "people", label: "People" },
+] as const;
+
+type TenantTab = (typeof TENANT_TABS)[number]["id"];
+
 export default async function PlatformTenantInvitesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.isPlatformAdmin) {
@@ -41,6 +51,8 @@ export default async function PlatformTenantInvitesPage({
   }
 
   const { tenantSlug } = await params;
+  const { tab } = await searchParams;
+  const activeTab: TenantTab = tab === "payroll" || tab === "people" ? tab : "settings";
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
     select: {
@@ -161,13 +173,6 @@ export default async function PlatformTenantInvitesPage({
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <PlatformModulesForm
-          tenantId={tenant.id}
-          tenantName={tenant.name}
-          tenantSlug={tenant.slug}
-          summary={tenantModuleSummary(tenant.settings)}
-          initial={normalizeTenantModuleFlags(tenant.settings)}
-        />
         <Link
           href={`/${tenant.slug}`}
           className="text-sm text-muted underline underline-offset-2 hover:text-foreground"
@@ -176,40 +181,106 @@ export default async function PlatformTenantInvitesPage({
         </Link>
       </div>
 
-      <div className="mt-8 space-y-8">
-        <PlatformPayrollFundingWorkspace
-          tenantSlug={tenant.slug}
-          tenantId={tenant.id}
-          availableBalanceLabel={availableBalanceLabel}
-          currency={tenant.defaultCurrency || "NGN"}
-          pending={pendingFunding}
-          recentLedger={recentLedger}
-          feeFlatNaira={disbursement.feeFlatNaira}
-          feePercentBps={disbursement.feePercentBps}
-          feeCapNaira={disbursement.feeCapNaira ?? ""}
-          fundingBankName={disbursement.fundingBankName || ""}
-          fundingAccountNumber={disbursement.fundingAccountNumber || ""}
-          fundingAccountName={disbursement.fundingAccountName || ""}
-          fundingAccountLabel={disbursement.fundingAccountLabel || ""}
-          dvaProvider={disbursement.dvaProvider || "PAYSTACK"}
-          dvaAccountNumber={disbursement.dvaAccountNumber || ""}
-          dvaBankName={disbursement.dvaBankName || ""}
-          dvaAccountName={disbursement.dvaAccountName || ""}
-          dvaBankCode={disbursement.dvaBankCode || ""}
-          dvaProviderAccountId={disbursement.dvaProviderAccountId || ""}
-          dvaCustomerCode={disbursement.dvaCustomerCode || ""}
-          dvaPurpose={disbursement.dvaPurpose || "PAYROLL_FLOAT"}
-          dvaNotes={disbursement.dvaNotes || ""}
-          requirePlatformApproval={Boolean(disbursement.requirePlatformApproval)}
-        />
-        <InviteTokenLookup />
-        <TenantMembersWorkspace tenantSlug={tenant.slug} tenantName={tenant.name} members={members} />
-        <TenantInvitesWorkspace
-          tenantSlug={tenant.slug}
-          tenantName={tenant.name}
-          invites={invites}
-          hasActiveOrgAdmin={hasActiveOrgAdmin}
-        />
+      <div className="mt-6 flex flex-wrap gap-1 border-b border-foreground/10 pb-1" role="tablist" aria-label="Organization">
+        {TENANT_TABS.map((item) => {
+          const active = item.id === activeTab;
+          return (
+            <Link
+              key={item.id}
+              href={`/platform/tenants/${tenant.slug}?tab=${item.id}`}
+              role="tab"
+              aria-selected={active}
+              className={[
+                "rounded-md px-3 py-2 text-sm font-medium",
+                active ? "bg-foreground text-background" : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+              ].join(" ")}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 space-y-8">
+        {activeTab === "settings" ? (
+          <>
+            <PlatformModulesForm
+              tenantId={tenant.id}
+              tenantName={tenant.name}
+              tenantSlug={tenant.slug}
+              summary={tenantModuleSummary(tenant.settings)}
+              initial={normalizeTenantModuleFlags(tenant.settings)}
+            />
+            <PlatformPayrollFundingWorkspace
+              view="settings"
+              tenantSlug={tenant.slug}
+              tenantId={tenant.id}
+              availableBalanceLabel={availableBalanceLabel}
+              currency={tenant.defaultCurrency || "NGN"}
+              pending={pendingFunding}
+              recentLedger={recentLedger}
+              feeFlatNaira={disbursement.feeFlatNaira}
+              feeBaseNaira={disbursement.feeBaseNaira}
+              feePercentBps={disbursement.feePercentBps}
+              feeCapNaira={disbursement.feeCapNaira ?? ""}
+              fundingBankName={disbursement.fundingBankName || ""}
+              fundingAccountNumber={disbursement.fundingAccountNumber || ""}
+              fundingAccountName={disbursement.fundingAccountName || ""}
+              fundingAccountLabel={disbursement.fundingAccountLabel || ""}
+              dvaProvider={disbursement.dvaProvider || "PAYSTACK"}
+              dvaAccountNumber={disbursement.dvaAccountNumber || ""}
+              dvaBankName={disbursement.dvaBankName || ""}
+              dvaAccountName={disbursement.dvaAccountName || ""}
+              dvaBankCode={disbursement.dvaBankCode || ""}
+              dvaProviderAccountId={disbursement.dvaProviderAccountId || ""}
+              dvaCustomerCode={disbursement.dvaCustomerCode || ""}
+              dvaPurpose={disbursement.dvaPurpose || "PAYROLL_FLOAT"}
+              dvaNotes={disbursement.dvaNotes || ""}
+              requirePlatformApproval={Boolean(disbursement.requirePlatformApproval)}
+            />
+          </>
+        ) : null}
+        {activeTab === "payroll" ? (
+          <PlatformPayrollFundingWorkspace
+            view="payroll"
+            tenantSlug={tenant.slug}
+            tenantId={tenant.id}
+            availableBalanceLabel={availableBalanceLabel}
+            currency={tenant.defaultCurrency || "NGN"}
+            pending={pendingFunding}
+            recentLedger={recentLedger}
+            feeFlatNaira={disbursement.feeFlatNaira}
+            feeBaseNaira={disbursement.feeBaseNaira}
+            feePercentBps={disbursement.feePercentBps}
+            feeCapNaira={disbursement.feeCapNaira ?? ""}
+            fundingBankName={disbursement.fundingBankName || ""}
+            fundingAccountNumber={disbursement.fundingAccountNumber || ""}
+            fundingAccountName={disbursement.fundingAccountName || ""}
+            fundingAccountLabel={disbursement.fundingAccountLabel || ""}
+            dvaProvider={disbursement.dvaProvider || "PAYSTACK"}
+            dvaAccountNumber={disbursement.dvaAccountNumber || ""}
+            dvaBankName={disbursement.dvaBankName || ""}
+            dvaAccountName={disbursement.dvaAccountName || ""}
+            dvaBankCode={disbursement.dvaBankCode || ""}
+            dvaProviderAccountId={disbursement.dvaProviderAccountId || ""}
+            dvaCustomerCode={disbursement.dvaCustomerCode || ""}
+            dvaPurpose={disbursement.dvaPurpose || "PAYROLL_FLOAT"}
+            dvaNotes={disbursement.dvaNotes || ""}
+            requirePlatformApproval={Boolean(disbursement.requirePlatformApproval)}
+          />
+        ) : null}
+        {activeTab === "people" ? (
+          <>
+            <InviteTokenLookup />
+            <TenantMembersWorkspace tenantSlug={tenant.slug} tenantName={tenant.name} members={members} />
+            <TenantInvitesWorkspace
+              tenantSlug={tenant.slug}
+              tenantName={tenant.name}
+              invites={invites}
+              hasActiveOrgAdmin={hasActiveOrgAdmin}
+            />
+          </>
+        ) : null}
       </div>
     </div>
   );

@@ -37,6 +37,7 @@ type Props = {
   pending: PlatformFundingRow[];
   recentLedger: PlatformLedgerRow[];
   feeFlatNaira: number;
+  feeBaseNaira: number;
   feePercentBps: number;
   feeCapNaira: number | "";
   fundingBankName: string;
@@ -53,6 +54,7 @@ type Props = {
   dvaPurpose: string;
   dvaNotes: string;
   requirePlatformApproval: boolean;
+  view: "payroll" | "settings";
 };
 
 export function PlatformPayrollFundingWorkspace(props: Props) {
@@ -79,10 +81,13 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
     <section id="payroll-float" className="scroll-mt-6 rounded-lg border border-foreground/10 bg-background p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Payroll float</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            {props.view === "settings" ? "Payroll settings" : "Payroll float"}
+          </h2>
           <p className="mt-1 text-sm text-muted">
-            Client funds Realcorp → you verify → Available balance on the ledger. No payout until
-            Available covers salaries + fees.
+            {props.view === "settings"
+              ? "These numbers are what this organization pays Realcorp. HR sees them on Pay via Paystack."
+              : "Client funds Realcorp → you verify → Available balance on the ledger. No payout until Available covers salaries + fees."}
           </p>
         </div>
         <div className="text-right">
@@ -92,6 +97,124 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
           </p>
         </div>
       </div>
+
+      {props.view === "settings" ? (
+      <form
+        className="mt-4 grid gap-3 rounded-lg border border-foreground/15 bg-foreground/[0.03] px-3 py-3 sm:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          const capRaw = String(fd.get("feeCapNaira") || "").trim();
+          run(() =>
+            platformSavePayrollDisbursementSettings({
+              tenantSlug: props.tenantSlug,
+              feeFlatNaira: Number(fd.get("feeFlatNaira") || 0),
+              feeBaseNaira: Number(fd.get("feeBaseNaira") || 0),
+              feePercentBps: Number(fd.get("feePercentBps") || 0),
+              feeCapNaira: capRaw === "" ? undefined : Number(capRaw),
+              fundingBankName: props.fundingBankName,
+              fundingAccountNumber: props.fundingAccountNumber,
+              fundingAccountName: props.fundingAccountName,
+              fundingAccountLabel: props.fundingAccountLabel,
+              dvaProvider: (props.dvaProvider || "PAYSTACK") as "PAYSTACK" | "FLUTTERWAVE" | "",
+              dvaAccountNumber: props.dvaAccountNumber,
+              dvaBankName: props.dvaBankName,
+              dvaAccountName: props.dvaAccountName,
+              dvaBankCode: props.dvaBankCode,
+              dvaProviderAccountId: props.dvaProviderAccountId,
+              dvaCustomerCode: props.dvaCustomerCode,
+              dvaPurpose: props.dvaPurpose,
+              dvaNotes: props.dvaNotes,
+              requirePlatformApproval: String(fd.get("requirePlatformApproval") || "") === "yes",
+            }),
+          );
+        }}
+      >
+        <div className="sm:col-span-2">
+          <p className="text-sm font-semibold text-foreground">Approval and Realcorp fee</p>
+          <p className="mt-1 text-xs text-muted">
+            {props.requirePlatformApproval
+              ? "Approval is on. Pay waits until a platform admin approves."
+              : "Approval is off, so Pay sends immediately. Per person ₦" +
+                props.feeFlatNaira.toLocaleString("en-NG") +
+                ". Base ₦" +
+                props.feeBaseNaira.toLocaleString("en-NG") +
+                " once per payroll."}
+          </p>
+        </div>
+        <label className="block text-sm sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium">Wait for Realcorp before Paystack</span>
+          <select
+            name="requirePlatformApproval"
+            defaultValue={props.requirePlatformApproval ? "yes" : "no"}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+          >
+            <option value="no">No — send immediately</option>
+            <option value="yes">Yes — wait for Realcorp</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Realcorp fee (₦ per person)</span>
+          <input
+            name="feeFlatNaira"
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={props.feeFlatNaira}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+          <span className="mt-1 block text-xs text-muted">
+            Your charge on each salary. A ₦50,000 salary still pays this when Paystack charges ₦100. Type 100 to keep ₦100 per person.
+          </span>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Base fee (₦ once per payroll)</span>
+          <input
+            name="feeBaseNaira"
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={props.feeBaseNaira}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+          <span className="mt-1 block text-xs text-muted">
+            Optional. Type 30000 to charge ₦30,000 once each payroll, on top of the per-person fee. It returns if nobody is paid.
+          </span>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Percent (basis points, optional)</span>
+          <input
+            name="feePercentBps"
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={props.feePercentBps}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+          <span className="mt-1 block text-xs text-muted">0 recommended. 100 bps = 1% of the salary.</span>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium">Percent cap (₦, optional)</span>
+          <input
+            name="feeCapNaira"
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={props.feeCapNaira === "" ? undefined : props.feeCapNaira}
+            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+          />
+        </label>
+        <div className="sm:col-span-2">
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+          >
+            Save approval and fee
+          </button>
+        </div>
+      </form>
+      ) : null}
 
       {error ? (
         <p className="mt-3 rounded-md border border-[var(--danger)]/30 bg-[var(--danger)]/5 px-3 py-2 text-sm text-[var(--danger)]">
@@ -104,6 +227,8 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
         </p>
       ) : null}
 
+      {props.view === "payroll" ? (
+      <>
       <form
         className="mt-5 grid gap-3 sm:grid-cols-2"
         onSubmit={(e) => {
@@ -268,19 +393,22 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
           </div>
         )}
       </div>
+      </>
+      ) : null}
 
+      {props.view === "settings" ? (
       <form
         className="mt-8 grid gap-3 border-t border-foreground/10 pt-6 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
-          const capRaw = String(fd.get("feeCapNaira") || "").trim();
           run(() =>
             platformSavePayrollDisbursementSettings({
               tenantSlug: props.tenantSlug,
-              feeFlatNaira: Number(fd.get("feeFlatNaira") || 0),
-              feePercentBps: Number(fd.get("feePercentBps") || 0),
-              feeCapNaira: capRaw === "" ? undefined : Number(capRaw),
+              feeFlatNaira: props.feeFlatNaira,
+              feeBaseNaira: props.feeBaseNaira,
+              feePercentBps: props.feePercentBps,
+              feeCapNaira: props.feeCapNaira === "" ? undefined : props.feeCapNaira,
               fundingBankName: String(fd.get("fundingBankName") || ""),
               fundingAccountNumber: String(fd.get("fundingAccountNumber") || ""),
               fundingAccountName: String(fd.get("fundingAccountName") || ""),
@@ -297,62 +425,14 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
               dvaCustomerCode: String(fd.get("dvaCustomerCode") || ""),
               dvaPurpose: String(fd.get("dvaPurpose") || "PAYROLL_FLOAT"),
               dvaNotes: String(fd.get("dvaNotes") || ""),
-              requirePlatformApproval: String(fd.get("requirePlatformApproval") || "") === "yes",
+              requirePlatformApproval: props.requirePlatformApproval,
             }),
           );
         }}
       >
         <h3 className="sm:col-span-2 text-sm font-semibold text-foreground">
-          Fee schedule &amp; funding instructions
+          Funding account
         </h3>
-        <label className="block text-sm sm:col-span-2">
-          <span className="mb-1 block text-xs font-medium">Wait for Realcorp approval before Paystack send</span>
-          <select
-            name="requirePlatformApproval"
-            defaultValue={props.requirePlatformApproval ? "yes" : "no"}
-            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
-          >
-            <option value="no">No — org pays itself (default)</option>
-            <option value="yes">Yes — queue for platform admin, then email Realcorp</option>
-          </select>
-          <span className="mt-1 block text-xs text-muted">
-            Leave No for most organizations. Turn Yes on only when this org must be vetted before money moves.
-          </span>
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-medium">Flat fee (₦ per payout)</span>
-          <input
-            name="feeFlatNaira"
-            type="number"
-            min={0}
-            step="0.01"
-            defaultValue={props.feeFlatNaira}
-            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-medium">Percent (basis points)</span>
-          <input
-            name="feePercentBps"
-            type="number"
-            min={0}
-            step={1}
-            defaultValue={props.feePercentBps}
-            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
-          />
-          <span className="mt-1 block text-xs text-muted">50 bps = 0.5%</span>
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block text-xs font-medium">Percent fee cap (₦, optional)</span>
-          <input
-            name="feeCapNaira"
-            type="number"
-            min={0}
-            step="0.01"
-            defaultValue={props.feeCapNaira === "" ? undefined : props.feeCapNaira}
-            className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
-          />
-        </label>
         <label className="block text-sm">
           <span className="mb-1 block text-xs font-medium">Funding label</span>
           <input
@@ -489,6 +569,7 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
           </button>
         </div>
       </form>
+      ) : null}
     </section>
   );
 }

@@ -8,6 +8,7 @@ import type { PayrollDisbursementSettings } from "./settings";
 
 const settings = (patch: Partial<PayrollDisbursementSettings>): PayrollDisbursementSettings => ({
   feeFlatNaira: 0,
+  feeBaseNaira: 0,
   feePercentBps: 0,
   dvaProvider: "PAYSTACK",
   ...patch,

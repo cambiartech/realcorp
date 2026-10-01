@@ -110,6 +110,8 @@ export function applyLedgerDelta(input: {
 export type FeeSchedule = {
   /** Flat fee per successful staff payout, in Naira (2dp). */
   feeFlatNaira: number;
+  /** Flat fee once per payroll run, in Naira. Not reduced by the Paystack transfer fee. */
+  feeBaseNaira: number;
   /** Percent of net pay in basis points (100 bps = 1%). */
   feePercentBps: number;
   /** Optional cap on the percent portion (Naira). Flat fee is always added. */
@@ -119,10 +121,12 @@ export type FeeSchedule = {
 export function parseFeeSchedule(raw: unknown): FeeSchedule {
   const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const flat = typeof obj.feeFlatNaira === "number" ? obj.feeFlatNaira : 0;
+  const base = typeof obj.feeBaseNaira === "number" ? obj.feeBaseNaira : 0;
   const bps = typeof obj.feePercentBps === "number" ? obj.feePercentBps : 0;
   const cap = typeof obj.feeCapNaira === "number" ? obj.feeCapNaira : undefined;
   return {
     feeFlatNaira: flat >= 0 ? flat : 0,
+    feeBaseNaira: base >= 0 ? base : 0,
     feePercentBps: bps >= 0 ? bps : 0,
     feeCapNaira: cap !== undefined && cap >= 0 ? cap : undefined,
   };

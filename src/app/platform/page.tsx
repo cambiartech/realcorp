@@ -1,128 +1,99 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import prisma from "@/lib/db";
-import { normalizeTenantModuleFlags, tenantModuleSummary } from "@/lib/tenant-module-definitions";
-import { PlatformModulesForm } from "./modules-form";
+import { MembershipStatus, PayrollDisbursementBatchStatus } from "@/generated/prisma";
+import { PlatformTenantTable, type PlatformTenantRow } from "./platform-tenant-table";
+
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Platform · Realcorp",
+  title: "Tenants · Platform",
 };
 
+function moneyLabel(value: { toString(): string } | string | number | null | undefined) {
+  const n = Number(value == null ? 0 : typeof value === "object" ? value.toString() : value);
+  return Number.isFinite(n)
+    ? n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "0.00";
+}
+
 export default async function PlatformHomePage() {
-  const tenants = await prisma.tenant.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    include: {
-      settings: true,
-      invitations: {
-        where: { acceptedAt: null },
-        select: { id: true, expiresAt: true },
+  const session = await auth();
+  if (!session?.user?.isPlatformAdmin) {
+    redirect("/login?callbackUrl=/platform");
+  }
+
+  const [tenants, waitingApproval] = await Promise.all([
+    prisma.tenant.findMany({
+      orderBy: { name: "asc" },
+      include: {
+        payrollTenantBalance: { select: { availableBalance: true } },
+        _count: {
+          select: {
+            memberships: { where: { status: MembershipStatus.ACTIVE } },
+            invitations: { where: { acceptedAt: null } },
+          },
+        },
       },
-    },
-  });
+    }),
+    prisma.payrollDisbursementBatch.count({
+      where: { status: PayrollDisbursementBatchStatus.DRAFT, startedAt: null },
+    }),
+  ]);
+
+  const rows: PlatformTenantRow[] = tenants.map((tenant) => ({
+    slug: tenant.slug,
+    name: tenant.name,
+    status: tenant.status,
+    plan: tenant.plan,
+    createdLabel: tenant.createdAt.toISOString().slice(0, 10),
+    memberCount: tenant._count.memberships,
+    pendingInvites: tenant._count.invitations,
+    availableLabel: moneyLabel(tenant.payrollTenantBalance?.availableBalance),
+    currency: tenant.defaultCurrency || "NGN",
+  }));
+
+  const active = tenants.filter((tenant) => tenant.status === "ACTIVE").length;
+  const pendingInvites = rows.reduce((sum, row) => sum + row.pendingInvites, 0);
+
+  const cards = [
+    { label: "Organizations", value: String(tenants.length), href: "/platform" },
+    { label: "Active", value: String(active), href: "/platform" },
+    { label: "Open invites", value: String(pendingInvites), href: "/platform" },
+    { label: "Payroll waiting", value: String(waitingApproval), href: "/platform/payroll" },
+  ];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="text-2xl font-bold text-foreground">Tenants</h1>
-      <p className="mt-1 text-sm text-muted">
-        Provisioned organizations. Tenant users sign in and work under{" "}
-        <code className="border border-foreground/10 bg-field px-1.5 py-0.5 font-mono text-xs text-foreground">
-          /your-tenant-slug/…
-        </code>{" "}
-        routes.
-      </p>
-
-      <Link
-        href="/platform/onboarding"
-        className="mt-6 inline-flex border border-foreground bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-      >
-        Onboard new organization
-      </Link>
-
-      <p className="mt-4 text-sm text-muted">
-        Payroll float (fund → verify → ledger)?{" "}
-        <Link href="/platform/payroll" className="font-semibold text-foreground underline underline-offset-2">
-          Open Payroll float →
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Tenants</h1>
+          <p className="mt-1 text-sm text-muted">Every organization on Realcorp. Open one to change its payroll fees.</p>
+        </div>
+        <Link
+          href="/platform/onboarding"
+          className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background"
+        >
+          Onboard organization
         </Link>
-      </p>
+      </div>
 
-      <p className="mt-4 text-sm text-muted">
-        Debug a production crash?{" "}
-        <Link href="/platform/errors" className="font-semibold text-foreground underline underline-offset-2">
-          Error lookup →
-        </Link>
-      </p>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((card) => (
+          <Link
+            key={card.label}
+            href={card.href}
+            className="rounded-lg border border-foreground/10 px-4 py-3 hover:bg-foreground/[0.03]"
+          >
+            <p className="text-xs uppercase tracking-wide text-muted">{card.label}</p>
+            <p className="mt-1 font-mono text-2xl font-semibold text-foreground">{card.value}</p>
+          </Link>
+        ))}
+      </div>
 
-      <div className="mt-10 overflow-hidden border border-foreground/10">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-foreground/10 bg-foreground/[0.03] text-xs uppercase text-muted">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Slug</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Plan</th>
-              <th className="px-4 py-3">Modules</th>
-              <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3">Invites</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tenants.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-muted">
-                  No tenants yet. Use <strong className="text-foreground/90">Onboard new organization</strong>
-                  .
-                </td>
-              </tr>
-            ) : (
-              tenants.map((t) => {
-                const now = new Date();
-                const pendingValid = t.invitations.filter((i) => i.expiresAt > now).length;
-                const pendingExpired = t.invitations.length - pendingValid;
-                return (
-                  <tr
-                    key={t.id}
-                    className="border-b border-foreground/5 transition-colors hover:bg-foreground/[0.02]"
-                  >
-                    <td className="px-4 py-3 font-medium text-foreground">{t.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-foreground/90">
-                      <Link
-                        href={`/${t.slug}`}
-                        className="underline decoration-foreground/20 underline-offset-2"
-                      >
-                        {t.slug}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-muted">{t.status}</td>
-                    <td className="px-4 py-3 text-muted">{t.plan}</td>
-                    <td className="px-4 py-3 text-muted">
-                      <PlatformModulesForm
-                        tenantId={t.id}
-                        tenantName={t.name}
-                        tenantSlug={t.slug}
-                        summary={tenantModuleSummary(t.settings)}
-                        initial={normalizeTenantModuleFlags(t.settings)}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-muted">{t.createdAt.toISOString().slice(0, 10)}</td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/platform/tenants/${t.slug}`}
-                        className="text-xs font-semibold text-foreground underline underline-offset-2"
-                      >
-                        {t.invitations.length === 0
-                          ? "Send invite"
-                          : pendingExpired > 0 && pendingValid === 0
-                            ? "Expired — fix"
-                            : `${pendingValid} pending`}
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <PlatformTenantTable rows={rows} />
       </div>
     </div>
   );

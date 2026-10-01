@@ -142,10 +142,14 @@ export default async function PlatformPayrollPage() {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
-      platformFeeLabel: Number(batch.totalPlatformFee).toLocaleString("en-NG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
+      platformFeeLabel: batch.lines
+        .reduce((sum, line) => sum + Number(line.platformFee), 0)
+        .toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      baseFeeLabel: Math.max(
+        0,
+        Number(batch.totalPlatformFee) -
+          batch.lines.reduce((sum, line) => sum + Number(line.platformFee), 0),
+      ).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       providerFeeLabel: batch.lines
         .reduce((sum, line) => sum + Number(line.providerFeeEstimate), 0)
         .toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
