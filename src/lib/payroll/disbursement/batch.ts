@@ -101,6 +101,8 @@ function monthKey(year: number, month: number) {
 export type SalaryPayPreviewRow = {
   employeeName: string;
   netPay: string;
+  platformFee: string;
+  providerFee: string;
   bankName: string;
   accountNumber: string;
   ready: boolean;
@@ -112,6 +114,7 @@ export type SalaryPayPreview = {
   rows: SalaryPayPreviewRow[];
   readyCount: number;
   totalNetLabel: string;
+  platformFeeLabel: string;
   estimatedProviderFeeLabel: string;
   needLabel: string;
   orgAvailableLabel: string;
@@ -144,9 +147,15 @@ export async function previewSalaryDisbursement(
 
   const listed = await paystackListBanks();
   const banks = listed.ok ? listed.data : [];
+  const settings = await prisma.tenantSettings.findUnique({
+    where: { tenantId },
+    select: { payrollDisbursementSettings: true },
+  });
+  const feeSchedule = parseFeeSchedule(parsePayrollDisbursementSettings(settings?.payrollDisbursementSettings));
   const rows: SalaryPayPreviewRow[] = [];
   let totalNetKobo = 0;
   let providerFeeKobo = 0;
+  let platformFeeKobo = 0;
 
   for (const slip of run.payslips) {
     const net = decimalLikeToKobo(slip.netPay);
@@ -168,29 +177,23 @@ export async function previewSalaryDisbursement(
     }
 
     const ready = bank.ok && bank.disbursementReady;
+    const platformFee = ready ? calculatePayoutFeeKobo(net, feeSchedule) : 0;
+    const providerFee = ready ? estimatePaystackTransferFeeKobo(net) : 0;
     if (ready) {
       totalNetKobo += net;
-      providerFeeKobo += estimatePaystackTransferFeeKobo(net);
+      providerFeeKobo += providerFee;
+      platformFeeKobo += platformFee;
     }
     rows.push({
       employeeName: slip.profile.fullName || "Employee",
       netPay: koboToNairaString(net),
+      platformFee: koboToNairaString(platformFee),
+      providerFee: koboToNairaString(providerFee),
       bankName: bank.ok ? bank.account.bankName : "",
       accountNumber: bank.ok ? bank.account.accountNumber : "",
       ready,
       reason: ready ? undefined : bank.ok ? bank.warnings.join(" ") : bank.error,
     });
-  }
-
-  const settings = await prisma.tenantSettings.findUnique({
-    where: { tenantId },
-    select: { payrollDisbursementSettings: true },
-  });
-  const feeSchedule = parseFeeSchedule(parsePayrollDisbursementSettings(settings?.payrollDisbursementSettings));
-  let platformFeeKobo = 0;
-  for (const row of rows) {
-    if (!row.ready) continue;
-    platformFeeKobo += calculatePayoutFeeKobo(decimalLikeToKobo(row.netPay), feeSchedule);
   }
 
   const orgAvailableKobo = await getAvailableBalanceKobo(prisma, tenantId);
@@ -210,6 +213,7 @@ export async function previewSalaryDisbursement(
     rows,
     readyCount,
     totalNetLabel: koboToNairaString(totalNetKobo),
+    platformFeeLabel: koboToNairaString(platformFeeKobo),
     estimatedProviderFeeLabel: koboToNairaString(providerFeeKobo),
     needLabel: koboToNairaString(floatNeedKobo),
     orgAvailableLabel: koboToNairaString(orgAvailableKobo),
@@ -476,7 +480,7 @@ async function reserveBatchFunds(tx: LedgerTx, batchId: string, actor: DisburseA
       amountNaira: batch.totalNet.toString(),
       currency: batch.currency,
       idempotencyKey: `payout:${batch.id}`,
-      description: `Salary payout batch ${batch.id}`,
+        description: `Salary debit from Available — ₦${batch.totalNet}`,
       disbursementBatchId: batch.id,
       createdByUserId: actor.userId,
       createdByLabel: actor.label,
@@ -489,7 +493,7 @@ async function reserveBatchFunds(tx: LedgerTx, batchId: string, actor: DisburseA
       amountNaira: batch.totalPlatformFee.toString(),
       currency: batch.currency,
       idempotencyKey: `fee:${batch.id}`,
-      description: `Platform payout fees for batch ${batch.id}`,
+        description: `Realcorp fee debit from Available — ₦${batch.totalPlatformFee}`,
       disbursementBatchId: batch.id,
       createdByUserId: actor.userId,
       createdByLabel: actor.label,
@@ -741,11 +745,19 @@ async function markLineSuccess(
 
 async function reverseLineOnLedger(
   tenantId: string,
-  line: { id: string; amount: Prisma.Decimal | string; platformFee: Prisma.Decimal | string; batchId: string },
+  line: {
+    id: string;
+    amount: Prisma.Decimal | string;
+    platformFee: Prisma.Decimal | string;
+    batchId: string;
+    accountName?: string;
+  },
   actor: DisburseActor,
+  why = "payout did not complete",
 ) {
   const net = decimalLikeToKobo(line.amount);
   const fee = decimalLikeToKobo(line.platformFee);
+  const who = line.accountName?.trim() || "staff";
   await prisma.$transaction(async (tx) => {
     if (net > 0) {
       await postLedgerEntry(tx, {
@@ -753,7 +765,7 @@ async function reverseLineOnLedger(
         entryType: PayrollLedgerEntryType.PAYOUT_REVERSAL,
         amountNaira: koboToNairaString(net),
         idempotencyKey: `payout-rev:${line.id}`,
-        description: `Reversal for failed payout line ${line.id}`,
+        description: `Salary returned to Available — ${who}. ${why} ₦${koboToNairaString(net)}`,
         disbursementBatchId: line.batchId,
         createdByUserId: actor.userId,
         createdByLabel: actor.label,
@@ -765,7 +777,7 @@ async function reverseLineOnLedger(
         entryType: PayrollLedgerEntryType.ADJUSTMENT_CREDIT,
         amountNaira: koboToNairaString(fee),
         idempotencyKey: `fee-rev:${line.id}`,
-        description: `Fee reversal for failed payout line ${line.id}`,
+        description: `Realcorp fee returned to Available — ${who}. ${why} ₦${koboToNairaString(fee)}`,
         disbursementBatchId: line.batchId,
         createdByUserId: actor.userId,
         createdByLabel: actor.label,
@@ -880,6 +892,8 @@ export async function rejectDisbursementBatch(
       periodLabel: string;
       payslipRunId: string;
       alreadyPaidNames: string[];
+      refundedSalaryLabel: string;
+      refundedFeeLabel: string;
     }
   | { ok: false; error: string }
 > {
@@ -917,6 +931,8 @@ export async function rejectDisbursementBatch(
     };
   }
 
+  let refundedNetKobo = 0;
+  let refundedFeeKobo = 0;
   if (batch.startedAt) {
     for (const line of batch.lines) {
       if (
@@ -925,7 +941,9 @@ export async function rejectDisbursementBatch(
       ) {
         continue;
       }
-      await reverseLineOnLedger(batch.tenantId, line, actor);
+      refundedNetKobo += decimalLikeToKobo(line.amount);
+      refundedFeeKobo += decimalLikeToKobo(line.platformFee);
+      await reverseLineOnLedger(batch.tenantId, line, actor, "Payroll rejected");
       await prisma.payrollDisbursementLine.update({
         where: { id: line.id },
         data: { failureReason: reason.slice(0, 500) },
@@ -965,6 +983,8 @@ export async function rejectDisbursementBatch(
       `${batch.run?.year ?? ""}-${String(batch.run?.month ?? "").padStart(2, "0")}`,
     payslipRunId: batch.payslipRunId,
     alreadyPaidNames,
+    refundedSalaryLabel: koboToNairaString(refundedNetKobo),
+    refundedFeeLabel: koboToNairaString(refundedFeeKobo),
   };
 }
 

@@ -220,6 +220,8 @@ export default async function HrQueuePage({
                     accountNumber: true,
                     bankCode: true,
                     amount: true,
+                    platformFee: true,
+                    providerFeeEstimate: true,
                     status: true,
                     failureReason: true,
                     paidAt: true,
@@ -507,6 +509,20 @@ export default async function HrQueuePage({
     ...new Set(profiles.map((p) => p.paygroupName?.trim()).filter((g): g is string => Boolean(g))),
   ].sort((a, b) => a.localeCompare(b));
   const draftPayslipRunCount = payslipRuns.filter((r) => r.status === "DRAFT").length;
+  const payBatchIds = payslipRuns.flatMap((run) => run.disbursementBatches.map((batch) => batch.id));
+  const payLedger = payBatchIds.length
+    ? await prisma.payrollLedgerEntry.findMany({
+        where: { tenantId: tenant.id, disbursementBatchId: { in: payBatchIds } },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+  const ledgerByBatch = new Map<string, typeof payLedger>();
+  for (const entry of payLedger) {
+    if (!entry.disbursementBatchId) continue;
+    const list = ledgerByBatch.get(entry.disbursementBatchId) ?? [];
+    list.push(entry);
+    ledgerByBatch.set(entry.disbursementBatchId, list);
+  }
   const payrollReadyByPaygroup = paygroups.map((name) => ({
     name,
     count: profiles.filter(
@@ -969,6 +985,23 @@ export default async function HrQueuePage({
               failedCount: r.disbursementBatches[0].failedCount,
               lineCount: r.disbursementBatches[0].lineCount,
               rejectionNote: r.disbursementBatches[0].lastError || "",
+              movements: (ledgerByBatch.get(r.disbursementBatches[0].id) ?? []).map((entry) => ({
+                id: entry.id,
+                whenLabel: new Intl.DateTimeFormat("en-NG", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(entry.createdAt),
+                description: entry.description,
+                amountLabel: Number(entry.amount).toLocaleString("en-NG", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }),
+                balanceAfterLabel: Number(entry.balanceAfter).toLocaleString("en-NG", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }),
+                credit: entry.entryType === "PAYOUT_REVERSAL" || entry.entryType === "ADJUSTMENT_CREDIT" || entry.entryType === "FUNDING_CREDIT",
+              })),
               lines: r.disbursementBatches[0].lines.map((line) => ({
                 id: line.id,
                 payslipId: line.payslipId,
@@ -976,6 +1009,8 @@ export default async function HrQueuePage({
                 accountNumber: line.accountNumber,
                 bankCode: line.bankCode,
                 amount: Number(line.amount),
+                platformFee: Number(line.platformFee),
+                providerFee: Number(line.providerFeeEstimate),
                 status: line.status,
                 failureReason: line.failureReason || "",
                 providerReference: line.providerReference,

@@ -846,10 +846,15 @@ export async function platformRejectPayrollBatch(input: {
           to,
           tenantName: rejected.tenantName,
           periodLabel: rejected.periodLabel,
-          note:
+          note: [
+            input.note.trim(),
+            Number(rejected.refundedSalaryLabel) > 0 || Number(rejected.refundedFeeLabel) > 0
+              ? `Returned ₦${rejected.refundedSalaryLabel} salary and ₦${rejected.refundedFeeLabel} Realcorp fee to Available.`
+              : "Available was not charged.",
             rejected.alreadyPaidNames.length > 0
-              ? `${input.note.trim()} Already paid and left as paid: ${rejected.alreadyPaidNames.join(", ")}. Pay the others again from this same month.`
-              : `${input.note.trim()} Pay again from this same month. Do not generate a new period.`,
+              ? `Already paid and left as paid: ${rejected.alreadyPaidNames.join(", ")}.`
+              : "Pay the unpaid people again from this same month.",
+          ].join(" "),
           payslipsUrl,
         });
         if (!sent.ok) console.error("[payroll-reject-mail]", to, sent.error);
@@ -864,10 +869,14 @@ export async function platformRejectPayrollBatch(input: {
   const paid =
     rejected.alreadyPaidNames.length > 0
       ? ` Already paid and left as paid: ${rejected.alreadyPaidNames.join(", ")}.`
-      : " Nothing was paid.";
+      : "";
+  const refunded =
+    Number(rejected.refundedSalaryLabel) > 0 || Number(rejected.refundedFeeLabel) > 0
+      ? ` Returned ₦${rejected.refundedSalaryLabel} salary and ₦${rejected.refundedFeeLabel} Realcorp fee to Available.`
+      : " Available was not charged, so nothing to return.";
   return {
     ok: true,
-    message: `${rejected.tenantName} · ${rejected.periodLabel} rejected.${paid} HR has the note. Do not generate the month again — they pay the unpaid people from the same period.`,
+    message: `${rejected.tenantName} · ${rejected.periodLabel} rejected.${paid}${refunded} HR has the note. Do not generate the month again.`,
   };
 }
 

@@ -110,6 +110,17 @@ export default async function PlatformPayrollPage() {
     include: {
       tenant: { select: { name: true, slug: true, defaultCurrency: true } },
       run: { select: { label: true, year: true, month: true } },
+      lines: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          accountName: true,
+          amount: true,
+          platformFee: true,
+          providerFeeEstimate: true,
+          status: true,
+        },
+      },
     },
   });
   const approvalRows: PlatformPayrollApprovalRow[] = awaitingApprovalRaw
@@ -131,7 +142,30 @@ export default async function PlatformPayrollPage() {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
+      platformFeeLabel: Number(batch.totalPlatformFee).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+      providerFeeLabel: batch.lines
+        .reduce((sum, line) => sum + Number(line.providerFeeEstimate), 0)
+        .toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       currency: batch.tenant.defaultCurrency || batch.currency || "NGN",
+      lines: batch.lines.map((line) => ({
+        id: line.id,
+        name: line.accountName,
+        netLabel: Number(line.amount).toLocaleString("en-NG", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        platformFeeLabel: Number(line.platformFee).toLocaleString("en-NG", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        providerFeeLabel: Number(line.providerFeeEstimate).toLocaleString("en-NG", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      })),
       createdAtLabel: new Intl.DateTimeFormat("en-NG", {
         dateStyle: "medium",
         timeStyle: "short",

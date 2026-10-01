@@ -63,6 +63,17 @@ export type PayAttemptLineView = {
   transferCode: string;
   providerTransferId: string;
   paidAtLabel: string | null;
+  platformFee: number;
+  providerFee: number;
+};
+
+export type PayAttemptMovement = {
+  id: string;
+  whenLabel: string;
+  description: string;
+  amountLabel: string;
+  balanceAfterLabel: string;
+  credit: boolean;
 };
 
 export type PayAttemptView = {
@@ -73,6 +84,7 @@ export type PayAttemptView = {
   lineCount: number;
   rejectionNote: string;
   lines: PayAttemptLineView[];
+  movements: PayAttemptMovement[];
 };
 
 export type PayslipRunView = {
@@ -768,12 +780,23 @@ export function HrPayslipsWorkspace({
                               {line.name}
                             </p>
                             <p className="mt-0.5 text-xs tabular-nums text-muted">
-                              ₦
+                              Salary ₦
                               {line.amount.toLocaleString("en-NG", {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
-                              })}{" "}
-                              · {line.accountNumber}
+                              })}
+                              {" · "}Realcorp fee ₦
+                              {line.platformFee.toLocaleString("en-NG", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                              {" · "}Paystack fee ₦
+                              {line.providerFee.toLocaleString("en-NG", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                              {" · "}
+                              {line.accountNumber}
                               {line.bankCode ? ` · bank ${line.bankCode}` : ""}
                             </p>
                           </div>
@@ -817,6 +840,27 @@ export function HrPayslipsWorkspace({
                       </div>
                     ))}
                   </div>
+                  {payAttempt.movements.length > 0 ? (
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                        Float ledger
+                      </p>
+                      <ul className="space-y-1.5">
+                        {payAttempt.movements.map((movement) => (
+                          <li key={movement.id} className="text-xs text-foreground">
+                            <span className="text-muted">{movement.whenLabel}</span>
+                            {" · "}
+                            <span className={movement.credit ? "text-[var(--success)]" : ""}>
+                              {movement.credit ? "+" : "−"}₦{movement.amountLabel}
+                            </span>
+                            {" · "}
+                            {movement.description}
+                            <span className="text-muted"> · Available after ₦{movement.balanceAfterLabel}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1220,6 +1264,24 @@ export function HrPayslipsWorkspace({
                 </span>
               </li>
               <li className="flex justify-between gap-3">
+                <span className="text-muted">Realcorp fee</span>
+                <span className="font-mono text-foreground">
+                  {currency} {payPreview.platformFeeLabel}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span className="text-muted">Paystack transfer fee</span>
+                <span className="font-mono text-foreground">
+                  {currency} {payPreview.estimatedProviderFeeLabel}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span className="text-muted">Taken from Available</span>
+                <span className="font-mono font-semibold text-foreground">
+                  {currency} {payPreview.needLabel}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
                 <span className="text-muted">Paystack rail</span>
                 <span
                   className={
@@ -1248,15 +1310,27 @@ export function HrPayslipsWorkspace({
                         : row.reason || "Account cannot be paid"}
                     </p>
                   </div>
-                  <p className="shrink-0 font-mono text-sm text-foreground">
-                    {currency} {Number(row.netPay).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                  </p>
+                  <div className="shrink-0 text-right font-mono text-xs text-foreground">
+                    <p className="text-sm">
+                      {currency} {Number(row.netPay).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="mt-0.5 text-muted">
+                      Realcorp {currency}{" "}
+                      {Number(row.platformFee).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-muted">
+                      Paystack {currency}{" "}
+                      {Number(row.providerFee).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
             <p className="mt-3 text-xs text-muted">
-              {payPreview.readyCount} of {payPreview.rows.length} can be paid. Flow: DVA deposit →
-              Available credit → Paystack Balance send → float debit.
+              {payPreview.readyCount} of {payPreview.rows.length} can be paid. Available is charged the
+              salary plus the Realcorp fee. Paystack’s transfer fee comes off Paystack Balance. A
+              rejection returns both the salary and the Realcorp fee to Available, one line per person
+              on the float ledger.
             </p>
           </>
         )}

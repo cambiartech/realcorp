@@ -11,8 +11,17 @@ export type PlatformPayrollApprovalRow = {
   periodLabel: string;
   staffCount: number;
   amountLabel: string;
+  platformFeeLabel: string;
+  providerFeeLabel: string;
   currency: string;
   createdAtLabel: string;
+  lines: Array<{
+    id: string;
+    name: string;
+    netLabel: string;
+    platformFeeLabel: string;
+    providerFeeLabel: string;
+  }>;
 };
 
 export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprovalRow[] }) {
@@ -51,9 +60,20 @@ export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprov
                 {row.tenantName} · {row.periodLabel}
               </p>
               <p className="mt-0.5 text-xs text-muted">
-                {row.staffCount} {row.staffCount === 1 ? "person" : "people"} · {row.currency}{" "}
-                {row.amountLabel} · queued {row.createdAtLabel}
+                {row.staffCount} {row.staffCount === 1 ? "person" : "people"} · salaries {row.currency}{" "}
+                {row.amountLabel} · Realcorp fee {row.currency} {row.platformFeeLabel} · Paystack fee{" "}
+                {row.currency} {row.providerFeeLabel} · queued {row.createdAtLabel}
               </p>
+              <ul className="mt-2 space-y-1">
+                {row.lines.map((line) => (
+                  <li key={line.id} className="text-xs text-muted">
+                    <span className="font-medium text-foreground">{line.name}</span>
+                    {" · "}salary {row.currency} {line.netLabel}
+                    {" · "}Realcorp {row.currency} {line.platformFeeLabel}
+                    {" · "}Paystack {row.currency} {line.providerFeeLabel}
+                  </li>
+                ))}
+              </ul>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[280px]">
               <textarea

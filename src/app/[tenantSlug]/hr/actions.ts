@@ -3022,6 +3022,8 @@ export async function previewPayslipDisbursement(
       rows: Array<{
         employeeName: string;
         netPay: string;
+        platformFee: string;
+        providerFee: string;
         bankName: string;
         accountNumber: string;
         ready: boolean;
@@ -3029,6 +3031,7 @@ export async function previewPayslipDisbursement(
       }>;
       readyCount: number;
       totalNetLabel: string;
+      platformFeeLabel: string;
       estimatedProviderFeeLabel: string;
       needLabel: string;
       orgAvailableLabel: string;
