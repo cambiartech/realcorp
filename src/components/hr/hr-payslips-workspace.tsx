@@ -26,6 +26,7 @@ import {
   finalizeAllDraftPayslipRuns,
   discardDraftPayslipRun,
   finalizePayslipRun,
+  reopenPayslipRun,
   generatePayslipRun,
   markPayslipPayments,
   deletePayrollAdjustment,
@@ -195,6 +196,7 @@ export function HrPayslipsWorkspace({
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishChecked, setPublishChecked] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [payPreview, setPayPreview] = useState<Awaited<ReturnType<typeof previewPayslipDisbursement>> | null>(
     null,
   );
@@ -659,9 +661,21 @@ export function HrPayslipsWorkspace({
                       </button>
                     </>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--success)]">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Published
+                    <span className="inline-flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--success)]">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Published
+                      </span>
+                      {runPaymentStats.paid === 0 ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => setUnlockOpen(true)}
+                          className="rounded-md border border-foreground/20 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground/[0.04] disabled:opacity-50"
+                        >
+                          Unlock to edit
+                        </button>
+                      ) : null}
                     </span>
                   )}
                 </div>
@@ -828,7 +842,9 @@ export function HrPayslipsWorkspace({
                         {line.failureReason &&
                         !line.failureReason.toLowerCase().includes("verification code") ? (
                           <p className="mt-1 text-xs leading-snug text-[var(--danger)]">
-                            {line.failureReason}
+                            {line.failureReason.toLowerCase().includes("confirmation codes")
+                              ? "Last attempt stopped because Paystack confirmation codes were on. Turn that off, then Pay again. Salary and Realcorp fee already came back to Available."
+                              : line.failureReason}
                           </p>
                         ) : null}
                         <p className="mt-1 break-all font-mono text-[10px] text-muted">
@@ -1220,6 +1236,52 @@ export function HrPayslipsWorkspace({
                 className="rounded-md border border-[var(--danger-line)] bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 Discard draft
+              </button>
+            </div>
+          </>
+        ) : null}
+      </ModalOverlay>
+
+      <ModalOverlay
+        open={unlockOpen}
+        onClose={() => {
+          if (!pending) setUnlockOpen(false);
+        }}
+        panelClassName={MODAL_PANEL_MD}
+        aria-labelledby="unlock-payroll-title"
+      >
+        {selectedRun ? (
+          <>
+            <h2 id="unlock-payroll-title" className="text-lg font-semibold text-foreground">
+              Unlock {selectedRun.label}?
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Nobody has been paid, so this month can go back to a draft. Edit it, generate again, then
+              publish. Employees stop seeing it until you publish.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setUnlockOpen(false)}
+                className="rounded-md border border-foreground/15 px-4 py-2 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  void runAction(
+                    () => reopenPayslipRun(tenantSlug, selectedRun.id),
+                    `${selectedRun.label} is a draft again. Edit it, then publish.`,
+                  ).then((ok) => {
+                    if (ok) setUnlockOpen(false);
+                  });
+                }}
+                className="rounded-md border border-foreground bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
+              >
+                Unlock
               </button>
             </div>
           </>

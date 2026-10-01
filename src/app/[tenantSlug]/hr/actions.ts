@@ -1736,6 +1736,75 @@ export async function finalizePayslipRun(tenantSlug: string, runId: string): Pro
   return { ok: true };
 }
 
+export async function reopenPayslipRun(tenantSlug: string, runId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
+  const { tenant, membership } = await getTenantAndMembership(tenantSlug, session.user.id);
+  if (!tenant) return { ok: false, error: "Organization not found." };
+  if (!canManageHr(Boolean(session.user.isPlatformAdmin), membership)) {
+    return { ok: false, error: "You do not have permission." };
+  }
+
+  const run = await prisma.hrPayslipRun.findFirst({
+    where: { id: runId, tenantId: tenant.id },
+    include: {
+      payslips: { select: { paymentStatus: true } },
+      disbursementBatches: { include: { lines: { select: { status: true } } } },
+    },
+  });
+  if (!run) return { ok: false, error: "Payroll run not found." };
+  if (run.status !== HrPayslipRunStatus.FINALIZED) {
+    return { ok: false, error: "This month is already a draft." };
+  }
+  if (run.payslips.some((slip) => slip.paymentStatus === HrPayslipPaymentStatus.PAID)) {
+    return { ok: false, error: "Someone is already paid. This month stays published." };
+  }
+  const moneyMoved = run.disbursementBatches.some((batch) =>
+    batch.lines.some((line) => line.status === "SUCCESS" || line.status === "SENDING" || line.status === "PENDING"),
+  );
+  if (moneyMoved) {
+    return { ok: false, error: "A payment is still open or already sent. Finish that before unlocking." };
+  }
+  const laterPublished = await prisma.hrPayslipRun.findFirst({
+    where: {
+      tenantId: tenant.id,
+      status: HrPayslipRunStatus.FINALIZED,
+      OR: [{ year: { gt: run.year } }, { year: run.year, month: { gt: run.month } }],
+    },
+    select: { label: true },
+  });
+  if (laterPublished) {
+    return {
+      ok: false,
+      error: `${laterPublished.label} is already published after this month. Unlock that one first.`,
+    };
+  }
+
+  const actorLabel = session.user.name || session.user.email || "HR";
+  await prisma.hrPayslipRun.update({
+    where: { id: run.id },
+    data: {
+      status: HrPayslipRunStatus.DRAFT,
+      finalizedAt: null,
+      finalizedByUserId: null,
+      finalizedByLabel: null,
+    },
+  });
+  await writeAuditLog({
+    tenantId: tenant.id,
+    actorUserId: session.user.id,
+    actorLabel,
+    module: "HR",
+    entityType: "PAYROLL_RUN",
+    entityId: run.id,
+    action: "REOPEN",
+    summary: `Unlocked ${run.label} because nobody had been paid.`,
+    metadata: { year: run.year, month: run.month },
+  });
+  revalidateHr(tenantSlug);
+  return { ok: true };
+}
+
 export async function discardDraftPayslipRun(tenantSlug: string, runId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "You must be signed in." };
