@@ -71,6 +71,7 @@ export type PayAttemptView = {
   successCount: number;
   failedCount: number;
   lineCount: number;
+  rejectionNote: string;
   lines: PayAttemptLineView[];
 };
 
@@ -175,6 +176,7 @@ export function HrPayslipsWorkspace({
   const [generatePaygroup, setGeneratePaygroup] = useState("ALL");
   const [filterPaygroup, setFilterPaygroup] = useState("ALL");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(payslipRuns[0]?.id ?? null);
+  const [focusPeriod, setFocusPeriod] = useState<{ year: number; month: number } | null>(null);
   const [viewPayslipId, setViewPayslipId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [payConfirmOpen, setPayConfirmOpen] = useState(false);
@@ -193,6 +195,15 @@ export function HrPayslipsWorkspace({
     () => payslipRuns.find((r) => r.id === selectedRunId) ?? payslipRuns[0] ?? null,
     [payslipRuns, selectedRunId],
   );
+
+  useEffect(() => {
+    if (!focusPeriod) return;
+    const run = payslipRuns.find((item) => item.year === focusPeriod.year && item.month === focusPeriod.month);
+    if (!run) return;
+    setSelectedRunId(run.id);
+    setViewPayslipId(null);
+    setFocusPeriod(null);
+  }, [payslipRuns, focusPeriod]);
 
   const filteredPayslips = useMemo(() => {
     if (!selectedRun) return [];
@@ -455,18 +466,28 @@ export function HrPayslipsWorkspace({
             className="flex flex-wrap items-end gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              void runAction(
-                () =>
-                  generatePayslipRun(tenantSlug, {
-                    year,
-                    month,
-                    paygroupName: generatePaygroupParam,
-                  }),
-                (n) =>
-                  n && n > 0
-                    ? `Created/updated ${n} payslip${n === 1 ? "" : "s"} for ${MONTHS[month - 1]} ${year}. Publish when ready.`
-                    : `No payslips created — check that ${payrollReadyCount} eligible employee${payrollReadyCount === 1 ? "" : "s"} match the pay group filter.`,
-              );
+              const period = { year, month };
+              setFocusPeriod(period);
+              const existing = payslipRuns.find((run) => run.year === period.year && run.month === period.month);
+              if (existing) {
+                setSelectedRunId(existing.id);
+                setViewPayslipId(null);
+              }
+              void (async () => {
+                const ok = await runAction(
+                  () =>
+                    generatePayslipRun(tenantSlug, {
+                      year,
+                      month,
+                      paygroupName: generatePaygroupParam,
+                    }),
+                  (n) =>
+                    n && n > 0
+                      ? `Created/updated ${n} payslip${n === 1 ? "" : "s"} for ${MONTHS[month - 1]} ${year}. Publish when ready.`
+                      : `No payslips created — check that ${payrollReadyCount} eligible employee${payrollReadyCount === 1 ? "" : "s"} match the pay group filter.`,
+                );
+                if (!ok) setFocusPeriod(null);
+              })();
             }}
           >
             <div>
@@ -706,20 +727,18 @@ export function HrPayslipsWorkspace({
                       </p>
                       <p className="mt-0.5 text-sm text-foreground">
                         {payAttempt.status === "SENDING"
-                          ? payAttempt.lines.some((line) =>
-                              line.failureReason.toLowerCase().includes("verification code"),
-                            )
-                            ? "Waiting for the Paystack code — Realcorp confirms it"
-                            : "Sending…"
+                          ? "Sending…"
                           : payAttempt.status === "COMPLETED"
                             ? "Finished"
                             : payAttempt.status === "PARTIAL"
                               ? "Some paid · some failed"
                               : payAttempt.status === "FAILED"
                                 ? "Stopped — pay again for unpaid staff"
-                                : payAttempt.status === "DRAFT"
-                                  ? "Waiting for Realcorp approval"
-                                  : payAttempt.status}
+                                : payAttempt.status === "CANCELLED"
+                                  ? "Rejected — nothing was paid"
+                                  : payAttempt.status === "DRAFT"
+                                    ? "Waiting for Realcorp approval"
+                                    : payAttempt.status}
                         {" · "}
                         {payAttempt.successCount} paid
                         {payAttempt.failedCount > 0 ? ` · ${payAttempt.failedCount} failed` : ""}
@@ -732,6 +751,11 @@ export function HrPayslipsWorkspace({
                       </span>
                     ) : null}
                   </div>
+                  {payAttempt.status === "CANCELLED" && payAttempt.rejectionNote ? (
+                    <p className="mb-2 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-sm text-[var(--danger)]">
+                      {payAttempt.rejectionNote}
+                    </p>
+                  ) : null}
                   <div className="max-h-72 overflow-y-auto rounded-lg border border-foreground/10">
                     {payAttempt.lines.map((line) => (
                       <div
@@ -778,7 +802,8 @@ export function HrPayslipsWorkspace({
                                         : line.status}
                           </p>
                         </div>
-                        {line.failureReason ? (
+                        {line.failureReason &&
+                        !line.failureReason.toLowerCase().includes("verification code") ? (
                           <p className="mt-1 text-xs leading-snug text-[var(--danger)]">
                             {line.failureReason}
                           </p>

@@ -326,6 +326,28 @@ export function payrollApprovalEmailContent(input: {
   return { subject: `Approve payroll — ${input.tenantName} · ${input.periodLabel}`, html };
 }
 
+export function payrollRejectedEmailContent(input: {
+  tenantName: string;
+  periodLabel: string;
+  note: string;
+  payslipsUrl: string;
+}) {
+  const html = mailDocument(
+    mailCard({
+      eyebrow: input.tenantName,
+      heading: "Payroll was rejected",
+      bodyHtml: [
+        mailParagraph(`${escapeHtml(input.periodLabel)} was not sent. Nothing was paid.`, true),
+        mailNote("Note from Realcorp"),
+        mailParagraph(escapeHtml(input.note)),
+        mailParagraph("Fix what does not match, then send the payroll again."),
+        mailButton(input.payslipsUrl, "Open payslips"),
+      ].join(""),
+    }),
+  );
+  return { subject: `Payroll rejected — ${input.tenantName} · ${input.periodLabel}`, html };
+}
+
 export function taskAssignedEmailContent(input: {
   tenantName: string;
   assigneeName: string;

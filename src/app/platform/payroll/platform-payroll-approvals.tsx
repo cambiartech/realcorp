@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { platformApprovePayrollBatch } from "@/app/platform/actions";
+import { platformApprovePayrollBatch, platformRejectPayrollBatch } from "@/app/platform/actions";
 
 export type PlatformPayrollApprovalRow = {
   batchId: string;
@@ -20,6 +20,7 @@ export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprov
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [noteByBatch, setNoteByBatch] = useState<Record<string, string>>({});
 
   if (rows.length === 0) return null;
 
@@ -27,7 +28,7 @@ export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprov
     <section className="mt-8 rounded-lg border border-foreground/10 bg-background p-5">
       <h2 className="text-lg font-semibold text-foreground">Waiting for approval</h2>
       <p className="mt-1 text-sm text-muted">
-        These organizations have Wait for approval turned on. Approve to send through Paystack.
+        These organizations have Wait for approval turned on. Approve to send through Paystack, or reject with a note if something does not match. HR gets the note and can send again.
       </p>
       {error ? (
         <p className="mt-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -54,26 +55,62 @@ export function PlatformPayrollApprovals({ rows }: { rows: PlatformPayrollApprov
                 {row.amountLabel} · queued {row.createdAtLabel}
               </p>
             </div>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                setError(null);
-                setMessage(null);
-                startTransition(async () => {
-                  const res = await platformApprovePayrollBatch({ batchId: row.batchId });
-                  if (!res.ok) {
-                    setError(res.error);
-                    return;
-                  }
-                  setMessage(res.message);
-                  router.refresh();
-                });
-              }}
-              className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
-            >
-              Approve &amp; send
-            </button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[280px]">
+              <textarea
+                value={noteByBatch[row.batchId] || ""}
+                onChange={(event) =>
+                  setNoteByBatch((current) => ({ ...current, [row.batchId]: event.target.value }))
+                }
+                rows={2}
+                placeholder="What does not match? HR will see this if you reject."
+                className="w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setError(null);
+                    setMessage(null);
+                    startTransition(async () => {
+                      const res = await platformApprovePayrollBatch({ batchId: row.batchId });
+                      if (!res.ok) {
+                        setError(res.error);
+                        return;
+                      }
+                      setMessage(res.message);
+                      router.refresh();
+                    });
+                  }}
+                  className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                >
+                  Approve &amp; send
+                </button>
+                <button
+                  type="button"
+                  disabled={pending || (noteByBatch[row.batchId] || "").trim().length < 4}
+                  onClick={() => {
+                    setError(null);
+                    setMessage(null);
+                    startTransition(async () => {
+                      const res = await platformRejectPayrollBatch({
+                        batchId: row.batchId,
+                        note: noteByBatch[row.batchId] || "",
+                      });
+                      if (!res.ok) {
+                        setError(res.error);
+                        return;
+                      }
+                      setMessage(res.message);
+                      router.refresh();
+                    });
+                  }}
+                  className="rounded-md border border-[var(--danger-line)] px-3 py-2 text-xs font-semibold text-[var(--danger)] disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
           </div>
         ))}
       </div>

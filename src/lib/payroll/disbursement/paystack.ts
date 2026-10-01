@@ -134,6 +134,38 @@ export type InitiatedTransfer = {
   id?: number;
 };
 
+export type BulkTransferItem = {
+  reference?: string;
+  transfer_code?: string;
+  status?: string;
+  id?: number;
+  reason?: string;
+};
+
+/** One Paystack request for a whole payroll. OTP must be off on the Paystack account. Max 100. */
+export async function paystackInitiateBulkTransfer(input: {
+  transfers: Array<{
+    amountKobo: number;
+    recipientCode: string;
+    reference: string;
+    reason: string;
+  }>;
+}): Promise<PaystackResult<BulkTransferItem[]>> {
+  return paystackFetch<BulkTransferItem[]>("/transfer/bulk", {
+    method: "POST",
+    body: JSON.stringify({
+      currency: "NGN",
+      source: "balance",
+      transfers: input.transfers.map((transfer) => ({
+        amount: transfer.amountKobo,
+        recipient: transfer.recipientCode,
+        reference: transfer.reference,
+        reason: transfer.reason.slice(0, 50),
+      })),
+    }),
+  });
+}
+
 export async function paystackInitiateTransfer(input: {
   amountKobo: number;
   recipientCode: string;

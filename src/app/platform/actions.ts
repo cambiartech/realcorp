@@ -795,6 +795,75 @@ export async function platformApprovePayrollBatch(input: {
   };
 }
 
+export async function platformRejectPayrollBatch(input: {
+  batchId: string;
+  note: string;
+}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const actor = {
+    userId: gate.session.user!.id!,
+    label: gate.session.user!.name || gate.session.user!.email || "Platform admin",
+  };
+  const { rejectDisbursementBatch } = await import("@/lib/payroll/disbursement/batch");
+  const rejected = await rejectDisbursementBatch(input.batchId, input.note, actor);
+  if (!rejected.ok) return rejected;
+
+  const { writeAuditLog } = await import("@/lib/audit-log");
+  await writeAuditLog({
+    tenantId: rejected.tenantId,
+    actorUserId: actor.userId,
+    actorLabel: actor.label,
+    module: "HR",
+    entityType: "PAYROLL_DISBURSEMENT",
+    entityId: input.batchId,
+    action: "REJECT",
+    summary: `Rejected ${rejected.periodLabel} payroll. ${input.note.trim()}`,
+  });
+
+  try {
+    const { absoluteAppUrl } = await import("@/lib/app-url");
+    const { sendPayrollRejectedEmail } = await import("@/lib/email");
+    const { MembershipRole, MembershipStatus } = await import("@/generated/prisma");
+    const members = await prisma.membership.findMany({
+      where: {
+        tenantId: rejected.tenantId,
+        status: MembershipStatus.ACTIVE,
+        role: { in: [MembershipRole.ORG_ADMIN, MembershipRole.HR_MANAGER] },
+      },
+      select: { user: { select: { email: true } } },
+    });
+    const recipients = [
+      ...new Set(
+        members.map((member) => member.user.email?.trim().toLowerCase()).filter(Boolean) as string[],
+      ),
+    ];
+    const payslipsUrl = absoluteAppUrl(`/${rejected.tenantSlug}/hr/payslips`);
+    await Promise.all(
+      recipients.map(async (to) => {
+        const sent = await sendPayrollRejectedEmail({
+          to,
+          tenantName: rejected.tenantName,
+          periodLabel: rejected.periodLabel,
+          note: input.note.trim(),
+          payslipsUrl,
+        });
+        if (!sent.ok) console.error("[payroll-reject-mail]", to, sent.error);
+      }),
+    );
+  } catch (err) {
+    console.error("[payroll-reject-mail]", err);
+  }
+
+  revalidatePath("/platform/payroll");
+  revalidatePath(`/${rejected.tenantSlug}/hr/payslips`);
+  return {
+    ok: true,
+    message: `${rejected.tenantName} · ${rejected.periodLabel} rejected. HR has the note.`,
+  };
+}
+
 export async function platformConfirmPaystackTransferOtp(input: {
   lineId: string;
   otp: string;
@@ -811,6 +880,23 @@ export async function platformConfirmPaystackTransferOtp(input: {
   if (result.ok) {
     revalidatePath("/platform/payroll");
   }
+  return result;
+}
+
+export async function platformConfirmPaystackBatchOtp(input: {
+  batchId: string;
+  otp: string;
+}): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate;
+
+  const actor = {
+    userId: gate.session.user!.id!,
+    label: gate.session.user!.name || gate.session.user!.email || "Platform admin",
+  };
+  const { finalizeDisbursementBatchOtp } = await import("@/lib/payroll/disbursement/batch");
+  const result = await finalizeDisbursementBatchOtp(input.batchId, input.otp, actor);
+  if (result.ok) revalidatePath("/platform/payroll");
   return result;
 }
 

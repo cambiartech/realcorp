@@ -26,7 +26,7 @@ import {
   paystackCreateRecipient,
   paystackFinalizeTransfer,
   paystackGetNgnBalanceKobo,
-  paystackInitiateTransfer,
+  paystackInitiateBulkTransfer,
   paystackListBanks,
   paystackResendTransferOtp,
   paystackResolveAccount,
@@ -52,6 +52,13 @@ function explainPaystackTransferError(raw: string): string {
     return (
       `${msg} — Paystack Transfers debit your merchant Paystack balance (Dashboard → Balance), ` +
       `not the org Available float. Top up that balance (or wait for DVA deposits to settle there), then retry.`
+    );
+  }
+  if (/otp/i.test(msg)) {
+    return (
+      "Paystack will not send a whole payroll while confirmation codes are turned on. " +
+      "In Paystack → Settings → Preferences, turn off “Confirm transfers before sending”, then click Pay again. " +
+      "One payroll is one batch — not a code per person."
     );
   }
   return msg;
@@ -562,6 +569,12 @@ export async function executeDisbursementBatch(
 
   let success = 0;
   let failed = 0;
+  const ready: Array<{
+    line: (typeof lines)[number];
+    amountKobo: number;
+    recipientCode: string;
+    accountName: string;
+  }> = [];
 
   for (const line of lines) {
     await prisma.payrollDisbursementLine.update({
@@ -600,62 +613,81 @@ export async function executeDisbursementBatch(
       continue;
     }
 
-    const transfer = await paystackInitiateTransfer({
+    ready.push({
+      line,
       amountKobo,
       recipientCode: recipient.data.recipient_code,
-      reference: line.providerReference,
-      reason: `Salary ${line.providerReference}`,
+      accountName: resolve.data.account_name || line.accountName,
     });
+  }
 
+  for (let offset = 0; offset < ready.length; offset += 100) {
+    const chunk = ready.slice(offset, offset + 100);
+    if (offset > 0) await new Promise((resolve) => setTimeout(resolve, 5000));
+    const transfer = await paystackInitiateBulkTransfer({
+      transfers: chunk.map((item) => ({
+        amountKobo: item.amountKobo,
+        recipientCode: item.recipientCode,
+        reference: item.line.providerReference,
+        reason: `Salary ${item.line.providerReference}`,
+      })),
+    });
     if (!transfer.ok) {
-      await markLineFailed(line.id, explainPaystackTransferError(transfer.error));
-      await reverseLineOnLedger(tenantId, line, actor);
-      failed += 1;
+      const reason = explainPaystackTransferError(transfer.error);
+      for (const item of chunk) {
+        await markLineFailed(item.line.id, reason);
+        await reverseLineOnLedger(tenantId, item.line, actor);
+        failed += 1;
+      }
       continue;
     }
 
-    const status = (transfer.data.status || "").toLowerCase();
-    if (status === "otp") {
-      await prisma.payrollDisbursementLine.update({
-        where: { id: line.id },
-        data: {
-          recipientCode: recipient.data.recipient_code,
-          accountNameResolved: resolve.data.account_name,
-          transferCode: transfer.data.transfer_code || null,
-          providerTransferId: transfer.data.id != null ? String(transfer.data.id) : null,
-          status: PayrollDisbursementLineStatus.SENDING,
-          failureReason: PAYSTACK_OTP_HOLD,
-        },
-      });
-    } else if (status === "success" || status === "pending" || !status) {
+    const byReference = new Map(
+      (Array.isArray(transfer.data) ? transfer.data : []).map((item) => [item.reference || "", item]),
+    );
+    for (const item of chunk) {
+      const sent = byReference.get(item.line.providerReference);
+      const status = (sent?.status || "").toLowerCase();
+      if (!sent) {
+        await markLineFailed(item.line.id, "Paystack did not return this salary in the batch.");
+        await reverseLineOnLedger(tenantId, item.line, actor);
+        failed += 1;
+        continue;
+      }
       if (status === "success") {
-        await markLineSuccess(line, transfer.data.transfer_code, String(transfer.data.id || ""), actor.label);
-        success += 1;
-      } else {
         await prisma.payrollDisbursementLine.update({
-          where: { id: line.id },
+          where: { id: item.line.id },
           data: {
-            recipientCode: recipient.data.recipient_code,
-            accountNameResolved: resolve.data.account_name,
-            transferCode: transfer.data.transfer_code || null,
-            providerTransferId: transfer.data.id != null ? String(transfer.data.id) : null,
-            status: PayrollDisbursementLineStatus.SENDING,
-            failureReason: null,
+            recipientCode: item.recipientCode,
+            accountNameResolved: item.accountName,
+            transferCode: sent.transfer_code || null,
+            providerTransferId: sent.id != null ? String(sent.id) : null,
           },
         });
+        await markLineSuccess(
+          item.line,
+          sent.transfer_code,
+          sent.id != null ? String(sent.id) : "",
+          actor.label,
+        );
+        success += 1;
+        continue;
       }
-    } else if (status === "failed" || status === "reversed") {
-      await markLineFailed(line.id, `Paystack status: ${status}`);
-      await reverseLineOnLedger(tenantId, line, actor);
-      failed += 1;
-    } else {
+      if (status === "failed" || status === "reversed") {
+        await markLineFailed(item.line.id, sent.reason || `Paystack status: ${status}`);
+        await reverseLineOnLedger(tenantId, item.line, actor);
+        failed += 1;
+        continue;
+      }
       await prisma.payrollDisbursementLine.update({
-        where: { id: line.id },
+        where: { id: item.line.id },
         data: {
-          recipientCode: recipient.data.recipient_code,
-          accountNameResolved: resolve.data.account_name,
-          transferCode: transfer.data.transfer_code || null,
-          providerTransferId: transfer.data.id != null ? String(transfer.data.id) : null,
+          recipientCode: item.recipientCode,
+          accountNameResolved: item.accountName,
+          transferCode: sent.transfer_code || null,
+          providerTransferId: sent.id != null ? String(sent.id) : null,
+          status: PayrollDisbursementLineStatus.SENDING,
+          failureReason: status === "otp" ? PAYSTACK_OTP_HOLD : null,
         },
       });
     }
@@ -801,6 +833,138 @@ export async function finalizeDisbursementLineOtp(
   }
   await refreshBatchCounts(line.batchId);
   return { ok: true, message: `Paystack status: ${status}.` };
+}
+
+/** One SMS code releases every salary still waiting in this payroll. */
+export async function finalizeDisbursementBatchOtp(
+  batchId: string,
+  otp: string,
+  actor: DisburseActor,
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const lines = await prisma.payrollDisbursementLine.findMany({
+    where: {
+      batchId,
+      status: PayrollDisbursementLineStatus.SENDING,
+      transferCode: { not: null },
+      failureReason: { contains: "verification code" },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (lines.length === 0) {
+    return { ok: false, error: "This payroll is not waiting on a Paystack code." };
+  }
+
+  let released = 0;
+  const problems: string[] = [];
+  for (const line of lines) {
+    const result = await finalizeDisbursementLineOtp(line.id, otp, actor);
+    if (!result.ok) problems.push(`${line.accountName}: ${result.error}`);
+    else released += 1;
+  }
+  if (released === 0) {
+    return { ok: false, error: problems[0] || "Paystack did not accept that code." };
+  }
+  const summary = `One code released ${released} of ${lines.length} salaries.`;
+  if (problems.length === 0) return { ok: true, message: summary };
+  return { ok: true, message: `${summary} Still waiting: ${problems.slice(0, 2).join(" ")}` };
+}
+
+/**
+ * Stop a payroll before anyone is paid. A note is stored for HR.
+ * Drafts waiting for approval have not reserved float. A batch still on a Paystack code has, so that float is returned.
+ */
+export async function rejectDisbursementBatch(
+  batchId: string,
+  note: string,
+  actor: DisburseActor,
+): Promise<
+  | {
+      ok: true;
+      tenantId: string;
+      tenantSlug: string;
+      tenantName: string;
+      periodLabel: string;
+      payslipRunId: string;
+    }
+  | { ok: false; error: string }
+> {
+  const reason = note.trim();
+  if (reason.length < 4) return { ok: false, error: "Write a short note for HR about what does not match." };
+  if (reason.length > 500) return { ok: false, error: "Keep the note under 500 characters." };
+
+  const batch = await prisma.payrollDisbursementBatch.findUnique({
+    where: { id: batchId },
+    include: {
+      tenant: { select: { id: true, slug: true, name: true } },
+      run: { select: { label: true, year: true, month: true } },
+      lines: true,
+    },
+  });
+  if (!batch) return { ok: false, error: "Batch not found." };
+  if (batch.lines.some((line) => line.status === PayrollDisbursementLineStatus.SUCCESS)) {
+    return { ok: false, error: "Someone in this payroll is already paid. It cannot be rejected." };
+  }
+  const waitingForCode = batch.lines.some(
+    (line) =>
+      line.status === PayrollDisbursementLineStatus.SENDING &&
+      Boolean(line.transferCode) &&
+      (line.failureReason || "").toLowerCase().includes("verification code"),
+  );
+  const notStarted = batch.status === PayrollDisbursementBatchStatus.DRAFT && !batch.startedAt;
+  if (!notStarted && !(batch.status === PayrollDisbursementBatchStatus.SENDING && waitingForCode)) {
+    return {
+      ok: false,
+      error: "This payroll has already been sent to Paystack. Reject it only while it is waiting for approval or a confirmation code.",
+    };
+  }
+
+  if (batch.startedAt) {
+    for (const line of batch.lines) {
+      if (
+        line.status !== PayrollDisbursementLineStatus.PENDING &&
+        line.status !== PayrollDisbursementLineStatus.SENDING
+      ) {
+        continue;
+      }
+      await reverseLineOnLedger(batch.tenantId, line, actor);
+      await prisma.payrollDisbursementLine.update({
+        where: { id: line.id },
+        data: { failureReason: reason.slice(0, 500) },
+      });
+    }
+  } else {
+    await prisma.payrollDisbursementLine.updateMany({
+      where: {
+        batchId: batch.id,
+        status: { in: [PayrollDisbursementLineStatus.PENDING, PayrollDisbursementLineStatus.SENDING] },
+      },
+      data: {
+        status: PayrollDisbursementLineStatus.FAILED,
+        failureReason: reason.slice(0, 500),
+      },
+    });
+  }
+
+  await refreshBatchCounts(batch.id);
+  await prisma.payrollDisbursementBatch.update({
+    where: { id: batch.id },
+    data: {
+      status: PayrollDisbursementBatchStatus.CANCELLED,
+      lastError: reason.slice(0, 500),
+      completedAt: new Date(),
+    },
+  });
+
+  return {
+    ok: true,
+    tenantId: batch.tenant.id,
+    tenantSlug: batch.tenant.slug,
+    tenantName: batch.tenant.name,
+    periodLabel:
+      batch.run?.label ||
+      `${batch.run?.year ?? ""}-${String(batch.run?.month ?? "").padStart(2, "0")}`,
+    payslipRunId: batch.payslipRunId,
+  };
 }
 
 export async function resendDisbursementLineOtp(

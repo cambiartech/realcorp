@@ -78,7 +78,7 @@ import { parsePensionAdministrators } from "@/lib/org-pension-administrators";
 import { z } from "zod";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
-type PayslipActionResult = ActionResult & { count?: number };
+type PayslipActionResult = ActionResult & { count?: number; runId?: string };
 
 async function getTenantAndMembership(tenantSlug: string, userId: string) {
   const tenant = await prisma.tenant.findUnique({
@@ -1476,7 +1476,7 @@ export async function generatePayslipRun(
     },
   });
   revalidateHr(tenantSlug);
-  return { ok: true, count: prepared.length };
+  return { ok: true, count: prepared.length, runId: run.id };
 }
 
 export async function savePayrollAdjustment(

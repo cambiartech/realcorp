@@ -155,6 +155,7 @@ export default async function PlatformPayrollPage() {
     .filter((line) => line.transferCode)
     .map((line) => ({
       lineId: line.id,
+      batchId: line.batchId,
       tenantName: line.tenant.name,
       periodLabel:
         line.batch.run?.label ||

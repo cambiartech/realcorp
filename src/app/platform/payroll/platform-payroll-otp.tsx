@@ -1,14 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
-  platformConfirmPaystackTransferOtp,
+  platformConfirmPaystackBatchOtp,
+  platformRejectPayrollBatch,
   platformResendPaystackTransferOtp,
 } from "@/app/platform/actions";
 
 export type PlatformPaystackOtpRow = {
   lineId: string;
+  batchId: string;
   tenantName: string;
   periodLabel: string;
   staffName: string;
@@ -21,18 +23,29 @@ export type PlatformPaystackOtpRow = {
 export function PlatformPayrollOtp({ rows }: { rows: PlatformPaystackOtpRow[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [otpByLine, setOtpByLine] = useState<Record<string, string>>({});
+  const [otpByBatch, setOtpByBatch] = useState<Record<string, string>>({});
+  const [noteByBatch, setNoteByBatch] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  if (rows.length === 0) return null;
+  const batches = useMemo(() => {
+    const grouped = new Map<string, PlatformPaystackOtpRow[]>();
+    for (const row of rows) {
+      const list = grouped.get(row.batchId) ?? [];
+      list.push(row);
+      grouped.set(row.batchId, list);
+    }
+    return [...grouped.entries()];
+  }, [rows]);
+
+  if (batches.length === 0) return null;
 
   return (
     <section className="mt-8 rounded-lg border border-foreground/10 bg-background p-5">
       <h2 className="text-lg font-semibold text-foreground">Paystack verification code</h2>
       <p className="mt-1 text-sm text-muted">
-        Paystack texts this code to the business phone on the Paystack account, not to the
-        organization. Enter it here to release the salary. Codes expire in 30 minutes.
+        One code releases the whole payroll. Paystack texts it to the business phone. It expires in
+        30 minutes. New pays go out as one batch and do not ask for a code per person.
       </p>
       {error ? (
         <p className="mt-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-wash)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -45,39 +58,93 @@ export function PlatformPayrollOtp({ rows }: { rows: PlatformPaystackOtpRow[] })
         </p>
       ) : null}
       <div className="mt-4 space-y-3">
-        {rows.map((row) => (
-          <div key={row.lineId} className="rounded-lg border border-foreground/10 px-3 py-3">
-            <p className="font-semibold text-foreground">
-              {row.tenantName} · {row.staffName}
-            </p>
-            <p className="mt-0.5 text-xs text-muted">
-              {row.periodLabel} · {row.currency} {row.amountLabel} · {row.accountNumber}
-            </p>
-            <p className="mt-1 font-mono text-[10px] text-muted">{row.transferCode}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={otpByLine[row.lineId] || ""}
-                onChange={(e) =>
-                  setOtpByLine((current) => ({
-                    ...current,
-                    [row.lineId]: e.target.value.replace(/\D/g, "").slice(0, 8),
-                  }))
+        {batches.map(([batchId, people]) => {
+          const first = people[0];
+          return (
+            <div key={batchId} className="rounded-lg border border-foreground/10 px-3 py-3">
+              <p className="font-semibold text-foreground">
+                {first.tenantName} · {first.periodLabel}
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                {people.length} {people.length === 1 ? "salary" : "salaries"} · {first.currency}{" "}
+                {people.map((person) => person.staffName).join(", ")}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otpByBatch[batchId] || ""}
+                  onChange={(e) =>
+                    setOtpByBatch((current) => ({
+                      ...current,
+                      [batchId]: e.target.value.replace(/\D/g, "").slice(0, 8),
+                    }))
+                  }
+                  placeholder="SMS code"
+                  className="w-36 rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={pending || (otpByBatch[batchId] || "").length < 4}
+                  onClick={() => {
+                    setError(null);
+                    setMessage(null);
+                    startTransition(async () => {
+                      const res = await platformConfirmPaystackBatchOtp({
+                        batchId,
+                        otp: otpByBatch[batchId] || "",
+                      });
+                      if (!res.ok) {
+                        setError(res.error);
+                        return;
+                      }
+                      setMessage(res.message);
+                      router.refresh();
+                    });
+                  }}
+                  className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                >
+                  Confirm code
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setError(null);
+                    setMessage(null);
+                    startTransition(async () => {
+                      const res = await platformResendPaystackTransferOtp({ lineId: first.lineId });
+                      if (!res.ok) {
+                        setError(res.error);
+                        return;
+                      }
+                      setMessage("Paystack sent a new code. Use it once for this whole payroll.");
+                    });
+                  }}
+                  className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                >
+                  Resend code
+                </button>
+              </div>
+              <textarea
+                value={noteByBatch[batchId] || ""}
+                onChange={(event) =>
+                  setNoteByBatch((current) => ({ ...current, [batchId]: event.target.value }))
                 }
-                placeholder="SMS code"
-                className="w-36 rounded-md border border-foreground/15 bg-background px-3 py-2 font-mono text-sm"
+                rows={2}
+                placeholder="What does not match? HR will see this if you reject."
+                className="mt-3 w-full rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm"
               />
               <button
                 type="button"
-                disabled={pending || (otpByLine[row.lineId] || "").length < 4}
+                disabled={pending || (noteByBatch[batchId] || "").trim().length < 4}
                 onClick={() => {
                   setError(null);
                   setMessage(null);
                   startTransition(async () => {
-                    const res = await platformConfirmPaystackTransferOtp({
-                      lineId: row.lineId,
-                      otp: otpByLine[row.lineId] || "",
+                    const res = await platformRejectPayrollBatch({
+                      batchId,
+                      note: noteByBatch[batchId] || "",
                     });
                     if (!res.ok) {
                       setError(res.error);
@@ -87,32 +154,13 @@ export function PlatformPayrollOtp({ rows }: { rows: PlatformPaystackOtpRow[] })
                     router.refresh();
                   });
                 }}
-                className="rounded-md border border-foreground bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50"
+                className="mt-2 rounded-md border border-[var(--danger-line)] px-3 py-2 text-xs font-semibold text-[var(--danger)] disabled:opacity-50"
               >
-                Confirm code
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  setError(null);
-                  setMessage(null);
-                  startTransition(async () => {
-                    const res = await platformResendPaystackTransferOtp({ lineId: row.lineId });
-                    if (!res.ok) {
-                      setError(res.error);
-                      return;
-                    }
-                    setMessage(res.message);
-                  });
-                }}
-                className="rounded-md border border-foreground/20 px-3 py-2 text-xs font-semibold disabled:opacity-50"
-              >
-                Resend code
+                Reject payroll
               </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
