@@ -48,12 +48,8 @@ export function NightAuditReport({ tenantName, audit, showPrintButton = true }: 
           <h2 className="font-semibold">Housekeeping status</h2>
           <ul className="mt-3 space-y-2 text-sm">
             <li className="flex justify-between">
-              <span>Clean & vacant</span>
-              <strong>{audit.housekeeping.vacantClean}</strong>
-            </li>
-            <li className="flex justify-between">
-              <span>Dirty & vacant</span>
-              <strong>{audit.housekeeping.vacantDirty}</strong>
+              <span>Vacant</span>
+              <strong>{audit.housekeeping.vacantClean + audit.housekeeping.vacantDirty}</strong>
             </li>
             <li className="flex justify-between">
               <span>Occupied</span>

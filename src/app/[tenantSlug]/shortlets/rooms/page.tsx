@@ -69,8 +69,8 @@ export default async function RoomsPage({
       propertyId: u.propertyId || u.property?.id || null,
       propertyName: u.property?.name || null,
       location: u.location || "—",
-      status: formatEnumLabel(u.housekeepingStatus),
-      statusValue: u.housekeepingStatus,
+      status: u.housekeepingStatus === "VACANT_DIRTY" ? "Vacant" : formatEnumLabel(u.housekeepingStatus),
+      statusValue: u.housekeepingStatus === "VACANT_DIRTY" ? "VACANT_CLEAN" : u.housekeepingStatus,
       guestLabel: res ? `${res.guestName}` : null,
       checkoutLabel: res
         ? new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(res.checkOut)

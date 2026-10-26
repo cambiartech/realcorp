@@ -85,7 +85,7 @@ export function RoomsWorkspace({
     router.replace(q ? `${pathname}?${q}` : pathname);
   }
 
-  function setStatus(unitId: string, status: "VACANT_CLEAN" | "VACANT_DIRTY" | "OUT_OF_ORDER") {
+  function setStatus(unitId: string, status: "VACANT_CLEAN" | "OUT_OF_ORDER") {
     startTransition(async () => {
       const res = await updateHousekeepingStatus(tenantSlug, { unitId, status });
       if (res.ok) showSnackbar("Room updated.", "success");
@@ -147,9 +147,12 @@ export function RoomsWorkspace({
         </div>
       ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Clean & vacant" value={displaySummary.vacantClean} tone="success" />
-        <Stat label="Dirty & vacant" value={displaySummary.vacantDirty} tone="warn" />
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Stat
+          label="Vacant"
+          value={displaySummary.vacantClean + displaySummary.vacantDirty}
+          tone="success"
+        />
         <Stat label="Occupied" value={displaySummary.occupied} tone="info" />
         <Stat label="Out of order" value={displaySummary.outOfOrder} />
       </section>
@@ -234,24 +237,14 @@ export function RoomsWorkspace({
               ) : null}
               {canHousekeeping && room.statusValue !== "OCCUPIED" ? (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {room.statusValue !== "VACANT_CLEAN" ? (
+                  {room.statusValue !== "VACANT_CLEAN" && room.statusValue !== "VACANT_DIRTY" ? (
                     <button
                       type="button"
                       disabled={isPending}
                       onClick={() => setStatus(room.id, "VACANT_CLEAN")}
                       className="rc-btn rc-btn-primary rc-btn-sm"
                     >
-                      Mark clean
-                    </button>
-                  ) : null}
-                  {room.statusValue !== "VACANT_DIRTY" ? (
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => setStatus(room.id, "VACANT_DIRTY")}
-                      className="rc-btn rc-btn-secondary rc-btn-sm"
-                    >
-                      Mark dirty
+                      Mark vacant
                     </button>
                   ) : null}
                   {room.statusValue !== "OUT_OF_ORDER" ? (

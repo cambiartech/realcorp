@@ -54,7 +54,7 @@ export function LocationBoardWorkspace({
   const [isPending, startTransition] = useTransition();
   const base = `/${tenantSlug}/shortlets`;
 
-  function setStatus(unitId: string, status: "VACANT_CLEAN" | "VACANT_DIRTY" | "OUT_OF_ORDER") {
+  function setStatus(unitId: string, status: "VACANT_CLEAN" | "OUT_OF_ORDER") {
     startTransition(async () => {
       const res = await updateHousekeepingStatus(tenantSlug, { unitId, status });
       if (res.ok) showSnackbar("Room updated.", "success");
@@ -113,9 +113,8 @@ export function LocationBoardWorkspace({
         </div>
       </div>
 
-      <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MiniStat label="Clean" value={summary.vacantClean} />
-        <MiniStat label="Dirty" value={summary.vacantDirty} />
+      <section className="grid grid-cols-3 gap-2">
+        <MiniStat label="Vacant" value={summary.vacantClean + summary.vacantDirty} />
         <MiniStat label="Occupied" value={summary.occupied} />
         <MiniStat label="OOO" value={summary.outOfOrder} />
       </section>
@@ -176,18 +175,23 @@ export function LocationBoardWorkspace({
                 <div className="mt-2 space-y-1.5">
                   <UiSelect
                     className="!py-1 text-[11px]"
-                    value={unit.statusValue === "OCCUPIED" ? "" : unit.statusValue}
+                    value={
+                      unit.statusValue === "OCCUPIED"
+                        ? ""
+                        : unit.statusValue === "VACANT_DIRTY"
+                          ? "VACANT_CLEAN"
+                          : unit.statusValue
+                    }
                     disabled={isPending || unit.statusValue === "OCCUPIED"}
                     onChange={(e) => {
-                      const v = e.target.value as "VACANT_CLEAN" | "VACANT_DIRTY" | "OUT_OF_ORDER";
+                      const v = e.target.value as "VACANT_CLEAN" | "OUT_OF_ORDER";
                       if (v) setStatus(unit.id, v);
                     }}
                   >
                     <option value="" disabled>
                       {unit.statusValue === "OCCUPIED" ? "Occupied" : "Set status"}
                     </option>
-                    <option value="VACANT_CLEAN">Clean</option>
-                    <option value="VACANT_DIRTY">Dirty</option>
+                    <option value="VACANT_CLEAN">Vacant</option>
                     <option value="OUT_OF_ORDER">Out of order</option>
                   </UiSelect>
                   <UiSelect

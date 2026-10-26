@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function PlatformErrorsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="w-full">
       <h1 className="text-2xl font-bold text-foreground">Error reference lookup</h1>
       <p className="mt-1 text-sm text-muted">
         Paste the error reference from a failed page. Rows older than 21 days are removed automatically.

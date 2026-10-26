@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function PlatformOnboardingPage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
+    <div className="w-full">
       <p className="text-xs font-semibold uppercase tracking-[0.35em] text-muted">Platform</p>
       <h1 className="mt-2 text-2xl font-bold text-foreground">Onboard a new organization</h1>
       <p className="mt-2 text-sm text-muted">

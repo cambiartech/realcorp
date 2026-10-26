@@ -209,7 +209,7 @@ export default async function PlatformPayrollPage() {
     }));
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
+    <div className="w-full">
       <h1 className="text-2xl font-bold text-foreground">Payroll float</h1>
       <p className="mt-1 max-w-2xl text-sm text-muted">
         Fund → verify → Available on the ledger. Orgs pay themselves by default. Turn on Wait for

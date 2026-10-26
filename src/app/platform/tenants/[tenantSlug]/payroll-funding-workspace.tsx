@@ -55,6 +55,7 @@ type Props = {
   dvaNotes: string;
   requirePlatformApproval: boolean;
   view: "payroll" | "settings";
+  settingsSection?: "fees" | "funding";
 };
 
 export function PlatformPayrollFundingWorkspace(props: Props) {
@@ -82,11 +83,17 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">
-            {props.view === "settings" ? "Payroll settings" : "Payroll float"}
+            {props.view === "settings"
+              ? props.settingsSection === "funding"
+                ? "Funding account"
+                : "Payroll fees"
+              : "Payroll float"}
           </h2>
           <p className="mt-1 text-sm text-muted">
             {props.view === "settings"
-              ? "These numbers are what this organization pays Realcorp. HR sees them on Pay via Paystack."
+              ? props.settingsSection === "funding"
+                ? "The account this organization pays into, and the dedicated account Paystack credits."
+                : "These numbers are what this organization pays Realcorp. HR sees them on Pay via Paystack."
               : "Client funds Realcorp → you verify → Available balance on the ledger. No payout until Available covers salaries + fees."}
           </p>
         </div>
@@ -98,7 +105,7 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
         </div>
       </div>
 
-      {props.view === "settings" ? (
+      {props.view === "settings" && props.settingsSection !== "funding" ? (
       <form
         className="mt-4 grid gap-3 rounded-lg border border-foreground/15 bg-foreground/[0.03] px-3 py-3 sm:grid-cols-2"
         onSubmit={(e) => {
@@ -396,9 +403,9 @@ export function PlatformPayrollFundingWorkspace(props: Props) {
       </>
       ) : null}
 
-      {props.view === "settings" ? (
+      {props.view === "settings" && props.settingsSection === "funding" ? (
       <form
-        className="mt-8 grid gap-3 border-t border-foreground/10 pt-6 sm:grid-cols-2"
+        className="mt-4 grid gap-3 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);

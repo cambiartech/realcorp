@@ -1204,7 +1204,7 @@ export async function updateShortletReservationStatus(
       await tx.shortletUnit.update({
         where: { id: reservation.unitId },
         data: {
-          housekeepingStatus: ShortletHousekeepingStatus.VACANT_DIRTY,
+          housekeepingStatus: ShortletHousekeepingStatus.VACANT_CLEAN,
           activeReservationId: null,
         },
       });
@@ -1226,10 +1226,7 @@ export async function updateShortletReservationStatus(
         where: { id: reservation.unitId },
         data: {
           activeReservationId: null,
-          housekeepingStatus:
-            reservation.status === ShortletReservationStatus.CHECKED_IN
-              ? ShortletHousekeepingStatus.VACANT_DIRTY
-              : ShortletHousekeepingStatus.VACANT_CLEAN,
+          housekeepingStatus: ShortletHousekeepingStatus.VACANT_CLEAN,
         },
       });
     }
@@ -1363,7 +1360,10 @@ export async function updateHousekeepingStatus(
   });
   if (!unit) return { ok: false, error: "Unit not found." };
 
-  const next = parsed.data.status as ShortletHousekeepingStatus;
+  const next =
+    parsed.data.status === "VACANT_DIRTY"
+      ? ShortletHousekeepingStatus.VACANT_CLEAN
+      : (parsed.data.status as ShortletHousekeepingStatus);
   if (next !== ShortletHousekeepingStatus.OCCUPIED && unit.activeReservationId) {
     return { ok: false, error: "Cannot change status while a guest is checked in. Check out first." };
   }

@@ -43,7 +43,7 @@ export default async function PlatformTenantInvitesPage({
   searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; section?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.isPlatformAdmin) {
@@ -51,8 +51,9 @@ export default async function PlatformTenantInvitesPage({
   }
 
   const { tenantSlug } = await params;
-  const { tab } = await searchParams;
+  const { tab, section } = await searchParams;
   const activeTab: TenantTab = tab === "payroll" || tab === "people" ? tab : "settings";
+  const settingsSection = section === "funding" || section === "modules" ? section : "fees";
   const tenant = await prisma.tenant.findUnique({
     where: { slug: tenantSlug },
     select: {
@@ -159,7 +160,7 @@ export default async function PlatformTenantInvitesPage({
   }));
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
+    <div className="w-full">
       <Link
         href="/platform"
         className="text-sm text-muted underline underline-offset-2 hover:text-foreground"
@@ -204,15 +205,45 @@ export default async function PlatformTenantInvitesPage({
       <div className="mt-6 space-y-8">
         {activeTab === "settings" ? (
           <>
-            <PlatformModulesForm
-              tenantId={tenant.id}
-              tenantName={tenant.name}
-              tenantSlug={tenant.slug}
-              summary={tenantModuleSummary(tenant.settings)}
-              initial={normalizeTenantModuleFlags(tenant.settings)}
-            />
+            <div className="flex flex-wrap gap-1 border-b border-foreground/10 pb-1" role="tablist" aria-label="Settings">
+              {(
+                [
+                  ["fees", "Payroll fees"],
+                  ["funding", "Funding account"],
+                  ["modules", "Modules"],
+                ] as const
+              ).map(([id, label]) => {
+                const active = id === settingsSection;
+                return (
+                  <Link
+                    key={id}
+                    href={`/platform/tenants/${tenant.slug}?tab=settings&section=${id}`}
+                    role="tab"
+                    aria-selected={active}
+                    className={[
+                      "rounded-md px-3 py-2 text-sm font-medium",
+                      active
+                        ? "bg-foreground text-background"
+                        : "text-muted hover:bg-foreground/[0.06] hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+            {settingsSection === "modules" ? (
+              <PlatformModulesForm
+                tenantId={tenant.id}
+                tenantName={tenant.name}
+                tenantSlug={tenant.slug}
+                summary={tenantModuleSummary(tenant.settings)}
+                initial={normalizeTenantModuleFlags(tenant.settings)}
+              />
+            ) : (
             <PlatformPayrollFundingWorkspace
               view="settings"
+              settingsSection={settingsSection}
               tenantSlug={tenant.slug}
               tenantId={tenant.id}
               availableBalanceLabel={availableBalanceLabel}
@@ -238,6 +269,7 @@ export default async function PlatformTenantInvitesPage({
               dvaNotes={disbursement.dvaNotes || ""}
               requirePlatformApproval={Boolean(disbursement.requirePlatformApproval)}
             />
+            )}
           </>
         ) : null}
         {activeTab === "payroll" ? (

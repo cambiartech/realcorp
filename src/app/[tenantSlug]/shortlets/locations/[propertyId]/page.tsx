@@ -64,8 +64,8 @@ export default async function LocationBoardPage({
         id: u.id,
         name: u.name,
         floor: u.floor || "",
-        status: formatEnumLabel(u.housekeepingStatus),
-        statusValue: u.housekeepingStatus,
+        status: u.housekeepingStatus === "VACANT_DIRTY" ? "Vacant" : formatEnumLabel(u.housekeepingStatus),
+        statusValue: u.housekeepingStatus === "VACANT_DIRTY" ? "VACANT_CLEAN" : u.housekeepingStatus,
         guestLabel: res ? res.guestName : null,
         checkoutLabel: res
           ? new Intl.DateTimeFormat("en-NG", { dateStyle: "short", timeStyle: "short" }).format(res.checkOut)
