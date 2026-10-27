@@ -148,6 +148,7 @@ export function ReservationsWorkspace({
     stay: r.stayLabel,
     nights: r.nights,
     total: r.totalAmountLabel,
+    caution: r.cautionFeeLabel || "—",
     balance: r.balanceLabel,
     status: r.status,
   }));
@@ -240,6 +241,7 @@ export function ReservationsWorkspace({
                 "Stay",
                 "Nights",
                 "Total",
+                "Caution",
                 "Balance",
                 "Status",
               ]}
@@ -251,6 +253,7 @@ export function ReservationsWorkspace({
                 "stay",
                 "nights",
                 "total",
+                "caution",
                 "balance",
                 "status",
               ]}
@@ -309,6 +312,7 @@ export function ReservationsWorkspace({
                 <th>Apartment</th>
                 <th>Stay</th>
                 <th>Total</th>
+                <th>Caution</th>
                 <th>Balance</th>
                 <th>Status</th>
                 {canManage ? <th>Actions</th> : null}
@@ -325,6 +329,7 @@ export function ReservationsWorkspace({
                   </td>
                   <td>{r.stayLabel}</td>
                   <td>{r.totalAmountLabel}</td>
+                  <td>{r.cautionFeeLabel || "—"}</td>
                   <td>{r.balanceLabel}</td>
                   <td>{r.status}</td>
                   {canManage ? (
