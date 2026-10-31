@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowUp, Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowUp, Download, Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { AssistantChart, parseChartSpec } from "@/components/org-assistant/assistant-chart";
 
 type Message = { role: "user" | "assistant"; text: string; error?: boolean };
 
@@ -29,6 +30,57 @@ function tableCells(line: string) {
     .map((c) => c.trim());
 }
 
+function csvEscape(value: string) {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+/** Pull markdown tables and chart series into one CSV blob for download. */
+export function messageToCsv(text: string): string | null {
+  const chunks: string[] = [];
+  const lines = text.split("\n");
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim().startsWith("|")) {
+      const rows: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) rows.push(lines[i++]);
+      const body = rows.filter((r) => !/^\s*\|?[\s:|-]+\|?\s*$/.test(r)).map(tableCells);
+      if (body.length) {
+        chunks.push(body.map((r) => r.map(csvEscape).join(",")).join("\n"));
+      }
+      continue;
+    }
+    if (line.trim().startsWith("```chart")) {
+      const body: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) body.push(lines[i++]);
+      if (i < lines.length) i++;
+      const spec = parseChartSpec(body.join("\n"));
+      if (spec) {
+        const header = ["label", ...spec.series.map((s) => s.name)].map(csvEscape).join(",");
+        const rows = spec.labels.map((label, idx) =>
+          [label, ...spec.series.map((s) => String(s.data[idx] ?? ""))].map(csvEscape).join(","),
+        );
+        chunks.push([header, ...rows].join("\n"));
+      }
+      continue;
+    }
+    i++;
+  }
+  return chunks.length ? chunks.join("\n\n") : null;
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function Markdown({ text }: { text: string }) {
   const lines = text.split("\n");
   const blocks: ReactNode[] = [];
@@ -38,6 +90,26 @@ function Markdown({ text }: { text: string }) {
     const key = `b${i}`;
     if (!line.trim()) {
       i++;
+      continue;
+    }
+    if (line.trim().startsWith("```")) {
+      const lang = line.trim().slice(3).trim().toLowerCase();
+      const body: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) body.push(lines[i++]);
+      if (i < lines.length) i++;
+      if (lang === "chart") {
+        const spec = parseChartSpec(body.join("\n"));
+        if (spec) {
+          blocks.push(<AssistantChart key={key} spec={spec} />);
+          continue;
+        }
+      }
+      blocks.push(
+        <pre key={key} className="my-2 overflow-x-auto rounded-md border border-foreground/10 bg-foreground/[0.03] p-3 text-xs">
+          {body.join("\n")}
+        </pre>,
+      );
       continue;
     }
     if (line.trim().startsWith("|")) {
@@ -197,7 +269,7 @@ export function OrgAssistantChat({
           </span>
           <div>
             <h1 className="text-[15px] font-semibold tracking-tight">Ask AI</h1>
-            <p className="text-xs text-muted">Reports and analysis from {orgName} data. Read only.</p>
+            <p className="text-xs text-muted">Reports, trends and analysis from {orgName}. Read only.</p>
           </div>
         </div>
         {!empty ? (
@@ -220,7 +292,7 @@ export function OrgAssistantChat({
               {userName ? `Hi ${userName}, what would you like to know?` : "What would you like to know?"}
             </p>
             <p className="mt-1 text-sm text-muted">
-              Ask about sales, money, people, bookings or tasks. Answers use live figures from your workspace.
+              Ask for trends, charts, rankings or a period comparison. Export any table or chart as CSV.
             </p>
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
               {suggestions.map((s) => (
@@ -251,6 +323,24 @@ export function OrgAssistantChat({
                   </span>
                   <div className={`min-w-0 flex-1 ${m.error ? "text-red-600 dark:text-red-400" : ""}`}>
                     <Markdown text={m.text} />
+                    {!m.error ? (
+                      (() => {
+                        const csv = messageToCsv(m.text);
+                        if (!csv) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              downloadCsv(`ask-ai-${tenantSlug}-${new Date().toISOString().slice(0, 10)}.csv`, csv)
+                            }
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-2.5 py-1.5 text-[11px] font-medium text-muted hover:bg-foreground/[0.06] hover:text-foreground"
+                          >
+                            <Download className="h-3 w-3" />
+                            Export CSV
+                          </button>
+                        );
+                      })()
+                    ) : null}
                   </div>
                 </div>
               ),
@@ -273,7 +363,7 @@ export function OrgAssistantChat({
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
             rows={1}
-            placeholder="Ask about revenue, leads, payroll, occupancy…"
+            placeholder="Ask about trends, revenue, leads, payroll, occupancy…"
             className="max-h-40 min-h-[44px] flex-1 resize-none rounded-lg border border-foreground/15 bg-[var(--elevated)] px-3.5 py-2.5 text-sm outline-none focus:border-foreground/40"
           />
           <button

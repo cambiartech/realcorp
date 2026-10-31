@@ -27,8 +27,9 @@ export const instrumentSerif = Instrument_Serif({
 });
 
 export const jetbrainsMono = JetBrains_Mono({
+  // One subset + one weight: Turbopack's next/font resolver breaks on multi-entry font queries.
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: "400",
   variable: "--font-rc-mono",
   display: "swap",
   fallback: ["ui-monospace", "Menlo", "monospace"],

@@ -353,6 +353,230 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "get_trends",
+    description:
+      "Time series and period comparison for consultancy-style reports. Metrics: leads, won_deals, payments, expenses, shortlet_revenue, tasks_done. Granularity week or month. Returns buckets, totals, previous-period totals, and percent change.",
+    module: null,
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        metric: {
+          type: "STRING",
+          enum: ["leads", "won_deals", "payments", "expenses", "shortlet_revenue", "tasks_done"],
+          description: "Which KPI to chart over time.",
+        },
+        granularity: {
+          type: "STRING",
+          enum: ["week", "month"],
+          description: "Bucket size. Default week.",
+        },
+        ...PERIOD_PARAMS,
+      },
+      required: ["metric"],
+    },
+    run: async (tenantId, args) => {
+      const metric = String(args.metric || "");
+      const granularity = args.granularity === "month" ? "month" : "week";
+      const p = resolvePeriod(args);
+      const span = p.to.getTime() - p.from.getTime();
+      const prevTo = new Date(p.from.getTime() - 1);
+      const prevFrom = new Date(p.from.getTime() - span);
+
+      function bucketKey(d: Date) {
+        if (granularity === "month") return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+        const day = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+        const weekday = day.getUTCDay();
+        day.setUTCDate(day.getUTCDate() - ((weekday + 6) % 7));
+        return day.toISOString().slice(0, 10);
+      }
+
+      function emptyBuckets(from: Date, to: Date) {
+        const map = new Map<string, number>();
+        const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+        const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+        while (cursor <= end) {
+          map.set(bucketKey(cursor), 0);
+          if (granularity === "month") {
+            cursor.setUTCMonth(cursor.getUTCMonth() + 1, 1);
+          } else {
+            cursor.setUTCDate(cursor.getUTCDate() + 7);
+          }
+        }
+        map.set(bucketKey(to), map.get(bucketKey(to)) ?? 0);
+        return map;
+      }
+
+      async function loadPoints(from: Date, to: Date): Promise<Array<{ at: Date; value: number }>> {
+        switch (metric) {
+          case "leads": {
+            const rows = await prisma.lead.findMany({
+              where: { tenantId, createdAt: { gte: from, lte: to } },
+              select: { createdAt: true },
+            });
+            return rows.map((r) => ({ at: r.createdAt, value: 1 }));
+          }
+          case "won_deals": {
+            const rows = await prisma.deal.findMany({
+              where: { tenantId, stage: "CLOSED_WON", updatedAt: { gte: from, lte: to } },
+              select: { updatedAt: true, value: true },
+            });
+            return rows.map((r) => ({ at: r.updatedAt, value: num(r.value) }));
+          }
+          case "payments": {
+            const rows = await prisma.paymentRecord.findMany({
+              where: { tenantId, voidedAt: null, paidAt: { gte: from, lte: to } },
+              select: { paidAt: true, amount: true },
+            });
+            return rows.map((r) => ({ at: r.paidAt, value: num(r.amount) }));
+          }
+          case "expenses": {
+            const rows = await prisma.expense.findMany({
+              where: { tenantId, voidedAt: null, expenseDate: { gte: from, lte: to } },
+              select: { expenseDate: true, amount: true },
+            });
+            return rows.map((r) => ({ at: r.expenseDate, value: num(r.amount) }));
+          }
+          case "shortlet_revenue": {
+            const rows = await prisma.shortletReservation.findMany({
+              where: {
+                tenantId,
+                checkIn: { gte: from, lte: to },
+                status: { notIn: ["CANCELLED", "NO_SHOW"] },
+              },
+              select: { checkIn: true, totalAmount: true },
+            });
+            return rows.map((r) => ({ at: r.checkIn, value: num(r.totalAmount) }));
+          }
+          case "tasks_done": {
+            const rows = await prisma.workTask.findMany({
+              where: { tenantId, status: "DONE", completedAt: { gte: from, lte: to } },
+              select: { completedAt: true },
+            });
+            return rows.map((r) => ({ at: r.completedAt ?? p.from, value: 1 }));
+          }
+          default:
+            return [];
+        }
+      }
+
+      if (!["leads", "won_deals", "payments", "expenses", "shortlet_revenue", "tasks_done"].includes(metric)) {
+        return { error: "Unknown metric." };
+      }
+
+      const [currentPts, previousPts] = await Promise.all([loadPoints(p.from, p.to), loadPoints(prevFrom, prevTo)]);
+      const buckets = emptyBuckets(p.from, p.to);
+      for (const pt of currentPts) {
+        const key = bucketKey(pt.at);
+        if (!buckets.has(key)) buckets.set(key, 0);
+        buckets.set(key, (buckets.get(key) ?? 0) + pt.value);
+      }
+      const series = [...buckets.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([bucket, value]) => ({ bucket, value: Math.round(value * 100) / 100 }));
+      const currentTotal = Math.round(currentPts.reduce((s, p) => s + p.value, 0) * 100) / 100;
+      const previousTotal = Math.round(previousPts.reduce((s, p) => s + p.value, 0) * 100) / 100;
+      const changePercent =
+        previousTotal === 0
+          ? currentTotal === 0
+            ? 0
+            : null
+          : Math.round(((currentTotal - previousTotal) / Math.abs(previousTotal)) * 1000) / 10;
+
+      return {
+        metric,
+        granularity,
+        period: p.label,
+        previousPeriod: `${prevFrom.toISOString().slice(0, 10)} to ${prevTo.toISOString().slice(0, 10)}`,
+        series,
+        currentTotal,
+        previousTotal,
+        changePercent,
+        unit: metric === "leads" || metric === "tasks_done" ? "count" : "NGN",
+        chartHint: {
+          type: "line",
+          title: `${metric} by ${granularity}`,
+          labels: series.map((s) => s.bucket),
+          series: [{ name: metric, data: series.map((s) => s.value) }],
+        },
+      };
+    },
+  },
+  {
+    name: "compare_periods",
+    description:
+      "Side-by-side snapshot of the main KPIs for two periods (current vs previous of equal length). Use for month-over-month or week-over-week consultancy summaries.",
+    module: null,
+    parameters: { type: "OBJECT", properties: PERIOD_PARAMS },
+    run: async (tenantId, args) => {
+      const p = resolvePeriod(args);
+      const span = p.to.getTime() - p.from.getTime();
+      const prevTo = new Date(p.from.getTime() - 1);
+      const prevFrom = new Date(p.from.getTime() - span);
+
+      async function snap(from: Date, to: Date) {
+        const range = { gte: from, lte: to };
+        const [leads, won, payments, expenses, shortlets, tasksDone] = await Promise.all([
+          prisma.lead.count({ where: { tenantId, createdAt: range } }),
+          prisma.deal.aggregate({
+            where: { tenantId, stage: "CLOSED_WON", updatedAt: range },
+            _count: true,
+            _sum: { value: true },
+          }),
+          prisma.paymentRecord.aggregate({
+            where: { tenantId, voidedAt: null, paidAt: range },
+            _sum: { amount: true },
+            _count: true,
+          }),
+          prisma.expense.aggregate({
+            where: { tenantId, voidedAt: null, expenseDate: range },
+            _sum: { amount: true },
+            _count: true,
+          }),
+          prisma.shortletReservation.aggregate({
+            where: { tenantId, checkIn: range, status: { notIn: ["CANCELLED", "NO_SHOW"] } },
+            _sum: { totalAmount: true },
+            _count: true,
+          }),
+          prisma.workTask.count({ where: { tenantId, status: "DONE", completedAt: range } }),
+        ]);
+        return {
+          leads,
+          dealsWon: won._count,
+          dealsWonValue: num(won._sum.value),
+          payments: num(payments._sum.amount),
+          paymentCount: payments._count,
+          expenses: num(expenses._sum.amount),
+          expenseCount: expenses._count,
+          netCash: num(payments._sum.amount) - num(expenses._sum.amount),
+          shortletBookings: shortlets._count,
+          shortletRevenue: num(shortlets._sum.totalAmount),
+          tasksCompleted: tasksDone,
+        };
+      }
+
+      const [current, previous] = await Promise.all([snap(p.from, p.to), snap(prevFrom, prevTo)]);
+      const delta = (a: number, b: number) => {
+        if (b === 0) return a === 0 ? 0 : null;
+        return Math.round(((a - b) / Math.abs(b)) * 1000) / 10;
+      };
+      return {
+        currentPeriod: p.label,
+        previousPeriod: `${prevFrom.toISOString().slice(0, 10)} to ${prevTo.toISOString().slice(0, 10)}`,
+        current,
+        previous,
+        changePercent: {
+          leads: delta(current.leads, previous.leads),
+          dealsWonValue: delta(current.dealsWonValue, previous.dealsWonValue),
+          payments: delta(current.payments, previous.payments),
+          expenses: delta(current.expenses, previous.expenses),
+          netCash: delta(current.netCash, previous.netCash),
+          shortletRevenue: delta(current.shortletRevenue, previous.shortletRevenue),
+          tasksCompleted: delta(current.tasksCompleted, previous.tasksCompleted),
+        },
+      };
+    },
+  },
+  {
     name: "list_records",
     description:
       "List individual records (up to 25) when the user asks 'which ones' or wants names: recent_leads, open_deals, overdue_invoices, largest_expenses, upcoming_checkins, overdue_tasks.",
@@ -532,6 +756,15 @@ const RECORD_KIND_MODULE: Record<string, keyof AssistantModules> = {
   overdue_tasks: "tasks",
 };
 
+const TREND_METRIC_MODULE: Record<string, keyof AssistantModules> = {
+  leads: "sales",
+  won_deals: "sales",
+  payments: "finance",
+  expenses: "finance",
+  shortlet_revenue: "shortlets",
+  tasks_done: "tasks",
+};
+
 export async function runAssistantTool(
   tools: ToolDef[],
   modules: AssistantModules,
@@ -543,6 +776,10 @@ export async function runAssistantTool(
   if (!tool) return { error: `Tool ${name} is not available for this organization.` };
   if (name === "list_records") {
     const mod = RECORD_KIND_MODULE[String(args?.kind)];
+    if (mod && !modules[mod]) return { error: "That module is switched off for this organization." };
+  }
+  if (name === "get_trends") {
+    const mod = TREND_METRIC_MODULE[String(args?.metric)];
     if (mod && !modules[mod]) return { error: "That module is switched off for this organization." };
   }
   try {

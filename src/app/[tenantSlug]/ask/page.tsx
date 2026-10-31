@@ -13,14 +13,15 @@ export default async function AskAiPage({ params }: { params: Promise<{ tenantSl
 
   const modules = assistantModules(tenant.settings);
   const suggestions = [
-    "Give me a summary of how the business is doing this month",
-    modules.finance ? "Compare money in and expenses for last month vs this month" : null,
+    "Give me a consultancy-style summary of how the business is doing this month, with trends",
+    "Compare this month vs last month across the main KPIs and chart the changes",
+    modules.finance ? "Show payments vs expenses by week for the last 8 weeks as a chart" : null,
     modules.finance ? "Which invoices are overdue and how much is owed?" : null,
+    modules.sales ? "Chart lead volume by week this quarter and name the top sources" : null,
     modules.sales ? "Which salesperson closed the most deals this quarter?" : null,
-    modules.sales ? "Where are our leads coming from in the last 30 days?" : null,
-    modules.shortlets ? "How did our short lets perform last month, by property?" : null,
+    modules.shortlets ? "Short-let revenue trend by month, by property" : null,
     modules.hr ? "What did payroll cost us over the last 3 months?" : null,
-    modules.tasks ? "Who has the most overdue tasks?" : null,
+    modules.tasks ? "Who are the top task performers this week, with a ranking chart?" : null,
   ].filter((s): s is string => Boolean(s));
 
   return (
