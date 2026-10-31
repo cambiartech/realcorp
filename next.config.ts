@@ -13,6 +13,24 @@ const nextConfig: NextConfig = {
    * normal builds and deploys are unaffected.
    */
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Keep Node-only DB drivers out of webpack bundles (instrumentation → platform-error-capture → db → pg).
+  serverExternalPackages: ["pg", "@prisma/adapter-pg", "pg-connection-string", "pgpass", "pg-pool"],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve = config.resolve ?? {};
+      config.resolve.fallback = {
+        ...(config.resolve.fallback ?? {}),
+        fs: false,
+        path: false,
+        stream: false,
+        net: false,
+        tls: false,
+        dns: false,
+        crypto: false,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

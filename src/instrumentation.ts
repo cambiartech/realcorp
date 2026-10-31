@@ -1,9 +1,35 @@
-/** Server-side error capture — use dynamic imports only, never top-level Prisma imports. */
+/** Server-side error capture — never top-level Prisma/pg imports (breaks webpack / Edge). */
 import {
   formatSerializedError,
   isSanitizedProductionErrorMessage,
   serializeError,
 } from "@/lib/platform-error-details";
+
+function guessTenantSlugFromPath(pathname: string | null | undefined): string | null {
+  if (!pathname) return null;
+  const first = pathname.split("/").filter(Boolean)[0] || null;
+  if (!first) return null;
+  const reserved = new Set(["api", "platform", "login", "join", "auth", "f", "privacy", "terms"]);
+  return reserved.has(first) ? null : first;
+}
+
+function cleanErrorMetadata(value: unknown): Record<string, unknown> | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "object") return undefined;
+  try {
+    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Load the DB-backed capture helper at runtime only.
+ * webpackIgnore keeps `pg` out of the instrumentation graph (Next webpack build).
+ */
+async function loadErrorCapture() {
+  return import(/* webpackIgnore: true */ "./lib/platform-error-capture");
+}
 
 export async function onRequestError(
   error: Error & { digest?: string },
@@ -21,7 +47,6 @@ export async function onRequestError(
   const serialized = serializeError(error);
   const formatted = formatSerializedError(serialized);
 
-  // Always log full details to runtime logs (Netlify → Functions / Runtime).
   console.error("[onRequestError]", {
     digest,
     path: request.path,
@@ -32,13 +57,11 @@ export async function onRequestError(
   });
 
   if (!digest) return;
-
-  // Prisma/pg do not run on Edge — skip DB capture but console above still fires.
-  if (process.env.NEXT_RUNTIME === "edge") return;
+  // Prisma/pg are Node-only.
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   try {
-    const { capturePlatformErrorEvent, cleanErrorMetadata, guessTenantSlugFromPath } =
-      await import("@/lib/platform-error-capture");
+    const { capturePlatformErrorEvent } = await loadErrorCapture();
 
     const message = isSanitizedProductionErrorMessage(serialized.message)
       ? serialized.cause?.message || serialized.message
@@ -63,7 +86,7 @@ export async function onRequestError(
         renderSource: context.renderSource ?? null,
         serialized,
         formatted,
-      }),
+      }) as never,
     });
   } catch (captureErr) {
     console.error("[onRequestError] failed to persist error event:", captureErr);
