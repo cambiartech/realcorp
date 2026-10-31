@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "@/components/snackbar";
 import { UiSelect } from "@/components/ui-select";
@@ -443,8 +443,10 @@ export function TasksWorkspace({
     setEditingTask(task);
   }
 
-  async function handleEdit(formData: FormData) {
+  function handleEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!editingTask) return;
+    const formData = new FormData(event.currentTarget);
     startTransition(async () => {
       const frequencyRaw = String(formData.get("recurrenceFrequency") || "");
       const endModeRaw = String(formData.get("recurrenceEndMode") || "NEVER") as
@@ -825,7 +827,6 @@ export function TasksWorkspace({
                         <div className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
-                            disabled={pending}
                             onClick={() => openEditTask(task)}
                             className="rounded px-1 text-[10px] font-medium text-muted hover:bg-foreground/[0.06] hover:text-foreground"
                             aria-label="Edit task"
@@ -834,7 +835,6 @@ export function TasksWorkspace({
                           </button>
                           <button
                             type="button"
-                            disabled={pending}
                             onClick={() => handleDeleteRequest(task)}
                             className="rounded px-1 text-[10px] text-muted hover:bg-error/10 hover:text-error"
                             aria-label="Delete task"
@@ -1067,7 +1067,7 @@ export function TasksWorkspace({
           </div>
           <form
             id={`edit-task-${editingTask.id}`}
-            action={handleEdit}
+            onSubmit={handleEdit}
             className="mt-4 space-y-3"
             onInput={(event) => {
               writeTaskCreateDraft(tenantSlug, currentUserId, {

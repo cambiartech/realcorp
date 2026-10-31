@@ -44,6 +44,7 @@ import {
   Wrench,
   Home,
   Warehouse,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { EmployeePassportPhotoUpload } from "@/components/hr/employee-passport-photo-upload";
@@ -73,6 +74,7 @@ type NavItem = { key: TenantNavKey; label: string; href: string; mobileLabel: st
 
 const ALL_ITEMS: NavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "", mobileLabel: "Dash" },
+  { key: "assistant", label: "Ask AI", href: "/ask", mobileLabel: "Ask AI" },
   { key: "portal", label: "My portfolio", href: "/portal", mobileLabel: "Portfolio" },
   { key: "portalShortlets", label: "My shortlets", href: "/portal/shortlets", mobileLabel: "Shortlets" },
   { key: "portalDocuments", label: "My documents", href: "/portal/documents", mobileLabel: "Documents" },
@@ -97,6 +99,7 @@ const ALL_ITEMS: NavItem[] = [
 
 const NAV_ICONS: Record<TenantNavKey, LucideIcon> = {
   dashboard: LayoutDashboard,
+  assistant: Sparkles,
   portal: TrendingUp,
   portalShortlets: BedDouble,
   portalDocuments: FileText,
@@ -125,6 +128,7 @@ const SALES_GROUP_KEYS: TenantNavKey[] = ["leads", "deals"];
 /** Keys that render as top-level items (no group) */
 const TOP_LEVEL_KEYS: TenantNavKey[] = [
   "dashboard",
+  "assistant",
   "portal",
   "portalShortlets",
   "portalDocuments",
@@ -583,7 +587,7 @@ export function TenantSidebar({
   const initial = (displayName || emailDisplay || "?").charAt(0).toUpperCase();
 
   // Separate dashboard + projects from the rest of topLevel
-  const preGroupKeys: TenantNavKey[] = ["dashboard", "portal", "projects"];
+  const preGroupKeys: TenantNavKey[] = ["dashboard", "assistant", "portal", "projects"];
   const preGroupItems = topLevelItems.filter((i) => preGroupKeys.includes(i.key));
   const postGroupItems = topLevelItems.filter((i) => !preGroupKeys.includes(i.key));
 

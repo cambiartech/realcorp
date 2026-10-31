@@ -7,6 +7,7 @@ import type { TenantModuleFlags } from "@/lib/tenant-module-definitions";
 
 export type TenantNavKey =
   | "dashboard"
+  | "assistant"
   | "portal"
   | "portalShortlets"
   | "portalDocuments"
@@ -42,11 +43,13 @@ export type TenantSettingsNavSlice = {
   moduleInvestorPortal?: boolean;
   moduleFacility?: boolean;
   moduleInventory?: boolean;
+  moduleAi?: boolean;
   roleModuleGrants: unknown;
 };
 
 const NAV_ORDER: TenantNavKey[] = [
   "dashboard",
+  "assistant",
   "portal",
   "portalShortlets",
   "portalDocuments",
@@ -125,7 +128,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
     case MembershipRole.FINANCE_MANAGER:
       return ["dashboard", "clients", "tasks", "finance", "settings"];
     case MembershipRole.HR_MANAGER:
-      return ["dashboard", "tasks", "hr", "team", "settings"];
+      return ["dashboard", "assistant", "tasks", "hr", "team", "settings"];
     case MembershipRole.MARKETING_MANAGER:
       return ["dashboard", "projects", "leads", "tasks", "marketing", "listings", "activities", "settings"];
     case MembershipRole.MARKETING_EXECUTIVE:
@@ -150,6 +153,7 @@ function defaultNavForRole(role: MembershipRole, isPlatformAdmin: boolean): Tena
 
 function applyOrgModuleToggles(keys: TenantNavKey[], s: TenantSettingsNavSlice): TenantNavKey[] {
   return keys.filter((k) => {
+    if (k === "assistant") return Boolean(s.moduleAi);
     if (k === "portal") return s.moduleInvestorPortal !== false;
     if (k === "portalShortlets") return s.moduleShortLets;
     if (k === "portalDocuments") return s.moduleClients;
@@ -216,6 +220,7 @@ export function normalizeSettingsNavSlice(
     moduleInvestorPortal: raw?.moduleInvestorPortal,
     moduleFacility: raw?.moduleFacility ?? false,
     moduleInventory: raw?.moduleInventory ?? false,
+    moduleAi: raw?.moduleAi ?? false,
     roleModuleGrants: raw?.roleModuleGrants ?? null,
   };
 }

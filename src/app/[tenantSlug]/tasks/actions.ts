@@ -469,8 +469,6 @@ export async function updateWorkTask(
     ...(parsed.data.assigneeUserIds ?? []),
     parsed.data.assigneeUserId,
   ]);
-  const assigneeError = await assertAssigneesAllowed(ctx, nextAssigneeIds);
-  if (assigneeError) return assigneeError;
 
   const existing = await prisma.workTask.findFirst({
     where: { id: parsed.data.taskId, tenantId: ctx.tenant.id },
@@ -484,6 +482,9 @@ export async function updateWorkTask(
   const previousAssigneeIds = assigneeIdsFromTask(existing);
   const nextAssigneeUserId = nextAssigneeIds[0] ?? null;
   const addedAssigneeIds = nextAssigneeIds.filter((id) => !previousAssigneeIds.includes(id));
+  // Keep people already on the task. Only new names have to pass the assign rules.
+  const assigneeError = await assertAssigneesAllowed(ctx, addedAssigneeIds);
+  if (assigneeError) return assigneeError;
   const becomingDone = nextStatus === WorkTaskStatus.DONE && existing.status !== WorkTaskStatus.DONE;
   const becomingCancelled =
     nextStatus === WorkTaskStatus.CANCELLED && existing.status !== WorkTaskStatus.CANCELLED;

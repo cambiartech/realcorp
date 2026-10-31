@@ -97,8 +97,8 @@ export const TENANT_MODULE_DEFINITIONS: TenantModuleDefinition[] = [
   {
     key: "moduleAi",
     label: "AI Assistant",
-    description: "AI-assisted document reading, data extraction, and content editing",
-    subpages: ["HR document reader", "Employee record generation", "Offer-letter editing"],
+    description: "Ask AI reports for org admins and HR, plus AI document reading, data extraction, and content editing",
+    subpages: ["Ask AI (org admins & HR)", "HR document reader", "Employee record generation", "Offer-letter editing"],
     group: "people",
     defaultOn: false,
     platformOnly: true,
