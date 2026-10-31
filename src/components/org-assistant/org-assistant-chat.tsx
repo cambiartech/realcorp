@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowUp, Download, Loader2, RotateCcw, Sparkles } from "lucide-react";
-import { AssistantChart, parseChartSpec } from "@/components/org-assistant/assistant-chart";
+import { ArrowUp, Download, FileText, Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { AssistantChart, KpiStrip, parseChartSpec, parseKpis } from "@/components/org-assistant/assistant-chart";
 
 type Message = { role: "user" | "assistant"; text: string; error?: boolean };
 
@@ -51,6 +51,19 @@ export function messageToCsv(text: string): string | null {
       }
       continue;
     }
+    if (line.trim().startsWith("```kpis")) {
+      const body: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) body.push(lines[i++]);
+      if (i < lines.length) i++;
+      const items = parseKpis(body.join("\n"));
+      if (items?.length) {
+        chunks.push(
+          ["KPI,Value,Change", ...items.map((k) => [k.label, k.value, k.change ?? ""].map(csvEscape).join(","))].join("\n"),
+        );
+      }
+      continue;
+    }
     if (line.trim().startsWith("```chart")) {
       const body: string[] = [];
       i++;
@@ -58,17 +71,55 @@ export function messageToCsv(text: string): string | null {
       if (i < lines.length) i++;
       const spec = parseChartSpec(body.join("\n"));
       if (spec) {
+        const title = spec.title ? `${csvEscape(spec.title)}\n` : "";
         const header = ["label", ...spec.series.map((s) => s.name)].map(csvEscape).join(",");
         const rows = spec.labels.map((label, idx) =>
           [label, ...spec.series.map((s) => String(s.data[idx] ?? ""))].map(csvEscape).join(","),
         );
-        chunks.push([header, ...rows].join("\n"));
+        chunks.push(title + [header, ...rows].join("\n"));
       }
       continue;
     }
     i++;
   }
   return chunks.length ? chunks.join("\n\n") : null;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c);
+}
+
+/** Opens the answer as a standalone, print-ready report (Save as PDF from the print dialog). */
+function printReport(node: HTMLElement, opts: { orgName: string; question: string }) {
+  const win = window.open("", "_blank", "width=900,height=1100");
+  if (!win) return;
+  const styles = [...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => el.outerHTML).join("\n");
+  const date = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(opts.orgName)} report: ${date}</title>${styles}
+<style>
+  html,body{background:#fff!important;color:#0f172a!important}
+  body{padding:40px 48px;font-size:13px}
+  .report-head{border-bottom:2px solid #0f172a;padding-bottom:14px;margin-bottom:22px}
+  .report-head h1{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0}
+  .report-head p{margin:4px 0 0;color:#475569;font-size:12px}
+  .report-foot{margin-top:28px;border-top:1px solid #e2e8f0;padding-top:10px;color:#64748b;font-size:10.5px}
+  .report-figure,table,.break-inside-avoid{break-inside:avoid}
+  @page{size:A4;margin:16mm}
+  @media print{body{padding:0}}
+</style></head><body>
+<div class="report-head">
+  <h1>${escapeHtml(opts.orgName)}: Management report</h1>
+  <p><strong>Prepared:</strong> ${date} &nbsp;·&nbsp; <strong>Scope:</strong> ${escapeHtml(opts.question)}</p>
+  <p>Source: live data from the ${escapeHtml(opts.orgName)} Realcorp workspace. Figures are as recorded at the time of preparation.</p>
+</div>
+${node.innerHTML}
+<div class="report-foot">Generated with Realcorp Ask AI. AI-assisted analysis: verify material figures in the source modules before relying on them.</div>
+</body></html>`);
+  win.document.close();
+  win.onload = () => {
+    win.focus();
+    win.print();
+  };
 }
 
 function downloadCsv(filename: string, csv: string) {
@@ -84,6 +135,7 @@ function downloadCsv(filename: string, csv: string) {
 function Markdown({ text }: { text: string }) {
   const lines = text.split("\n");
   const blocks: ReactNode[] = [];
+  let figure = 0;
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
@@ -101,7 +153,15 @@ function Markdown({ text }: { text: string }) {
       if (lang === "chart") {
         const spec = parseChartSpec(body.join("\n"));
         if (spec) {
-          blocks.push(<AssistantChart key={key} spec={spec} />);
+          figure += 1;
+          blocks.push(<AssistantChart key={key} spec={spec} index={figure} />);
+          continue;
+        }
+      }
+      if (lang === "kpis") {
+        const items = parseKpis(body.join("\n"));
+        if (items) {
+          blocks.push(<KpiStrip key={key} items={items} />);
           continue;
         }
       }
@@ -164,9 +224,12 @@ function Markdown({ text }: { text: string }) {
     const heading = /^(#{1,4})\s+(.*)$/.exec(line);
     if (heading) {
       blocks.push(
-        <p key={key} className="mt-3 mb-1 font-semibold text-foreground">
+        <h3
+          key={key}
+          className="mt-5 mb-1.5 border-b border-foreground/10 pb-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-foreground first:mt-0"
+        >
           {inline(heading[2], key)}
-        </p>,
+        </h3>,
       );
       i++;
       continue;
@@ -179,6 +242,48 @@ function Markdown({ text }: { text: string }) {
     i++;
   }
   return <div className="text-sm leading-relaxed">{blocks}</div>;
+}
+
+function AnswerToolbar({
+  text,
+  index,
+  tenantSlug,
+  orgName,
+  question,
+}: {
+  text: string;
+  index: number;
+  tenantSlug: string;
+  orgName: string;
+  question: string;
+}) {
+  const csv = messageToCsv(text);
+  const rich = Boolean(csv) || text.length > 400;
+  if (!rich) return null;
+  const stamp = new Date().toISOString().slice(0, 10);
+  const btn =
+    "inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-2.5 py-1.5 text-[11px] font-medium text-muted hover:bg-foreground/[0.06] hover:text-foreground";
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      <button
+        type="button"
+        className={btn}
+        onClick={() => {
+          const node = document.getElementById(`ask-ai-answer-${index}`);
+          if (node) printReport(node, { orgName, question });
+        }}
+      >
+        <FileText className="h-3 w-3" />
+        Download PDF report
+      </button>
+      {csv ? (
+        <button type="button" className={btn} onClick={() => downloadCsv(`ask-ai-${tenantSlug}-${stamp}.csv`, csv)}>
+          <Download className="h-3 w-3" />
+          Export data (CSV)
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 export function OrgAssistantChat({
@@ -322,24 +427,17 @@ export function OrgAssistantChat({
                     <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
                   </span>
                   <div className={`min-w-0 flex-1 ${m.error ? "text-red-600 dark:text-red-400" : ""}`}>
-                    <Markdown text={m.text} />
+                    <div id={`ask-ai-answer-${i}`}>
+                      <Markdown text={m.text} />
+                    </div>
                     {!m.error ? (
-                      (() => {
-                        const csv = messageToCsv(m.text);
-                        if (!csv) return null;
-                        return (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              downloadCsv(`ask-ai-${tenantSlug}-${new Date().toISOString().slice(0, 10)}.csv`, csv)
-                            }
-                            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-2.5 py-1.5 text-[11px] font-medium text-muted hover:bg-foreground/[0.06] hover:text-foreground"
-                          >
-                            <Download className="h-3 w-3" />
-                            Export CSV
-                          </button>
-                        );
-                      })()
+                      <AnswerToolbar
+                        text={m.text}
+                        index={i}
+                        tenantSlug={tenantSlug}
+                        orgName={orgName}
+                        question={[...messages.slice(0, i)].reverse().find((x) => x.role === "user")?.text ?? "Ask AI"}
+                      />
                     ) : null}
                   </div>
                 </div>
@@ -348,7 +446,7 @@ export function OrgAssistantChat({
             {pending ? (
               <div className="flex items-center gap-2 pl-10 text-sm text-muted">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Checking your data…
+                Pulling figures and preparing your report. This takes 10–20 seconds…
               </div>
             ) : null}
             <div ref={endRef} />

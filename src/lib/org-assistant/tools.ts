@@ -328,27 +328,52 @@ const TOOLS: ToolDef[] = [
       const p = resolvePeriod(args);
       const now = new Date();
       const open = { tenantId, status: { in: ["TODO", "IN_PROGRESS", "IN_REVIEW"] as ("TODO" | "IN_PROGRESS" | "IN_REVIEW")[] } };
-      const [byStatus, byPriority, completed, openByPerson, overdueByPerson] = await Promise.all([
-        prisma.workTask.groupBy({ by: ["status"], where: { tenantId }, _count: true }),
-        prisma.workTask.groupBy({ by: ["priority"], where: open, _count: true }),
-        prisma.workTask.count({ where: { tenantId, status: "DONE", completedAt: { gte: p.from, lte: p.to } } }),
-        prisma.workTask.groupBy({ by: ["assigneeUserId"], where: open, _count: true }),
-        prisma.workTask.groupBy({ by: ["assigneeUserId"], where: { ...open, dueDate: { lt: now } }, _count: true }),
+      const doneInPeriod = { tenantId, status: "DONE" as const, completedAt: { gte: p.from, lte: p.to } };
+      const [byStatus, byPriority, completed, openByPerson, overdueByPerson, doneByPerson, lateDone] =
+        await Promise.all([
+          prisma.workTask.groupBy({ by: ["status"], where: { tenantId }, _count: true }),
+          prisma.workTask.groupBy({ by: ["priority"], where: open, _count: true }),
+          prisma.workTask.count({ where: doneInPeriod }),
+          prisma.workTask.groupBy({ by: ["assigneeUserId"], where: open, _count: true }),
+          prisma.workTask.groupBy({ by: ["assigneeUserId"], where: { ...open, dueDate: { lt: now } }, _count: true }),
+          prisma.workTask.groupBy({ by: ["assigneeUserId"], where: doneInPeriod, _count: true }),
+          prisma.workTask.findMany({
+            where: { ...doneInPeriod, dueDate: { not: null } },
+            select: { assigneeUserId: true, dueDate: true, completedAt: true },
+          }),
+        ]);
+      const names = await userLabels([
+        ...openByPerson.map((r) => r.assigneeUserId),
+        ...doneByPerson.map((r) => r.assigneeUserId),
       ]);
-      const names = await userLabels(openByPerson.map((r) => r.assigneeUserId));
       const overdueMap = new Map(overdueByPerson.map((r) => [r.assigneeUserId, r._count]));
+      const openMap = new Map(openByPerson.map((r) => [r.assigneeUserId, r._count]));
+      const doneMap = new Map(doneByPerson.map((r) => [r.assigneeUserId, r._count]));
+      const onTime = new Map<string | null, { onTime: number; withDue: number }>();
+      for (const t of lateDone) {
+        const row = onTime.get(t.assigneeUserId) ?? { onTime: 0, withDue: 0 };
+        row.withDue += 1;
+        if (t.completedAt && t.dueDate && t.completedAt <= t.dueDate) row.onTime += 1;
+        onTime.set(t.assigneeUserId, row);
+      }
+      const people = new Set<string | null>([...openMap.keys(), ...doneMap.keys()]);
       return {
         period: p.label,
         byStatus: byStatus.map((r) => ({ status: r.status, count: r._count })),
         openByPriority: byPriority.map((r) => ({ priority: r.priority, count: r._count })),
         completedInPeriod: completed,
-        perPerson: openByPerson
-          .map((r) => ({
-            person: r.assigneeUserId ? names.get(r.assigneeUserId) ?? "Unknown" : "Unassigned",
-            open: r._count,
-            overdue: overdueMap.get(r.assigneeUserId) ?? 0,
-          }))
-          .sort((a, b) => b.overdue - a.overdue || b.open - a.open),
+        perPerson: [...people]
+          .map((id) => {
+            const due = onTime.get(id);
+            return {
+              person: id ? names.get(id) ?? "Unknown" : "Unassigned",
+              completedInPeriod: doneMap.get(id) ?? 0,
+              onTimePercent: due && due.withDue ? Math.round((due.onTime / due.withDue) * 100) : null,
+              open: openMap.get(id) ?? 0,
+              overdue: overdueMap.get(id) ?? 0,
+            };
+          })
+          .sort((a, b) => b.completedInPeriod - a.completedInPeriod || a.overdue - b.overdue),
       };
     },
   },
