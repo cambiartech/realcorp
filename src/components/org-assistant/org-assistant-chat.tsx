@@ -364,17 +364,26 @@ export function OrgAssistantChat({
   }
 
   const empty = messages.length === 0;
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, pending]);
 
   return (
-    <div className="flex min-h-full w-full flex-col px-4 sm:px-6">
-      <div className="flex items-center justify-between gap-3 border-b border-foreground/10 py-4">
-        <div className="flex items-center gap-2.5">
+    // Fill the tenant main pane: header stays put, messages scroll, composer is always docked at the bottom
+    // (ChatGPT / Claude pattern). Negative margin cancels the layout's mobile-dock padding so there's no gap under the bar.
+    <div className="-mb-28 flex h-[calc(100dvh-3.25rem)] w-full flex-col overflow-hidden bg-[var(--surface)] md:-mb-24">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-foreground/10 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2.5">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-foreground/15 bg-foreground/[0.04]">
             <Sparkles className="h-4 w-4" strokeWidth={2} />
           </span>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-[15px] font-semibold tracking-tight">Ask AI</h1>
-            <p className="text-xs text-muted">Reports, trends and analysis from {orgName}. Read only.</p>
+            <p className="truncate text-xs text-muted">Reports & analysis from {orgName}</p>
           </div>
         </div>
         {!empty ? (
@@ -382,7 +391,7 @@ export function OrgAssistantChat({
             type="button"
             onClick={() => setMessages([])}
             disabled={pending}
-            className="inline-flex items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-medium text-muted hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-foreground/15 px-3 py-2 text-xs font-medium text-muted hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-50"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             New chat
@@ -390,71 +399,73 @@ export function OrgAssistantChat({
         ) : null}
       </div>
 
-      <div className="mx-auto w-full max-w-3xl flex-1 py-6">
-        {empty ? (
-          <div className="pt-10">
-            <p className="text-xl font-semibold tracking-tight">
-              {userName ? `Hi ${userName}, what would you like to know?` : "What would you like to know?"}
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              Ask for trends, charts, rankings or a period comparison. Export any table or chart as CSV.
-            </p>
-            <div className="mt-6 grid gap-2 sm:grid-cols-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => void ask(s)}
-                  className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-3.5 py-3 text-left text-sm hover:bg-foreground/[0.05]"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {messages.map((m, i) =>
-              m.role === "user" ? (
-                <div key={i} className="flex justify-end">
-                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-sm text-background">
-                    {m.text}
-                  </div>
-                </div>
-              ) : (
-                <div key={i} className="flex gap-3">
-                  <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-foreground/15 bg-foreground/[0.04]">
-                    <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
-                  </span>
-                  <div className={`min-w-0 flex-1 ${m.error ? "text-red-600 dark:text-red-400" : ""}`}>
-                    <div id={`ask-ai-answer-${i}`}>
-                      <Markdown text={m.text} />
-                    </div>
-                    {!m.error ? (
-                      <AnswerToolbar
-                        text={m.text}
-                        index={i}
-                        tenantSlug={tenantSlug}
-                        orgName={orgName}
-                        question={[...messages.slice(0, i)].reverse().find((x) => x.role === "user")?.text ?? "Ask AI"}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              ),
-            )}
-            {pending ? (
-              <div className="flex items-center gap-2 pl-10 text-sm text-muted">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Pulling figures and preparing your report. This takes 10–20 seconds…
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl py-6">
+          {empty ? (
+            <div className="flex min-h-[min(52vh,420px)] flex-col justify-end pb-2 sm:justify-center sm:pb-0">
+              <p className="text-xl font-semibold tracking-tight">
+                {userName ? `Hi ${userName}, what would you like to know?` : "What would you like to know?"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Ask for trends, charts, rankings or a period comparison. Export any table or chart as CSV.
+              </p>
+              <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => void ask(s)}
+                    className="rounded-lg border border-foreground/10 bg-foreground/[0.02] px-3.5 py-3 text-left text-sm hover:bg-foreground/[0.05]"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
-            ) : null}
-            <div ref={endRef} />
-          </div>
-        )}
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {messages.map((m, i) =>
+                m.role === "user" ? (
+                  <div key={i} className="flex justify-end">
+                    <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-foreground px-4 py-2.5 text-sm text-background">
+                      {m.text}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={i} className="flex gap-3">
+                    <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-foreground/15 bg-foreground/[0.04]">
+                      <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                    </span>
+                    <div className={`min-w-0 flex-1 ${m.error ? "text-red-600 dark:text-red-400" : ""}`}>
+                      <div id={`ask-ai-answer-${i}`}>
+                        <Markdown text={m.text} />
+                      </div>
+                      {!m.error ? (
+                        <AnswerToolbar
+                          text={m.text}
+                          index={i}
+                          tenantSlug={tenantSlug}
+                          orgName={orgName}
+                          question={[...messages.slice(0, i)].reverse().find((x) => x.role === "user")?.text ?? "Ask AI"}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                ),
+              )}
+              {pending ? (
+                <div className="flex items-center gap-2 pl-10 text-sm text-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Pulling figures and preparing your report. This takes 10–20 seconds…
+                </div>
+              ) : null}
+              <div ref={endRef} />
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="sticky bottom-0 -mx-4 border-t border-foreground/10 bg-[var(--surface)] px-4 py-3 sm:-mx-6 sm:px-6">
+      <div className="shrink-0 border-t border-foreground/10 bg-[var(--surface)] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 md:pb-4">
         <form onSubmit={onSubmit} className="mx-auto flex w-full max-w-3xl items-end gap-2">
           <textarea
             value={draft}
@@ -468,7 +479,7 @@ export function OrgAssistantChat({
             type="submit"
             disabled={pending || !draft.trim()}
             aria-label="Send"
-            className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg border border-foreground bg-foreground text-background disabled:opacity-40"
+            className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg border border-foreground bg-foreground text-background disabled:opacity-40"
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
           </button>
