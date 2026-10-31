@@ -485,6 +485,44 @@ export function toolDeclarations(tools: ToolDef[]) {
   return tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters }));
 }
 
+/** OpenAI / Anthropic / Groq want lowercase JSON Schema types. */
+function toJsonSchema(node: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "type" && typeof value === "string") {
+      out.type = value.toLowerCase();
+    } else if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+      out.properties = Object.fromEntries(
+        Object.entries(value as Record<string, Record<string, unknown>>).map(([k, v]) => [k, toJsonSchema(v)]),
+      );
+    } else if (key === "items" && value && typeof value === "object" && !Array.isArray(value)) {
+      out.items = toJsonSchema(value as Record<string, unknown>);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+export function openAiToolDeclarations(tools: ToolDef[]) {
+  return tools.map((t) => ({
+    type: "function" as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: toJsonSchema(t.parameters),
+    },
+  }));
+}
+
+export function anthropicToolDeclarations(tools: ToolDef[]) {
+  return tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: toJsonSchema(t.parameters),
+  }));
+}
+
 const RECORD_KIND_MODULE: Record<string, keyof AssistantModules> = {
   recent_leads: "sales",
   open_deals: "sales",

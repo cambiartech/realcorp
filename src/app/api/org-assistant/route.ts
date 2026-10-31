@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/db";
 import { assistantModules, canUseOrgAssistant } from "@/lib/org-assistant/access";
-import { AssistantUnavailableError, runOrgAssistant, type AssistantMessage } from "@/lib/org-assistant/gemini-chat";
+import {
+  AssistantUnavailableError,
+  availableAssistantProviders,
+  runOrgAssistant,
+  type AssistantMessage,
+} from "@/lib/org-assistant/chat";
 
 const MAX_MESSAGES = 20;
 const MAX_CHARS = 4_000;
@@ -56,12 +61,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ask a question first." }, { status: 400 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "AI is not configured on this server." }, { status: 503 });
+  const providers = availableAssistantProviders();
+  if (!providers.gemini && !providers.anthropic && !providers.openai && !providers.groq) {
+    return NextResponse.json(
+      { error: "No AI provider key is configured on this server." },
+      { status: 503 },
+    );
+  }
 
   try {
     const result = await runOrgAssistant({
-      apiKey,
       tenantId: tenant.id,
       orgName: tenant.name,
       modules: assistantModules(tenant.settings),
